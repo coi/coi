@@ -9,20 +9,18 @@ A component-based language for high-performance web apps.
 Compiles to WASM, JS, and HTML with tiny binaries and efficient updates for DOM, Canvas, and beyond.
 </div>
 
+> [!WARNING]
+> This project is a work in progress. I don't recommend using it in production yet, as the language features and syntax are still evolving and may change.
+
 ## Features
 
-> [!WARNING]
-> This project is a **work in progress** and is not recommended for use in production projects. The language features and syntax are not yet set in stone and are subject to change.
-
-- **Minimal & Fast**: Compiles to tiny WASM binaries with no heavy runtime. High-performance updates for DOM, Canvas, and more.
-- **Incremental Updates**: Smart reactivity that only updates the specific DOM elements affected by a state change, avoiding Virtual DOM overhead.
-- **Type-Safe Components**: Catch errors at compile time. Props and state are strictly typed.
-- **Reactive State**: Use the `mut` keyword for reactive state that automatically updates the DOM when changed.
-- **Reference Props**: Pass state by reference using `&` to allow child components to modify parent state with automatic UI synchronization.
-- **HTML & CSS**: Write standard HTML and scoped CSS directly in your components.
-- **Update Loop**: Integrated `tick` lifecycle method for animations and updates.
-- **Component Composition**: Build complex UIs from small, reusable components with typed `prop`s.
-- **App Configuration**: Define your app entry point with a simple `app` block.
+- **Type-Safe Components**: Compile-time error checking with strictly typed props and state.
+- **Reactive State Management**: Use `mut` for automatic, incremental DOM updates without Virtual DOM overhead.
+- **Reference Props**: Pass state by reference with `&` for seamless parent-child synchronization.
+- **Minimal Runtime**: Tiny WASM binaries with high-performance updates for DOM, Canvas, and more.
+- **Integrated Styling**: Write standard HTML and scoped CSS directly in components.
+- **Component Composition**: Build complex UIs from reusable components with typed props.
+- **Animation Support**: Built-in `tick` lifecycle method for smooth animations and updates.
 
 ## Example
 
@@ -200,7 +198,3 @@ A VS Code extension for syntax highlighting is included in the `vscode-extension
 
 1. Copy the `vscode-extension/` folder to your VS Code extensions directory (usually `~/.vscode/extensions/`).
 2. Or, open the `vscode-extension/` folder in VS Code and press `F5` to run a development instance with the extension enabled.
-
-## Technical Details
-
-Coi is built on top of the [WebCC](https://github.com/io-eric/webcc) toolchain and framework. It generates optimized C++ code which is then compiled to minimal WebAssembly binaries and JavaScript glue code.
