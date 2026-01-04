@@ -15,6 +15,7 @@ Compiles to WASM, JS, and HTML with tiny binaries and efficient updates for DOM,
 > This project is a **work in progress** and is not recommended for use in production projects. The language features and syntax are not yet set in stone and are subject to change.
 
 - **Minimal & Fast**: Compiles to tiny WASM binaries with no heavy runtime. High-performance updates for DOM, Canvas, and more.
+- **Incremental Updates**: Smart reactivity that only updates the specific DOM elements affected by a state change, avoiding Virtual DOM overhead.
 - **Type-Safe Components**: Catch errors at compile time. Props and state are strictly typed.
 - **Reactive State**: Use the `mut` keyword for reactive state that automatically updates the DOM when changed.
 - **Reference Props**: Pass state by reference using `&` to allow child components to modify parent state with automatic UI synchronization.
