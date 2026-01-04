@@ -3,8 +3,8 @@
 set -e
 
 echo "[COI] Compiling compiler..."
-# Compile the single-file compiler
-g++ -std=c++17 -O3 -o coi src/main.cc
+# Compile the compiler (now split into multiple files)
+g++ -std=c++20 -O3 -o coi src/main.cc src/lexer.cc src/parser.cc src/ast.cc
 
 echo "[COI] Done."
 
