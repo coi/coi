@@ -176,13 +176,22 @@ component App {
 }
 ```
 
+## Prerequisites
+
 ## Building
 
-To build the compiler:
+Coi requires [WebCC](https://github.com/io-eric/webcc) (another project of mine) to be installed. The build script will automatically initialize the WebCC submodule and build it if it's not found on your system.
+
+To build the compiler and the toolchain:
 
 ```bash
 ./build.sh
 ```
+
+The script will:
+1. **Bootstrap WebCC** (if not installed): Compiles a bootstrap version of the tool, generates API headers from the schema, and compiles the final `webcc` binary.
+2. **Compile Coi**: Compiles the Coi compiler using `g++`.
+3. **Install**: Offers to create symlinks for both `coi` and `webcc` in your `/usr/local/bin` for easy access.
 
 ## Usage
 
