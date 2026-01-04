@@ -176,8 +176,6 @@ component App {
 }
 ```
 
-## Prerequisites
-
 ## Building
 
 Coi requires [WebCC](https://github.com/io-eric/webcc) (another project of mine) to be installed. The build script will automatically initialize the WebCC submodule and build it if it's not found on your system.
