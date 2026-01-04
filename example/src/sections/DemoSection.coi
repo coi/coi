@@ -1,5 +1,6 @@
 import "../demos/Counter.coi";
 import "../demos/CodeExample.coi";
+import "../demos/FunctionPropCodeExample.coi";
 import "../demos/AnimatedBallCodeExample.coi";
 import "../demos/AnimatedBox.coi";
 
@@ -32,7 +33,7 @@ component DemoSection {
 
     view {
         <div class="demo-section">
-            <h2>Experience the Difference</h2>
+            <h2>Live Demos</h2>
             <div class="demo-row">
                 <Counter />
                 <CodeExample />
@@ -40,6 +41,9 @@ component DemoSection {
             <div class="demo-row">
                 <AnimatedBallCodeExample />
                 <AnimatedBox />
+            </div>
+            <div class="demo-row">
+                <FunctionPropCodeExample />
             </div>
         </div>
     }

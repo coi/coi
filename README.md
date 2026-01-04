@@ -110,6 +110,30 @@ You can pass state to child components by reference using the `&` operator. This
 
 When the child modifies `count`, the parent's UI (the `score` display) will automatically update to reflect the change. Coi handles the synchronization by generating efficient `onChange` callbacks.
 
+### Function Props (`def`)
+You can pass functions as props to components. Since functions are passed by reference, you must use the `&` operator when passing them. Function props are useful for triggering logic in the parent or for retrieving data.
+
+```tsx
+component CustomButton {
+    prop string label;
+    prop def onclick : void;
+
+    view {
+        <button onclick={onclick}>{label}</button>
+    }
+}
+
+component App {
+    def handleClick() : void {
+        // Handle click
+    }
+
+    view {
+        <CustomButton label="Click Me" &onclick={handleClick} />
+    }
+}
+```
+
 ## Styling
 
 Coi features a powerful styling system that combines the simplicity of CSS with component-level isolation.
