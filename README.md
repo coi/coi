@@ -25,7 +25,7 @@ Compiles to WASM, JS, and HTML with tiny binaries and efficient updates for DOM,
 
 ## Example
 
-```coi
+```tsx
 component StepButton {
     prop mut int& count;
     prop int amount;
@@ -89,7 +89,7 @@ Coi provides a powerful system for managing state and component communication:
 ### Mutability (`mut`)
 Variables declared with `mut` are reactive. When a `mut` variable is modified (e.g., `count++`), Coi automatically triggers an update for any DOM elements or child components that depend on that variable.
 
-```coi
+```tsx
 mut int count = 0; // Reactive state
 int fixed = 10;    // Constant state (cannot be modified)
 ```
@@ -98,11 +98,11 @@ int fixed = 10;    // Constant state (cannot be modified)
 You can pass state to child components by reference using the `&` operator. This allows the child component to modify the parent's state directly.
 
 1. **Declaration**: In the child component, declare the prop with `mut` and `&`.
-   ```coi
+   ```tsx
    prop mut int& count;
    ```
 2. **Passing**: In the parent component, pass the variable with `&`.
-   ```coi
+   ```tsx
    <StepButton &count={score} />
    ```
 
@@ -115,7 +115,7 @@ Coi features a powerful styling system that combines the simplicity of CSS with 
 ### Scoped Styling
 By default, styles defined within a `style { ... }` block are **scoped** to that component. Coi achieves this by automatically injecting a `coi-scope` attribute into your HTML elements and rewriting your CSS selectors to target only elements within that scope.
 
-```coi
+```tsx
 component Card {
     style {
         /* This only affects divs inside the Card component */
@@ -133,7 +133,7 @@ component Card {
 ### Global Styling
 If you need to define global styles (e.g., for resets or base typography), you can use the `style global` block.
 
-```coi
+```tsx
 component App {
     /* Global styles (not scoped) */
     style global {
