@@ -1,8 +1,10 @@
 coi
 **/dist/
 **/build/
-./def/
+/def/
 .vscode
 .ninja_log
 src/coi_schema.h
 src/coi_schema.cc
+node_modules/
+*.vsix
