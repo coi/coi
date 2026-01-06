@@ -1,0 +1,44 @@
+// GENERATED FILE - DO NOT EDIT
+// COI definitions for dom namespace
+// Maps to: webcc/dom.h
+
+// =========================================================
+// DOMElement
+// =========================================================
+
+type DOMElement {
+    // Shared methods (call as DOMElement.methodName(...))
+    shared def getBody(): DOMElement {
+        // maps to: dom::get_body
+    }
+    shared def createElement(tag: string): DOMElement {
+        // maps to: dom::create_element
+    }
+
+    // Instance methods (call as instance.methodName(...))
+    def setAttribute(name: string, value: string): void {
+        // maps to: dom::set_attribute
+    }
+    def getAttribute(name: string): string {
+        // maps to: dom::get_attribute
+    }
+    def appendChild(child_handle: DOMElement): void {
+        // maps to: dom::append_child
+    }
+    def removeElement(): void {
+        // maps to: dom::remove_element
+    }
+    def setInnerHtml(html: string): void {
+        // maps to: dom::set_inner_html
+    }
+    def setInnerText(text: string): void {
+        // maps to: dom::set_inner_text
+    }
+    def addClass(cls: string): void {
+        // maps to: dom::add_class
+    }
+    def removeClass(cls: string): void {
+        // maps to: dom::remove_class
+    }
+}
+

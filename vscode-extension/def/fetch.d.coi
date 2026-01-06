@@ -1,0 +1,19 @@
+// GENERATED FILE - DO NOT EDIT
+// COI definitions for fetch namespace
+// Maps to: webcc/fetch.h
+
+// =========================================================
+// FetchRequest
+// =========================================================
+
+type FetchRequest {
+    // Shared methods (call as FetchRequest.methodName(...))
+    shared def get(url: string): FetchRequest {
+        // maps to: fetch::get
+    }
+    shared def post(url: string, body: string): FetchRequest {
+        // maps to: fetch::post
+    }
+
+}
+

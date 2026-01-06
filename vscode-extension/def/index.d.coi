@@ -1,0 +1,105 @@
+// GENERATED FILE - DO NOT EDIT
+// COI Standard Library Index
+//
+// This file lists all available COI definitions.
+// These map to the webcc library for web platform access.
+//
+// Available modules:
+//   - audio.d.coi (7 functions)
+//   - canvas.d.coi (51 functions)
+//   - dom.d.coi (10 functions)
+//   - fetch.d.coi (2 functions)
+//   - image.d.coi (1 functions)
+//   - input.d.coi (4 functions)
+//   - storage.d.coi (3 functions)
+//   - system.d.coi (9 functions)
+//   - webgl.d.coi (18 functions)
+//   - websocket.d.coi (3 functions)
+//   - wgpu.d.coi (14 functions)
+
+// =========================================================
+// All Handle Types
+// =========================================================
+
+// Audio extends DOMElement
+type Audio {}
+
+// Canvas extends DOMElement
+type Canvas {}
+
+// CanvasContext2D
+type CanvasContext2D {}
+
+// DOMElement
+type DOMElement {}
+
+// FetchRequest
+type FetchRequest {}
+
+// Image extends DOMElement
+type Image {}
+
+// WGPUAdapter
+type WGPUAdapter {}
+
+// WGPUCommandBuffer
+type WGPUCommandBuffer {}
+
+// WGPUCommandEncoder
+type WGPUCommandEncoder {}
+
+// WGPUContext
+type WGPUContext {}
+
+// WGPUDevice
+type WGPUDevice {}
+
+// WGPUQueue
+type WGPUQueue {}
+
+// WGPURenderPass
+type WGPURenderPass {}
+
+// WGPURenderPipeline
+type WGPURenderPipeline {}
+
+// WGPUShaderModule
+type WGPUShaderModule {}
+
+// WGPUTextureView
+type WGPUTextureView {}
+
+// WebGLBuffer
+type WebGLBuffer {}
+
+// WebGLContext
+type WebGLContext {}
+
+// WebGLProgram
+type WebGLProgram {}
+
+// WebGLShader
+type WebGLShader {}
+
+// WebGLUniform
+type WebGLUniform {}
+
+// WebSocket
+type WebSocket {}
+
+// =========================================================
+// Language Constructs (built into COI)
+// =========================================================
+//
+// The following functionality is handled by COI language constructs:
+//
+// - init { ... }          : Runs once when component mounts
+// - tick { ... }          : Main loop (replaces setMainLoop)
+// - style { ... }         : Scoped CSS styles for this component
+// - style global { ... }  : Global CSS styles (not scoped)
+// - onClick={handler}     : Click events (replaces addEventListener)
+// - view { ... }          : DOM generation
+// - component Name { }    : Component definition
+// - prop Type name        : Component properties
+// - mut Type name         : Mutable state
+//

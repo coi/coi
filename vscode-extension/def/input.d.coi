@@ -1,0 +1,33 @@
+// GENERATED FILE - DO NOT EDIT
+// COI definitions for input namespace
+// Maps to: webcc/input.h
+
+// =========================================================
+// DOMElement
+// =========================================================
+
+type DOMElement {
+    // Instance methods (call as instance.methodName(...))
+    def initMouse(): void {
+        // maps to: input::init_mouse
+    }
+    def requestPointerLock(): void {
+        // maps to: input::request_pointer_lock
+    }
+}
+
+// =========================================================
+// Input (static utilities - not instantiable)
+// =========================================================
+// Usage: Input.methodName(...)
+
+type Input {
+    // Shared methods (call as Input.methodName(...))
+    shared def initKeyboard(): void {
+        // maps to: input::init_keyboard
+    }
+    shared def exitPointerLock(): void {
+        // maps to: input::exit_pointer_lock
+    }
+}
+

@@ -1,25 +1,57 @@
 {
   "name": "coi-language",
-  "displayName": "Coi Language",
-  "description": "Syntax highlighting for Coi",
-  "version": "0.0.1",
+  "displayName": "COI Language",
+  "description": "Language support for COI - syntax highlighting, completions, hover, and diagnostics",
+  "version": "0.1.2",
+  "publisher": "coi-lang",
+  "icon": "logo.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/io-eric/coi.git"
+  },
   "engines": {
     "vscode": "^1.74.0"
   },
   "categories": [
     "Programming Languages"
   ],
+  "activationEvents": [
+    "onLanguage:coi"
+  ],
+  "main": "./extension.js",
   "contributes": {
-    "languages": [{
-      "id": "coi",
-      "aliases": ["Coi", "coi"],
-      "extensions": [".coi"],
-      "configuration": "./language-configuration.json"
-    }],
-    "grammars": [{
-      "language": "coi",
-      "scopeName": "source.coi",
-      "path": "./syntaxes/coi.tmLanguage.json"
-    }]
+    "languages": [
+      {
+        "id": "coi",
+        "aliases": ["COI", "Coi", "coi"],
+        "extensions": [".coi", ".d.coi"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "coi",
+        "scopeName": "source.coi",
+        "path": "./syntaxes/coi.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "COI",
+      "properties": {
+        "coi.definitionsPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to COI definition files (.d.coi). Leave empty to use bundled definitions."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@vscode/vsce": "^2.22.0"
   }
 }
+

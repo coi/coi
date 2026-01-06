@@ -1,0 +1,23 @@
+// GENERATED FILE - DO NOT EDIT
+// COI definitions for websocket namespace
+// Maps to: webcc/websocket.h
+
+// =========================================================
+// WebSocket
+// =========================================================
+
+type WebSocket {
+    // Shared methods (call as WebSocket.methodName(...))
+    shared def create(url: string, events: int): WebSocket {
+        // maps to: websocket::create
+    }
+
+    // Instance methods (call as instance.methodName(...))
+    def send(msg: string): void {
+        // maps to: websocket::send
+    }
+    def close(): void {
+        // maps to: websocket::close
+    }
+}
+

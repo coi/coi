@@ -1,0 +1,26 @@
+// GENERATED FILE - DO NOT EDIT
+// COI Built-in Types
+//
+// These are the primitive types available in COI.
+
+// =========================================================
+// Primitive Types
+// =========================================================
+//
+// int     - 32-bit signed integer
+// float   - 32-bit floating point
+// string  - UTF-8 string
+// bool    - Boolean (true/false)
+// void    - No return value
+//
+
+// =========================================================
+// Type Mappings (COI -> WebAssembly)
+// =========================================================
+//
+// int     -> i32
+// float   -> f32
+// string  -> i32 (pointer to memory)
+// bool    -> i32 (0 or 1)
+// Handle  -> i32 (handle ID)
+//

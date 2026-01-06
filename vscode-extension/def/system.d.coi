@@ -1,0 +1,48 @@
+// GENERATED FILE - DO NOT EDIT
+// COI definitions for system namespace
+// Maps to: webcc/system.h
+
+// =========================================================
+// DOMElement
+// =========================================================
+
+type DOMElement {
+    // Instance methods (call as instance.methodName(...))
+    def requestFullscreen(): void {
+        // maps to: system::request_fullscreen
+    }
+}
+
+// =========================================================
+// System (static utilities - not instantiable)
+// =========================================================
+// Usage: System.methodName(...)
+
+type System {
+    // Shared methods (call as System.methodName(...))
+    shared def log(msg: string): void {
+        // maps to: system::log
+    }
+    shared def warn(msg: string): void {
+        // maps to: system::warn
+    }
+    shared def error(msg: string): void {
+        // maps to: system::error
+    }
+    shared def setTitle(title: string): void {
+        // maps to: system::set_title
+    }
+    shared def reload(): void {
+        // maps to: system::reload
+    }
+    shared def openUrl(url: string): void {
+        // maps to: system::open_url
+    }
+    shared def getTime(): float {
+        // maps to: system::get_time
+    }
+    shared def getDateNow(): float {
+        // maps to: system::get_date_now
+    }
+}
+

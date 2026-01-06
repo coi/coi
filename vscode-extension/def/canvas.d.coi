@@ -1,0 +1,175 @@
+// GENERATED FILE - DO NOT EDIT
+// COI definitions for canvas namespace
+// Maps to: webcc/canvas.h
+
+// =========================================================
+// Canvas (extends DOMElement)
+// =========================================================
+
+type Canvas {
+    // Shared methods (call as Canvas.methodName(...))
+    shared def createCanvas(dom_id: string, width: float, height: float): Canvas {
+        // maps to: canvas::create_canvas
+    }
+
+    // Instance methods (call as instance.methodName(...))
+    def getContext(context_type: string): CanvasContext2D {
+        // maps to: canvas::get_context
+    }
+    def setSize(width: float, height: float): void {
+        // maps to: canvas::set_size
+    }
+    def logCanvasInfo(): void {
+        // maps to: canvas::log_canvas_info
+    }
+}
+
+// =========================================================
+// CanvasContext2D
+// =========================================================
+
+type CanvasContext2D {
+    // Instance methods (call as instance.methodName(...))
+    def setFillStyle(r: int, g: int, b: int): void {
+        // maps to: canvas::set_fill_style
+    }
+    def setFillStyleStr(color: string): void {
+        // maps to: canvas::set_fill_style_str
+    }
+    def fillRect(x: float, y: float, w: float, h: float): void {
+        // maps to: canvas::fill_rect
+    }
+    def clearRect(x: float, y: float, w: float, h: float): void {
+        // maps to: canvas::clear_rect
+    }
+    def strokeRect(x: float, y: float, w: float, h: float): void {
+        // maps to: canvas::stroke_rect
+    }
+    def setStrokeStyle(r: int, g: int, b: int): void {
+        // maps to: canvas::set_stroke_style
+    }
+    def setStrokeStyleStr(color: string): void {
+        // maps to: canvas::set_stroke_style_str
+    }
+    def setLineWidth(width: float): void {
+        // maps to: canvas::set_line_width
+    }
+    def beginPath(): void {
+        // maps to: canvas::begin_path
+    }
+    def closePath(): void {
+        // maps to: canvas::close_path
+    }
+    def moveTo(x: float, y: float): void {
+        // maps to: canvas::move_to
+    }
+    def lineTo(x: float, y: float): void {
+        // maps to: canvas::line_to
+    }
+    def stroke(): void {
+        // maps to: canvas::stroke
+    }
+    def fill(): void {
+        // maps to: canvas::fill
+    }
+    def arc(x: float, y: float, radius: float, start_angle: float, end_angle: float): void {
+        // maps to: canvas::arc
+    }
+    def fillText(text: string, x: float, y: float): void {
+        // maps to: canvas::fill_text
+    }
+    def fillTextF(fmt: string, val: float, x: float, y: float): void {
+        // maps to: canvas::fill_text_f
+    }
+    def fillTextI(fmt: string, val: int, x: float, y: float): void {
+        // maps to: canvas::fill_text_i
+    }
+    def setFont(font: string): void {
+        // maps to: canvas::set_font
+    }
+    def setTextAlign(align: string): void {
+        // maps to: canvas::set_text_align
+    }
+    def drawImage(img_handle: Image, x: float, y: float): void {
+        // maps to: canvas::draw_image
+    }
+    def translate(x: float, y: float): void {
+        // maps to: canvas::translate
+    }
+    def rotate(angle: float): void {
+        // maps to: canvas::rotate
+    }
+    def scale(x: float, y: float): void {
+        // maps to: canvas::scale
+    }
+    def save(): void {
+        // maps to: canvas::save
+    }
+    def restore(): void {
+        // maps to: canvas::restore
+    }
+    def setGlobalAlpha(alpha: float): void {
+        // maps to: canvas::set_global_alpha
+    }
+    def setLineCap(cap: string): void {
+        // maps to: canvas::set_line_cap
+    }
+    def setLineJoin(join: string): void {
+        // maps to: canvas::set_line_join
+    }
+    def setShadow(blur: float, off_x: float, off_y: float, color: string): void {
+        // maps to: canvas::set_shadow
+    }
+    def bezierCurveTo(cp1x: float, cp1y: float, cp2x: float, cp2y: float, x: float, y: float): void {
+        // maps to: canvas::bezier_curve_to
+    }
+    def quadraticCurveTo(cpx: float, cpy: float, x: float, y: float): void {
+        // maps to: canvas::quadratic_curve_to
+    }
+    def rect(x: float, y: float, w: float, h: float): void {
+        // maps to: canvas::rect
+    }
+    def clip(): void {
+        // maps to: canvas::clip
+    }
+    def strokeText(text: string, x: float, y: float): void {
+        // maps to: canvas::stroke_text
+    }
+    def setTextBaseline(baseline: string): void {
+        // maps to: canvas::set_text_baseline
+    }
+    def setGlobalCompositeOperation(op: string): void {
+        // maps to: canvas::set_global_composite_operation
+    }
+    def drawImageScaled(img_handle: Image, x: float, y: float, w: float, h: float): void {
+        // maps to: canvas::draw_image_scaled
+    }
+    def drawImageFull(img_handle: Image, sx: float, sy: float, sw: float, sh: float, dx: float, dy: float, dw: float, dh: float): void {
+        // maps to: canvas::draw_image_full
+    }
+    def resetTransform(): void {
+        // maps to: canvas::reset_transform
+    }
+    def ellipse(x: float, y: float, radius_x: float, radius_y: float, rotation: float, start_angle: float, end_angle: float, counter_clockwise: int): void {
+        // maps to: canvas::ellipse
+    }
+    def arcTo(x1: float, y1: float, x2: float, y2: float, radius: float): void {
+        // maps to: canvas::arc_to
+    }
+    def setTransform(a: float, b: float, c: float, d: float, e: float, f: float): void {
+        // maps to: canvas::set_transform
+    }
+    def transform(a: float, b: float, c: float, d: float, e: float, f: float): void {
+        // maps to: canvas::transform
+    }
+    def setMiterLimit(limit: float): void {
+        // maps to: canvas::set_miter_limit
+    }
+    def setImageSmoothingEnabled(enabled: int): void {
+        // maps to: canvas::set_image_smoothing_enabled
+    }
+    def measureTextWidth(text: string): float {
+        // maps to: canvas::measure_text_width
+    }
+}
+

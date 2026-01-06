@@ -1,0 +1,103 @@
+// GENERATED FILE - DO NOT EDIT
+// COI definitions for wgpu namespace
+// Maps to: webcc/wgpu.h
+
+// =========================================================
+// WGPUAdapter
+// =========================================================
+
+type WGPUAdapter {
+    // Instance methods (call as instance.methodName(...))
+    def requestDevice(): void {
+        // maps to: wgpu::request_device
+    }
+}
+
+// =========================================================
+// WGPUCommandEncoder
+// =========================================================
+
+type WGPUCommandEncoder {
+    // Instance methods (call as instance.methodName(...))
+    def beginRenderPass(view_handle: WGPUTextureView, r: float, g: float, b: float, a: float): WGPURenderPass {
+        // maps to: wgpu::begin_render_pass
+    }
+    def finishEncoder(): WGPUCommandBuffer {
+        // maps to: wgpu::finish_encoder
+    }
+}
+
+// =========================================================
+// WGPUContext
+// =========================================================
+
+type WGPUContext {
+    // Instance methods (call as instance.methodName(...))
+    def configure(device_handle: WGPUDevice, format: string): void {
+        // maps to: wgpu::configure
+    }
+    def getCurrentTextureView(): WGPUTextureView {
+        // maps to: wgpu::get_current_texture_view
+    }
+}
+
+// =========================================================
+// WGPUDevice
+// =========================================================
+
+type WGPUDevice {
+    // Instance methods (call as instance.methodName(...))
+    def getQueue(): WGPUQueue {
+        // maps to: wgpu::get_queue
+    }
+    def createShaderModule(code: string): WGPUShaderModule {
+        // maps to: wgpu::create_shader_module
+    }
+    def createCommandEncoder(): WGPUCommandEncoder {
+        // maps to: wgpu::create_command_encoder
+    }
+    def createRenderPipelineSimple(vs_module_handle: WGPUShaderModule, fs_module_handle: WGPUShaderModule, vs_entry: string, fs_entry: string, format: string): WGPURenderPipeline {
+        // maps to: wgpu::create_render_pipeline_simple
+    }
+}
+
+// =========================================================
+// WGPUQueue
+// =========================================================
+
+type WGPUQueue {
+    // Instance methods (call as instance.methodName(...))
+    def queueSubmit(command_buffer_handle: WGPUCommandBuffer): void {
+        // maps to: wgpu::queue_submit
+    }
+}
+
+// =========================================================
+// WGPURenderPass
+// =========================================================
+
+type WGPURenderPass {
+    // Instance methods (call as instance.methodName(...))
+    def endPass(): void {
+        // maps to: wgpu::end_pass
+    }
+    def setPipeline(pipeline_handle: WGPURenderPipeline): void {
+        // maps to: wgpu::set_pipeline
+    }
+    def draw(vertex_count: int, instance_count: int, first_vertex: int, first_instance: int): void {
+        // maps to: wgpu::draw
+    }
+}
+
+// =========================================================
+// Wgpu (static utilities - not instantiable)
+// =========================================================
+// Usage: Wgpu.methodName(...)
+
+type Wgpu {
+    // Shared methods (call as Wgpu.methodName(...))
+    shared def requestAdapter(): void {
+        // maps to: wgpu::request_adapter
+    }
+}
+

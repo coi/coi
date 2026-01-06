@@ -1,0 +1,66 @@
+// GENERATED FILE - DO NOT EDIT
+// COI definitions for webgl namespace
+// Maps to: webcc/webgl.h
+
+// =========================================================
+// WebGLContext
+// =========================================================
+
+type WebGLContext {
+    // Instance methods (call as instance.methodName(...))
+    def viewport(x: int, y: int, width: int, height: int): void {
+        // maps to: webgl::viewport
+    }
+    def clearColor(r: float, g: float, b: float, a: float): void {
+        // maps to: webgl::clear_color
+    }
+    def clear(mask: int): void {
+        // maps to: webgl::clear
+    }
+    def createShader(type: int, source: string): WebGLShader {
+        // maps to: webgl::create_shader
+    }
+    def createProgram(): WebGLProgram {
+        // maps to: webgl::create_program
+    }
+    def attachShader(prog_handle: WebGLProgram, shader_handle: WebGLShader): void {
+        // maps to: webgl::attach_shader
+    }
+    def linkProgram(prog_handle: WebGLProgram): void {
+        // maps to: webgl::link_program
+    }
+    def bindAttribLocation(prog_handle: WebGLProgram, index: int, name: string): void {
+        // maps to: webgl::bind_attrib_location
+    }
+    def useProgram(prog_handle: WebGLProgram): void {
+        // maps to: webgl::use_program
+    }
+    def createBuffer(): WebGLBuffer {
+        // maps to: webgl::create_buffer
+    }
+    def bindBuffer(target: int, buf_handle: WebGLBuffer): void {
+        // maps to: webgl::bind_buffer
+    }
+    def bufferData(target: int, data_ptr: int, data_len: int, usage: int): void {
+        // maps to: webgl::buffer_data
+    }
+    def enableVertexAttribArray(index: int): void {
+        // maps to: webgl::enable_vertex_attrib_array
+    }
+    def enable(cap: int): void {
+        // maps to: webgl::enable
+    }
+    def getUniformLocation(prog_handle: WebGLProgram, name: string): WebGLUniform {
+        // maps to: webgl::get_uniform_location
+    }
+    def uniform1f(loc_handle: WebGLUniform, val: float): void {
+        // maps to: webgl::uniform_1f
+    }
+    def vertexAttribPointer(index: int, size: int, type: int, normalized: int, stride: int, offset: int): void {
+        // maps to: webgl::vertex_attrib_pointer
+    }
+    def drawArrays(mode: int, first: int, count: int): void {
+        // maps to: webgl::draw_arrays
+    }
+}
+

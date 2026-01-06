@@ -21,6 +21,12 @@
       "include": "#tick-definition"
     },
     {
+      "include": "#init-definition"
+    },
+    {
+      "include": "#style-block"
+    },
+    {
       "include": "#view-block"
     },
     {
@@ -52,7 +58,11 @@
       "patterns": [
         {
           "name": "keyword.control.coi",
-          "match": "\\b(component|def|view|return|if|else|computed|prop|tick|app)\\b"
+          "match": "\\b(component|def|view|return|if|else|for|while|computed|prop|tick|init|app|import|struct|style|type|global)\\b"
+        },
+        {
+          "name": "storage.modifier.coi",
+          "match": "\\b(mut|shared)\\b"
         }
       ]
     },
@@ -127,6 +137,24 @@
       "captures": {
         "1": { "name": "keyword.control.coi" }
       }
+    },
+    "init-definition": {
+      "match": "\\b(init)\\b",
+      "captures": {
+        "1": { "name": "keyword.control.coi" }
+      }
+    },
+    "style-block": {
+      "begin": "\\b(style)\\s*(global)?\\s*\\{",
+      "beginCaptures": {
+        "1": { "name": "keyword.control.coi" },
+        "2": { "name": "keyword.control.coi" }
+      },
+      "end": "\\}",
+      "name": "meta.embedded.block.css",
+      "patterns": [
+        { "include": "source.css" }
+      ]
     },
     "function-definition": {
       "match": "\\b(def)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\(",

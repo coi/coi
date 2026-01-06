@@ -1,0 +1,22 @@
+// GENERATED FILE - DO NOT EDIT
+// COI definitions for storage namespace
+// Maps to: webcc/storage.h
+
+// =========================================================
+// Storage (static utilities - not instantiable)
+// =========================================================
+// Usage: Storage.methodName(...)
+
+type Storage {
+    // Shared methods (call as Storage.methodName(...))
+    shared def setItem(key: string, value: string): void {
+        // maps to: storage::set_item
+    }
+    shared def removeItem(key: string): void {
+        // maps to: storage::remove_item
+    }
+    shared def clear(): void {
+        // maps to: storage::clear
+    }
+}
+

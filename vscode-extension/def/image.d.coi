@@ -1,0 +1,16 @@
+// GENERATED FILE - DO NOT EDIT
+// COI definitions for image namespace
+// Maps to: webcc/image.h
+
+// =========================================================
+// Image (extends DOMElement)
+// =========================================================
+
+type Image {
+    // Shared methods (call as Image.methodName(...))
+    shared def load(src: string): Image {
+        // maps to: image::load
+    }
+
+}
+

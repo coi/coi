@@ -1,0 +1,35 @@
+// GENERATED FILE - DO NOT EDIT
+// COI definitions for audio namespace
+// Maps to: webcc/audio.h
+
+// =========================================================
+// Audio (extends DOMElement)
+// =========================================================
+
+type Audio {
+    // Shared methods (call as Audio.methodName(...))
+    shared def createAudio(src: string): Audio {
+        // maps to: audio::create_audio
+    }
+
+    // Instance methods (call as instance.methodName(...))
+    def play(): void {
+        // maps to: audio::play
+    }
+    def pause(): void {
+        // maps to: audio::pause
+    }
+    def setVolume(vol: float): void {
+        // maps to: audio::set_volume
+    }
+    def setLoop(loop: int): void {
+        // maps to: audio::set_loop
+    }
+    def getCurrentTime(): float {
+        // maps to: audio::get_current_time
+    }
+    def getDuration(): float {
+        // maps to: audio::get_duration
+    }
+}
+
