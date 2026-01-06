@@ -679,6 +679,21 @@ Component Parser::parse_component(){
             expect(TokenType::RBRACE, "Expected '}'");
             comp.methods.push_back(std::move(func));
         }
+        // Init block
+        else if(current().type == TokenType::INIT){
+            advance();
+            FunctionDef func;
+            func.name = "init";
+            func.return_type = "void";
+            expect(TokenType::LBRACE, "Expected '{'");
+
+            while(current().type != TokenType::RBRACE){
+                func.body.push_back(parse_statement());
+            }
+
+            expect(TokenType::RBRACE, "Expected '}'");
+            comp.methods.push_back(std::move(func));
+        }
         // Tick definition
         else if(current().type == TokenType::TICK){
             advance();

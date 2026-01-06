@@ -876,9 +876,13 @@ std::string Component::to_webcc() {
         std::string original_name = method.name;
         if (method.name == "tick") {
             method.name = "_user_tick";
+        } else if (method.name == "init") {
+            method.name = "_user_init";
         }
         ss << "    " << method.to_webcc(updates);
         if (original_name == "tick") {
+            method.name = original_name;
+        } else if (original_name == "init") {
             method.name = original_name;
         }
     }
@@ -903,6 +907,10 @@ std::string Component::to_webcc() {
     for(auto& handler : click_handlers) {
         ss << "        g_dispatcher.register_click(el_" << std::get<0>(handler) << ", [this]() { this->_handler_" << std::get<0>(handler) << "(); });\n";
     }
+    // Call init if it exists
+    bool has_init = false;
+    for(auto& m : methods) if(m.name == "init") has_init = true;
+    if(has_init) ss << "        _user_init();\n";
     ss << "    }\n";
 
     // Update method for event loop
