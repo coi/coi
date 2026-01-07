@@ -101,6 +101,39 @@ component Hero {
             line-height: 1.6;
             font-size: 16px;
         }
+
+        @media (max-width: 768px) {
+            .hero {
+                padding: 120px 20px 60px;
+            }
+            .logo {
+                width: 160px;
+                margin-bottom: 24px;
+            }
+            h1 {
+                font-size: 48px;
+                letter-spacing: -1px;
+            }
+            .tagline {
+                font-size: 18px;
+            }
+            .buttons {
+                flex-direction: column;
+                width: 100%;
+                max-width: 320px;
+                margin: 0 auto;
+            }
+            button {
+                width: 100%;
+                padding: 16px 20px;
+                font-size: 18px;
+            }
+            .popup {
+                width: 90%;
+                max-width: 420px;
+                padding: 24px;
+            }
+        }
     }
 
     view {

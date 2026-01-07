@@ -23,7 +23,8 @@ component AnimatedBox {
             color: #999;
         }
         .container {
-            width: 350px;
+            width: 100%;
+            max-width: 350px;
             height: 60px;
             background: #fff;
             border: 1px solid #eee;

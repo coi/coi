@@ -368,6 +368,6 @@ component CodeView {
     }
 
     view {
-        <pre class="code-window" style="width: {width};"><code &={codeEl}></code></pre>
+        <pre class="code-window" style="max-width: {width}; width: 100%; box-sizing: border-box;"><code &={codeEl}></code></pre>
     }
 }

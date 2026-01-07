@@ -127,6 +127,11 @@ component CanvasDemo {
             box-shadow: 0 4px 12px rgba(0,0,0,0.05);
             background: #fff;
             font-size: 0;
+            max-width: 100%;
+        }
+        canvas {
+            max-width: 100%;
+            height: auto;
         }
         .controls {
             display: flex;

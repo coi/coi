@@ -98,11 +98,23 @@ component DemoSection {
             align-items: center;
             justify-content: center;
             flex-wrap: wrap;
+            width: 100%;
         }
         .demo-wrapper {
-            width: 380px;
+            width: 100%;
+            max-width: 380px;
             display: flex;
             justify-content: center;
+        }
+
+        @media (max-width: 768px) {
+            .demo-section {
+                padding: 40px 16px;
+                gap: 40px;
+            }
+            .demo-row {
+                gap: 24px;
+            }
         }
     }
 
