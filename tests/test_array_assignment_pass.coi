@@ -1,0 +1,16 @@
+// Test: array element assignment
+component ArrayAssignmentTest {
+    mut int[] scores = [100, 200, 300];
+
+    init {
+        scores[1] = 250;
+    }
+
+    view {
+        <div>Score: {scores[1]}</div>
+    }
+}
+
+app {
+    root = ArrayAssignmentTest;
+}

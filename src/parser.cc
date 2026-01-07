@@ -206,11 +206,61 @@ std::unique_ptr<Expression> Parser::parse_primary(){
                 expect(TokenType::IDENTIFIER, "Expected member name");
                 expr = std::make_unique<MemberAccess>(std::move(expr), member);
             }
+            else if(current().type == TokenType::LBRACKET){
+                // Array index access
+                advance();
+                auto index = parse_expression();
+                expect(TokenType::RBRACKET, "Expected ']'");
+                expr = std::make_unique<IndexAccess>(std::move(expr), std::move(index));
+            }
             else {
                 break;
             }
         }
         return expr;
+    }
+
+    // Array literal: [expr, expr, ...] or repeat initializer: [value; count]
+    if(current().type == TokenType::LBRACKET){
+        advance();
+        
+        // Empty array
+        if(current().type == TokenType::RBRACKET){
+            advance();
+            return std::make_unique<ArrayLiteral>();
+        }
+        
+        // Parse first expression
+        auto first_expr = parse_expression();
+        
+        // Check for repeat initializer syntax: [value; count]
+        if(current().type == TokenType::SEMICOLON){
+            advance();
+            auto repeat = std::make_unique<ArrayRepeatLiteral>();
+            repeat->value = std::move(first_expr);
+            
+            // Count must be an integer literal (compile-time constant)
+            if (current().type != TokenType::INT_LITERAL) {
+                throw std::runtime_error("Array repeat count must be an integer literal at line " + std::to_string(current().line));
+            }
+            repeat->count = std::stoi(current().value);
+            advance();
+            
+            expect(TokenType::RBRACKET, "Expected ']'");
+            return repeat;
+        }
+        
+        // Regular array literal
+        auto arr = std::make_unique<ArrayLiteral>();
+        arr->elements.push_back(std::move(first_expr));
+        
+        while(current().type == TokenType::COMMA){
+            advance();
+            if(current().type == TokenType::RBRACKET) break; // Allow trailing comma
+            arr->elements.push_back(parse_expression());
+        }
+        expect(TokenType::RBRACKET, "Expected ']'");
+        return arr;
     }
 
     // Parenthesized expression
@@ -388,6 +438,47 @@ std::unique_ptr<Statement> Parser::parse_statement(){
         return var_decl;
     } else if (is_mutable) {
         throw std::runtime_error("Expected type after 'mut'");
+    }
+
+    // Assignment to array element: arr[i] = value
+    if(current().type == TokenType::IDENTIFIER && peek().type == TokenType::LBRACKET) {
+        // Could be an index assignment or an expression statement with index access
+        // Need to look ahead to see if there's an assignment operator after the bracket
+        std::string name = current().value;
+        size_t saved_pos = pos;
+        advance(); // skip identifier
+        advance(); // skip '['
+        
+        // Skip to find matching ']'
+        int bracket_depth = 1;
+        while (bracket_depth > 0 && current().type != TokenType::END_OF_FILE) {
+            if (current().type == TokenType::LBRACKET) bracket_depth++;
+            else if (current().type == TokenType::RBRACKET) bracket_depth--;
+            advance();
+        }
+        
+        // Check if followed by assignment operator
+        bool is_index_assign = (current().type == TokenType::ASSIGN);
+        
+        // Restore position
+        pos = saved_pos;
+        
+        if (is_index_assign) {
+            advance(); // skip identifier
+            expect(TokenType::LBRACKET, "Expected '['");
+            auto index_expr = parse_expression();
+            expect(TokenType::RBRACKET, "Expected ']'");
+            
+            expect(TokenType::ASSIGN, "Expected '='");
+            
+            auto idx_assign = std::make_unique<IndexAssignment>();
+            idx_assign->array = std::make_unique<Identifier>(name);
+            idx_assign->index = std::move(index_expr);
+            idx_assign->value = parse_expression();
+            
+            expect(TokenType::SEMICOLON, "Expected ';'");
+            return idx_assign;
+        }
     }
 
     // Assignment

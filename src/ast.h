@@ -109,6 +109,36 @@ struct UnaryOp : Expression {
     bool is_static() override;
 };
 
+struct ArrayLiteral : Expression {
+    std::vector<std::unique_ptr<Expression>> elements;
+    std::string element_type;  // Inferred or specified type of elements
+
+    ArrayLiteral() = default;
+    std::string to_webcc() override;
+    void collect_dependencies(std::set<std::string>& deps) override;
+    bool is_static() override;
+};
+
+// Fixed-size array repeat initializer: [value; count] e.g., [0; 100] creates array<int, 100> filled with 0
+struct ArrayRepeatLiteral : Expression {
+    std::unique_ptr<Expression> value;  // The value to repeat
+    int count;  // Number of times to repeat (must be compile-time constant)
+
+    ArrayRepeatLiteral() = default;
+    std::string to_webcc() override;
+    void collect_dependencies(std::set<std::string>& deps) override;
+    bool is_static() override;
+};
+
+struct IndexAccess : Expression {
+    std::unique_ptr<Expression> array;
+    std::unique_ptr<Expression> index;
+
+    IndexAccess(std::unique_ptr<Expression> arr, std::unique_ptr<Expression> idx);
+    std::string to_webcc() override;
+    void collect_dependencies(std::set<std::string>& deps) override;
+};
+
 struct VarDeclaration : Statement {
     std::string type;
     std::string name;
@@ -133,6 +163,15 @@ struct Assignment : Statement {
     std::string name;
     std::unique_ptr<Expression> value;
     std::string target_type;  // Type of the variable being assigned to (for handle casts)
+
+    std::string to_webcc() override;
+    void collect_dependencies(std::set<std::string>& deps) override;
+};
+
+struct IndexAssignment : Statement {
+    std::unique_ptr<Expression> array;
+    std::unique_ptr<Expression> index;
+    std::unique_ptr<Expression> value;
 
     std::string to_webcc() override;
     void collect_dependencies(std::set<std::string>& deps) override;
@@ -251,6 +290,40 @@ struct ComponentProp {
     bool is_mutable_def = false;
 };
 
+// Struct to track reactive loop regions 
+struct LoopRegion {
+    int loop_id;
+    std::string parent_element;     // Element handle to append children to
+    std::string component_type;     // Component type in the loop (or empty for HTML elements)
+    std::string start_expr;         // Start expression code
+    std::string end_expr;           // End expression code  
+    std::set<std::string> dependencies;  // Variables this loop depends on
+    std::string item_creation_code; // Code to create one loop item
+    std::string item_update_code;   // Code to update an existing item's props (for reconciliation)
+    std::string var_name;           // Loop variable name
+    std::string root_element_var;   // For HTML-only loops: the variable name of the root element (e.g., "_el_7")
+    bool is_html_loop = false;      // True if this loop contains HTML elements (not components)
+};
+
+// Struct to track reactive if/else regions
+struct IfRegion {
+    int if_id;
+    std::string condition_code;         // The condition expression code
+    std::set<std::string> dependencies; // Variables this if depends on
+    std::string then_creation_code;     // Code to create then branch elements
+    std::string else_creation_code;     // Code to create else branch elements
+    std::string then_destroy_code;      // Code to destroy then branch elements
+    std::string else_destroy_code;      // Code to destroy else branch elements
+    std::vector<int> then_element_ids;  // Element IDs created in then branch
+    std::vector<int> else_element_ids;  // Element IDs created in else branch
+    std::vector<std::pair<std::string, int>> then_components; // Component types and instance IDs in then branch
+    std::vector<std::pair<std::string, int>> else_components; // Component types and instance IDs in else branch
+    std::vector<int> then_loop_ids;     // Loop IDs in then branch
+    std::vector<int> else_loop_ids;     // Loop IDs in else branch
+    std::vector<int> then_if_ids;       // Nested if IDs in then branch
+    std::vector<int> else_if_ids;       // Nested if IDs in else branch
+};
+
 struct ComponentInstantiation : ASTNode {
     std::string component_name;
     std::vector<ComponentProp> props;
@@ -262,7 +335,12 @@ struct ComponentInstantiation : ASTNode {
                       std::vector<Binding>& bindings,
                       std::map<std::string, int>& component_counters,
                       const std::set<std::string>& method_names,
-                      const std::string& parent_component_name);
+                      const std::string& parent_component_name,
+                      bool in_loop = false,
+                      std::vector<LoopRegion>* loop_regions = nullptr,
+                      int* loop_counter = nullptr,
+                      std::vector<IfRegion>* if_regions = nullptr,
+                      int* if_counter = nullptr);
     
     void collect_dependencies(std::set<std::string>& deps) override;
 };
@@ -280,9 +358,16 @@ struct HTMLElement : ASTNode {
                       std::vector<Binding>& bindings,
                       std::map<std::string, int>& component_counters,
                       const std::set<std::string>& method_names,
-                      const std::string& parent_component_name);
+                      const std::string& parent_component_name,
+                      bool in_loop = false,
+                      std::vector<LoopRegion>* loop_regions = nullptr,
+                      int* loop_counter = nullptr,
+                      std::vector<IfRegion>* if_regions = nullptr,
+                      int* if_counter = nullptr);
     void collect_dependencies(std::set<std::string>& deps) override;
 };
+
+   
 
 struct Component : ASTNode {
     std::string name;
@@ -316,6 +401,7 @@ struct ViewIfStatement : ASTNode {
     std::unique_ptr<Expression> condition;
     std::vector<std::unique_ptr<ASTNode>> then_children;
     std::vector<std::unique_ptr<ASTNode>> else_children;
+    int if_id = -1;  // Assigned during code generation
 
     std::string to_webcc() override { return ""; }
     void generate_code(std::stringstream& ss, const std::string& parent, int& counter, 
@@ -323,7 +409,12 @@ struct ViewIfStatement : ASTNode {
                       std::vector<Binding>& bindings,
                       std::map<std::string, int>& component_counters,
                       const std::set<std::string>& method_names,
-                      const std::string& parent_component_name);
+                      const std::string& parent_component_name,
+                      bool in_loop = false,
+                      std::vector<LoopRegion>* loop_regions = nullptr,
+                      int* loop_counter = nullptr,
+                      std::vector<IfRegion>* if_regions = nullptr,
+                      int* if_counter = nullptr);
     void collect_dependencies(std::set<std::string>& deps) override;
 };
 
@@ -333,6 +424,7 @@ struct ViewForRangeStatement : ASTNode {
     std::unique_ptr<Expression> start;
     std::unique_ptr<Expression> end;
     std::vector<std::unique_ptr<ASTNode>> children;
+    int loop_id = -1;  // Assigned during code generation
 
     std::string to_webcc() override { return ""; }
     void generate_code(std::stringstream& ss, const std::string& parent, int& counter, 
@@ -340,7 +432,12 @@ struct ViewForRangeStatement : ASTNode {
                       std::vector<Binding>& bindings,
                       std::map<std::string, int>& component_counters,
                       const std::set<std::string>& method_names,
-                      const std::string& parent_component_name);
+                      const std::string& parent_component_name,
+                      bool in_loop = false,
+                      std::vector<LoopRegion>* loop_regions = nullptr,
+                      int* loop_counter = nullptr,
+                      std::vector<IfRegion>* if_regions = nullptr,
+                      int* if_counter = nullptr);
     void collect_dependencies(std::set<std::string>& deps) override;
 };
 
@@ -356,6 +453,11 @@ struct ViewForEachStatement : ASTNode {
                       std::vector<Binding>& bindings,
                       std::map<std::string, int>& component_counters,
                       const std::set<std::string>& method_names,
-                      const std::string& parent_component_name);
+                      const std::string& parent_component_name,
+                      bool in_loop = false,
+                      std::vector<LoopRegion>* loop_regions = nullptr,
+                      int* loop_counter = nullptr,
+                      std::vector<IfRegion>* if_regions = nullptr,
+                      int* if_counter = nullptr);
     void collect_dependencies(std::set<std::string>& deps) override;
 };

@@ -33,88 +33,73 @@ Compiles to WASM, JS, and HTML with tiny binaries and efficient updates for DOM,
 ## Example
 
 ```tsx
-component TodoItem {
-    prop string text;
-    prop def onremove : void;
+component Counter {
+    prop string label;
+    prop mut int& value;  // Reference to parent's state
+
+    def add(int i) : void {
+        value += i;
+    }
 
     style {
-        .item {
+        .counter {
             display: flex;
-            align-items: center;
             gap: 12px;
-            padding: 12px 16px;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            align-items: center;
         }
         button {
-            background: #ff4444;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            padding: 4px 8px;
+            padding: 8px 16px;
             cursor: pointer;
         }
     }
 
     view {
-        <div class="item">
-            <span>{text}</span>
-            <button onclick={onremove}>Remove</button>
+        <div class="counter">
+            <span>{label}: {value}</span>
+            <button onclick={add(-1)}>+</button>
+            <button onclick={add(1)}>-</button>
         </div>
     }
 }
 
 component App {
-    mut int itemCount = 3;
-    mut bool showCompleted = true;
+    mut int score;
+    mut string message;
 
-    def addItem() : void {
-        itemCount++;
+    init {
+        score = 0;
+        message = "Keep going!";
     }
 
     style {
-        .container {
-            max-width: 400px;
-            margin: 40px auto;
+        .app {
             padding: 24px;
+            font-family: system-ui;
         }
-        h1 { color: #1a73e8; }
-        .controls {
-            display: flex;
-            gap: 12px;
-            margin-bottom: 16px;
+        h1 {
+            color: #1a73e8;
         }
-        .list {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
+        .win {
+            color: #34a853;
+            font-weight: bold;
         }
     }
 
     view {
-        <div class="container">
-            <h1>Todo List</h1>
-            <div class="controls">
-                <button onclick={addItem}>Add Item</button>
-            </div>
-            <div class="list">
-                <if itemCount == 0>
-                    <p>No items yet!</p>
-                <else>
-                    <for i in 0:itemCount>
-                        <TodoItem text="Item {i}" />
-                    </for>
-                </else>
-                </if>
-            </div>
+        <div class="app">
+            <h1>Score: {score}</h1>
+            <Counter label="Player" &value={score} />
+            <if score >= 10>
+                <p class="win">You win!</p>
+            <else>
+                <p>{message}</p>
+            </else>
+            </if>
         </div>
     }
 }
 
-app {
-    root = App;
-}
+app { root = App; }
 ```
 
 ## Getting Started
@@ -448,19 +433,19 @@ component Gallery {
 
 ### Available APIs
 
-| Module | Description |
-|--------|-------------|
-| `Canvas` | 2D drawing, paths, text, images, transformations |
-| `Image` | Image loading for canvas rendering |
-| `Audio` | Audio playback, volume, looping |
-| `Storage` | Local storage (setItem, removeItem, clear) |
-| `System` | Logging, page title, time, URL navigation |
-| `Input` | Keyboard and mouse input, pointer lock |
-| `DOMElement` | Direct DOM manipulation |
-| `WebGL` | WebGL context and rendering |
-| `WGPU` | WebGPU support |
-| `Fetch` | HTTP requests |
-| `WebSocket` | WebSocket connections |
+| Module       | Description                                      |
+|--------------|--------------------------------------------------|
+| `Canvas`     | 2D drawing, paths, text, images, transformations |
+| `Image`      | Image loading for canvas rendering               |
+| `Audio`      | Audio playback, volume, looping                  |
+| `Storage`    | Local storage (setItem, removeItem, clear)       |
+| `System`     | Logging, page title, time, URL navigation        |
+| `Input`      | Keyboard and mouse input, pointer lock           |
+| `DOMElement` | Direct DOM manipulation                          |
+| `WebGL`      | WebGL context and rendering                      |
+| `WGPU`       | WebGPU support                                   |
+| `Fetch`      | HTTP requests                                    |
+| `WebSocket`  | WebSocket connections                            |
 
 ## VS Code Extension
 

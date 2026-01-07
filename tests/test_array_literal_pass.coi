@@ -1,0 +1,13 @@
+// Test: array literal declaration and initialization
+component ArrayLiteralTest {
+    int[] numbers = [1, 2, 3, 4, 5];
+    string[] names = ["Alice", "Bob", "Charlie"];
+    
+    view {
+        <div>Array test</div>
+    }
+}
+
+app {
+    root = ArrayLiteralTest;
+}

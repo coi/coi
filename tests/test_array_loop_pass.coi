@@ -1,0 +1,19 @@
+// Test: iterating over array with for loop
+component ArrayLoopTest {
+    int[] values = [5, 10, 15, 20];
+    mut int sum = 0;
+
+    init {
+        for (int i = 0; i < values.size(); i++) {
+            sum = sum + values[i];
+        }
+    }
+
+    view {
+        <div>Sum: {sum}</div>
+    }
+}
+
+app {
+    root = ArrayLoopTest;
+}

@@ -1,0 +1,17 @@
+// Test: array index access
+component ArrayIndexTest {
+    int[] numbers = [10, 20, 30, 40, 50];
+    mut int value = 0;
+
+    init {
+        value = numbers[2];
+    }
+
+    view {
+        <div>Value at index 2: {value}</div>
+    }
+}
+
+app {
+    root = ArrayIndexTest;
+}

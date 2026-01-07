@@ -1,0 +1,21 @@
+// Test array repeat initializer syntax: [value; count]
+component ArrayRepeatTest {
+    int[] zeros = [0; 5];
+    int[] tens = [10; 3];
+    mut int first = 0;
+    mut int second = 0;
+
+    init {
+        // Access elements
+        first = zeros[0];
+        second = tens[1];
+    }
+
+    view {
+        <div>First: {first}, Second: {second}</div>
+    }
+}
+
+app {
+    root = ArrayRepeatTest;
+}

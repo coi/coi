@@ -1,0 +1,28 @@
+// Test: array methods (push, pop, size, clear)
+component ArrayMethodsTest {
+    mut int[] items = [1, 2, 3];
+    mut int count = 0;
+    mut int lastItem = 0;
+
+    init {
+        // Test size
+        count = items.size();
+        
+        // Test push
+        items.push(4);
+        
+        // Test pop
+        items.pop();
+        
+        // Test size after operations
+        count = items.size();
+    }
+
+    view {
+        <div>Count: {count}</div>
+    }
+}
+
+app {
+    root = ArrayMethodsTest;
+}

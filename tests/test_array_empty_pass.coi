@@ -1,0 +1,18 @@
+// Test: empty array declaration
+component ArrayEmptyTest {
+    mut int[] emptyArray = [];
+    mut int count = 0;
+
+    init {
+        emptyArray.push(42);
+        count = emptyArray.size();
+    }
+
+    view {
+        <div>Count: {count}</div>
+    }
+}
+
+app {
+    root = ArrayEmptyTest;
+}

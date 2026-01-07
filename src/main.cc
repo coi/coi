@@ -18,6 +18,21 @@
 // =========================================================
 
 std::string normalize_type(const std::string& type) {
+    // Handle dynamic array types: T[]
+    if (type.ends_with("[]")) {
+        std::string elem_type = type.substr(0, type.length() - 2);
+        return normalize_type(elem_type) + "[]";
+    }
+    // Handle fixed-size array types: T[N]
+    size_t bracket_pos = type.rfind('[');
+    if (bracket_pos != std::string::npos && type.back() == ']') {
+        std::string size_str = type.substr(bracket_pos + 1, type.length() - bracket_pos - 2);
+        bool is_number = !size_str.empty() && std::all_of(size_str.begin(), size_str.end(), ::isdigit);
+        if (is_number) {
+            std::string elem_type = type.substr(0, bracket_pos);
+            return normalize_type(elem_type) + "[" + size_str + "]";
+        }
+    }
     if (type == "int") return "int32";
     if (type == "float") return "float32";
     if (type == "bool") return "bool";
@@ -28,6 +43,43 @@ std::string normalize_type(const std::string& type) {
 bool is_compatible_type(const std::string& source, const std::string& target) {
     if (source == target) return true;
     if (source == "unknown" || target == "unknown") return true;
+    
+    // Handle dynamic array type compatibility: T[]
+    if (source.ends_with("[]") && target.ends_with("[]")) {
+        std::string src_elem = source.substr(0, source.length() - 2);
+        std::string tgt_elem = target.substr(0, target.length() - 2);
+        return is_compatible_type(src_elem, tgt_elem);
+    }
+    // Allow unknown[] to match any array type (for empty array literals)
+    if (source == "unknown[]" && target.ends_with("[]")) return true;
+    
+    // Handle fixed-size array type compatibility: T[N]
+    // Extract element type and size from both source and target
+    auto extract_fixed_array = [](const std::string& t) -> std::pair<std::string, std::string> {
+        size_t bracket_pos = t.rfind('[');
+        if (bracket_pos != std::string::npos && t.back() == ']' && !t.ends_with("[]")) {
+            std::string size_str = t.substr(bracket_pos + 1, t.length() - bracket_pos - 2);
+            std::string elem = t.substr(0, bracket_pos);
+            return {elem, size_str};
+        }
+        return {"", ""};
+    };
+    
+    auto [src_elem, src_size] = extract_fixed_array(source);
+    auto [tgt_elem, tgt_size] = extract_fixed_array(target);
+    
+    if (!src_elem.empty() && !tgt_elem.empty()) {
+        // Both are fixed-size arrays - check element type and size match
+        return src_size == tgt_size && is_compatible_type(src_elem, tgt_elem);
+    }
+    
+    // Allow fixed-size array T[N] to be assigned to T[] declaration
+    // (the actual type will be determined by VarDeclaration::to_webcc)
+    if (!src_elem.empty() && target.ends_with("[]")) {
+        std::string tgt_elem = target.substr(0, target.length() - 2);
+        return is_compatible_type(src_elem, tgt_elem);
+    }
+    
     // Allow upcast (derived -> base), e.g., Canvas -> DOMElement
     if (SchemaLoader::instance().is_assignable_to(source, target)) return true;
     // Allow downcast from base to derived types (e.g., DOMElement -> Canvas)
@@ -46,6 +98,35 @@ std::string infer_expression_type(Expression* expr, const std::map<std::string, 
     if (dynamic_cast<FloatLiteral*>(expr)) return "float32";
     if (dynamic_cast<StringLiteral*>(expr)) return "string";
     if (dynamic_cast<BoolLiteral*>(expr)) return "bool";
+    
+    // Array literal type inference (dynamic array)
+    if (auto arr = dynamic_cast<ArrayLiteral*>(expr)) {
+        if (arr->elements.empty()) return "unknown[]";
+        // Infer type from first element
+        std::string elem_type = infer_expression_type(arr->elements[0].get(), scope);
+        return elem_type + "[]";
+    }
+    
+    // Array repeat literal type inference: [value; count] -> fixed-size array
+    if (auto arr = dynamic_cast<ArrayRepeatLiteral*>(expr)) {
+        std::string elem_type = infer_expression_type(arr->value.get(), scope);
+        return elem_type + "[" + std::to_string(arr->count) + "]";
+    }
+    
+    // Index access type inference
+    if (auto idx = dynamic_cast<IndexAccess*>(expr)) {
+        std::string arr_type = infer_expression_type(idx->array.get(), scope);
+        // If it's a dynamic array type (e.g., int[]), return the element type
+        if (arr_type.ends_with("[]")) {
+            return arr_type.substr(0, arr_type.length() - 2);
+        }
+        // If it's a fixed-size array type (e.g., int[100]), return the element type
+        size_t bracket_pos = arr_type.rfind('[');
+        if (bracket_pos != std::string::npos && arr_type.back() == ']') {
+            return arr_type.substr(0, bracket_pos);
+        }
+        return "unknown";
+    }
     
     if (auto id = dynamic_cast<Identifier*>(expr)) {
         if (scope.count(id->name)) return scope.at(id->name);
@@ -338,6 +419,21 @@ void collect_component_deps(ASTNode* node, std::set<std::string>& deps) {
         for (const auto& child : el->children) {
             collect_component_deps(child.get(), deps);
         }
+    } else if (auto* viewIf = dynamic_cast<ViewIfStatement*>(node)) {
+        for (const auto& child : viewIf->then_children) {
+            collect_component_deps(child.get(), deps);
+        }
+        for (const auto& child : viewIf->else_children) {
+            collect_component_deps(child.get(), deps);
+        }
+    } else if (auto* viewFor = dynamic_cast<ViewForRangeStatement*>(node)) {
+        for (const auto& child : viewFor->children) {
+            collect_component_deps(child.get(), deps);
+        }
+    } else if (auto* viewForEach = dynamic_cast<ViewForEachStatement*>(node)) {
+        for (const auto& child : viewForEach->children) {
+            collect_component_deps(child.get(), deps);
+        }
     }
 }
 
@@ -545,34 +641,45 @@ int main(int argc, char** argv){
         out << "#include \"webcc/input.h\"\n";
         out << "#include \"webcc/core/function.h\"\n";
         out << "#include \"webcc/core/allocator.h\"\n";
-        out << "#include \"webcc/core/new.h\"\n\n";
-
-        out << "struct Listener {\n";
-        out << "    int32_t handle;\n";
-        out << "    webcc::function<void()> callback;\n";
-        out << "};\n\n";
+        out << "#include \"webcc/core/new.h\"\n";
+        out << "#include \"webcc/core/vector.h\"\n\n";
 
         out << "struct EventDispatcher {\n";
         out << "    static constexpr int MAX_LISTENERS = 128;\n";
-        out << "    Listener listeners[MAX_LISTENERS];\n";
+        out << "    int32_t handles[MAX_LISTENERS];\n";
+        out << "    webcc::function<void()> callbacks[MAX_LISTENERS];\n";
         out << "    int count = 0;\n";
-        out << "    void register_click(webcc::handle h, webcc::function<void()> cb) {\n";
+        out << "    void set(webcc::handle h, webcc::function<void()> cb) {\n";
+        out << "        int32_t hid = (int32_t)h;\n";
+        out << "        for (int i = 0; i < count; i++) {\n";
+        out << "            if (handles[i] == hid) { callbacks[i] = cb; return; }\n";
+        out << "        }\n";
         out << "        if (count < MAX_LISTENERS) {\n";
-        out << "            listeners[count].handle = (int32_t)h;\n";
-        out << "            listeners[count].callback = cb;\n";
+        out << "            handles[count] = hid;\n";
+        out << "            callbacks[count] = cb;\n";
         out << "            count++;\n";
         out << "        }\n";
         out << "    }\n";
+        out << "    void remove(webcc::handle h) {\n";
+        out << "        int32_t hid = (int32_t)h;\n";
+        out << "        for (int i = 0; i < count; i++) {\n";
+        out << "            if (handles[i] == hid) {\n";
+        out << "                handles[i] = handles[count-1];\n";
+        out << "                callbacks[i] = callbacks[count-1];\n";
+        out << "                count--;\n";
+        out << "                return;\n";
+        out << "            }\n";
+        out << "        }\n";
+        out << "    }\n";
         out << "    void dispatch(const webcc::Event* events, uint32_t event_count) {\n";
-        out << "        for(uint32_t i=0; i<event_count; ++i) {\n";
+        out << "        for (uint32_t i = 0; i < event_count; i++) {\n";
         out << "            const auto& e = events[i];\n";
         out << "            if (e.opcode == webcc::dom::ClickEvent::OPCODE) {\n";
         out << "                auto click = e.as<webcc::dom::ClickEvent>();\n";
         out << "                if (click) {\n";
-        out << "                    for(int j=0; j<count; ++j) {\n";
-        out << "                        if (listeners[j].handle == (int32_t)click->handle) {\n";
-        out << "                            listeners[j].callback();\n";
-        out << "                        }\n";
+        out << "                    int32_t hid = (int32_t)click->handle;\n";
+        out << "                    for (int j = 0; j < count; j++) {\n";
+        out << "                        if (handles[j] == hid) { callbacks[j](); break; }\n";
         out << "                    }\n";
         out << "                }\n";
         out << "            }\n";

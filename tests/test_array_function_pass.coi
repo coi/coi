@@ -1,0 +1,25 @@
+// Test: array passed to function and returned from function
+component ArrayFunctionTest {
+    int[] data = [1, 2, 3, 4, 5];
+    mut int total = 0;
+
+    def sumArray() : int {
+        int result = 0;
+        for (int i = 0; i < data.size(); i++) {
+            result = result + data[i];
+        }
+        return result;
+    }
+
+    init {
+        total = sumArray();
+    }
+
+    view {
+        <div>Total: {total}</div>
+    }
+}
+
+app {
+    root = ArrayFunctionTest;
+}
