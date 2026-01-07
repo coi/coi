@@ -1,0 +1,22 @@
+// Test: References must be initialized.
+// This prevents "dangling" references by disallowing uninitialized reference variables
+// that could later be assigned to temporary objects.
+
+component App {
+    mut int val = 0;
+    
+    // Error: Reference variable must be initialized immediately.
+    // You cannot declare it and assign it later.
+    mut int& badRef; 
+
+    // Also attempting to return a reference (if we supported return types syntax check)
+    // def getRef() : int& { return val; }
+
+    view {
+        <div></div>
+    }
+}
+
+app {
+    root = App;
+}

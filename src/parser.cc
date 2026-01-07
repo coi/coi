@@ -957,6 +957,10 @@ Component Parser::parse_component(){
                 var_decl->initializer = parse_expression();
             }
 
+            if (var_decl->is_reference && !var_decl->initializer) {
+                throw std::runtime_error("Reference variable '" + var_decl->name + "' must be initialized immediately.");
+            }
+
             expect(TokenType::SEMICOLON, "Expected ';'");
             comp.state.push_back(std::move(var_decl));
         }

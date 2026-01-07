@@ -216,6 +216,9 @@ std::string infer_expression_type(Expression* expr, const std::map<std::string, 
 }
 
 void validate_types(const std::vector<Component>& components) {
+    std::set<std::string> component_names;
+    for (const auto& c : components) component_names.insert(c.name);
+
     for (const auto& comp : components) {
         std::map<std::string, std::string> scope;
         
@@ -234,6 +237,30 @@ void validate_types(const std::vector<Component>& components) {
         
         for (const auto& var : comp.state) {
             std::string type = normalize_type(var->type);
+
+            // Disallow uninitialized references (they must be bound immediately)
+            if (var->is_reference && !var->initializer) {
+                std::cerr << "Error: Reference variable '" << var->name << "' must be initialized. References cannot be left unbound." << std::endl;
+                exit(1);
+            }
+
+            // Disallow storing references to child component properties (upward references)
+            if (var->is_reference && var->initializer) {
+                if (auto member = dynamic_cast<MemberAccess*>(var->initializer.get())) {
+                    if (auto id = dynamic_cast<Identifier*>(member->object.get())) {
+                        auto it = scope.find(id->name);
+                        if (it != scope.end()) {
+                            std::string owner_type = it->second;
+                            if (component_names.count(owner_type)) {
+                                std::cerr << "Error: Storing reference to child component property is not allowed (upward reference): " 
+                                          << var->name << " = " << id->name << "." << member->member << std::endl;
+                                exit(1);
+                            }
+                        }
+                    }
+                }
+            }
+
             if (var->initializer) {
                 std::string init = infer_expression_type(var->initializer.get(), scope);
                 if (init != "unknown" && !is_compatible_type(init, type)) {
@@ -369,10 +396,15 @@ void validate_view_hierarchy(const std::vector<Component>& components) {
                 
                 // Validate reference props
                 const Component* target_comp = it->second;
+                std::set<std::string> passed_prop_names;
+
                 for (auto& passed_prop : comp_inst->props) {
+                    passed_prop_names.insert(passed_prop.name);
                     // Find the prop declaration in the target component
+                    bool prop_found = false;
                     for (const auto& declared_prop : target_comp->props) {
                         if (declared_prop->name == passed_prop.name) {
+                            prop_found = true;
                             passed_prop.is_mutable_def = declared_prop->is_mutable;
                             if (declared_prop->is_reference && !passed_prop.is_reference) {
                                 throw std::runtime_error(
@@ -394,10 +426,36 @@ void validate_view_hierarchy(const std::vector<Component>& components) {
                             break;
                         }
                     }
+                    if (!prop_found) {
+                        // Warn or error about unknown prop?
+                        // For now we focus on missing required props.
+                    }
+                }
+
+                // Check for missing required reference props
+                for (const auto& declared_prop : target_comp->props) {
+                    if (declared_prop->is_reference && passed_prop_names.find(declared_prop->name) == passed_prop_names.end()) {
+                        throw std::runtime_error("Missing required reference prop '&" + declared_prop->name + "' for component '" + comp_inst->component_name + "' at line " + std::to_string(comp_inst->line));
+                    }
                 }
             }
         } else if (auto* el = dynamic_cast<HTMLElement*>(node)) {
             for (const auto& child : el->children) {
+                validate_node(child.get(), parent_comp_name);
+            }
+        } else if (auto* viewIf = dynamic_cast<ViewIfStatement*>(node)) {
+            for (const auto& child : viewIf->then_children) {
+                validate_node(child.get(), parent_comp_name);
+            }
+            for (const auto& child : viewIf->else_children) {
+                validate_node(child.get(), parent_comp_name);
+            }
+        } else if (auto* viewFor = dynamic_cast<ViewForRangeStatement*>(node)) {
+            for (const auto& child : viewFor->children) {
+                validate_node(child.get(), parent_comp_name);
+            }
+        } else if (auto* viewForEach = dynamic_cast<ViewForEachStatement*>(node)) {
+            for (const auto& child : viewForEach->children) {
                 validate_node(child.get(), parent_comp_name);
             }
         }
