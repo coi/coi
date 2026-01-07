@@ -28,52 +28,80 @@ Compiles to WASM, JS, and HTML with tiny binaries and efficient updates for DOM,
 ## Example
 
 ```tsx
-component StepButton {
-    prop mut int& count;
-    prop int amount;
+component TodoItem {
+    prop string text;
+    prop def onremove : void;
 
-    def update() : void {
-        count += amount;
+    style {
+        .item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #ff4444;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 4px 8px;
+            cursor: pointer;
+        }
     }
 
     view {
-        <button onclick={update}>
-            "Add " {amount}
-        </button>
+        <div class="item">
+            <span>{text}</span>
+            <button onclick={onremove}>Remove</button>
+        </div>
     }
 }
 
 component App {
-    mut int score = 0;
+    mut int itemCount = 3;
+    mut bool showCompleted = true;
+
+    def addItem() : void {
+        itemCount++;
+    }
 
     style {
         .container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 20px;
-            padding: 40px;
-            background: #f0f2f5;
-            border-radius: 16px;
+            max-width: 400px;
+            margin: 40px auto;
+            padding: 24px;
         }
-        .score {
-            font-size: 64px;
-            font-weight: 800;
-            color: #1a73e8;
-        }
+        h1 { color: #1a73e8; }
         .controls {
             display: flex;
             gap: 12px;
+            margin-bottom: 16px;
+        }
+        .list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
         }
     }
 
     view {
         <div class="container">
-            <div class="score">{score}</div>
+            <h1>Todo List</h1>
             <div class="controls">
-                <StepButton amount=1 &count={score} />
-                <StepButton amount=5 &count={score} />
-                <StepButton amount=10 &count={score} />
+                <button onclick={addItem}>Add Item</button>
+            </div>
+            <div class="list">
+                <if itemCount == 0>
+                    <p>No items yet!</p>
+                <else>
+                    <for i in 0:itemCount>
+                        <TodoItem text="Item {i}" />
+                    </for>
+                </else>
+                </if>
             </div>
         </div>
     }
@@ -130,10 +158,49 @@ for (int i = 0; i < 10; i++) {
 }
 ```
 
-**While Loops:**
+### View Control Flow
+
+Coi supports conditional rendering and loops directly in the view using `<if>` and `<for>` tags.
+
+**Conditional Rendering:**
 ```tsx
-while (count < 100) {
-    count++;
+view {
+    <div>
+        <if showContent>
+            <p>Content is visible!</p>
+        </if>
+        
+        <if status == "active">
+            <span class="green">Active</span>
+        <else>
+            <span class="red">Inactive</span>
+        </else>
+        </if>
+    </div>
+}
+```
+
+**List Rendering with Range:**
+```tsx
+view {
+    <div class="list">
+        <for i in 0:itemCount>
+            <div class="item">Item {i}</div>
+        </for>
+    </div>
+}
+```
+
+**Nested Loops:**
+```tsx
+view {
+    <div class="grid">
+        <for row in 0:3>
+            <for col in 0:3>
+                <div class="cell">{row},{col}</div>
+            </for>
+        </for>
+    </div>
 }
 ```
 

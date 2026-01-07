@@ -28,8 +28,15 @@ std::string normalize_type(const std::string& type) {
 bool is_compatible_type(const std::string& source, const std::string& target) {
     if (source == target) return true;
     if (source == "unknown" || target == "unknown") return true;
+    // Allow upcast (derived -> base), e.g., Canvas -> DOMElement
     if (SchemaLoader::instance().is_assignable_to(source, target)) return true;
+    // Allow downcast from base to derived types (e.g., DOMElement -> Canvas)
+    // This is needed for getElementById which returns DOMElement but you know it's a Canvas/etc
+    // Uses the HANDLE_INHERITANCE table to check if target derives from source
+    if (SchemaLoader::instance().is_assignable_to(target, source)) return true;
+    // Numeric conversions
     if (source == "int32" && (target == "float32" || target == "uint8")) return true;
+    // int32 can be used as handle (for raw handle values)
     if (source == "int32" && SchemaLoader::instance().is_handle(target)) return true;
     return false;
 }
@@ -179,6 +186,9 @@ void validate_types(const std::vector<Component>& components) {
                     } else if (auto assign = dynamic_cast<Assignment*>(stmt.get())) {
                          std::string var_type = method_scope.count(assign->name) ? method_scope.at(assign->name) : "unknown";
                          std::string val_type = infer_expression_type(assign->value.get(), method_scope);
+                         
+                         // Store the target type for code generation (needed for handle casts)
+                         assign->target_type = var_type;
                          
                          if (var_type != "unknown" && val_type != "unknown") {
                              if (!is_compatible_type(val_type, var_type)) {

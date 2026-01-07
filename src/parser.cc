@@ -29,7 +29,43 @@ void Parser::expect(TokenType type, const std::string& msg){
 }
 
 std::unique_ptr<Expression> Parser::parse_expression(){
-    return parse_equality();
+    return parse_or();
+}
+
+std::unique_ptr<Expression> Parser::parse_expression_no_gt(){
+    // Parse expression but don't treat > as comparison operator
+    // Used for expressions inside view tags like <if condition>
+    bool old_allow_gt = allow_gt_comparison;
+    allow_gt_comparison = false;
+    auto expr = parse_or();
+    allow_gt_comparison = old_allow_gt;
+    return expr;
+}
+
+std::unique_ptr<Expression> Parser::parse_or(){
+    auto left = parse_and();
+
+    while(current().type == TokenType::OR){
+        std::string op = current().value;
+        advance();
+        auto right = parse_and();
+        left = std::make_unique<BinaryOp>(std::move(left), op, std::move(right));
+    }
+
+    return left;
+}
+
+std::unique_ptr<Expression> Parser::parse_and(){
+    auto left = parse_equality();
+
+    while(current().type == TokenType::AND){
+        std::string op = current().value;
+        advance();
+        auto right = parse_equality();
+        left = std::make_unique<BinaryOp>(std::move(left), op, std::move(right));
+    }
+
+    return left;
 }
 
 std::unique_ptr<Expression> Parser::parse_equality(){
@@ -48,7 +84,8 @@ std::unique_ptr<Expression> Parser::parse_equality(){
 std::unique_ptr<Expression> Parser::parse_comparison(){
     auto left = parse_additive();
 
-    while(current().type == TokenType::LT || current().type == TokenType::GT ||
+    while(current().type == TokenType::LT || 
+          (current().type == TokenType::GT && allow_gt_comparison) ||
             current().type == TokenType::LTE || current().type == TokenType::GTE){
         std::string op = current().value;
         advance();
@@ -90,7 +127,7 @@ std::unique_ptr<Expression> Parser::parse_postfix() {
 }
 
 std::unique_ptr<Expression> Parser::parse_unary() {
-    if (current().type == TokenType::MINUS || current().type == TokenType::PLUS) {
+    if (current().type == TokenType::MINUS || current().type == TokenType::PLUS || current().type == TokenType::NOT) {
         std::string op = current().value;
         advance();
         auto operand = parse_unary();
@@ -215,22 +252,38 @@ std::unique_ptr<Statement> Parser::parse_statement(){
         return ifStmt;
     }
 
-    // While
-    if(current().type == TokenType::WHILE){
-        advance();
-        expect(TokenType::LPAREN, "Expected '('");
-        auto cond = parse_expression();
-        expect(TokenType::RPAREN, "Expected ')'");
-        
-        auto whileStmt = std::make_unique<WhileStatement>();
-        whileStmt->condition = std::move(cond);
-        whileStmt->body = parse_statement();
-        return whileStmt;
-    }
-
-    // For
+    // For (three syntaxes: traditional, range-based, and foreach)
     if(current().type == TokenType::FOR){
         advance();
+        
+        // Check for range-based or foreach syntax: for i in start:end { } OR for e in array { }
+        if(current().type == TokenType::IDENTIFIER && peek().type == TokenType::IN) {
+            std::string var_name = current().value;
+            advance(); // skip identifier
+            advance(); // skip 'in'
+            
+            auto first_expr = parse_expression();
+            
+            // If we see ':', it's a range: for i in start:end
+            if(current().type == TokenType::COLON) {
+                advance(); // skip ':'
+                auto rangeFor = std::make_unique<ForRangeStatement>();
+                rangeFor->var_name = var_name;
+                rangeFor->start = std::move(first_expr);
+                rangeFor->end = parse_expression();
+                rangeFor->body = parse_statement();
+                return rangeFor;
+            }
+            
+            // Otherwise it's foreach: for e in array
+            auto forEach = std::make_unique<ForEachStatement>();
+            forEach->var_name = var_name;
+            forEach->iterable = std::move(first_expr);
+            forEach->body = parse_statement();
+            return forEach;
+        }
+        
+        // Traditional C-style for loop: for (init; cond; update) { }
         expect(TokenType::LPAREN, "Expected '('");
         
         auto forStmt = std::make_unique<ForStatement>();
@@ -341,7 +394,10 @@ std::unique_ptr<Statement> Parser::parse_statement(){
     if(current().type == TokenType::IDENTIFIER && 
         (peek().type == TokenType::ASSIGN || 
         peek().type == TokenType::PLUS_ASSIGN || 
-        peek().type == TokenType::MINUS_ASSIGN)){
+        peek().type == TokenType::MINUS_ASSIGN ||
+        peek().type == TokenType::STAR_ASSIGN ||
+        peek().type == TokenType::SLASH_ASSIGN ||
+        peek().type == TokenType::PERCENT_ASSIGN)){
         
         std::string name = current().value;
         advance();
@@ -361,6 +417,18 @@ std::unique_ptr<Statement> Parser::parse_statement(){
         } else if (opType == TokenType::MINUS_ASSIGN) {
             auto left = std::make_unique<Identifier>(name);
             auto binOp = std::make_unique<BinaryOp>(std::move(left), "-", std::move(val));
+            assign->value = std::move(binOp);
+        } else if (opType == TokenType::STAR_ASSIGN) {
+            auto left = std::make_unique<Identifier>(name);
+            auto binOp = std::make_unique<BinaryOp>(std::move(left), "*", std::move(val));
+            assign->value = std::move(binOp);
+        } else if (opType == TokenType::SLASH_ASSIGN) {
+            auto left = std::make_unique<Identifier>(name);
+            auto binOp = std::make_unique<BinaryOp>(std::move(left), "/", std::move(val));
+            assign->value = std::move(binOp);
+        } else if (opType == TokenType::PERCENT_ASSIGN) {
+            auto left = std::make_unique<Identifier>(name);
+            auto binOp = std::make_unique<BinaryOp>(std::move(left), "%", std::move(val));
             assign->value = std::move(binOp);
         } else {
             assign->value = std::move(val);
@@ -527,7 +595,20 @@ std::unique_ptr<ASTNode> Parser::parse_html_element(){
     el->tag = tag;
 
     // Attributes
-    while(current().type == TokenType::IDENTIFIER || current().type == TokenType::STYLE){
+    while(current().type == TokenType::IDENTIFIER || current().type == TokenType::STYLE || current().type == TokenType::AMPERSAND){
+        // Check for element ref binding: &={varName}
+        if(match(TokenType::AMPERSAND)){
+            expect(TokenType::ASSIGN, "Expected '=' after '&' for element binding");
+            expect(TokenType::LBRACE, "Expected '{' after '&='");
+            if(current().type != TokenType::IDENTIFIER){
+                throw std::runtime_error("Expected variable name in element binding &={varName}");
+            }
+            el->ref_binding = current().value;
+            advance();
+            expect(TokenType::RBRACE, "Expected '}' after variable name");
+            continue;
+        }
+        
         std::string attrName = current().value;
         advance();
         
@@ -564,8 +645,15 @@ std::unique_ptr<ASTNode> Parser::parse_html_element(){
                 // Closing tag
                 break;
             }
-            // Child element
-            el->children.push_back(parse_html_element());
+            // Check for special tags: <if>, <for>
+            if(peek().type == TokenType::IF){
+                el->children.push_back(parse_view_if());
+            } else if(peek().type == TokenType::FOR){
+                el->children.push_back(parse_view_for());
+            } else {
+                // Regular child element
+                el->children.push_back(parse_html_element());
+            }
         } else if(current().type == TokenType::LBRACE){
             // Expression
             advance();
@@ -576,7 +664,9 @@ std::unique_ptr<ASTNode> Parser::parse_html_element(){
             std::string text;
             bool first = true;
             Token prev_token = current();
-            while(current().type != TokenType::LT && current().type != TokenType::LBRACE && current().type != TokenType::END_OF_FILE){
+            // Text continues until we hit '<' or '{'
+            while(current().type != TokenType::LT && current().type != TokenType::LBRACE && 
+                  current().type != TokenType::END_OF_FILE){
                 if(!first){
                     int prev_len = prev_token.value.length();
                     if (prev_token.type == TokenType::STRING_LITERAL) prev_len += 2;
@@ -609,6 +699,152 @@ std::unique_ptr<ASTNode> Parser::parse_html_element(){
     expect(TokenType::GT, "Expected '>'");
 
     return el;
+}
+
+std::unique_ptr<ASTNode> Parser::parse_view_node() {
+    // Must start with '<'
+    if (current().type != TokenType::LT) {
+        throw std::runtime_error("Expected '<' at line " + std::to_string(current().line));
+    }
+    
+    // Check for special tags
+    if (peek().type == TokenType::IF) {
+        return parse_view_if();
+    }
+    if (peek().type == TokenType::FOR) {
+        return parse_view_for();
+    }
+    // Regular HTML element
+    return parse_html_element();
+}
+
+std::unique_ptr<ViewIfStatement> Parser::parse_view_if() {
+    // Syntax: <if condition> ... <else> ... </else> </if>
+    //     or: <if condition> ... </if>
+    auto viewIf = std::make_unique<ViewIfStatement>();
+    viewIf->line = current().line;
+    
+    expect(TokenType::LT, "Expected '<'");
+    expect(TokenType::IF, "Expected 'if'");
+    
+    // Parse condition (everything until '>')
+    // Use parse_expression_no_gt so > is not treated as comparison
+    viewIf->condition = parse_expression_no_gt();
+    expect(TokenType::GT, "Expected '>'");
+    
+    // Parse then children until we hit </if> or <else>
+    while (current().type != TokenType::END_OF_FILE) {
+        if (current().type == TokenType::LT) {
+            if (peek().type == TokenType::SLASH && peek(2).type == TokenType::IF) {
+                // </if> - end of if block
+                break;
+            }
+            if (peek().type == TokenType::ELSE) {
+                // <else> block
+                break;
+            }
+        }
+        viewIf->then_children.push_back(parse_view_node());
+    }
+    
+    // Check for <else>
+    if (current().type == TokenType::LT && peek().type == TokenType::ELSE) {
+        advance(); // <
+        advance(); // else
+        expect(TokenType::GT, "Expected '>'");
+        
+        // Parse else children until </else>
+        while (current().type != TokenType::END_OF_FILE) {
+            if (current().type == TokenType::LT && peek().type == TokenType::SLASH && peek(2).type == TokenType::ELSE) {
+                break;
+            }
+            viewIf->else_children.push_back(parse_view_node());
+        }
+        
+        // </else>
+        expect(TokenType::LT, "Expected '<'");
+        expect(TokenType::SLASH, "Expected '/'");
+        expect(TokenType::ELSE, "Expected 'else'");
+        expect(TokenType::GT, "Expected '>'");
+    }
+    
+    // </if>
+    expect(TokenType::LT, "Expected '<'");
+    expect(TokenType::SLASH, "Expected '/'");
+    expect(TokenType::IF, "Expected 'if'");
+    expect(TokenType::GT, "Expected '>'");
+    
+    return viewIf;
+}
+
+std::unique_ptr<ASTNode> Parser::parse_view_for() {
+    // Syntax: <for var in start:end> ... </for>
+    //     or: <for var in iterable> ... </for>
+    int start_line = current().line;
+    
+    expect(TokenType::LT, "Expected '<'");
+    expect(TokenType::FOR, "Expected 'for'");
+    
+    std::string var_name = current().value;
+    expect(TokenType::IDENTIFIER, "Expected loop variable name");
+    expect(TokenType::IN, "Expected 'in'");
+    
+    // Use parse_expression_no_gt so > is not treated as comparison
+    auto first_expr = parse_expression_no_gt();
+    
+    // Check if this is a range (has colon) or foreach
+    if (current().type == TokenType::COLON) {
+        // Range: <for i in 0:10>
+        advance();
+        auto end_expr = parse_expression_no_gt();
+        expect(TokenType::GT, "Expected '>'");
+        
+        auto viewFor = std::make_unique<ViewForRangeStatement>();
+        viewFor->line = start_line;
+        viewFor->var_name = var_name;
+        viewFor->start = std::move(first_expr);
+        viewFor->end = std::move(end_expr);
+        
+        // Parse children until </for>
+        while (current().type != TokenType::END_OF_FILE) {
+            if (current().type == TokenType::LT && peek().type == TokenType::SLASH && peek(2).type == TokenType::FOR) {
+                break;
+            }
+            viewFor->children.push_back(parse_view_node());
+        }
+        
+        // </for>
+        expect(TokenType::LT, "Expected '<'");
+        expect(TokenType::SLASH, "Expected '/'");
+        expect(TokenType::FOR, "Expected 'for'");
+        expect(TokenType::GT, "Expected '>'");
+        
+        return viewFor;
+    } else {
+        // ForEach: <for item in items>
+        expect(TokenType::GT, "Expected '>'");
+        
+        auto viewForEach = std::make_unique<ViewForEachStatement>();
+        viewForEach->line = start_line;
+        viewForEach->var_name = var_name;
+        viewForEach->iterable = std::move(first_expr);
+        
+        // Parse children until </for>
+        while (current().type != TokenType::END_OF_FILE) {
+            if (current().type == TokenType::LT && peek().type == TokenType::SLASH && peek(2).type == TokenType::FOR) {
+                break;
+            }
+            viewForEach->children.push_back(parse_view_node());
+        }
+        
+        // </for>
+        expect(TokenType::LT, "Expected '<'");
+        expect(TokenType::SLASH, "Expected '/'");
+        expect(TokenType::FOR, "Expected 'for'");
+        expect(TokenType::GT, "Expected '>'");
+        
+        return viewForEach;
+    }
 }
 
 Component Parser::parse_component(){
@@ -874,7 +1110,7 @@ Component Parser::parse_component(){
     if(match(TokenType::VIEW)){
         expect(TokenType::LBRACE, "Expected '{'");
         while(current().type != TokenType::RBRACE && current().type != TokenType::END_OF_FILE){
-            comp.render_roots.push_back(parse_html_element());
+            comp.render_roots.push_back(parse_view_node());
         }
         expect(TokenType::RBRACE, "Expected '}'");
     }

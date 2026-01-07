@@ -109,7 +109,7 @@ Token Lexer::read_identifier(){
         {"if", TokenType::IF},
         {"else", TokenType::ELSE},
         {"for", TokenType::FOR},
-        {"while", TokenType::WHILE},
+        {"in", TokenType::IN},
         {"int", TokenType::INT},
         {"float", TokenType::FLOAT},
         {"string", TokenType::STRING},
@@ -201,6 +201,31 @@ std::vector<Token> Lexer::tokenize(){
             advance(); advance();
             continue;
         }
+        if (current() == '*' && peek() == '=') {
+            tokens.push_back(make_token(TokenType::STAR_ASSIGN, "*="));
+            advance(); advance();
+            continue;
+        }
+        if (current() == '/' && peek() == '=') {
+            tokens.push_back(make_token(TokenType::SLASH_ASSIGN, "/="));
+            advance(); advance();
+            continue;
+        }
+        if (current() == '%' && peek() == '=') {
+            tokens.push_back(make_token(TokenType::PERCENT_ASSIGN, "%="));
+            advance(); advance();
+            continue;
+        }
+        if (current() == '&' && peek() == '&') {
+            tokens.push_back(make_token(TokenType::AND, "&&"));
+            advance(); advance();
+            continue;
+        }
+        if (current() == '|' && peek() == '|') {
+            tokens.push_back(make_token(TokenType::OR, "||"));
+            advance(); advance();
+            continue;
+        }
         if (current() == '=' && peek() == '>') {
             tokens.push_back(make_token(TokenType::ARROW, "=>"));
             advance(); advance();
@@ -217,6 +242,7 @@ std::vector<Token> Lexer::tokenize(){
             case '=': tokens.push_back(make_token(TokenType::ASSIGN, "=")); break;
             case '<': tokens.push_back(make_token(TokenType::LT, "<")); break;
             case '>': tokens.push_back(make_token(TokenType::GT, ">")); break;
+            case '!': tokens.push_back(make_token(TokenType::NOT, "!")); break;
             case '(': tokens.push_back(make_token(TokenType::LPAREN, "(")); break;
             case ')': tokens.push_back(make_token(TokenType::RPAREN, ")")); break;
             case '{': tokens.push_back(make_token(TokenType::LBRACE, "{")); break;
@@ -228,6 +254,7 @@ std::vector<Token> Lexer::tokenize(){
             case '.': tokens.push_back(make_token(TokenType::DOT, ".")); break;
             case ':': tokens.push_back(make_token(TokenType::COLON, ":")); break;
             case '&': tokens.push_back(make_token(TokenType::AMPERSAND, "&")); break;
+            case '|': tokens.push_back(make_token(TokenType::UNKNOWN, "|")); break;  // Single | not supported
             default:
                 tokens.push_back(make_token(TokenType::UNKNOWN, std::string(1, current())));
         }

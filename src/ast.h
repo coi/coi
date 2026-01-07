@@ -132,6 +132,7 @@ struct PropDeclaration : Statement {
 struct Assignment : Statement {
     std::string name;
     std::unique_ptr<Expression> value;
+    std::string target_type;  // Type of the variable being assigned to (for handle casts)
 
     std::string to_webcc() override;
     void collect_dependencies(std::set<std::string>& deps) override;
@@ -164,18 +165,29 @@ struct IfStatement : Statement {
     void collect_dependencies(std::set<std::string>& deps) override;
 };
 
-struct WhileStatement : Statement {
+struct ForStatement : Statement {
+    std::unique_ptr<Statement> init;
     std::unique_ptr<Expression> condition;
+    std::unique_ptr<Expression> update;
     std::unique_ptr<Statement> body;
 
     std::string to_webcc() override;
     void collect_dependencies(std::set<std::string>& deps) override;
 };
 
-struct ForStatement : Statement {
-    std::unique_ptr<Statement> init;
-    std::unique_ptr<Expression> condition;
-    std::unique_ptr<Expression> update;
+struct ForRangeStatement : Statement {
+    std::string var_name;
+    std::unique_ptr<Expression> start;
+    std::unique_ptr<Expression> end;
+    std::unique_ptr<Statement> body;
+
+    std::string to_webcc() override;
+    void collect_dependencies(std::set<std::string>& deps) override;
+};
+
+struct ForEachStatement : Statement {
+    std::string var_name;
+    std::unique_ptr<Expression> iterable;
     std::unique_ptr<Statement> body;
 
     std::string to_webcc() override;
@@ -259,6 +271,7 @@ struct HTMLElement : ASTNode {
     std::string tag;
     std::vector<HTMLAttribute> attributes;
     std::vector<std::unique_ptr<ASTNode>> children;
+    std::string ref_binding;  // Variable name to bind this element to (e.g., &={canvas})
 
     std::string to_webcc() override;
 
@@ -296,4 +309,53 @@ struct BoolLiteral : Expression {
     BoolLiteral(bool v) : value(v){}
     std::string to_webcc() override { return value ? "true" : "false"; }
     bool is_static() override { return true; }
+};
+
+// Conditional rendering in view (if/else)
+struct ViewIfStatement : ASTNode {
+    std::unique_ptr<Expression> condition;
+    std::vector<std::unique_ptr<ASTNode>> then_children;
+    std::vector<std::unique_ptr<ASTNode>> else_children;
+
+    std::string to_webcc() override { return ""; }
+    void generate_code(std::stringstream& ss, const std::string& parent, int& counter, 
+                      std::vector<std::tuple<int, std::string, bool>>& click_handlers,
+                      std::vector<Binding>& bindings,
+                      std::map<std::string, int>& component_counters,
+                      const std::set<std::string>& method_names,
+                      const std::string& parent_component_name);
+    void collect_dependencies(std::set<std::string>& deps) override;
+};
+
+// For range loop in view (for i in 0:10)
+struct ViewForRangeStatement : ASTNode {
+    std::string var_name;
+    std::unique_ptr<Expression> start;
+    std::unique_ptr<Expression> end;
+    std::vector<std::unique_ptr<ASTNode>> children;
+
+    std::string to_webcc() override { return ""; }
+    void generate_code(std::stringstream& ss, const std::string& parent, int& counter, 
+                      std::vector<std::tuple<int, std::string, bool>>& click_handlers,
+                      std::vector<Binding>& bindings,
+                      std::map<std::string, int>& component_counters,
+                      const std::set<std::string>& method_names,
+                      const std::string& parent_component_name);
+    void collect_dependencies(std::set<std::string>& deps) override;
+};
+
+// For each loop in view (for item in items)
+struct ViewForEachStatement : ASTNode {
+    std::string var_name;
+    std::unique_ptr<Expression> iterable;
+    std::vector<std::unique_ptr<ASTNode>> children;
+
+    std::string to_webcc() override { return ""; }
+    void generate_code(std::stringstream& ss, const std::string& parent, int& counter, 
+                      std::vector<std::tuple<int, std::string, bool>>& click_handlers,
+                      std::vector<Binding>& bindings,
+                      std::map<std::string, int>& component_counters,
+                      const std::set<std::string>& method_names,
+                      const std::string& parent_component_name);
+    void collect_dependencies(std::set<std::string>& deps) override;
 };

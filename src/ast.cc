@@ -140,7 +140,7 @@ BinaryOp::BinaryOp(std::unique_ptr<Expression> l, const std::string& o, std::uni
     : left(std::move(l)), op(o), right(std::move(r)){}
 
 std::string BinaryOp::to_webcc() {
-    return "(" + left->to_webcc() + " " + op + " " + right->to_webcc() + ")";
+    return left->to_webcc() + " " + op + " " + right->to_webcc();
 }
 void BinaryOp::collect_dependencies(std::set<std::string>& deps) {
     left->collect_dependencies(deps);
@@ -160,6 +160,40 @@ std::string FunctionCall::args_to_string() {
 }
 
 std::string FunctionCall::to_webcc() {
+    // Handle string methods: str.length(), str.at(i), str.substr(pos, len), str.contains(text)
+    {
+        size_t dot_pos = name.rfind('.');
+        if (dot_pos != std::string::npos && dot_pos > 0 && dot_pos < name.length() - 1) {
+            std::string obj = name.substr(0, dot_pos);
+            std::string method = name.substr(dot_pos + 1);
+            
+            // String methods - map to webcc::string methods
+            if (method == "length") {
+                return obj + ".length()";
+            }
+            if (method == "at" && args.size() == 1) {
+                // Returns a single character as a string
+                return obj + ".at(" + args[0]->to_webcc() + ")";
+            }
+            if (method == "substr" && args.size() >= 1) {
+                // substr(pos) or substr(pos, len)
+                if (args.size() == 1) {
+                    return obj + ".substr(" + args[0]->to_webcc() + ")";
+                } else {
+                    return obj + ".substr(" + args[0]->to_webcc() + ", " + args[1]->to_webcc() + ")";
+                }
+            }
+            if (method == "contains" && args.size() == 1) {
+                // Check if string contains substring
+                return obj + ".contains(" + args[0]->to_webcc() + ")";
+            }
+            if (method == "isEmpty" && args.size() == 0) {
+                // Check if string is empty
+                return obj + ".empty()";
+            }
+        }
+    }
+
     if (name == "log" || name == "log.info" || name == "log.warn" || name == "log.error" || name == "log.debug" || name == "log.event") {
         std::vector<Expression*> parts;
         std::function<void(Expression*)> flatten = [&](Expression* e) {
@@ -333,7 +367,19 @@ std::string Assignment::to_webcc() {
     if(g_ref_props.count(name)) {
         lhs = "(*" + name + ")";
     }
-    return lhs + " = " + value->to_webcc() + ";";
+    
+    std::string rhs = value->to_webcc();
+    
+    // For handle downcasts (e.g., DOMElement -> Canvas), we need to cast via int32_t
+    // Only allowed when target_type extends the source type (checked during type validation)
+    // e.g., canvas = webcc::Canvas((int32_t)webcc::dom::get_element_by_id("id"));
+    if (!target_type.empty() && SchemaLoader::instance().is_handle(target_type)) {
+        // Check if this is a downcast (target extends some base type)
+        // The type checker already validated this is a valid cast via is_assignable_to
+        rhs = convert_type(target_type) + "((int32_t)" + rhs + ")";
+    }
+    
+    return lhs + " = " + rhs + ";";
 }
 void Assignment::collect_dependencies(std::set<std::string>& deps) {
     value->collect_dependencies(deps);
@@ -383,19 +429,13 @@ void IfStatement::collect_dependencies(std::set<std::string>& deps) {
     if(else_branch) else_branch->collect_dependencies(deps);
 }
 
-std::string WhileStatement::to_webcc() {
-    std::string code = "while(" + condition->to_webcc() + ") ";
-    code += body->to_webcc();
-    return code;
-}
-void WhileStatement::collect_dependencies(std::set<std::string>& deps) {
-    condition->collect_dependencies(deps);
-    body->collect_dependencies(deps);
-}
-
 std::string ForStatement::to_webcc() {
     std::string code = "for(";
     if(init) {
+        // For loop init variables must be mutable (not const) for increment to work
+        if(auto varDecl = dynamic_cast<VarDeclaration*>(init.get())) {
+            varDecl->is_mutable = true;
+        }
         // Remove trailing semicolon from init statement since for() adds it
         std::string init_code = init->to_webcc();
         if(!init_code.empty() && init_code.back() == ';') {
@@ -419,6 +459,31 @@ void ForStatement::collect_dependencies(std::set<std::string>& deps) {
     if(init) init->collect_dependencies(deps);
     if(condition) condition->collect_dependencies(deps);
     if(update) update->collect_dependencies(deps);
+    body->collect_dependencies(deps);
+}
+
+std::string ForRangeStatement::to_webcc() {
+    // Generates: for(int var_name = start; var_name < end; var_name++)
+    std::string code = "for(int " + var_name + " = " + start->to_webcc() + "; ";
+    code += "(" + var_name + " < " + end->to_webcc() + "); ";
+    code += var_name + "++) ";
+    code += body->to_webcc();
+    return code;
+}
+void ForRangeStatement::collect_dependencies(std::set<std::string>& deps) {
+    start->collect_dependencies(deps);
+    end->collect_dependencies(deps);
+    body->collect_dependencies(deps);
+}
+
+std::string ForEachStatement::to_webcc() {
+    // Generates: for(auto& var_name : iterable)
+    std::string code = "for(auto& " + var_name + " : " + iterable->to_webcc() + ") ";
+    code += body->to_webcc();
+    return code;
+}
+void ForEachStatement::collect_dependencies(std::set<std::string>& deps) {
+    iterable->collect_dependencies(deps);
     body->collect_dependencies(deps);
 }
 
@@ -451,12 +516,15 @@ void collect_mods_recursive(Statement* stmt, std::set<std::string>& mods) {
             collect_mods_recursive(ifStmt->else_branch.get(), mods);
         }
     }
-    else if(auto whileStmt = dynamic_cast<WhileStatement*>(stmt)) {
-        collect_mods_recursive(whileStmt->body.get(), mods);
-    }
     else if(auto forStmt = dynamic_cast<ForStatement*>(stmt)) {
         if(forStmt->init) collect_mods_recursive(forStmt->init.get(), mods);
         collect_mods_recursive(forStmt->body.get(), mods);
+    }
+    else if(auto forRange = dynamic_cast<ForRangeStatement*>(stmt)) {
+        collect_mods_recursive(forRange->body.get(), mods);
+    }
+    else if(auto forEach = dynamic_cast<ForEachStatement*>(stmt)) {
+        collect_mods_recursive(forEach->body.get(), mods);
     }
 }
 
@@ -597,6 +665,11 @@ void HTMLElement::generate_code(std::stringstream& ss, const std::string& parent
     ss << "        " << var << " = webcc::dom::create_element(\"" << tag << "\");\n";
     ss << "        webcc::dom::set_attribute(" << var << ", \"coi-scope\", \"" << parent_component_name << "\");\n";
     
+    // Bind element to variable if ref_binding is set (e.g., &={canvas})
+    if (!ref_binding.empty()) {
+        ss << "        " << ref_binding << " = " << var << ";\n";
+    }
+    
     // Attributes
     for(auto& attr : attributes){
         if(attr.name == "onclick"){
@@ -629,7 +702,9 @@ void HTMLElement::generate_code(std::stringstream& ss, const std::string& parent
     // Children
     bool has_elements = false;
     for(auto& child : children) {
-        if(dynamic_cast<HTMLElement*>(child.get()) || dynamic_cast<ComponentInstantiation*>(child.get())) has_elements = true;
+        if(dynamic_cast<HTMLElement*>(child.get()) || dynamic_cast<ComponentInstantiation*>(child.get()) || 
+           dynamic_cast<ViewIfStatement*>(child.get()) || dynamic_cast<ViewForRangeStatement*>(child.get()) ||
+           dynamic_cast<ViewForEachStatement*>(child.get())) has_elements = true;
     }
 
     if(has_elements){
@@ -638,6 +713,12 @@ void HTMLElement::generate_code(std::stringstream& ss, const std::string& parent
                  el->generate_code(ss, var, counter, click_handlers, bindings, component_counters, method_names, parent_component_name);
              } else if(auto comp = dynamic_cast<ComponentInstantiation*>(child.get())){
                  comp->generate_code(ss, var, counter, click_handlers, bindings, component_counters, method_names, parent_component_name);
+             } else if(auto viewIf = dynamic_cast<ViewIfStatement*>(child.get())){
+                 viewIf->generate_code(ss, var, counter, click_handlers, bindings, component_counters, method_names, parent_component_name);
+             } else if(auto viewFor = dynamic_cast<ViewForRangeStatement*>(child.get())){
+                 viewFor->generate_code(ss, var, counter, click_handlers, bindings, component_counters, method_names, parent_component_name);
+             } else if(auto viewForEach = dynamic_cast<ViewForEachStatement*>(child.get())){
+                 viewForEach->generate_code(ss, var, counter, click_handlers, bindings, component_counters, method_names, parent_component_name);
              }
          }
     } else {
@@ -688,12 +769,136 @@ void HTMLElement::collect_dependencies(std::set<std::string>& deps) {
     }
 }
 
+// ViewIfStatement - conditional rendering in view
+void ViewIfStatement::generate_code(std::stringstream& ss, const std::string& parent, int& counter, 
+                  std::vector<std::tuple<int, std::string, bool>>& click_handlers,
+                  std::vector<Binding>& bindings,
+                  std::map<std::string, int>& component_counters,
+                  const std::set<std::string>& method_names,
+                  const std::string& parent_component_name) {
+    ss << "        if (" << condition->to_webcc() << ") {\n";
+    for(auto& child : then_children) {
+        if(auto el = dynamic_cast<HTMLElement*>(child.get())){
+            el->generate_code(ss, parent, counter, click_handlers, bindings, component_counters, method_names, parent_component_name);
+        } else if(auto comp = dynamic_cast<ComponentInstantiation*>(child.get())){
+            comp->generate_code(ss, parent, counter, click_handlers, bindings, component_counters, method_names, parent_component_name);
+        } else if(auto viewIf = dynamic_cast<ViewIfStatement*>(child.get())){
+            viewIf->generate_code(ss, parent, counter, click_handlers, bindings, component_counters, method_names, parent_component_name);
+        }
+    }
+    if (!else_children.empty()) {
+        ss << "        } else {\n";
+        for(auto& child : else_children) {
+            if(auto el = dynamic_cast<HTMLElement*>(child.get())){
+                el->generate_code(ss, parent, counter, click_handlers, bindings, component_counters, method_names, parent_component_name);
+            } else if(auto comp = dynamic_cast<ComponentInstantiation*>(child.get())){
+                comp->generate_code(ss, parent, counter, click_handlers, bindings, component_counters, method_names, parent_component_name);
+            } else if(auto viewIf = dynamic_cast<ViewIfStatement*>(child.get())){
+                viewIf->generate_code(ss, parent, counter, click_handlers, bindings, component_counters, method_names, parent_component_name);
+            }
+        }
+    }
+    ss << "        }\n";
+}
+
+void ViewIfStatement::collect_dependencies(std::set<std::string>& deps) {
+    condition->collect_dependencies(deps);
+    for(auto& child : then_children) {
+        child->collect_dependencies(deps);
+    }
+    for(auto& child : else_children) {
+        child->collect_dependencies(deps);
+    }
+}
+
+// Helper to generate code for a view child node
+static void generate_view_child(ASTNode* child, std::stringstream& ss, const std::string& parent, int& counter,
+                                std::vector<std::tuple<int, std::string, bool>>& click_handlers,
+                                std::vector<Binding>& bindings,
+                                std::map<std::string, int>& component_counters,
+                                const std::set<std::string>& method_names,
+                                const std::string& parent_component_name) {
+    if(auto el = dynamic_cast<HTMLElement*>(child)){
+        el->generate_code(ss, parent, counter, click_handlers, bindings, component_counters, method_names, parent_component_name);
+    } else if(auto comp = dynamic_cast<ComponentInstantiation*>(child)){
+        comp->generate_code(ss, parent, counter, click_handlers, bindings, component_counters, method_names, parent_component_name);
+    } else if(auto viewIf = dynamic_cast<ViewIfStatement*>(child)){
+        viewIf->generate_code(ss, parent, counter, click_handlers, bindings, component_counters, method_names, parent_component_name);
+    } else if(auto viewFor = dynamic_cast<ViewForRangeStatement*>(child)){
+        viewFor->generate_code(ss, parent, counter, click_handlers, bindings, component_counters, method_names, parent_component_name);
+    } else if(auto viewForEach = dynamic_cast<ViewForEachStatement*>(child)){
+        viewForEach->generate_code(ss, parent, counter, click_handlers, bindings, component_counters, method_names, parent_component_name);
+    }
+}
+
+// ViewForRangeStatement - for i in 0:10 in view
+void ViewForRangeStatement::generate_code(std::stringstream& ss, const std::string& parent, int& counter, 
+                  std::vector<std::tuple<int, std::string, bool>>& click_handlers,
+                  std::vector<Binding>& bindings,
+                  std::map<std::string, int>& component_counters,
+                  const std::set<std::string>& method_names,
+                  const std::string& parent_component_name) {
+    ss << "        for (int " << var_name << " = " << start->to_webcc() << "; " 
+       << var_name << " < " << end->to_webcc() << "; " << var_name << "++) {\n";
+    for(auto& child : children) {
+        generate_view_child(child.get(), ss, parent, counter, click_handlers, bindings, component_counters, method_names, parent_component_name);
+    }
+    ss << "        }\n";
+}
+
+void ViewForRangeStatement::collect_dependencies(std::set<std::string>& deps) {
+    start->collect_dependencies(deps);
+    end->collect_dependencies(deps);
+    for(auto& child : children) {
+        child->collect_dependencies(deps);
+    }
+}
+
+// ViewForEachStatement - for item in items in view
+void ViewForEachStatement::generate_code(std::stringstream& ss, const std::string& parent, int& counter, 
+                  std::vector<std::tuple<int, std::string, bool>>& click_handlers,
+                  std::vector<Binding>& bindings,
+                  std::map<std::string, int>& component_counters,
+                  const std::set<std::string>& method_names,
+                  const std::string& parent_component_name) {
+    ss << "        for (auto& " << var_name << " : " << iterable->to_webcc() << ") {\n";
+    for(auto& child : children) {
+        generate_view_child(child.get(), ss, parent, counter, click_handlers, bindings, component_counters, method_names, parent_component_name);
+    }
+    ss << "        }\n";
+}
+
+void ViewForEachStatement::collect_dependencies(std::set<std::string>& deps) {
+    iterable->collect_dependencies(deps);
+    for(auto& child : children) {
+        child->collect_dependencies(deps);
+    }
+}
+
 void Component::collect_child_components(ASTNode* node, std::map<std::string, int>& counts) {
     if(auto comp = dynamic_cast<ComponentInstantiation*>(node)) {
         counts[comp->component_name]++;
     }
     if(auto el = dynamic_cast<HTMLElement*>(node)) {
         for(auto& child : el->children) {
+            collect_child_components(child.get(), counts);
+        }
+    }
+    if(auto viewIf = dynamic_cast<ViewIfStatement*>(node)) {
+        for(auto& child : viewIf->then_children) {
+            collect_child_components(child.get(), counts);
+        }
+        for(auto& child : viewIf->else_children) {
+            collect_child_components(child.get(), counts);
+        }
+    }
+    if(auto viewFor = dynamic_cast<ViewForRangeStatement*>(node)) {
+        for(auto& child : viewFor->children) {
+            collect_child_components(child.get(), counts);
+        }
+    }
+    if(auto viewForEach = dynamic_cast<ViewForEachStatement*>(node)) {
+        for(auto& child : viewForEach->children) {
             collect_child_components(child.get(), counts);
         }
     }
@@ -715,6 +920,24 @@ void Component::collect_child_updates(ASTNode* node, std::map<std::string, std::
     }
     if(auto el = dynamic_cast<HTMLElement*>(node)) {
         for(auto& child : el->children) {
+            collect_child_updates(child.get(), updates, counters);
+        }
+    }
+    if(auto viewIf = dynamic_cast<ViewIfStatement*>(node)) {
+        for(auto& child : viewIf->then_children) {
+            collect_child_updates(child.get(), updates, counters);
+        }
+        for(auto& child : viewIf->else_children) {
+            collect_child_updates(child.get(), updates, counters);
+        }
+    }
+    if(auto viewFor = dynamic_cast<ViewForRangeStatement*>(node)) {
+        for(auto& child : viewFor->children) {
+            collect_child_updates(child.get(), updates, counters);
+        }
+    }
+    if(auto viewForEach = dynamic_cast<ViewForEachStatement*>(node)) {
+        for(auto& child : viewForEach->children) {
             collect_child_updates(child.get(), updates, counters);
         }
     }
@@ -751,6 +974,12 @@ std::string Component::to_webcc() {
             el->generate_code(ss_render, "parent", element_count, click_handlers, bindings, component_counters, method_names, name);
         } else if(auto comp = dynamic_cast<ComponentInstantiation*>(root.get())){
             comp->generate_code(ss_render, "parent", element_count, click_handlers, bindings, component_counters, method_names, name);
+        } else if(auto viewIf = dynamic_cast<ViewIfStatement*>(root.get())){
+            viewIf->generate_code(ss_render, "parent", element_count, click_handlers, bindings, component_counters, method_names, name);
+        } else if(auto viewFor = dynamic_cast<ViewForRangeStatement*>(root.get())){
+            viewFor->generate_code(ss_render, "parent", element_count, click_handlers, bindings, component_counters, method_names, name);
+        } else if(auto viewForEach = dynamic_cast<ViewForEachStatement*>(root.get())){
+            viewForEach->generate_code(ss_render, "parent", element_count, click_handlers, bindings, component_counters, method_names, name);
         }
     }
 
