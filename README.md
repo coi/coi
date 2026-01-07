@@ -56,8 +56,8 @@ component Counter {
     view {
         <div class="counter">
             <span>{label}: {value}</span>
-            <button onclick={add(-1)}>+</button>
-            <button onclick={add(1)}>-</button>
+            <button onclick={add(1)}>+</button>
+            <button onclick={add(-1)}>-</button>
         </div>
     }
 }
