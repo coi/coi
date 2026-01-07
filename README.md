@@ -73,6 +73,10 @@ component App {
         itemCount++;
     }
 
+    def removeItem() : void {
+        itemCount--;
+    }
+
     style {
         .container {
             max-width: 400px;
@@ -103,7 +107,7 @@ component App {
                     <p>No items yet!</p>
                 <else>
                     <for i in 0:itemCount>
-                        <TodoItem text="Item {i}" />
+                        <TodoItem text="Item {i}" &onremove={removeItem} />
                     </for>
                 </else>
                 </if>
