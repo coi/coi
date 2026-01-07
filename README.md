@@ -508,6 +508,51 @@ Logic-only components are useful for:
 - **Network/API handlers**: Manage async operations
 - **Game logic**: Separate game state from rendering
 
+## Persisting Component State
+
+When you use `<if>` conditionals in your view, components inside branches are **created and destroyed** each time the condition changes. If you need a component to persist its state across conditional toggles, declare it as a member variable and reference it in the view:
+
+```tsx
+component Editor {
+    pub mut string text = "";
+    
+    def updateText(string newText) : void {
+        text = newText;
+    }
+    
+    view {
+        <textarea value={text}></textarea>
+    }
+}
+
+component App {
+    mut bool showEditor = false;
+    mut Editor editor;  // Declared as member - persists!
+    
+    def toggle() : void {
+        showEditor = !showEditor;
+    }
+    
+    view {
+        <div>
+            <button onclick={toggle}>Toggle Editor</button>
+            <if showEditor>
+                <editor />  // References the member, not a new instance
+            </if>
+        </div>
+    }
+}
+```
+
+**Key difference:**
+- `<Editor />` — Creates a **new instance** each time the branch renders. State is lost when the condition becomes false.
+- `mut Editor editor;` + `<editor />` — Uses an **existing member**. State persists because the component lives in the parent, not the conditional branch.
+
+This pattern is especially useful for:
+- **Forms**: Preserve user input when toggling visibility
+- **Media players**: Keep playback state when hiding/showing
+- **Complex editors**: Maintain undo history and cursor position
+
 ## Styling
 
 Coi features a powerful styling system that combines the simplicity of CSS with component-level isolation.
