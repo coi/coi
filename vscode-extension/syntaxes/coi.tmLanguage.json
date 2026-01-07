@@ -58,7 +58,7 @@
       "patterns": [
         {
           "name": "keyword.control.coi",
-          "match": "\\b(component|def|view|return|if|else|for|while|computed|prop|tick|init|app|import|struct|style|type|global)\\b"
+          "match": "\\b(component|def|view|return|if|else|for|while|computed|prop|tick|init|app|import|struct|style|type|global|in|root)\\b"
         },
         {
           "name": "storage.modifier.coi",
@@ -139,10 +139,19 @@
       }
     },
     "init-definition": {
-      "match": "\\b(init)\\b",
-      "captures": {
+      "begin": "\\b(init)\\s*\\{",
+      "beginCaptures": {
         "1": { "name": "keyword.control.coi" }
-      }
+      },
+      "end": "\\}",
+      "patterns": [
+        { "include": "#comments" },
+        { "include": "#keywords" },
+        { "include": "#operators" },
+        { "include": "#strings" },
+        { "include": "#types" },
+        { "include": "#component-reference" }
+      ]
     },
     "style-block": {
       "begin": "\\b(style)\\s*(global)?\\s*\\{",
@@ -170,9 +179,98 @@
       },
       "end": "\\}",
       "patterns": [
+        { "include": "#view-control-tags" },
         { "include": "#jsx-tags" },
-        { "include": "#expression-interpolation" },
+        { "include": "#view-expression-interpolation" },
         { "include": "#comments" }
+      ]
+    },
+    "view-control-tags": {
+      "patterns": [
+        {
+          "comment": "Opening control flow tags: <if, <else, <for",
+          "match": "(<)(if|else|for)\\b",
+          "captures": {
+            "1": { "name": "punctuation.definition.tag.coi" },
+            "2": { "name": "keyword.control.coi" }
+          }
+        },
+        {
+          "comment": "Closing control flow tags: </if>, </else>, </for>",
+          "match": "(</)(if|else|for)(>)",
+          "captures": {
+            "1": { "name": "punctuation.definition.tag.coi" },
+            "2": { "name": "keyword.control.coi" },
+            "3": { "name": "punctuation.definition.tag.coi" }
+          }
+        },
+        {
+          "comment": "For loop with in keyword and range: <for i in 0:count>",
+          "match": "(<)(for)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s+(in)\\s+([a-zA-Z0-9_]+)(:)([a-zA-Z0-9_]+)(>)",
+          "captures": {
+            "1": { "name": "punctuation.definition.tag.coi" },
+            "2": { "name": "keyword.control.coi" },
+            "3": { "name": "variable.other.coi" },
+            "4": { "name": "keyword.control.coi" },
+            "5": { "name": "constant.numeric.coi" },
+            "6": { "name": "keyword.operator.range.coi" },
+            "7": { "name": "variable.other.coi" },
+            "8": { "name": "punctuation.definition.tag.coi" }
+          }
+        },
+        {
+          "comment": "If tag with condition: <if condition>",
+          "begin": "(<)(if)\\s+",
+          "beginCaptures": {
+            "1": { "name": "punctuation.definition.tag.coi" },
+            "2": { "name": "keyword.control.coi" }
+          },
+          "end": "(>)",
+          "endCaptures": {
+            "1": { "name": "punctuation.definition.tag.coi" }
+          },
+          "patterns": [
+            { "include": "#view-condition" }
+          ]
+        },
+        {
+          "comment": "Else tag",
+          "match": "(<)(else)(>)",
+          "captures": {
+            "1": { "name": "punctuation.definition.tag.coi" },
+            "2": { "name": "keyword.control.coi" },
+            "3": { "name": "punctuation.definition.tag.coi" }
+          }
+        }
+      ]
+    },
+    "view-condition": {
+      "patterns": [
+        {
+          "name": "keyword.operator.comparison.coi",
+          "match": "==|!=|<=|>=|<|>"
+        },
+        {
+          "name": "keyword.operator.logical.coi",
+          "match": "&&|\\|\\||!"
+        },
+        {
+          "name": "constant.language.boolean.coi",
+          "match": "\\b(true|false)\\b"
+        },
+        {
+          "name": "constant.numeric.coi",
+          "match": "\\b[0-9]+\\.?[0-9]*\\b"
+        },
+        {
+          "name": "string.quoted.double.coi",
+          "begin": "\"",
+          "end": "\""
+        },
+        {
+          "name": "variable.other.coi",
+          "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b"
+        }
       ]
     },
     "jsx-tags": {
@@ -196,7 +294,7 @@
           "include": "#strings"
         },
         {
-          "include": "#expression-interpolation"
+          "include": "#view-expression-interpolation"
         },
         {
           "name": "entity.other.attribute-name.event",
@@ -204,6 +302,48 @@
           "captures": {
             "1": { "name": "support.function.event-handler" }
           }
+        }
+      ]
+    },
+    "view-expression-interpolation": {
+      "begin": "\\{",
+      "end": "\\}",
+      "beginCaptures": {
+        "0": { "name": "punctuation.section.embedded.begin.coi" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.section.embedded.end.coi" }
+      },
+      "patterns": [
+        {
+          "name": "keyword.operator.comparison.coi",
+          "match": "==|!=|<=|>=|<|>"
+        },
+        {
+          "name": "keyword.operator.logical.coi",
+          "match": "&&|\\|\\||!"
+        },
+        {
+          "name": "keyword.operator.arithmetic.coi",
+          "match": "\\+\\+|--|\\+|-|\\*|/|%"
+        },
+        {
+          "name": "keyword.operator.ternary.coi",
+          "match": "\\?|:"
+        },
+        {
+          "name": "constant.numeric.coi",
+          "match": "\\b[0-9]+\\.?[0-9]*\\b"
+        },
+        {
+          "name": "constant.language.boolean.coi",
+          "match": "\\b(true|false)\\b"
+        },
+        {
+          "include": "#strings" },
+        {
+          "name": "variable.other.coi",
+          "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b"
         }
       ]
     },
@@ -230,6 +370,7 @@
       "end": "\\}",
       "patterns": [
         { "include": "#comments" },
+        { "include": "#keywords" },
         { "include": "#component-reference" },
         { "include": "#strings" },
         { "include": "#expression-interpolation" },

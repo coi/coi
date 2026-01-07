@@ -4,9 +4,15 @@ set -e
 
 # Get the directory of this script
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+PROJECT_ROOT="$(dirname "$DIR")"
+
+# Add local webcc to PATH if it exists (for CI and local builds)
+if [ -f "$PROJECT_ROOT/deps/webcc/webcc" ]; then
+    export PATH="$PROJECT_ROOT/deps/webcc:$PATH"
+fi
 
 # Compiler path (root of the repo)
-COMPILER="$DIR/../coi"
+COMPILER="$PROJECT_ROOT/coi"
 
 if [ ! -f "$COMPILER" ]; then
     echo "Error: Compiler not found at $COMPILER"
