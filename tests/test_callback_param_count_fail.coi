@@ -1,0 +1,26 @@
+// Test: callback parameter count mismatch - should fail
+// Passing 2 arguments to a callback that expects 1
+
+component Child(def onAction(int) : void) {
+    view {
+        <button onclick={onAction(42)}>Click</button>
+    }
+}
+
+component TestCallbackParamCountFail {
+    mut int a = 1;
+    mut int b = 2;
+
+    def handler(int x, int y) : void {
+    }
+
+    view {
+        <div>
+            <Child &onAction={handler(a, b)} />
+        </div>
+    }
+}
+
+app {
+    root = TestCallbackParamCountFail;
+}

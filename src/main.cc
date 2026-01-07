@@ -400,7 +400,31 @@ void validate_view_hierarchy(const std::vector<Component>& components) {
         component_map[comp.name] = &comp;
     }
 
-    std::function<void(ASTNode*, const std::string&)> validate_node = [&](ASTNode* node, const std::string& parent_comp_name) {
+    // Build scope for a component (params + state + methods)
+    // Methods are stored as "method(param_types):return_type" for validation
+    auto build_scope = [&](const Component* comp) -> std::map<std::string, std::string> {
+        std::map<std::string, std::string> scope;
+        for (const auto& param : comp->params) {
+            scope[param->name] = normalize_type(param->type);
+        }
+        for (const auto& var : comp->state) {
+            scope[var->name] = normalize_type(var->type);
+        }
+        // Methods are stored with their full signature for callback validation
+        for (const auto& method : comp->methods) {
+            std::string sig = "method(";
+            for (size_t i = 0; i < method.params.size(); ++i) {
+                if (i > 0) sig += ",";
+                sig += normalize_type(method.params[i].type);
+            }
+            sig += "):" + (method.return_type.empty() ? "void" : normalize_type(method.return_type));
+            scope[method.name] = sig;
+        }
+        return scope;
+    };
+
+    std::function<void(ASTNode*, const std::string&, std::map<std::string, std::string>&)> validate_node = 
+        [&](ASTNode* node, const std::string& parent_comp_name, std::map<std::string, std::string>& scope) {
         if (!node) return;
 
         if (auto* comp_inst = dynamic_cast<ComponentInstantiation*>(node)) {
@@ -431,11 +455,48 @@ void validate_view_hierarchy(const std::vector<Component>& components) {
                             if (!declared_param->is_reference && passed_prop.is_reference) {
                                 // Allow & syntax for function params (webcc::function)
                                 if (declared_param->type.find("webcc::function") == 0) {
-                                    // OK
+                                    // OK - but also validate callback argument types
                                 } else {
                                     throw std::runtime_error(
                                         "Parameter '" + passed_prop.name + "' in component '" + comp_inst->component_name + 
                                         "' does not expect a reference. Remove '&' prefix at line " + 
+                                        std::to_string(comp_inst->line));
+                                }
+                            }
+                            
+                            // Validate callback argument types
+                            if (declared_param->is_callback && passed_prop.value) {
+                                // The passed value should be a function call
+                                if (auto* func_call = dynamic_cast<FunctionCall*>(passed_prop.value.get())) {
+                                    // Check argument count
+                                    if (func_call->args.size() != declared_param->callback_param_types.size()) {
+                                        throw std::runtime_error(
+                                            "Callback parameter '" + passed_prop.name + "' in component '" + comp_inst->component_name + 
+                                            "' expects " + std::to_string(declared_param->callback_param_types.size()) + 
+                                            " argument(s) but got " + std::to_string(func_call->args.size()) + 
+                                            " at line " + std::to_string(comp_inst->line));
+                                    }
+                                    
+                                    // Check each argument type
+                                    for (size_t i = 0; i < func_call->args.size(); ++i) {
+                                        std::string arg_type = infer_expression_type(func_call->args[i].get(), scope);
+                                        std::string expected_type = normalize_type(declared_param->callback_param_types[i]);
+                                        if (arg_type != "unknown" && !is_compatible_type(arg_type, expected_type)) {
+                                            throw std::runtime_error(
+                                                "Callback parameter '" + passed_prop.name + "' argument " + std::to_string(i + 1) +
+                                                " expects type '" + expected_type + "' but got '" + arg_type + 
+                                                "' at line " + std::to_string(comp_inst->line));
+                                        }
+                                    }
+                                } else if (declared_param->callback_param_types.empty()) {
+                                    // No-argument callback, value can be an identifier (method reference) 
+                                    // or a function call with no args - this is OK
+                                } else {
+                                    // Callback expects arguments but wasn't given a function call
+                                    throw std::runtime_error(
+                                        "Callback parameter '" + passed_prop.name + "' in component '" + comp_inst->component_name + 
+                                        "' expects " + std::to_string(declared_param->callback_param_types.size()) + 
+                                        " argument(s). Use syntax like '&" + passed_prop.name + "={handler(arg)}' at line " + 
                                         std::to_string(comp_inst->line));
                                 }
                             }
@@ -453,33 +514,47 @@ void validate_view_hierarchy(const std::vector<Component>& components) {
                     if (declared_param->is_reference && passed_param_names.find(declared_param->name) == passed_param_names.end()) {
                         throw std::runtime_error("Missing required reference parameter '&" + declared_param->name + "' for component '" + comp_inst->component_name + "' at line " + std::to_string(comp_inst->line));
                     }
+                    // Note: Callbacks without defaults are optional - they may not always be needed
+                    // (e.g., Button can use href without onclick)
                 }
             }
         } else if (auto* el = dynamic_cast<HTMLElement*>(node)) {
             for (const auto& child : el->children) {
-                validate_node(child.get(), parent_comp_name);
+                validate_node(child.get(), parent_comp_name, scope);
             }
         } else if (auto* viewIf = dynamic_cast<ViewIfStatement*>(node)) {
             for (const auto& child : viewIf->then_children) {
-                validate_node(child.get(), parent_comp_name);
+                validate_node(child.get(), parent_comp_name, scope);
             }
             for (const auto& child : viewIf->else_children) {
-                validate_node(child.get(), parent_comp_name);
+                validate_node(child.get(), parent_comp_name, scope);
             }
         } else if (auto* viewFor = dynamic_cast<ViewForRangeStatement*>(node)) {
+            // Add loop variable to scope
+            std::map<std::string, std::string> loop_scope = scope;
+            loop_scope[viewFor->var_name] = "int32";  // Range loops always use int32
             for (const auto& child : viewFor->children) {
-                validate_node(child.get(), parent_comp_name);
+                validate_node(child.get(), parent_comp_name, loop_scope);
             }
         } else if (auto* viewForEach = dynamic_cast<ViewForEachStatement*>(node)) {
+            // Add loop variable to scope with inferred type from iterable
+            std::map<std::string, std::string> loop_scope = scope;
+            std::string iterable_type = infer_expression_type(viewForEach->iterable.get(), scope);
+            if (iterable_type.ends_with("[]")) {
+                loop_scope[viewForEach->var_name] = iterable_type.substr(0, iterable_type.size() - 2);
+            } else {
+                loop_scope[viewForEach->var_name] = "unknown";
+            }
             for (const auto& child : viewForEach->children) {
-                validate_node(child.get(), parent_comp_name);
+                validate_node(child.get(), parent_comp_name, loop_scope);
             }
         }
     };
 
     for (const auto& comp : components) {
+        std::map<std::string, std::string> scope = build_scope(&comp);
         for (const auto& root : comp.render_roots) {
-            validate_node(root.get(), comp.name);
+            validate_node(root.get(), comp.name, scope);
         }
     }
 }
@@ -716,7 +791,8 @@ int main(int argc, char** argv){
         out << "#include \"webcc/core/function.h\"\n";
         out << "#include \"webcc/core/allocator.h\"\n";
         out << "#include \"webcc/core/new.h\"\n";
-        out << "#include \"webcc/core/vector.h\"\n\n";
+        out << "#include \"webcc/core/vector.h\"\n";
+        out << "#include \"webcc/core/unordered_map.h\"\n\n";
 
         out << "struct EventDispatcher {\n";
         out << "    static constexpr int MAX_LISTENERS = 128;\n";

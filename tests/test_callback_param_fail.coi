@@ -1,0 +1,23 @@
+// Test: callback parameter type validation - should fail
+// Passing handler() with no args to a callback that expects (int)
+
+component Child(def onAction(int) : void) {
+    view {
+        <button onclick={onAction(42)}>Click</button>
+    }
+}
+
+component TestCallbackParamFail {
+    def handler() : void {
+    }
+
+    view {
+        <div>
+            <Child &onAction={handler()} />
+        </div>
+    }
+}
+
+app {
+    root = TestCallbackParamFail;
+}

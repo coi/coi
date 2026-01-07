@@ -1,0 +1,50 @@
+// Test: callback parameter validation - should pass
+// Correct types and argument counts
+
+component ChildOne(def onAction(int) : void) {
+    view {
+        <button onclick={onAction(42)}>Click</button>
+    }
+}
+
+component ChildTwo(def onUpdate(string, int) : void) {
+    view {
+        <button onclick={onUpdate("hello", 123)}>Update</button>
+    }
+}
+
+component ChildThree(def onSimple : void) {
+    view {
+        <button onclick={onSimple()}>Simple</button>
+    }
+}
+
+component TestCallbackParamPass {
+    mut int count = 0;
+    mut string text = "test";
+
+    def handleAction(int x) : void {
+        count = x;
+    }
+
+    def handleUpdate(string s, int n) : void {
+        text = s;
+        count = n;
+    }
+
+    def handleSimple() : void {
+        count++;
+    }
+
+    view {
+        <div>
+            <ChildOne &onAction={handleAction(count)} />
+            <ChildTwo &onUpdate={handleUpdate(text, count)} />
+            <ChildThree &onSimple={handleSimple()} />
+        </div>
+    }
+}
+
+app {
+    root = TestCallbackParamPass;
+}

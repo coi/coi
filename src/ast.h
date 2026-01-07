@@ -187,6 +187,8 @@ struct ComponentParam : Statement {
     bool is_mutable = false;
     bool is_reference = false;
     bool is_public = false;  // pub keyword makes param accessible from outside
+    std::vector<std::string> callback_param_types;  // For def params: stores parameter types (e.g., ["int"] for def onRemove(int) : void)
+    bool is_callback = false;  // True if this is a def (callback) parameter
 
     std::string to_webcc() override;
 };
@@ -326,6 +328,10 @@ struct LoopRegion {
     std::string var_name;           // Loop variable name
     std::string root_element_var;   // For HTML-only loops: the variable name of the root element (e.g., "_el_7")
     bool is_html_loop = false;      // True if this loop contains HTML elements (not components)
+    bool is_keyed = false;          // True if this loop uses key-based diffing
+    std::string key_expr;           // Key expression code (e.g., "item.id")
+    std::string key_type;           // Type of the key (e.g., "int", "string")
+    std::string iterable_expr;      // For foreach loops: the array expression
 };
 
 // Struct to track reactive if/else regions
@@ -469,7 +475,9 @@ struct ViewForRangeStatement : ASTNode {
 struct ViewForEachStatement : ASTNode {
     std::string var_name;
     std::unique_ptr<Expression> iterable;
+    std::unique_ptr<Expression> key_expr;  // Optional key expression for efficient diffing
     std::vector<std::unique_ptr<ASTNode>> children;
+    int loop_id = -1;  // Assigned during code generation
 
     std::string to_webcc() override { return ""; }
     void generate_code(std::stringstream& ss, const std::string& parent, int& counter, 

@@ -1,0 +1,23 @@
+// Test: callback expects arguments but none provided - should fail
+// Callback expects (int) but handler() called with no args
+
+component Child(def onAction(int) : void) {
+    view {
+        <button onclick={onAction(42)}>Click</button>
+    }
+}
+
+component TestCallbackMissingArgFail {
+    def handler() : void {
+    }
+
+    view {
+        <div>
+            <Child &onAction={handler()} />
+        </div>
+    }
+}
+
+app {
+    root = TestCallbackMissingArgFail;
+}

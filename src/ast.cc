@@ -749,8 +749,33 @@ void ComponentInstantiation::generate_code(std::stringstream& ss, const std::str
             // Wrap in function
             ss << "        " << instance_name << "." << prop.name << " = [this]() { this->" << val << "(); };\n";
         } else if (prop.is_reference) {
-            // Pass address for reference props
-            ss << "        " << instance_name << "." << prop.name << " = &(" << val << ");\n";
+            // Check if this is a callback (function call with args) vs a data reference
+            if (auto* func_call = dynamic_cast<FunctionCall*>(prop.value.get())) {
+                // Callback - wrap in lambda that calls the function
+                // The function call arguments become the lambda parameters
+                if (func_call->args.empty()) {
+                    // No args - simple callback
+                    ss << "        " << instance_name << "." << prop.name << " = [this]() { this->" << val << "; };\n";
+                } else {
+                    // Has args - generate lambda with parameters
+                    // Each arg should be an identifier that becomes a lambda parameter
+                    std::string lambda_params;
+                    for (size_t i = 0; i < func_call->args.size(); i++) {
+                        if (i > 0) lambda_params += ", ";
+                        // Assume int32_t for now - proper type checking is done in validation
+                        if (auto* id = dynamic_cast<Identifier*>(func_call->args[i].get())) {
+                            lambda_params += "int32_t " + id->name;
+                        } else {
+                            // Non-identifier argument - capture by value
+                            lambda_params += "int32_t _arg" + std::to_string(i);
+                        }
+                    }
+                    ss << "        " << instance_name << "." << prop.name << " = [this](" << lambda_params << ") { this->" << val << "; };\n";
+                }
+            } else {
+                // Data reference - pass address
+                ss << "        " << instance_name << "." << prop.name << " = &(" << val << ");\n";
+            }
         } else {
             ss << "        " << instance_name << "." << prop.name << " = " << val << ";\n";
         }
@@ -1251,8 +1276,30 @@ void ViewForRangeStatement::generate_code(std::stringstream& ss, const std::stri
                 // Function prop - regenerate the lambda
                 update_ss << "            " << inst_ref << "." << prop.name << " = [this]() { this->" << val << "(); };\n";
             } else if (prop.is_reference) {
-                update_ss << "            " << inst_ref << "." << prop.name << " = &(" << val << ");\n";
-                update_ss << "            " << inst_ref << "._update_" << prop.name << "();\n";
+                // Check if this is a callback (function call with args) vs a data reference
+                if (auto* func_call = dynamic_cast<FunctionCall*>(prop.value.get())) {
+                    // Callback - wrap in lambda that calls the function
+                    if (func_call->args.empty()) {
+                        // No args - simple callback
+                        update_ss << "            " << inst_ref << "." << prop.name << " = [this]() { this->" << val << "; };\n";
+                    } else {
+                        // Has args - generate lambda with parameters
+                        std::string lambda_params;
+                        for (size_t i = 0; i < func_call->args.size(); i++) {
+                            if (i > 0) lambda_params += ", ";
+                            if (auto* id = dynamic_cast<Identifier*>(func_call->args[i].get())) {
+                                lambda_params += "int32_t " + id->name;
+                            } else {
+                                lambda_params += "int32_t _arg" + std::to_string(i);
+                            }
+                        }
+                        update_ss << "            " << inst_ref << "." << prop.name << " = [this](" << lambda_params << ") { this->" << val << "; };\n";
+                    }
+                } else {
+                    // Data reference - pass address
+                    update_ss << "            " << inst_ref << "." << prop.name << " = &(" << val << ");\n";
+                    update_ss << "            " << inst_ref << "._update_" << prop.name << "();\n";
+                }
             } else {
                 update_ss << "            " << inst_ref << "." << prop.name << " = " << val << ";\n";
                 update_ss << "            " << inst_ref << "._update_" << prop.name << "();\n";
@@ -1288,16 +1335,120 @@ void ViewForEachStatement::generate_code(std::stringstream& ss, const std::strin
                   int* loop_counter,
                   std::vector<IfRegion>* if_regions,
                   int* if_counter) {
-    // For now, foreach loops are not reactive (would need more complex tracking)
-    ss << "        for (auto& " << var_name << " : " << iterable->to_webcc() << ") {\n";
-    for(auto& child : children) {
-        generate_view_child(child.get(), ss, parent, counter, click_handlers, bindings, component_counters, method_names, parent_component_name, true, nullptr, nullptr, nullptr, nullptr);
+    
+    // If we're already inside a loop, or no key is provided, use simple iteration
+    if (in_loop || !key_expr || !loop_regions || !loop_counter) {
+        ss << "        for (auto& " << var_name << " : " << iterable->to_webcc() << ") {\n";
+        for(auto& child : children) {
+            generate_view_child(child.get(), ss, parent, counter, click_handlers, bindings, component_counters, method_names, parent_component_name, true, nullptr, nullptr, nullptr, nullptr);
+        }
+        ss << "        }\n";
+        return;
     }
-    ss << "        }\n";
+    
+    // Top-level keyed loop: generate reactive keyed loop region
+    int my_loop_id = (*loop_counter)++;
+    loop_id = my_loop_id;
+    
+    LoopRegion region;
+    region.loop_id = my_loop_id;
+    region.parent_element = parent;
+    region.is_keyed = true;
+    region.key_expr = key_expr->to_webcc();
+    region.var_name = var_name;
+    region.iterable_expr = iterable->to_webcc();
+    
+    // Collect dependencies for this loop (the array itself)
+    iterable->collect_dependencies(region.dependencies);
+    
+    // Check if children contain a component instantiation
+    ComponentInstantiation* loop_component = nullptr;
+    HTMLElement* loop_html_element = nullptr;
+    for(auto& child : children) {
+        if(auto comp = dynamic_cast<ComponentInstantiation*>(child.get())) {
+            region.component_type = comp->component_name;
+            loop_component = comp;
+            break;
+        }
+        if(auto el = dynamic_cast<HTMLElement*>(child.get())) {
+            loop_html_element = el;
+            region.is_html_loop = true;
+            break;
+        }
+    }
+    
+    // Generate the item creation code
+    std::string loop_parent_var = "_loop_" + std::to_string(my_loop_id) + "_parent";
+    std::stringstream item_ss;
+    int temp_counter = counter;
+    std::map<std::string, int> temp_comp_counters = component_counters;
+    int root_element_id = temp_counter;
+    
+    for(auto& child : children) {
+        generate_view_child(child.get(), item_ss, loop_parent_var, temp_counter, click_handlers, bindings, temp_comp_counters, method_names, parent_component_name, true, nullptr, nullptr);
+    }
+    region.item_creation_code = item_ss.str();
+    
+    // For HTML-only loops, store the root element variable name
+    if (region.is_html_loop && loop_html_element) {
+        region.root_element_var = "_el_" + std::to_string(root_element_id);
+    }
+    
+    // Generate the item update code (for updating existing items)
+    if (loop_component && !region.component_type.empty()) {
+        std::stringstream update_ss;
+        std::string inst_ref = "_inst";
+        
+        for(auto& prop : loop_component->props) {
+            std::string val = prop.value->to_webcc();
+            if(method_names.count(val)) {
+                update_ss << "            " << inst_ref << "." << prop.name << " = [this]() { this->" << val << "(); };\n";
+            } else if (prop.is_reference) {
+                // Check if this is a callback (function call with args) vs a data reference
+                if (auto* func_call = dynamic_cast<FunctionCall*>(prop.value.get())) {
+                    // Callback - wrap in lambda that calls the function
+                    if (func_call->args.empty()) {
+                        update_ss << "            " << inst_ref << "." << prop.name << " = [this]() { this->" << val << "; };\n";
+                    } else {
+                        std::string lambda_params;
+                        for (size_t i = 0; i < func_call->args.size(); i++) {
+                            if (i > 0) lambda_params += ", ";
+                            if (auto* id = dynamic_cast<Identifier*>(func_call->args[i].get())) {
+                                lambda_params += "int32_t " + id->name;
+                            } else {
+                                lambda_params += "int32_t _arg" + std::to_string(i);
+                            }
+                        }
+                        update_ss << "            " << inst_ref << "." << prop.name << " = [this](" << lambda_params << ") { this->" << val << "; };\n";
+                    }
+                } else {
+                    update_ss << "            " << inst_ref << "." << prop.name << " = &(" << val << ");\n";
+                    update_ss << "            " << inst_ref << "._update_" << prop.name << "();\n";
+                }
+            } else {
+                update_ss << "            " << inst_ref << "." << prop.name << " = " << val << ";\n";
+                update_ss << "            " << inst_ref << "._update_" << prop.name << "();\n";
+            }
+        }
+        region.item_update_code = update_ss.str();
+    }
+    
+    // Determine key type - for now assume int (most common for IDs)
+    // TODO: Could infer from expression type
+    region.key_type = "int";
+    
+    loop_regions->push_back(region);
+    
+    // In the view() method, store the parent handle and call the sync function
+    ss << "        _loop_" << my_loop_id << "_parent = " << parent << ";\n";
+    ss << "        _sync_loop_" << my_loop_id << "();\n";
 }
 
 void ViewForEachStatement::collect_dependencies(std::set<std::string>& deps) {
     iterable->collect_dependencies(deps);
+    if (key_expr) {
+        key_expr->collect_dependencies(deps);
+    }
     for(auto& child : children) {
         child->collect_dependencies(deps);
     }
@@ -1517,7 +1668,12 @@ std::string Component::to_webcc() {
     // Loop region tracking (parent element and current count for each reactive loop)
     for(const auto& region : loop_regions) {
         ss << "    webcc::handle _loop_" << region.loop_id << "_parent;\n";
-        ss << "    int _loop_" << region.loop_id << "_count = 0;\n";
+        if (region.is_keyed) {
+            // Keyed loops use a map instead of count
+            ss << "    webcc::unordered_map<" << region.key_type << ", int> _loop_" << region.loop_id << "_map;\n";
+        } else {
+            ss << "    int _loop_" << region.loop_id << "_count = 0;\n";
+        }
         // For HTML-only loops, add a vector to track root elements
         if (region.is_html_loop) {
             ss << "    webcc::vector<webcc::handle> _loop_" << region.loop_id << "_elements;\n";
@@ -1617,76 +1773,152 @@ std::string Component::to_webcc() {
     
     for(const auto& region : loop_regions) {
         ss << "    void _sync_loop_" << region.loop_id << "() {\n";
-        ss << "        int new_count = " << region.end_expr << " - " << region.start_expr << ";\n";
-        ss << "        int old_count = _loop_" << region.loop_id << "_count;\n";
-        ss << "        if (new_count == old_count) return;\n";
-        ss << "        \n";
         
-        if (!region.component_type.empty()) {
+        if (region.is_keyed) {
+            // Efficient keyed loop sync - only create/destroy what changed
+            std::string map_name = "_loop_" + std::to_string(region.loop_id) + "_map";
             std::string vec_name = "_loop_" + region.component_type + "s";
+            std::string key_field = region.key_expr.substr(region.var_name.length() + 1); // e.g., "id" from "todo.id"
             
-            ss << "        if (new_count > old_count) {\n";
-            ss << "            for (int " << region.var_name << " = old_count; " << region.var_name << " < new_count; " << region.var_name << "++) {\n";
+            ss << "        // Build set of new keys\n";
+            ss << "        webcc::vector<int32_t> _new_keys;\n";
+            ss << "        for (auto& " << region.var_name << " : " << region.iterable_expr << ") {\n";
+            ss << "            _new_keys.push_back(" << region.key_expr << ");\n";
+            ss << "        }\n";
+            ss << "        \n";
             
-            // Insert the item creation code with proper indentation
+            ss << "        // Destroy items whose keys are no longer present\n";
+            ss << "        webcc::vector<int32_t> _keys_to_remove;\n";
+            ss << "        for (int _i = 0; _i < (int)" << vec_name << ".size(); _i++) {\n";
+            ss << "            int32_t _old_key = " << vec_name << "[_i]." << key_field << ";\n";
+            ss << "            bool _found = false;\n";
+            ss << "            for (int _j = 0; _j < (int)_new_keys.size(); _j++) {\n";
+            ss << "                if (_new_keys[_j] == _old_key) { _found = true; break; }\n";
+            ss << "            }\n";
+            ss << "            if (!_found) _keys_to_remove.push_back(_old_key);\n";
+            ss << "        }\n";
+            ss << "        \n";
+            
+            ss << "        // Remove destroyed items from vector (back to front to preserve indices)\n";
+            ss << "        bool _did_remove = false;\n";
+            ss << "        for (int _r = 0; _r < (int)_keys_to_remove.size(); _r++) {\n";
+            ss << "            int32_t _key_to_remove = _keys_to_remove[_r];\n";
+            ss << "            for (int _i = (int)" << vec_name << ".size() - 1; _i >= 0; _i--) {\n";
+            ss << "                if (" << vec_name << "[_i]." << key_field << " == _key_to_remove) {\n";
+            ss << "                    " << vec_name << "[_i]._destroy();\n";
+            ss << "                    " << vec_name << ".erase(_i);\n";
+            ss << "                    " << map_name << ".erase(_key_to_remove);\n";
+            ss << "                    _did_remove = true;\n";
+            ss << "                    break;\n";
+            ss << "                }\n";
+            ss << "            }\n";
+            ss << "        }\n";
+            ss << "        // Rebind handlers after erase (vector may have moved items)\n";
+            ss << "        if (_did_remove) {\n";
+            ss << "            for (int _i = 0; _i < (int)" << vec_name << ".size(); _i++) " << vec_name << "[_i]._rebind();\n";
+            ss << "        }\n";
+            ss << "        \n";
+            
+            ss << "        // Create new items that don't exist yet\n";
+            ss << "        int _old_size = (int)" << vec_name << ".size();\n";
+            ss << "        for (auto& " << region.var_name << " : " << region.iterable_expr << ") {\n";
+            ss << "            auto _key = " << region.key_expr << ";\n";
+            ss << "            if (" << map_name << ".contains(_key)) continue;\n";
+            
+            // Insert item creation code
             std::string item_code = region.item_creation_code;
             std::stringstream indented;
             std::istringstream iss(item_code);
             std::string line;
             while (std::getline(iss, line)) {
                 if (!line.empty()) {
-                    indented << "    " << line << "\n";
+                    indented << "        " << line << "\n";
                 }
             }
             ss << indented.str();
-            ss << "            }\n";
             
-            // After adding, rebind handlers for all items (vector may have reallocated)
-            ss << "            for (int _i = 0; _i < old_count; _i++) " << vec_name << "[_i]._rebind();\n";
+            if (!region.component_type.empty()) {
+                ss << "            " << map_name << "[_key] = 1;\n"; // Value doesn't matter, just track existence
+            }
+            ss << "        }\n";
+            ss << "        // Rebind handlers if vector grew (may have reallocated)\n";
+            ss << "        if ((int)" << vec_name << ".size() > _old_size) {\n";
+            ss << "            for (int _i = 0; _i < _old_size; _i++) " << vec_name << "[_i]._rebind();\n";
+            ss << "        }\n";
             
-            ss << "        } else {\n";
-            ss << "            while ((int)" << vec_name << ".size() > new_count) {\n";
-            ss << "                " << vec_name << "[" << vec_name << ".size() - 1]._destroy();\n";
-            ss << "                " << vec_name << ".pop_back();\n";
-            ss << "            }\n";
+        } else {
+            // Original index-based sync for range loops
+            ss << "        int new_count = " << region.end_expr << " - " << region.start_expr << ";\n";
+            ss << "        int old_count = _loop_" << region.loop_id << "_count;\n";
+            ss << "        if (new_count == old_count) return;\n";
+            ss << "        \n";
             
-            // Update remaining items' props
-            if (!region.item_update_code.empty()) {
-                ss << "            for (int " << region.var_name << " = 0; " << region.var_name << " < new_count; " << region.var_name << "++) {\n";
-                ss << region.item_update_code;
+            if (!region.component_type.empty()) {
+                std::string vec_name = "_loop_" + region.component_type + "s";
+                
+                ss << "        if (new_count > old_count) {\n";
+                ss << "            for (int " << region.var_name << " = old_count; " << region.var_name << " < new_count; " << region.var_name << "++) {\n";
+                
+                // Insert the item creation code with proper indentation
+                std::string item_code = region.item_creation_code;
+                std::stringstream indented;
+                std::istringstream iss(item_code);
+                std::string line;
+                while (std::getline(iss, line)) {
+                    if (!line.empty()) {
+                        indented << "    " << line << "\n";
+                    }
+                }
+                ss << indented.str();
                 ss << "            }\n";
-            }
-            ss << "        }\n";
-        } else if (region.is_html_loop) {
-            // HTML-only loops
-            std::string vec_name = "_loop_" + std::to_string(region.loop_id) + "_elements";
-            
-            ss << "        if (new_count > old_count) {\n";
-            ss << "            for (int " << region.var_name << " = old_count; " << region.var_name << " < new_count; " << region.var_name << "++) {\n";
-            
-            std::string item_code = region.item_creation_code;
-            std::stringstream indented;
-            std::istringstream iss(item_code);
-            std::string line;
-            while (std::getline(iss, line)) {
-                if (!line.empty()) {
-                    indented << "    " << line << "\n";
+                
+                // After adding, rebind handlers for all items (vector may have reallocated)
+                ss << "            for (int _i = 0; _i < old_count; _i++) " << vec_name << "[_i]._rebind();\n";
+                
+                ss << "        } else {\n";
+                ss << "            while ((int)" << vec_name << ".size() > new_count) {\n";
+                ss << "                " << vec_name << "[" << vec_name << ".size() - 1]._destroy();\n";
+                ss << "                " << vec_name << ".pop_back();\n";
+                ss << "            }\n";
+                
+                // Update remaining items' props
+                if (!region.item_update_code.empty()) {
+                    ss << "            for (int " << region.var_name << " = 0; " << region.var_name << " < new_count; " << region.var_name << "++) {\n";
+                    ss << region.item_update_code;
+                    ss << "            }\n";
                 }
+                ss << "        }\n";
+            } else if (region.is_html_loop) {
+                // HTML-only loops
+                std::string vec_name = "_loop_" + std::to_string(region.loop_id) + "_elements";
+                
+                ss << "        if (new_count > old_count) {\n";
+                ss << "            for (int " << region.var_name << " = old_count; " << region.var_name << " < new_count; " << region.var_name << "++) {\n";
+                
+                std::string item_code = region.item_creation_code;
+                std::stringstream indented;
+                std::istringstream iss(item_code);
+                std::string line;
+                while (std::getline(iss, line)) {
+                    if (!line.empty()) {
+                        indented << "    " << line << "\n";
+                    }
+                }
+                ss << indented.str();
+                
+                if (!region.root_element_var.empty()) {
+                    ss << "            " << vec_name << ".push_back(" << region.root_element_var << ");\n";
+                }
+                ss << "            }\n";
+                ss << "        } else {\n";
+                ss << "            while ((int)" << vec_name << ".size() > new_count) {\n";
+                ss << "                webcc::dom::remove_element(" << vec_name << "[" << vec_name << ".size() - 1]);\n";
+                ss << "                " << vec_name << ".pop_back();\n";
+                ss << "            }\n";
+                ss << "        }\n";
             }
-            ss << indented.str();
-            
-            if (!region.root_element_var.empty()) {
-                ss << "            " << vec_name << ".push_back(" << region.root_element_var << ");\n";
-            }
-            ss << "            }\n";
-            ss << "        } else {\n";
-            ss << "            while ((int)" << vec_name << ".size() > new_count) {\n";
-            ss << "                webcc::dom::remove_element(" << vec_name << "[" << vec_name << ".size() - 1]);\n";
-            ss << "                " << vec_name << ".pop_back();\n";
-            ss << "            }\n";
-            ss << "        }\n";
+            ss << "        _loop_" << region.loop_id << "_count = new_count;\n";
         }
-        ss << "        _loop_" << region.loop_id << "_count = new_count;\n";
         ss << "    }\n";
     }
     

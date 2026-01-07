@@ -934,13 +934,23 @@ std::unique_ptr<ASTNode> Parser::parse_view_for() {
         
         return viewFor;
     } else {
-        // ForEach: <for item in items>
-        expect(TokenType::GT, "Expected '>'");
-        
+        // ForEach: <for item in items key={item.id}>
         auto viewForEach = std::make_unique<ViewForEachStatement>();
         viewForEach->line = start_line;
         viewForEach->var_name = var_name;
         viewForEach->iterable = std::move(first_expr);
+        
+        // Require key attribute for foreach loops
+        if (current().type != TokenType::KEY) {
+            throw std::runtime_error("Expected 'key' for foreach loop at line " + std::to_string(start_line) + ". Use: <for " + var_name + " in array key={" + var_name + ".id}>");
+        }
+        advance(); // consume 'key'
+        expect(TokenType::ASSIGN, "Expected '=' after 'key'");
+        expect(TokenType::LBRACE, "Expected '{' for key expression");
+        viewForEach->key_expr = parse_expression();
+        expect(TokenType::RBRACE, "Expected '}' after key expression");
+        
+        expect(TokenType::GT, "Expected '>'");
         
         // Parse children until </for>
         while (current().type != TokenType::END_OF_FILE) {
@@ -986,10 +996,45 @@ Component Parser::parse_component(){
             
             // Parse type
             if (current().type == TokenType::DEF) {
-                // Function parameter: def onclick : void
+                // Function parameter: def onclick : void  OR  def onRemove(int) : void
                 advance();
+                param->is_callback = true;
                 param->name = current().value;
                 expect(TokenType::IDENTIFIER, "Expected param name");
+                
+                // Check for optional parameter list: (type1, type2, ...)
+                std::vector<std::string> callback_params;
+                if (current().type == TokenType::LPAREN) {
+                    advance();
+                    while (current().type != TokenType::RPAREN && current().type != TokenType::END_OF_FILE) {
+                        std::string param_type = current().value;
+                        if(current().type == TokenType::INT || current().type == TokenType::STRING || 
+                            current().type == TokenType::FLOAT || current().type == TokenType::BOOL || 
+                            current().type == TokenType::IDENTIFIER || current().type == TokenType::VOID){
+                            advance();
+                        } else {
+                            throw std::runtime_error("Expected parameter type in callback definition");
+                        }
+                        
+                        // Handle array type
+                        if(current().type == TokenType::LBRACKET){
+                            advance();
+                            expect(TokenType::RBRACKET, "Expected ']'");
+                            param_type += "[]";
+                        }
+                        
+                        callback_params.push_back(param_type);
+                        param->callback_param_types.push_back(param_type);
+                        
+                        if (current().type == TokenType::COMMA) {
+                            advance();
+                        } else {
+                            break;
+                        }
+                    }
+                    expect(TokenType::RPAREN, "Expected ')' after callback parameters");
+                }
+                
                 expect(TokenType::COLON, "Expected ':'");
                 
                 std::string retType = current().value;
@@ -1000,7 +1045,14 @@ Component Parser::parse_component(){
                 } else {
                     throw std::runtime_error("Expected return type");
                 }
-                param->type = "webcc::function<" + retType + "()>";
+                
+                // Build the webcc::function type with parameter types
+                std::string params_str;
+                for (size_t i = 0; i < callback_params.size(); ++i) {
+                    if (i > 0) params_str += ", ";
+                    params_str += convert_type(callback_params[i]);
+                }
+                param->type = "webcc::function<" + retType + "(" + params_str + ")>";
             } else {
                 param->type = current().value;
                 if(current().type == TokenType::INT || current().type == TokenType::STRING || 

@@ -20,6 +20,8 @@ Compiles to WASM, JS, and HTML with tiny binaries and efficient updates for DOM,
 
 - **Fine-Grained Reactivity**: State changes map directly to DOM elements at compile-time. Update only what changed, exactly where it changed, without Virtual DOM overhead.
 - **Type-Safe Components**: Compile-time error checking with strictly typed parameters and state.
+- **Typed Callbacks**: Pass callbacks with type-checked parameters using `def onAction(int) : void` syntax.
+- **Keyed Lists**: Efficient list rendering with `key={item.id}` for optimal DOM updates on additions, removals, and reorders.
 - **Reference Parameters**: Pass state by reference with `&` for seamless parent-child synchronization.
 - **Private by Default**: Component members are private by default; use `pub` to expose them.
 - **Minimal Runtime**: Tiny WASM binaries with high-performance updates for DOM, Canvas, and more.
@@ -215,15 +217,62 @@ view {
 ```
 
 **List Rendering with Array:**
+
+Array loops require a `key` attribute for efficient updates. The key uniquely identifies each item so Coi can track additions, removals, and reorders without rebuilding the entire list.
+
 ```tsx
-view {
-    <div class="list">
-        <for item in items>
-            <div class="item">{item}</div>
-        </for>
-    </div>
+component TodoItem(pub int id, pub string text, def onRemove(int) : void) {
+    view {
+        <div class="item">
+            <span>{text}</span>
+            <button onclick={onRemove(id)}>×</button>
+        </div>
+    }
+}
+
+component TodoList {
+    mut TodoItem[] todos;
+    mut int nextId = 0;
+
+    init {
+        todos.push(TodoItem(nextId++, "Learn Coi"));
+        todos.push(TodoItem(nextId++, "Build something cool"));
+    }
+
+    def addTodo() : void {
+        todos.push(TodoItem(nextId++, "New task"));
+    }
+
+    def removeTodo(int id) : void {
+        mut TodoItem[] newTodos;
+        for todo in todos {
+            if (todo.id != id) {
+                newTodos.push(todo);
+            }
+        }
+        todos = newTodos;
+    }
+
+    view {
+        <div class="todo-list">
+            <button onclick={addTodo}>+ Add</button>
+            <for todo in todos key={todo.id}>
+                <TodoItem
+                    id={todo.id}
+                    text={todo.text}
+                    &onRemove={removeTodo(id)}
+                />
+            </for>
+        </div>
+    }
 }
 ```
+
+When the array changes:
+- Items with the same key are reused (not recreated)
+- New keys trigger item creation
+- Removed keys trigger item destruction
+- Reordering moves existing DOM nodes
 
 **Nested Loops:**
 ```tsx
@@ -351,6 +400,7 @@ When the child modifies `count`, the parent's UI (the `score` display) will auto
 ### Function Parameters (`def`)
 You can pass functions as parameters to components. Since functions are passed by reference, use the `&` operator when passing them.
 
+**Simple callback (no parameters):**
 ```tsx
 component CustomButton(
     string label,
@@ -368,6 +418,36 @@ component App {
 
     view {
         <CustomButton label="Click Me" &onclick={handleClick} />
+    }
+}
+```
+
+**Typed callback with parameters:**
+
+Callbacks can have typed parameters. The compiler validates that the handler signature matches the callback definition.
+
+```tsx
+component ListItem(
+    pub int id,
+    pub string text,
+    def onRemove(int) : void    // Callback expects an int parameter
+) {
+    view {
+        <div>
+            <span>{text}</span>
+            <button onclick={onRemove(id)}>Delete</button>
+        </div>
+    }
+}
+
+component App {
+    // Handler must accept int to match onRemove(int)
+    def handleRemove(int itemId) : void {
+        // Remove item with itemId
+    }
+
+    view {
+        <ListItem id={1} text="Item" &onRemove={handleRemove(id)} />
     }
 }
 ```

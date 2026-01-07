@@ -1,0 +1,25 @@
+// Test: callback parameter type mismatch - should fail
+// Passing string argument to a callback that expects int
+
+component Child(def onAction(int) : void) {
+    view {
+        <button onclick={onAction(42)}>Click</button>
+    }
+}
+
+component TestCallbackParamTypeFail {
+    mut string name = "test";
+
+    def handler(int x) : void {
+    }
+
+    view {
+        <div>
+            <Child &onAction={handler(name)} />
+        </div>
+    }
+}
+
+app {
+    root = TestCallbackParamTypeFail;
+}

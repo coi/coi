@@ -103,6 +103,7 @@ Token Lexer::read_identifier(){
         {"init", TokenType::INIT},
         {"mount", TokenType::MOUNT},
         {"pub", TokenType::PUB},
+        {"key", TokenType::KEY},
         {"style", TokenType::STYLE},
         {"mut", TokenType::MUT},
         {"import", TokenType::IMPORT},

@@ -1,6 +1,7 @@
 import "../demos/Counter.coi";
 import "../demos/AnimatedBox.coi";
 import "../demos/CanvasDemo.coi";
+import "../demos/TodoList.coi";
 import "../components/CodeView.coi";
 
 component DemoSection {
@@ -76,6 +77,55 @@ component DemoSection {
     \}
 \}";
 
+    string todoCode = "component TodoItem(
+    pub int id,
+    pub string text,
+    pub mut bool done,
+    def onRemove(int) : void
+) \{
+    view \{
+        <div class=\"item\">
+            <span>\{text\}</span>
+            <button onclick=\{onRemove(id)\}>×</button>
+        </div>
+    \}
+\}
+
+component TodoList \{
+    mut TodoItem[] todos;
+    mut int nextId = 0;
+
+    init \{
+        todos.push(TodoItem(nextId++, \"Learn Coi\", true));
+        todos.push(TodoItem(nextId++, \"Build something cool\", false));
+    \}
+
+    def addTodo() : void \{
+        todos.push(TodoItem(nextId++, \"New task\", false));
+    \}
+
+    def removeTodo(int id) : void \{
+        mut TodoItem[] newTodos;
+        for todo in todos \{
+            if (todo.id != id) \{
+                newTodos.push(todo);
+            \}
+        \}
+        todos = newTodos;
+    \}
+
+    view \{
+        <for todo in todos key=\{todo.id\}>
+            <TodoItem
+                id=\{todo.id\}
+                text=\{todo.text\}
+                done=\{todo.done\}
+                &onRemove=\{removeTodo(id)\}
+            />
+        </for>
+    \}
+\}";
+
     style {
         .demo-section {
             padding: 80px 20px;
@@ -123,15 +173,21 @@ component DemoSection {
             <h2>Demos</h2>
             <div class="demo-row">
                 <div class="demo-wrapper">
-                    <CanvasDemo />
+                    <TodoList />
                 </div>
-                <CodeView code={canvasCode} width="600px" />
+                <CodeView code={todoCode} width="600px" />
             </div>
             <div class="demo-row">
                 <div class="demo-wrapper">
                     <Counter />
                 </div>
                 <CodeView code={counterCode} width="600px" />
+            </div>
+            <div class="demo-row">
+                <div class="demo-wrapper">
+                    <CanvasDemo />
+                </div>
+                <CodeView code={canvasCode} width="600px" />
             </div>
             <div class="demo-row">
                 <div class="demo-wrapper">
