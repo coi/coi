@@ -4,8 +4,15 @@ component Button {
     prop string href = "";
     prop def onclick : void;
 
+    def handleClick() : void {
+        if (!href.isEmpty()) {
+            System.openUrl(href);
+        }
+        onclick();
+    }
+
     style {
-        button, a {
+        button {
             border: none;
             border-radius: 8px;
             padding: 14px 28px;
@@ -15,8 +22,9 @@ component Button {
             transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
             text-decoration: none;
             display: inline-block;
+
         }
-        button:active, a:active {
+        button:active {
             transform: translateY(1px);
         }
         .primary {
@@ -43,11 +51,6 @@ component Button {
     }
 
     view {
-        <if href.isEmpty()>
-            <a class={type} onclick={onclick}>{label}</a>
-        <else>
-            <a class={type} onclick={onclick} href={href} target="_blank">{label}</a>
-        </else>
-        </if>
+        <button class={type} onclick={handleClick}>{label}</button>
     }
 }
