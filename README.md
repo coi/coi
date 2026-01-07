@@ -25,8 +25,7 @@ Compiles to WASM, JS, and HTML with tiny binaries and efficient updates for DOM,
 - **Integrated Styling**: Write standard HTML and scoped CSS directly in components.
 - **Component Composition**: Build complex UIs from reusable components with typed props.
 - **View Control Flow**: Declarative `<if>`, `<else>`, and `<for>` tags for conditional rendering and list iteration directly in the view.
-- **Animation Support**: Built-in `tick` lifecycle method for smooth animations and updates.
-- **Lifecycle Hooks**: `init` block runs when a component mounts, perfect for setup logic.
+- **Animation & Lifecycle**: Built-in `tick {}` block for frame-based animations, `init {}` for pre-render setup, and `mount {}` for post-render initialization when DOM elements are available.
 - **Auto-Generated APIs**: Browser APIs (Canvas, Storage, Audio, etc.) are automatically generated from the [WebCC](https://github.com/io-eric/webcc) schema; new WebCC features instantly become available in Coi.
 - **VS Code Extension**: Full language support with syntax highlighting, completions, hover docs, and signature help, also auto-generated from the schema.
 
@@ -344,37 +343,37 @@ type Storage {
 
 ```tsx
 component AnimatedBall {
-    Canvas canvas;
-    CanvasContext2D ctx;
+    mut Canvas canvas;
+    mut CanvasContext2D ctx;
     mut float x = 100.0;
     mut float y = 100.0;
     mut float dx = 3.0;
     mut float dy = 2.0;
 
     init {
-        canvas = Canvas.createCanvas("game", 800.0, 600.0);
+        canvas.setSize(800, 600);
         ctx = canvas.getContext("2d");
     }
 
     tick(float dt) {
         // Clear and draw
-        ctx.clearRect(0.0, 0.0, 800.0, 600.0);
+        ctx.clearRect(0, 0, 800, 600);
         ctx.setFillStyle(66, 133, 244);
         ctx.beginPath();
-        ctx.arc(x, y, 20.0, 0.0, 6.28318);
+        ctx.arc(x, y, 20, 0, 6.28318);
         ctx.fill();
 
         // Bounce logic
         x += dx;
         y += dy;
-        if (x < 20.0) { dx = 3.0; }
-        if (x > 780.0) { dx = -3.0; }
-        if (y < 20.0) { dy = 2.0; }
-        if (y > 580.0) { dy = -2.0; }
+        if (x < 20) { dx = 3; }
+        if (x > 780) { dx = -3; }
+        if (y < 20) { dy = 2; }
+        if (y > 580) { dy = -2; }
     }
 
     view {
-        <div id="game" />
+        <canvas &={canvas}></canvas>
     }
 }
 ```
@@ -405,26 +404,26 @@ component TodoApp {
 
 ```tsx
 component Gallery {
-    Canvas canvas;
-    CanvasContext2D ctx;
+    mut Canvas canvas;
+    mut CanvasContext2D ctx;
     Image photo;
 
     init {
-        canvas = Canvas.createCanvas("canvas", 400.0, 300.0);
+        canvas.setSize(400, 300);
         ctx = canvas.getContext("2d");
         photo = Image.load("photo.png");
     }
 
     def draw() : void {
-        ctx.drawImage(photo, 0.0, 0.0);
+        ctx.drawImage(photo, 0, 0);
         ctx.setFont("24px Arial");
         ctx.setFillStyleStr("#ffffff");
-        ctx.fillText("My Photo", 20.0, 40.0);
+        ctx.fillText("My Photo", 20, 40);
     }
 
     view {
         <div>
-            <div id="canvas" />
+            <canvas &={canvas}></canvas>
             <button onclick={draw}>"Draw"</button>
         </div>
     }

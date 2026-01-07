@@ -18,7 +18,7 @@ component CanvasDemo {
     float width = 300;
     float height = 200;
 
-    init {
+    mount {
         canvas.setSize(width, height);
         ctx = canvas.getContext("2d");
     }

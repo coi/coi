@@ -25,7 +25,7 @@ mkdir -p dist/images
 cp "$DIR/../docs/images/logo.png" dist/images/
 
 echo "Building example..."
-"$COMPILER" src/App.coi --out dist #--keep-cc
+"$COMPILER" src/App.coi --out dist --keep-cc
 
 echo "Done. Output generated in example/dist/"
 

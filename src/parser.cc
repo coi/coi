@@ -1064,6 +1064,21 @@ Component Parser::parse_component(){
             expect(TokenType::RBRACE, "Expected '}'");
             comp.methods.push_back(std::move(func));
         }
+        // Mount block (runs after view is created)
+        else if(current().type == TokenType::MOUNT){
+            advance();
+            FunctionDef func;
+            func.name = "mount";
+            func.return_type = "void";
+            expect(TokenType::LBRACE, "Expected '{'");
+
+            while(current().type != TokenType::RBRACE){
+                func.body.push_back(parse_statement());
+            }
+
+            expect(TokenType::RBRACE, "Expected '}'");
+            comp.methods.push_back(std::move(func));
+        }
         // Tick definition
         else if(current().type == TokenType::TICK){
             advance();

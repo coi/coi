@@ -12,7 +12,7 @@ component CodeView {
     mut int state = 0;  // 0=normal, 1=comment, 2=string, 3=number, 4=word
     mut string buffer = "";
 
-    init {
+    mount {
         highlighted = tokenize(code);
         codeEl.setInnerHtml(highlighted);
     }
