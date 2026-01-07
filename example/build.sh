@@ -29,6 +29,9 @@ echo "Building example..."
 
 echo "Done. Output generated in example/dist/"
 
-echo "Starting development server at http://localhost:8000"
-cd dist
-python3 -m http.server 8000
+# Start dev server only in interactive mode (not in CI)
+if [ -t 0 ] && [ -z "$CI" ]; then
+    echo "Starting development server at http://localhost:8000"
+    cd dist
+    python3 -m http.server 8000
+fi
