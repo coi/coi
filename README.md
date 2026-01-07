@@ -18,8 +18,8 @@ Compiles to WASM, JS, and HTML with tiny binaries and efficient updates for DOM,
 
 ## Features
 
+- **Fine-Grained Reactivity**: State changes map directly to DOM elements at compile-time. Update only what changed, exactly where it changed, without Virtual DOM overhead.
 - **Type-Safe Components**: Compile-time error checking with strictly typed props and state.
-- **Incremental Updates**: Automatic, fine-grained DOM updates without Virtual DOM overhead.
 - **Reference Props**: Pass state by reference with `&` for seamless parent-child synchronization.
 - **Minimal Runtime**: Tiny WASM binaries with high-performance updates for DOM, Canvas, and more.
 - **Integrated Styling**: Write standard HTML and scoped CSS directly in components.
@@ -73,10 +73,6 @@ component App {
         itemCount++;
     }
 
-    def removeItem() : void {
-        itemCount--;
-    }
-
     style {
         .container {
             max-width: 400px;
@@ -107,7 +103,7 @@ component App {
                     <p>No items yet!</p>
                 <else>
                     <for i in 0:itemCount>
-                        <TodoItem text="Item {i}" &onremove={removeItem} />
+                        <TodoItem text="Item {i}" />
                     </for>
                 </else>
                 </if>
