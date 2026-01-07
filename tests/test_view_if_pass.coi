@@ -1,0 +1,29 @@
+component ConditionalView {
+    mut bool showContent = true;
+    mut string status = "active";
+
+    style {
+        .container { padding: 20px; }
+        .shown { color: green; }
+        .hidden { color: red; }
+    }
+
+    view {
+        <div class="container">
+            <if showContent>
+                <p class="shown">Content is visible</p>
+            </if>
+            
+            <if status == "active">
+                <span>Active</span>
+            <else>
+                <span>Inactive</span>
+            </else>
+            </if>
+        </div>
+    }
+}
+
+app {
+    root = ConditionalView;
+}

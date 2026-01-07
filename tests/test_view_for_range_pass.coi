@@ -1,0 +1,20 @@
+component ForRangeView {
+    mut int count = 5;
+
+    style {
+        .list { display: flex; gap: 10px; }
+        .item { padding: 10px; background: #eee; }
+    }
+
+    view {
+        <div class="list">
+            <for i in 0:count>
+                <div class="item">{i}</div>
+            </for>
+        </div>
+    }
+}
+
+app {
+    root = ForRangeView;
+}

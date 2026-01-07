@@ -1,0 +1,149 @@
+import "../components/Button.coi";
+
+component CanvasDemo {
+    mut Canvas canvas;
+    mut CanvasContext2D ctx;
+    
+    // Physics State
+    mut float ballX = 150;
+    mut float ballY = 50;
+    mut float velX = 200;
+    mut float velY = 0;
+    
+    // Constants
+    float gravity = 1500;
+    float bounce = 0.7;
+    float friction = 0.9;
+    float radius = 15;
+    float width = 300;
+    float height = 200;
+
+    init {
+        canvas.setSize(width, height);
+        ctx = canvas.getContext("2d");
+    }
+
+    def reset() : void {
+        ballX = 150;
+        ballY = 50;
+        velX = 200;
+        velY = 0;
+    }
+
+    def jump() : void {
+        velY = -600;
+        // Add a little horizontal push if it's too slow
+        if (velX > -20) {
+            if (velX < 20) {
+                velX = 150;
+            }
+        }
+    }
+
+    tick(float dt) {
+        // Physics
+        velY += gravity * dt;
+        
+        ballX += velX * dt;
+        ballY += velY * dt;
+
+        // Floor collision
+        if (ballY > height - radius) {
+            ballY = height - radius;
+            velY = -velY * bounce;
+            velX = velX * friction;
+        }
+        
+        // Ceiling collision
+        if (ballY < radius) {
+            ballY = radius;
+            velY = -velY * bounce;
+        }
+
+        // Walls
+        if (ballX > width - radius) {
+            ballX = width - radius;
+            velX = -velX * bounce;
+        }
+        if (ballX < radius) {
+            ballX = radius;
+            velX = -velX * bounce;
+        }
+
+        // Draw
+        ctx.clearRect(0, 0, width, height);
+        
+        // Background
+        ctx.setFillStyleStr("#ffffff");
+        ctx.fillRect(0, 0, width, height);
+        
+        // Grid
+        ctx.setStrokeStyleStr("#f5f5f5");
+        ctx.setLineWidth(1);
+        ctx.beginPath();
+        for i in 0:15 {
+            float x = i * 20.0;
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, height);
+        }
+        for j in 0:10 {
+            float y = j * 20.0;
+            ctx.moveTo(0, y);
+            ctx.lineTo(width, y);
+        }
+        ctx.stroke();
+        
+        // Ball
+        ctx.beginPath();
+        ctx.arc(ballX, ballY, radius, 0, 6.28);
+        ctx.setFillStyleStr("#9477ff");
+        ctx.fill();
+        
+        // Shine
+        ctx.beginPath();
+        ctx.arc(ballX - 5, ballY - 5, 5, 0, 6.28);
+        ctx.setFillStyleStr("rgba(255, 255, 255, 0.3)");
+        ctx.fill();
+    }
+
+    style {
+        .wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+        .label {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: #666;
+            font-weight: 600;
+        }
+        .canvas-container {
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid #e0e0e0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            background: #fff;
+            font-size: 0;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+        }
+    }
+
+    view {
+        <div class="wrapper">
+            <div class="label">Canvas Demo</div>
+            <div class="canvas-container">
+                <canvas &={canvas} id="demo-canvas"></canvas>
+            </div>
+            <div class="controls">
+                <Button label="Reset" type="secondary" &onclick={reset} />
+                <Button label="Jump" type="primary" &onclick={jump} />
+            </div>
+        </div>
+    }
+}

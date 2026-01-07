@@ -1,0 +1,29 @@
+component StringIsEmpty {
+    mut string text = "";
+    mut string message = "Hello";
+
+    def checkEmpty() : void {
+        if (text.isEmpty()) {
+            message = "Text is empty";
+        } else {
+            message = "Text has content";
+        }
+    }
+
+    style {
+        .container { padding: 20px; }
+    }
+
+    view {
+        <div class="container">
+            <p>{message}</p>
+            <if text.isEmpty()>
+                <span>Empty!</span>
+            </if>
+        </div>
+    }
+}
+
+app {
+    root = StringIsEmpty;
+}

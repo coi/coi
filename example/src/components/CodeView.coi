@@ -1,0 +1,373 @@
+// CodeView - A syntax-highlighted code display component with built-in tokenizer
+// Simple character-by-character tokenizer using state machine (no while loops)
+
+component CodeView {
+    prop string code;
+    prop string width = "420px";
+
+    mut DOMElement codeEl;
+    mut string highlighted = "";
+
+    // State tracking for tokenizer
+    mut int state = 0;  // 0=normal, 1=comment, 2=string, 3=number, 4=word
+    mut string buffer = "";
+
+    init {
+        highlighted = tokenize(code);
+        codeEl.setInnerHtml(highlighted);
+    }
+
+    def isKeyword(string word) : bool {
+        if (word == "component") return true;
+        if (word == "mut") return true;
+        if (word == "def") return true;
+        if (word == "prop") return true;
+        if (word == "init") return true;
+        if (word == "tick") return true;
+        if (word == "view") return true;
+        if (word == "style") return true;
+        if (word == "if") return true;
+        if (word == "else") return true;
+        if (word == "for") return true;
+        if (word == "return") return true;
+        if (word == "import") return true;
+        if (word == "shared") return true;
+        if (word == "type") return true;
+        if (word == "in") return true;
+        return false;
+    }
+
+    def isType(string word) : bool {
+        if (word == "int") return true;
+        if (word == "float") return true;
+        if (word == "string") return true;
+        if (word == "bool") return true;
+        if (word == "void") return true;
+        if (word == "Canvas") return true;
+        if (word == "CanvasContext2D") return true;
+        if (word == "DOMElement") return true;
+        return false;
+    }
+
+    def isDigit(string ch) : bool {
+        if (ch == "0") return true;
+        if (ch == "1") return true;
+        if (ch == "2") return true;
+        if (ch == "3") return true;
+        if (ch == "4") return true;
+        if (ch == "5") return true;
+        if (ch == "6") return true;
+        if (ch == "7") return true;
+        if (ch == "8") return true;
+        if (ch == "9") return true;
+        return false;
+    }
+
+    def isAlpha(string ch) : bool {
+        if (ch >= "a") {
+            if (ch <= "z") return true;
+        }
+        if (ch >= "A") {
+            if (ch <= "Z") return true;
+        }
+        if (ch == "_") return true;
+        return false;
+    }
+
+    def isAlphaNum(string ch) : bool {
+        if (isAlpha(ch)) return true;
+        if (isDigit(ch)) return true;
+        return false;
+    }
+
+    def escapeHtml(string ch) : string {
+        if (ch == "<") return "&lt;";
+        if (ch == ">") return "&gt;";
+        if (ch == "&") return "&amp;";
+        return ch;
+    }
+
+    def isOperator(string ch) : bool {
+        if (ch == "=") return true;
+        if (ch == "+") return true;
+        if (ch == "-") return true;
+        if (ch == "*") return true;
+        if (ch == "/") return true;
+        if (ch == ":") return true;
+        if (ch == "&") return true;
+        return false;
+    }
+
+    def flushWord(string word, string nextCh) : string {
+        if (word == "") return "";
+        if (isKeyword(word)) {
+            return "<span class=\"kwd\">" + word + "</span>";
+        }
+        if (isType(word)) {
+            return "<span class=\"type\">" + word + "</span>";
+        }
+        // Check if function call
+        if (nextCh == "(") {
+            return "<span class=\"fn\">" + word + "</span>";
+        }
+        return word;
+    }
+
+    def tokenize(string src) : string {
+        mut string result = "";
+        mut string word = "";
+        mut string num = "";
+        mut string str = "";
+        mut string cmt = "";
+        mut int mode = 0;  // 0=normal, 1=comment, 2=string, 3=number, 4=word, 5=tag
+        mut string tag = "";
+        mut bool prevSlash = false;
+        int len = src.length();
+
+        for i in 0:len {
+            string ch = src.at(i);
+            mut string nextCh = "";
+            if (i + 1 < len) {
+                nextCh = src.at(i + 1);
+            }
+
+            // In comment mode
+            if (mode == 1) {
+                if (ch == "\n") {
+                    result += "<span class=\"cmt\">" + cmt + "</span>";
+                    result += "\n";
+                    cmt = "";
+                    mode = 0;
+                } else {
+                    cmt += escapeHtml(ch);
+                }
+            } else {
+                // In string mode
+                if (mode == 2) {
+                    str += escapeHtml(ch);
+                    if (ch == "\"") {
+                        result += "<span class=\"str\">" + str + "</span>";
+                        str = "";
+                        mode = 0;
+                    }
+                } else {
+                    // In number mode
+                    if (mode == 3) {
+                        if (isDigit(ch)) {
+                            num += ch;
+                        } else {
+                            if (ch == ".") {
+                                num += ch;
+                            } else {
+                                result += "<span class=\"num\">" + num + "</span>";
+                                num = "";
+                                mode = 0;
+                                // Process current char in normal mode (fall through)
+                                if (ch == "\"") {
+                                    str = "\"";
+                                    mode = 2;
+                                } else {
+                                    if (ch == "/" && nextCh == "/") {
+                                        cmt = "//";
+                                        mode = 1;
+                                    } else {
+                                        if (isAlpha(ch)) {
+                                            word = ch;
+                                            mode = 4;
+                                        } else {
+                                            if (isOperator(ch)) {
+                                                result += "<span class=\"op\">" + ch + "</span>";
+                                            } else {
+                                                if (ch == "<" && isAlpha(nextCh)) {
+                                                    result += "&lt;";
+                                                    tag = "";
+                                                    mode = 5;
+                                                } else {
+                                                    if (ch == "<" && nextCh == "/") {
+                                                        result += "&lt;";
+                                                        mode = 6;
+                                                    } else {
+                                                        result += escapeHtml(ch);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        // In word mode
+                        if (mode == 4) {
+                            if (isAlphaNum(ch)) {
+                                word += ch;
+                            } else {
+                                result += flushWord(word, ch);
+                                word = "";
+                                mode = 0;
+                                // Process current char
+                                if (ch == "\"") {
+                                    str = "\"";
+                                    mode = 2;
+                                } else {
+                                    if (ch == "/" && nextCh == "/") {
+                                        cmt = "//";
+                                        mode = 1;
+                                    } else {
+                                        if (isDigit(ch)) {
+                                            num = ch;
+                                            mode = 3;
+                                        } else {
+                                            if (isOperator(ch)) {
+                                                result += "<span class=\"op\">" + ch + "</span>";
+                                            } else {
+                                                if (ch == "<" && isAlpha(nextCh)) {
+                                                    result += "&lt;";
+                                                    tag = "";
+                                                    mode = 5;
+                                                } else {
+                                                    if (ch == "<" && nextCh == "/") {
+                                                        result += "&lt;";
+                                                        mode = 6;
+                                                    } else {
+                                                        result += escapeHtml(ch);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            // In tag mode (opening tag)
+                            if (mode == 5) {
+                                if (isAlphaNum(ch)) {
+                                    tag += ch;
+                                } else {
+                                    result += "<span class=\"tag\">" + tag + "</span>";
+                                    tag = "";
+                                    mode = 0;
+                                    result += escapeHtml(ch);
+                                }
+                            } else {
+                                // In closing tag mode
+                                if (mode == 6) {
+                                    if (ch == "/") {
+                                        result += "/";
+                                        tag = "";
+                                        mode = 7;
+                                    } else {
+                                        mode = 0;
+                                        result += escapeHtml(ch);
+                                    }
+                                } else {
+                                    if (mode == 7) {
+                                        if (isAlphaNum(ch)) {
+                                            tag += ch;
+                                        } else {
+                                            result += "<span class=\"tag\">" + tag + "</span>";
+                                            tag = "";
+                                            mode = 0;
+                                            result += escapeHtml(ch);
+                                        }
+                                    } else {
+                                        // Normal mode (mode == 0)
+                                        if (ch == "\"") {
+                                            str = "\"";
+                                            mode = 2;
+                                        } else {
+                                            if (ch == "/" && nextCh == "/") {
+                                                cmt = "//";
+                                                mode = 1;
+                                            } else {
+                                                if (isDigit(ch)) {
+                                                    num = ch;
+                                                    mode = 3;
+                                                } else {
+                                                    if (isAlpha(ch)) {
+                                                        word = ch;
+                                                        mode = 4;
+                                                    } else {
+                                                        if (isOperator(ch)) {
+                                                            result += "<span class=\"op\">" + ch + "</span>";
+                                                        } else {
+                                                            if (ch == "<" && isAlpha(nextCh)) {
+                                                                result += "&lt;";
+                                                                tag = "";
+                                                                mode = 5;
+                                                            } else {
+                                                                if (ch == "<" && nextCh == "/") {
+                                                                    result += "&lt;";
+                                                                    mode = 6;
+                                                                } else {
+                                                                    result += escapeHtml(ch);
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Flush any remaining content
+        if (mode == 1) {
+            result += "<span class=\"cmt\">" + cmt + "</span>";
+        }
+        if (mode == 2) {
+            result += "<span class=\"str\">" + str + "</span>";
+        }
+        if (mode == 3) {
+            result += "<span class=\"num\">" + num + "</span>";
+        }
+        if (mode == 4) {
+            result += flushWord(word, "");
+        }
+        if (mode == 5) {
+            result += "<span class=\"tag\">" + tag + "</span>";
+        }
+        if (mode == 7) {
+            result += "<span class=\"tag\">" + tag + "</span>";
+        }
+
+        return result;
+    }
+
+    style global{
+        .code-window {
+            background: #161616;
+            border-radius: 8px;
+            padding: 24px;
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', monospace;
+            color: #e0e0e0;
+            border: 1px solid #222;
+            text-align: left;
+            font-size: 13px;
+            line-height: 1.8;
+            white-space: pre;
+            overflow-x: auto;
+            overflow-y: auto;
+            max-height: 400px;
+        }
+        .kwd { color: #a29bfe; font-weight: bold; }
+        .type { color: #74b9ff; }
+        .str { color: #c3e88d; }
+        .num { color: #f78c6c; }
+        .tag { color: #ff7675; }
+        .attr { color: #fab1a0; }
+        .op { color: #89ddff; }
+        .cmt { color: #546e7a; font-style: italic; }
+        .fn { color: #82aaff; }
+    }
+
+    view {
+        <pre class="code-window" style="width: {width};"><code &={codeEl}></code></pre>
+    }
+}

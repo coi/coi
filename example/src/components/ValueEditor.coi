@@ -5,8 +5,30 @@ component ValueEditor {
         value += i;
     }
 
+    style {
+        .editor {
+            display: flex;
+            gap: 8px;
+            margin-top: 4px;
+        }
+        button {
+            background: transparent;
+            border: 1px solid #333;
+            color: #666;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        button:hover {
+            color: #fff;
+            border-color: #555;
+        }
+    }
+
     view {
-        <div style="display: flex; gap: 10px; margin-top: 10px;">
+        <div class="editor">
             <button onclick={add(1)}>"Ref +"</button>
             <button onclick={add(-1)}>"Ref -"</button>
         </div>

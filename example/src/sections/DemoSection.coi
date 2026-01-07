@@ -1,50 +1,133 @@
 import "../demos/Counter.coi";
-import "../demos/CodeExample.coi";
-import "../demos/FunctionPropCodeExample.coi";
-import "../demos/AnimatedBallCodeExample.coi";
 import "../demos/AnimatedBox.coi";
+import "../demos/CanvasDemo.coi";
+import "../components/CodeView.coi";
 
 component DemoSection {
+    string counterCode = "component Counter \{
+    mut int count = 0;
+
+    def increment() : void \{
+        count++;
+    \}
+
+    def decrement() : void \{
+        count--;
+    \}
+
+    view \{
+        <div class=\"counter\">
+            <div class=\"count-text\">\{count\}</div>
+            <div class=\"buttons\">
+                <Button label=\"-\" &onclick=\{decrement\} />
+                <Button label=\"+\" &onclick=\{increment\} />
+            </div>
+        </div>
+    \}
+\}";
+
+    string animatedBoxCode = "component AnimatedBox \{
+    mut float x = 0;
+    mut int direction = 1;
+
+    tick(float dt) \{
+        x += direction * dt * 200;
+    
+        if (x > 300) direction = -1;
+        if (x < 0) direction = 1;
+    \}
+
+    view \{
+        <div class=\"container\">
+            <div class=\"box\" style=\"left: \{x\}px;\"></div>
+        </div>
+    \}
+\}";
+
+    string canvasCode = "component CanvasDemo \{
+    mut Canvas canvas;
+    mut CanvasContext2D ctx;
+    mut float ballX = 150;
+    mut float ballY = 50;
+    mut float velY = 0;
+    float gravity = 1500;
+
+    init \{
+        canvas.setSize(300, 200);
+        ctx = canvas.getContext(\"2d\");
+    \}
+
+    tick(float dt) \{
+        velY += gravity * dt;
+        ballY += velY * dt;
+        
+        if (ballY > 185) \{
+            ballY = 185;
+            velY = -velY * 0.7;
+        \}
+
+        ctx.clearRect(0, 0, 300, 200);
+        ctx.arc(ballX, ballY, 15, 0, 6.28);
+        ctx.fill();
+    \}
+
+    view \{
+        <canvas &=\{canvas\}></canvas>
+    \}
+\}";
+
     style {
         .demo-section {
-            padding: 100px 20px;
-            background: linear-gradient(180deg, #ffffff 0%, #f8f9fa 100%);
+            padding: 80px 20px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 80px;
-            border-top: 1px solid #f1f2f6;
+            gap: 60px;
+            border-top: 1px solid #eee;
+            background: #fafafa;
+        }
+        h2 {
+            font-size: 32px;
+            color: #1a1a1a;
+            margin: 0;
+            font-weight: 600;
         }
         .demo-row {
             display: flex;
-            gap: 60px;
+            gap: 32px;
             align-items: center;
             justify-content: center;
             flex-wrap: wrap;
         }
-        h2 {
-            font-size: 42px;
-            color: #2d3436;
-            margin: 0;
-            font-weight: 800;
-            letter-spacing: -1px;
+        .demo-wrapper {
+            width: 380px;
+            display: flex;
+            justify-content: center;
         }
     }
 
     view {
         <div class="demo-section">
-            <h2>Live Demos</h2>
+            <h2>Demos</h2>
             <div class="demo-row">
-                <Counter />
-                <CodeExample />
+                <div class="demo-wrapper">
+                    <CanvasDemo />
+                </div>
+                <CodeView code={canvasCode} width="600px" />
             </div>
             <div class="demo-row">
-                <AnimatedBallCodeExample />
-                <AnimatedBox />
+                <div class="demo-wrapper">
+                    <Counter />
+                </div>
+                <CodeView code={counterCode} width="600px" />
             </div>
             <div class="demo-row">
-                <FunctionPropCodeExample />
+                <div class="demo-wrapper">
+                    <AnimatedBox />
+                </div>
+                <CodeView code={animatedBoxCode} width="600px" />
             </div>
+         
         </div>
     }
 }

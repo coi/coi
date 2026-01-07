@@ -1,45 +1,126 @@
 import "../components/Button.coi";
 
 component Hero {
+    mut string popupDisplay = "none";
+
+    def openPopup() : void {
+        popupDisplay = "flex";
+    }
+
+    def closePopup() : void {
+        popupDisplay = "none";
+    }
+
     style {
         .hero {
             text-align: center;
-            padding: 140px 20px 100px;
+            padding: 180px 20px 120px;
             max-width: 900px;
             margin: 0 auto;
-            background-image: radial-gradient(circle at 50% 0%, rgba(162, 155, 254, 0.15) 0%, rgba(255, 255, 255, 0) 60%);
+        }
+        .logo {
+            width: 180px;
+            height: auto;
+            margin-bottom: 40px;
+            filter: drop-shadow(0 20px 40px rgba(148, 119, 255, 0.2));
         }
         h1 {
             font-size: 72px;
-            font-weight: 900;
-            color: #2d3436;
-            margin: 0 auto 32px;
-            line-height: 1.1;
+            font-weight: 800;
+            margin: 0 0 24px 0;
             letter-spacing: -2px;
-            text-align: center;
+            line-height: 1.1;
+            background: linear-gradient(135deg, #1a1a1a 30%, #9477ff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            color: #1a1a1a;
         }
-        p {
-            font-size: 22px;
-            color: #636e72;
-            margin: 0 auto 48px;
-            line-height: 1.6;
-            max-width: 640px;
-            text-align: center;
+        .tagline {
+            font-size: 24px;
+            color: #666;
+            margin: 0 auto 32px auto;
+            line-height: 1.5;
+            max-width: 600px;
         }
         .buttons {
             display: flex;
             gap: 16px;
             justify-content: center;
         }
+        .subtitle {
+            font-size: 20px;
+            font-weight: 500;
+            color: #4a4a4a;
+            margin: -5px 0 24px 0;
+            letter-spacing: -0.2px;
+        }
+        .built-with {
+            margin-top: 48px;
+            font-size: 13px;
+            color: #9477ff;
+            opacity: 0.8;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        .popup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+        .popup {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            max-width: 420px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+            animation: popupIn 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        @keyframes popupIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .popup h3 {
+             font-size: 24px;
+             margin: 0 0 16px 0;
+             color: #1a1a1a;
+        }
+        .popup p {
+            color: #666;
+            margin: 0 0 32px 0;
+            line-height: 1.6;
+            font-size: 16px;
+        }
     }
 
     view {
         <div class="hero">
-            <h1>coi</h1>
-            <p>A component-based language for high-performance web apps. Fast, minimal, and type-safe.</p>
+            <img class="logo" src="images/logo.png" alt="Coi logo" />
+            <h1>Coi</h1>
+            <p class="subtitle">WebAssembly for the Modern Web</p>
+            <p class="tagline">A component-based language for high-performance web apps.<br/>Fast. Minimal. Type-safe.</p>
             <div class="buttons">
-                <Button label="Get Started" type="primary" />
-                <Button label="View on GitHub" type="secondary" />
+                <Button label="Get Started" type="primary" &onclick={openPopup} />
+                <Button label="GitHub" type="secondary" href="https://github.com/io-eric/coi"/>
+            </div>
+            <p class="built-with">✨ This site is built with Coi</p>
+
+            <div class="popup-overlay" style="display: {popupDisplay};">
+                 <div class="popup">
+                    <h3>Work in Progress 🚧</h3>
+                    <p>This section is not finished yet... but you can look into the demos below or in the git repository to get a good start with this language :D</p>
+                    <Button label="Got it!" type="primary" &onclick={closePopup} />
+                 </div>
             </div>
         </div>
     }

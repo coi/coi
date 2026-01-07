@@ -1,5 +1,4 @@
 import "../components/Button.coi";
-import "../components/ValueEditor.coi";
 
 component Counter {
     mut int count = 0;
@@ -19,30 +18,36 @@ component Counter {
             align-items: center;
             gap: 20px;
             padding: 40px;
-            background: #f8f9fa;
-            border-radius: 16px;
-            width: 300px;
+            background: #fff;
+            border: 1px solid #eee;
+            border-radius: 12px;
+            width: 280px;
+        }
+        .label {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #999;
         }
         .count-text {
             font-size: 64px;
-            font-weight: 800;
-            color: #2d3436;
+            font-weight: 700;
+            color: #1a1a1a;
         }
         .buttons {
             display: flex;
-            gap: 16px;
+            gap: 12px;
         }
     }
 
     view {
         <div class="counter">
-            <div style="font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #636e72;">Counter</div>
+            <div class="label">Counter</div>
             <div class="count-text">{count}</div>
             <div class="buttons">
                 <Button label="-" type="secondary" &onclick={decrement} />
                 <Button label="+" type="primary" &onclick={increment} />
             </div>
-            <ValueEditor &value={count} />
         </div>
     }
 }

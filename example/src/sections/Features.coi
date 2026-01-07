@@ -3,31 +3,52 @@ import "../components/FeatureCard.coi";
 component Features {
     style {
         .features {
-            padding: 80px 20px;
-            background-color: #ffffff;
-            max-width: 1200px;
+            padding: 100px 20px;
+            max-width: 1100px;
             margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 64px;
+        }
+        h2 {
+            font-size: 36px;
+            margin: 0 0 16px 0;
+            color: #1a1a1a;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+        .subtitle {
+            color: #64748b;
+            font-size: 18px;
+            margin: 0;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
         }
         .grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 32px;
-        }
-        h2 {
-            text-align: center;
-            font-size: 32px;
-            margin-bottom: 60px;
-            color: #2d3436;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 24px;
         }
     }
 
     view {
         <div class="features">
-            <h2>Why coi?</h2>
+            <div class="header">
+                <h2>Why Coi?</h2>
+                <p class="subtitle">A modern approach to building web applications with WebAssembly</p>
+            </div>
             <div class="grid">
-                <FeatureCard title="WebAssembly & WebCC" description="Compiles to raw WebAssembly using WebCC. No heavy runtime, just native speed." />
-                <FeatureCard title="Incremental DOM" description="Smart updates that only touch what changed, avoiding the overhead of a full Virtual DOM." />
-                <FeatureCard title="Type-Safe Components" description="Catch errors at compile time. Props and state are strictly typed." />
+                <FeatureCard icon="⚡" title="WebAssembly Powered" description="Compiles to WASM via WebCC. Native speed with no heavy runtime overhead." />
+                <FeatureCard icon="🎯" title="Incremental Updates" description="Fine-grained DOM updates that only touch what changed. No Virtual DOM." />
+                <FeatureCard icon="🔒" title="Type-Safe Components" description="Catch errors at compile time. Props, state, and functions are strictly typed." />
+                <FeatureCard icon="📦" title="Tiny Bundles" description="Minimal runtime footprint. Apps ship in kilobytes, not megabytes." />
+                <FeatureCard icon="🎨" title="Scoped Styling" description="CSS lives in components and is automatically scoped. No naming collisions." />
+                <FeatureCard icon="🔄" title="Reactive State" description="Simple mut keyword for reactivity. State changes propagate to the DOM automatically." />
+                <FeatureCard icon="🔗" title="Reference Props" description="Pass state by reference with & for seamless parent-child synchronization." />
+                <FeatureCard icon="🎬" title="Animation Support" description="Built-in tick lifecycle method for smooth animations and updates." />
+                <FeatureCard icon="🛠️" title="VS Code Extension" description="Full language support with syntax highlighting, completions, and hover docs." />
             </div>
         </div>
     }

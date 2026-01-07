@@ -3,16 +3,25 @@ component Footer {
         footer {
             padding: 40px;
             text-align: center;
-            color: #b2bec3;
+            color: #999;
             font-size: 14px;
-            border-top: 1px solid #f1f2f6;
-            margin-top: 40px;
+            border-top: 1px solid #eee;
+        }
+        a {
+            color: #666;
+            text-decoration: none;
+        }
+        a:hover {
+            color: #1a1a1a;
+        }
+        p {
+            margin: 0;
         }
     }
 
     view {
         <footer>
-            <p>&copy; 2025 coi Framework. Open Source.</p>
+            <p><a href="https://github.com/io-eric/coi" target="_blank">github.com/io-eric/coi</a></p>
         </footer>
     }
 }

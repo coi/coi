@@ -1,36 +1,53 @@
 component Button {
     prop string label = "Button";
-    prop string type = "primary"; // primary or secondary
+    prop string type = "primary";
+    prop string href = "";
     prop def onclick : void;
 
     style {
-        button {
+        button, a {
             border: none;
             border-radius: 8px;
-            padding: 12px 24px;
+            padding: 14px 28px;
             font-size: 16px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+            text-decoration: none;
+            display: inline-block;
+        }
+        button:active, a:active {
+            transform: translateY(1px);
         }
         .primary {
-            background-color: #a29bfe;
-            color: white;
+            background: #9477ff;
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(148, 119, 255, 0.3);
+        }
+        .primary:hover {
+            background: #8266ff;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(148, 119, 255, 0.4);
         }
         .secondary {
-            background-color: #dfe6e9;
-            color: #2d3436;
+            background: transparent;
+            color: #666;
+            border: 1px solid #e0e0e0;
         }
-        button:hover {
+        .secondary:hover {
+            color: #1a1a1a;
+            border-color: #999;
+            background: #fafafa;
             transform: translateY(-2px);
-            opacity: 0.9;
-        }
-        button:active {
-            transform: translateY(0);
         }
     }
 
     view {
-        <button class={type} onclick={onclick}>{label}</button>
+        <if href.isEmpty()>
+            <a class={type} onclick={onclick}>{label}</a>
+        <else>
+            <a class={type} onclick={onclick} href={href} target="_blank">{label}</a>
+        </else>
+        </if>
     }
 }

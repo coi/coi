@@ -1,0 +1,20 @@
+component NestedForView {
+    style {
+        .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+        .cell { padding: 10px; background: #ddd; text-align: center; }
+    }
+
+    view {
+        <div class="grid">
+            <for i in 0:3>
+                <for j in 0:3>
+                    <div class="cell">{i},{j}</div>
+                </for>
+            </for>
+        </div>
+    }
+}
+
+app {
+    root = NestedForView;
+}

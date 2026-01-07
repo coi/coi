@@ -11,6 +11,9 @@ type DOMElement {
     shared def getBody(): DOMElement {
         // maps to: dom::get_body
     }
+    shared def getElementById(id: string): DOMElement {
+        // maps to: dom::get_element_by_id
+    }
     shared def createElement(tag: string): DOMElement {
         // maps to: dom::create_element
     }

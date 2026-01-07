@@ -1,45 +1,45 @@
 component NavBar {
     style {
+        .nav-wrapper {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid #eee;
+        }
         nav {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 20px 40px;
+            padding: 16px 40px;
             max-width: 1200px;
             margin: 0 auto;
         }
         .logo {
-            font-size: 24px;
-            font-weight: 800;
-            color: #2d3436;
+            font-size: 22px;
+            font-weight: 700;
+            color: #1a1a1a;
         }
-        ul {
-            list-style: none;
-            display: flex;
-            gap: 32px;
-            margin: 0;
-            padding: 0;
-        }
-        li {
-            cursor: pointer;
-            color: #636e72;
+        a {
+            color: #666;
+            text-decoration: none;
             font-weight: 500;
             transition: color 0.2s;
         }
-        li:hover {
-            color: #a29bfe;
+        a:hover {
+            color: #1a1a1a;
         }
     }
 
     view {
-        <nav>
-            <div class="logo">.coi</div>
-            <ul>
-                <li>Home</li>
-                <li>Features</li>
-                <li>Docs</li>
-                <li>GitHub</li>
-            </ul>
-        </nav>
+        <div class="nav-wrapper">
+            <nav>
+                <div class="logo">.coi</div>
+                <a href="https://github.com/io-eric/coi" target="_blank">GitHub</a>
+            </nav>
+        </div>
     }
 }

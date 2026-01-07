@@ -10,10 +10,23 @@ component AnimatedBox {
     }
 
     style {
+        .wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+        .label {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #999;
+        }
         .container {
             width: 350px;
             height: 60px;
-            background: #dfe6e9;
+            background: #fff;
+            border: 1px solid #eee;
             border-radius: 30px;
             position: relative;
             overflow: hidden;
@@ -21,7 +34,7 @@ component AnimatedBox {
         .box {
             width: 50px;
             height: 50px;
-            background-color: #a29bfe;
+            background: #9477ff;
             border-radius: 50%;
             position: absolute;
             top: 5px;
@@ -29,8 +42,11 @@ component AnimatedBox {
     }
 
     view {
-        <div class="container">
-            <div class="box" style="left: {x}px;"></div>
+        <div class="wrapper">
+            <div class="label">Animation</div>
+            <div class="container">
+                <div class="box" style="left: {x}px;"></div>
+            </div>
         </div>
     }
 }

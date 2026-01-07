@@ -1,0 +1,26 @@
+component CombinedView {
+    mut bool showItems = true;
+    mut int itemCount = 3;
+
+    style {
+        .container { padding: 20px; }
+        .item { padding: 5px; margin: 2px; background: #f0f0f0; }
+    }
+
+    view {
+        <div class="container">
+            <if showItems>
+                <for i in 0:itemCount>
+                    <div class="item">Item {i}</div>
+                </for>
+            <else>
+                <p>No items to show</p>
+            </else>
+            </if>
+        </div>
+    }
+}
+
+app {
+    root = CombinedView;
+}

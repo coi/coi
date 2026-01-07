@@ -1,6 +1,6 @@
 component Test {
     def fail() : void {
-        Canvas c = dom.getBody();
+        Canvas c = DOMElement.getBody();
     }
 }
 app {

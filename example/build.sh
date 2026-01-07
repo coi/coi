@@ -20,6 +20,10 @@ cd "$DIR"
 # Create output directory
 mkdir -p dist
 
+# Copy assets
+mkdir -p dist/images
+cp "$DIR/../docs/images/logo.png" dist/images/
+
 echo "Building example..."
 "$COMPILER" src/App.coi --out dist #--keep-cc
 

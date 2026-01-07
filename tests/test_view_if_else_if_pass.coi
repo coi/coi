@@ -1,0 +1,32 @@
+component ElseIfView {
+    mut int value = 1;
+
+    style {
+        .container { padding: 20px; }
+    }
+
+    view {
+        <div class="container">
+            <if value == 0>
+                <p>Zero</p>
+            <else>
+                <if value == 1>
+                    <p>One</p>
+                <else>
+                    <if value == 2>
+                        <p>Two</p>
+                    <else>
+                        <p>Other</p>
+                    </else>
+                    </if>
+                </else>
+                </if>
+            </else>
+            </if>
+        </div>
+    }
+}
+
+app {
+    root = ElseIfView;
+}
