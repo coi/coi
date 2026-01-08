@@ -1123,9 +1123,17 @@ void ViewIfStatement::generate_code(std::stringstream& ss, const std::string& pa
     
     region.else_creation_code = else_ss.str();
     
-    // Merge bindings (only add if not in loop)
-    for (auto& b : then_bindings) bindings.push_back(b);
-    for (auto& b : else_bindings) bindings.push_back(b);
+    // Merge bindings with if-region tracking
+    for (auto& b : then_bindings) {
+        b.if_region_id = my_if_id;
+        b.in_then_branch = true;
+        bindings.push_back(b);
+    }
+    for (auto& b : else_bindings) {
+        b.if_region_id = my_if_id;
+        b.in_then_branch = false;
+        bindings.push_back(b);
+    }
     
     // Generate the actual if statement with initial rendering
     ss << "        _if_" << my_if_id << "_parent = " << parent << ";\n";
@@ -1687,7 +1695,14 @@ std::string Component::to_webcc() {
     }
 
     // Internal update methods (private) - Build a map of state variable -> update code for that variable
-    std::map<std::string, std::string> var_update_code;
+    // Now tracks if-region info to generate proper guards
+    struct UpdateEntry {
+        std::string code;
+        int if_region_id;      // -1 if not in an if region
+        bool in_then_branch;
+    };
+    std::map<std::string, std::vector<UpdateEntry>> var_update_entries;
+    
     for(const auto& binding : bindings) {
         for(const auto& dep : binding.dependencies) {
             std::string el_var = "el_" + std::to_string(binding.element_id);
@@ -1708,31 +1723,87 @@ std::string Component::to_webcc() {
                     } else {
                         fmt_code += "webcc::dom::set_inner_text(" + el_var + ", _fmt.c_str()); }";
                     }
-                    update_line = "        " + fmt_code + "\n";
+                    update_line = fmt_code;
                     optimized = true;
                 }
             }
             
             if(!optimized) {
                 if(binding.type == "attr") {
-                    update_line = "        webcc::dom::set_attribute(" + el_var + ", \"" + binding.name + "\", " + binding.value_code + ");\n";
+                    update_line = "webcc::dom::set_attribute(" + el_var + ", \"" + binding.name + "\", " + binding.value_code + ");";
                 } else if(binding.type == "text") {
-                    update_line = "        webcc::dom::set_inner_text(" + el_var + ", " + binding.value_code + ");\n";
+                    update_line = "webcc::dom::set_inner_text(" + el_var + ", " + binding.value_code + ");";
                 }
             }
             
             if(!update_line.empty()) {
-                var_update_code[dep] += update_line;
+                UpdateEntry entry;
+                entry.code = update_line;
+                entry.if_region_id = binding.if_region_id;
+                entry.in_then_branch = binding.in_then_branch;
+                var_update_entries[dep].push_back(entry);
             }
         }
     }
     
     // Generate _update_{varname}() methods for variables that have UI bindings
     std::set<std::string> generated_updaters;
-    for(const auto& [var_name, update_code] : var_update_code) {
-        if(!update_code.empty()) {
+    for(const auto& [var_name, entries] : var_update_entries) {
+        if(!entries.empty()) {
             ss << "    void _update_" << var_name << "() {\n";
-            ss << update_code;
+            
+            // Group entries by if-region for cleaner code generation
+            // First output entries not in any if-region
+            for(const auto& entry : entries) {
+                if(entry.if_region_id < 0) {
+                    ss << "        " << entry.code << "\n";
+                }
+            }
+            
+            // Then output entries grouped by if-region with guards
+            std::map<int, std::pair<std::vector<std::string>, std::vector<std::string>>> if_grouped;
+            for(const auto& entry : entries) {
+                if(entry.if_region_id >= 0) {
+                    if(entry.in_then_branch) {
+                        if_grouped[entry.if_region_id].first.push_back(entry.code);
+                    } else {
+                        if_grouped[entry.if_region_id].second.push_back(entry.code);
+                    }
+                }
+            }
+            
+            for(const auto& [if_id, branches] : if_grouped) {
+                const auto& then_codes = branches.first;
+                const auto& else_codes = branches.second;
+                
+                if(!then_codes.empty() && !else_codes.empty()) {
+                    // Both branches have updates
+                    ss << "        if (_if_" << if_id << "_state) {\n";
+                    for(const auto& code : then_codes) {
+                        ss << "            " << code << "\n";
+                    }
+                    ss << "        } else {\n";
+                    for(const auto& code : else_codes) {
+                        ss << "            " << code << "\n";
+                    }
+                    ss << "        }\n";
+                } else if(!then_codes.empty()) {
+                    // Only then branch has updates
+                    ss << "        if (_if_" << if_id << "_state) {\n";
+                    for(const auto& code : then_codes) {
+                        ss << "            " << code << "\n";
+                    }
+                    ss << "        }\n";
+                } else if(!else_codes.empty()) {
+                    // Only else branch has updates
+                    ss << "        if (!_if_" << if_id << "_state) {\n";
+                    for(const auto& code : else_codes) {
+                        ss << "            " << code << "\n";
+                    }
+                    ss << "        }\n";
+                }
+            }
+            
             // For pub mut variables, also call onChange callback if set (for parent subscriptions)
             if(pub_mut_vars.count(var_name)) {
                 std::string callback_name = "on" + std::string(1, std::toupper(var_name[0])) + var_name.substr(1) + "Change";

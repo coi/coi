@@ -306,6 +306,8 @@ struct Binding {
     std::string value_code;
     std::set<std::string> dependencies;
     Expression* expr = nullptr;
+    int if_region_id = -1;      // If >= 0, this binding is inside an if region
+    bool in_then_branch = true; // True if in then branch, false if in else branch
 };
 
 struct ComponentProp {
