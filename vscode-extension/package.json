@@ -1,8 +1,8 @@
 {
   "name": "coi-language",
   "displayName": "COI Language",
-  "description": "Language support for COI - syntax highlighting, completions, hover, and diagnostics",
-  "version": "0.1.3",
+  "description": "Language support for COI - syntax highlighting, completions, hover, signature help, and formatting",
+  "version": "0.1.4",
   "publisher": "coi-lang",
   "icon": "logo.png",
   "repository": {
@@ -13,7 +13,8 @@
     "vscode": "^1.74.0"
   },
   "categories": [
-    "Programming Languages"
+    "Programming Languages",
+    "Formatters"
   ],
   "activationEvents": [
     "onLanguage:coi"
@@ -43,6 +44,11 @@
           "type": "string",
           "default": "",
           "description": "Path to COI definition files (.d.coi). Leave empty to use bundled definitions."
+        },
+        "coi.format.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable COI document formatting."
         }
       }
     }

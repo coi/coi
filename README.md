@@ -452,6 +452,104 @@ component App {
 }
 ```
 
+## Component Lifecycle
+
+Coi components have a well-defined lifecycle with three key phases: **init**, **view**, and **mount**. Understanding when each runs is essential for proper initialization.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  1. init {}     - State initialization (no DOM yet)    │
+│  2. view {}     - DOM elements are created             │
+│  3. mount {}    - DOM is ready, elements accessible    │
+│  4. tick(dt) {} - Called every frame (if defined)      │
+└─────────────────────────────────────────────────────────┘
+```
+
+### `init {}` — Pre-render Setup
+Runs **before** the view is rendered. Use it to initialize state, set default values, or perform calculations that don't require DOM access.
+
+```tsx
+component App {
+    mut int[] data;
+    mut string status;
+    
+    init {
+        // Initialize state before rendering
+        data = [1, 2, 3, 4, 5];
+        status = "Ready";
+        
+        // ❌ Cannot access DOM elements here - they don't exist yet!
+    }
+}
+```
+
+### `view {}` — DOM Creation  
+Defines the component's HTML structure. Elements are created and added to the DOM during this phase.
+
+```tsx
+component App {
+    view {
+        <div class="container">
+            <h1>Hello World</h1>
+        </div>
+    }
+}
+```
+
+### `mount {}` — Post-render Initialization
+Runs **after** the view is rendered and DOM elements exist. Use it when you need access to actual DOM elements (like Canvas contexts) or need to perform setup that requires the DOM to be ready.
+
+```tsx
+component CanvasApp {
+    mut Canvas canvas;
+    mut CanvasContext2D ctx;
+    
+    init {
+        // ❌ Can't get context here - canvas element doesn't exist yet
+    }
+    
+    mount {
+        // ✅ DOM is ready, canvas element exists
+        canvas.setSize(800, 600);
+        ctx = canvas.getContext("2d");
+    }
+    
+    view {
+        <canvas &={canvas}></canvas>
+    }
+}
+```
+
+### `tick(float dt) {}` — Animation Loop
+Called every frame after mount. The `dt` parameter is the delta time in seconds since the last frame. Use it for animations, physics, or any continuous updates.
+
+```tsx
+component AnimatedBall {
+    mut float x = 0;
+    mut float speed = 100;
+    
+    tick(float dt) {
+        // dt is typically ~0.016 for 60fps
+        x += speed * dt;  // Move 100 pixels per second
+        
+        if (x > 400) x = 0;  // Reset when off screen
+    }
+    
+    view {
+        <div class="ball" style="left: {x}px;"></div>
+    }
+}
+```
+
+### Lifecycle Summary
+
+| Block | When it runs | DOM available? | Use for |
+|-------|--------------|----------------|---------|
+| `init {}` | Before view | ❌ No | State setup, calculations |
+| `view {}` | Creates DOM | Being created | Define HTML structure |
+| `mount {}` | After view | ✅ Yes | Canvas setup, DOM measurements |
+| `tick(dt) {}` | Every frame | ✅ Yes | Animations, physics, updates |
+
 ## Logic-Only Components
 
 Components don't require a `view` block. You can create logic-only components for state management, timers, network handlers, etc.:

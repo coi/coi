@@ -3,6 +3,206 @@ const fs = require('fs');
 const path = require('path');
 
 // =========================================================
+// COI Formatter
+// =========================================================
+
+class CoiFormatter {
+    constructor() {
+        this.indentSize = 4;
+        this.useSpaces = true;
+    }
+
+    format(text, options = {}) {
+        this.indentSize = options.tabSize || 4;
+        this.useSpaces = options.insertSpaces !== false;
+
+        const lines = text.split('\n');
+        const formattedLines = [];
+        let indentLevel = 0;
+        let inViewBlock = false;
+        let inStyleBlock = false;
+        let inMultilineString = false;
+
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i];
+            let trimmed = line.trim();
+
+            // Skip empty lines but preserve them
+            if (trimmed === '') {
+                formattedLines.push('');
+                continue;
+            }
+
+            // Handle style blocks (preserve CSS formatting)
+            if (inStyleBlock) {
+                if (trimmed === '}') {
+                    inStyleBlock = false;
+                    indentLevel--;
+                    formattedLines.push(this.indent(indentLevel) + trimmed);
+                } else {
+                    // Preserve CSS indentation relative to style block
+                    formattedLines.push(this.indent(indentLevel) + trimmed);
+                }
+                continue;
+            }
+
+            // Check for style block start
+            if (/^style\s*(global)?\s*\{/.test(trimmed)) {
+                inStyleBlock = true;
+                formattedLines.push(this.indent(indentLevel) + this.formatStyleDeclaration(trimmed));
+                indentLevel++;
+                continue;
+            }
+
+            // Calculate indent adjustment before this line
+            const closeBraces = (trimmed.match(/^\}|^\<\//) || []).length;
+            if (closeBraces > 0 && indentLevel > 0) {
+                indentLevel--;
+            }
+
+            // Format the line
+            let formattedLine = this.formatLine(trimmed, inViewBlock);
+            formattedLines.push(this.indent(indentLevel) + formattedLine);
+
+            // Calculate indent adjustment after this line
+            const openBraces = (trimmed.match(/\{$|\{\s*$/) || []).length;
+            const selfClosing = trimmed.endsWith('/>') || trimmed.endsWith('/>');
+            
+            // Check for view block
+            if (/^view\s*\{/.test(trimmed)) {
+                inViewBlock = true;
+            }
+            
+            // Check for view block end
+            if (inViewBlock && trimmed === '}') {
+                inViewBlock = false;
+            }
+
+            // Handle view element tags
+            if (inViewBlock) {
+                const tagOpen = (trimmed.match(/<[a-zA-Z][^/>]*>(?!.*<\/)/g) || []).length;
+                const tagClose = (trimmed.match(/<\/[a-zA-Z]+>/g) || []).length;
+                indentLevel += tagOpen - tagClose;
+            }
+
+            if (openBraces > 0 && !trimmed.includes('}')) {
+                indentLevel++;
+            }
+
+            // Ensure indent level doesn't go negative
+            indentLevel = Math.max(0, indentLevel);
+        }
+
+        return formattedLines.join('\n');
+    }
+
+    formatLine(line, inView) {
+        // Don't format comments
+        if (line.startsWith('//')) {
+            return line;
+        }
+
+        // Format component declaration
+        if (line.startsWith('component ')) {
+            return this.formatComponentDeclaration(line);
+        }
+
+        // Format function declaration
+        if (line.startsWith('def ')) {
+            return this.formatFunctionDeclaration(line);
+        }
+
+        // Format variable declarations
+        if (/^(pub\s+)?(mut\s+)?(\w+)\s+\w+/.test(line)) {
+            return this.formatVariableDeclaration(line);
+        }
+
+        // Format operators with proper spacing
+        line = this.formatOperators(line);
+
+        return line;
+    }
+
+    formatComponentDeclaration(line) {
+        // component Name(params) {
+        return line
+            .replace(/component\s+/, 'component ')
+            .replace(/\(\s*/g, '(')
+            .replace(/\s*\)/g, ')')
+            .replace(/\s*,\s*/g, ', ')
+            .replace(/\s*\{\s*$/, ' {');
+    }
+
+    formatFunctionDeclaration(line) {
+        // def name(params) : returnType {
+        return line
+            .replace(/def\s+/, 'def ')
+            .replace(/\(\s*/g, '(')
+            .replace(/\s*\)/g, ')')
+            .replace(/\s*,\s*/g, ', ')
+            .replace(/\s*:\s*/g, ' : ')
+            .replace(/\s*\{\s*$/, ' {');
+    }
+
+    formatVariableDeclaration(line) {
+        // pub mut Type name = value;
+        return line
+            .replace(/pub\s+/, 'pub ')
+            .replace(/mut\s+/, 'mut ')
+            .replace(/\s*=\s*/g, ' = ')
+            .replace(/\s*;\s*$/, ';');
+    }
+
+    formatStyleDeclaration(line) {
+        return line.replace(/style\s*(global)?\s*\{/, 'style$1 {').replace(/style {/, 'style {');
+    }
+
+    formatOperators(line) {
+        // Don't format inside strings
+        const strings = [];
+        let stringIndex = 0;
+        line = line.replace(/"[^"]*"/g, (match) => {
+            strings.push(match);
+            return `__STRING_${stringIndex++}__`;
+        });
+
+        // Format operators
+        line = line
+            // Comparison operators
+            .replace(/\s*==\s*/g, ' == ')
+            .replace(/\s*!=\s*/g, ' != ')
+            .replace(/\s*<=\s*/g, ' <= ')
+            .replace(/\s*>=\s*/g, ' >= ')
+            // Be careful with < and > (could be view elements)
+            .replace(/([^<>])\s*<\s*([^<>=])/g, '$1 < $2')
+            .replace(/([^<>])\s*>\s*([^<>=])/g, '$1 > $2')
+            // Logical operators
+            .replace(/\s*&&\s*/g, ' && ')
+            .replace(/\s*\|\|\s*/g, ' || ')
+            // Assignment operators
+            .replace(/\s*\+=\s*/g, ' += ')
+            .replace(/\s*-=\s*/g, ' -= ')
+            .replace(/\s*\*=\s*/g, ' *= ')
+            .replace(/\s*\/=\s*/g, ' /= ')
+            // Simple assignment (but not == or !=)
+            .replace(/([^=!<>+\-*/])\s*=\s*([^=])/g, '$1 = $2');
+
+        // Restore strings
+        strings.forEach((str, i) => {
+            line = line.replace(`__STRING_${i}__`, str);
+        });
+
+        return line;
+    }
+
+    indent(level) {
+        const char = this.useSpaces ? ' ' : '\t';
+        const size = this.useSpaces ? this.indentSize : 1;
+        return char.repeat(level * size);
+    }
+}
+
+// =========================================================
 // COI Definition Parser
 // =========================================================
 
@@ -199,6 +399,7 @@ class CoiDefinitions {
 // =========================================================
 
 let definitions = new CoiDefinitions();
+const formatter = new CoiFormatter();
 
 function activate(context) {
     console.log('COI Language extension activated');
@@ -215,7 +416,7 @@ function activate(context) {
             }
         },
         '.', // Trigger on dot
-        '<'  // Trigger on < for JSX tags
+        '<'  // Trigger on < for view element tags
     );
 
     // Register hover provider
@@ -236,7 +437,53 @@ function activate(context) {
         '(', ','
     );
 
-    context.subscriptions.push(completionProvider, hoverProvider, signatureProvider);
+    // Register document formatter
+    const formattingProvider = vscode.languages.registerDocumentFormattingEditProvider('coi', {
+        provideDocumentFormattingEdits(document) {
+            const text = document.getText();
+            const options = {
+                tabSize: vscode.workspace.getConfiguration('editor').get('tabSize', 4),
+                insertSpaces: vscode.workspace.getConfiguration('editor').get('insertSpaces', true)
+            };
+            const formatted = formatter.format(text, options);
+            
+            if (formatted === text) {
+                return [];
+            }
+
+            const fullRange = new vscode.Range(
+                document.positionAt(0),
+                document.positionAt(text.length)
+            );
+            return [vscode.TextEdit.replace(fullRange, formatted)];
+        }
+    });
+
+    // Register range formatter
+    const rangeFormattingProvider = vscode.languages.registerDocumentRangeFormattingEditProvider('coi', {
+        provideDocumentRangeFormattingEdits(document, range) {
+            const text = document.getText(range);
+            const options = {
+                tabSize: vscode.workspace.getConfiguration('editor').get('tabSize', 4),
+                insertSpaces: vscode.workspace.getConfiguration('editor').get('insertSpaces', true)
+            };
+            const formatted = formatter.format(text, options);
+            
+            if (formatted === text) {
+                return [];
+            }
+
+            return [vscode.TextEdit.replace(range, formatted)];
+        }
+    });
+
+    context.subscriptions.push(
+        completionProvider, 
+        hoverProvider, 
+        signatureProvider,
+        formattingProvider,
+        rangeFormattingProvider
+    );
 }
 
 function loadDefinitions(context) {
@@ -328,7 +575,7 @@ function getCompletions(document, position) {
         return items;
     }
 
-    // Check for JSX tag completion
+    // Check for view element tag completion
     if (textBefore.match(/<(\w*)$/)) {
         // Parse current document for components
         const userComponents = definitions.parseUserFile(document.getText());
@@ -355,7 +602,7 @@ function getCompletions(document, position) {
 
     // Top-level completions (types, namespaces, keywords)
     // Keywords
-    const keywords = ['component', 'def', 'view', 'style', 'prop', 'mut', 'tick', 'if', 'else', 'for', 'while', 'return', 'import', 'app', 'struct'];
+    const keywords = ['component', 'def', 'view', 'style', 'prop', 'mut', 'pub', 'tick', 'init', 'mount', 'if', 'else', 'for', 'while', 'return', 'import', 'app', 'struct', 'in', 'key'];
     for (const kw of keywords) {
         const item = new vscode.CompletionItem(kw, vscode.CompletionItemKind.Keyword);
         items.push(item);

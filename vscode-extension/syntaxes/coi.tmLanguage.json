@@ -24,6 +24,9 @@
       "include": "#init-definition"
     },
     {
+      "include": "#mount-definition"
+    },
+    {
       "include": "#style-block"
     },
     {
@@ -58,11 +61,11 @@
       "patterns": [
         {
           "name": "keyword.control.coi",
-          "match": "\\b(component|def|view|return|if|else|for|while|computed|prop|tick|init|app|import|struct|style|type|global|in|root)\\b"
+          "match": "\\b(component|def|view|return|if|else|for|while|computed|tick|init|mount|app|import|struct|style|type|global|in|root|key)\\b"
         },
         {
           "name": "storage.modifier.coi",
-          "match": "\\b(mut|shared)\\b"
+          "match": "\\b(mut|pub|shared)\\b"
         }
       ]
     },
@@ -153,6 +156,21 @@
         { "include": "#component-reference" }
       ]
     },
+    "mount-definition": {
+      "begin": "\\b(mount)\\s*\\{",
+      "beginCaptures": {
+        "1": { "name": "keyword.control.coi" }
+      },
+      "end": "\\}",
+      "patterns": [
+        { "include": "#comments" },
+        { "include": "#keywords" },
+        { "include": "#operators" },
+        { "include": "#strings" },
+        { "include": "#types" },
+        { "include": "#component-reference" }
+      ]
+    },
     "style-block": {
       "begin": "\\b(style)\\s*(global)?\\s*\\{",
       "beginCaptures": {
@@ -180,7 +198,7 @@
       "end": "\\}",
       "patterns": [
         { "include": "#view-control-tags" },
-        { "include": "#jsx-tags" },
+        { "include": "#view-element-tags" },
         { "include": "#view-expression-interpolation" },
         { "include": "#comments" }
       ]
@@ -273,13 +291,20 @@
         }
       ]
     },
-    "jsx-tags": {
+    "view-element-tags": {
       "patterns": [
         {
           "match": "(</?)([A-Za-z0-9:-]+)",
           "captures": {
             "1": { "name": "punctuation.definition.tag" },
             "2": { "name": "entity.name.tag" }
+          }
+        },
+        {
+          "name": "entity.other.attribute-name.key.coi",
+          "match": "\\b(key)\\s*=",
+          "captures": {
+            "1": { "name": "keyword.control.coi" }
           }
         },
         {
