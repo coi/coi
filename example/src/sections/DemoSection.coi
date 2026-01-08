@@ -53,9 +53,9 @@ component DemoSection {
     mut float velY = 0;
     float gravity = 1500;
 
-    init \{
+    mount \{
         canvas.setSize(300, 200);
-        ctx = canvas.getContext(\"2d\");
+        ctx = canvas.getContext2d();
     \}
 
     tick(float dt) \{

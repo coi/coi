@@ -13,8 +13,14 @@ type Canvas {
     }
 
     // Instance methods (call as instance.methodName(...))
-    def getContext(context_type: string): CanvasContext2D {
-        // maps to: canvas::get_context
+    def getContext2d(): CanvasContext2D {
+        // maps to: canvas::get_context_2d
+    }
+    def getContextWebgl(): WebGLContext {
+        // maps to: canvas::get_context_webgl
+    }
+    def getContextWebgpu(): WGPUContext {
+        // maps to: canvas::get_context_webgpu
     }
     def setSize(width: float, height: float): void {
         // maps to: canvas::set_size

@@ -38,7 +38,7 @@ bool SchemaLoader::is_assignable_to(const std::string& derived, const std::strin
     if (derived == base) {
         return true;
     }
-    
+
     // Walk up the inheritance chain
     std::string current = derived;
     while (true) {
@@ -56,12 +56,19 @@ bool SchemaLoader::is_assignable_to(const std::string& derived, const std::strin
 
 std::string SchemaLoader::to_snake_case(const std::string& camel) {
     std::string snake;
-    for (char c : camel) {
+    for (size_t i = 0; i < camel.size(); ++i) {
+        char c = camel[i];
         if (std::isupper(c)) {
             if (!snake.empty()) {
                 snake += '_';
             }
             snake += std::tolower(c);
+        } else if (std::isdigit(c)) {
+            // Add underscore before digit if previous char was a lowercase letter
+            if (!snake.empty() && i > 0 && std::islower(camel[i-1])) {
+                snake += '_';
+            }
+            snake += c;
         } else {
             snake += c;
         }

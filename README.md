@@ -508,7 +508,7 @@ component CanvasApp {
     mount {
         // ✅ DOM is ready, canvas element exists
         canvas.setSize(800, 600);
-        ctx = canvas.getContext("2d");
+        ctx = canvas.getContext2d();
     }
     
     view {
@@ -702,13 +702,15 @@ All platform types use a simple, consistent pattern:
 
 - **`type`**: Defines a handle type (like `Canvas`, `Image`, `DOMElement`)
 - **`shared def`**: Static/factory methods called on the type itself (e.g., `Canvas.createCanvas(...)`)
-- **`def`**: Instance methods called on an instance (e.g., `canvas.getContext(...)`)
+- **`def`**: Instance methods called on an instance (e.g., `canvas.getContext2d()`)
 
 ```tsx
 // Definition (auto-generated from WebCC schema)
 type Canvas {
     shared def createCanvas(id: string, width: float, height: float): Canvas
-    def getContext(type: string): CanvasContext2D
+    def getContext2d(): CanvasContext2D
+    def getContextWebgl(): WebGLContext
+    def getContextWebgpu(): WGPUContext
     def setSize(width: float, height: float): void
 }
 
@@ -730,9 +732,9 @@ component AnimatedBall {
     mut float dx = 3.0;
     mut float dy = 2.0;
 
-    init {
+    mount {
         canvas.setSize(800, 600);
-        ctx = canvas.getContext("2d");
+        ctx = canvas.getContext2d();
     }
 
     tick(float dt) {
@@ -788,9 +790,9 @@ component Gallery {
     mut CanvasContext2D ctx;
     Image photo;
 
-    init {
+    mount {
         canvas.setSize(400, 300);
-        ctx = canvas.getContext("2d");
+        ctx = canvas.getContext2d();
         photo = Image.load("photo.png");
     }
 

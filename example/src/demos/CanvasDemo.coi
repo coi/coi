@@ -20,7 +20,7 @@ component CanvasDemo {
 
     mount {
         canvas.setSize(width, height);
-        ctx = canvas.getContext("2d");
+        ctx = canvas.getContext2d();
     }
 
     def reset() : void {

@@ -107,7 +107,7 @@ Storage.setItem("key", "value");
 System.log("Hello!");
 
 // Instance methods
-CanvasContext2D ctx = canvas.getContext("2d");
+CanvasContext2D ctx = canvas.getContext2d();
 ctx.setFillStyle(66, 133, 244);
 ctx.fillRect(0.0, 0.0, 100.0, 100.0);
 ```
