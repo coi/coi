@@ -1748,6 +1748,21 @@ std::string Component::to_webcc() {
         ss << "    webcc::handle el[" << element_count << "];\n";
     }
     
+    // Event handler bitmasks (which elements have which event listeners)
+    uint64_t click_mask = 0, input_mask = 0, change_mask = 0, keydown_mask = 0;
+    for (const auto& handler : event_handlers) {
+        if (handler.element_id < 64) {
+            if (handler.event_type == "click") click_mask |= (1ULL << handler.element_id);
+            else if (handler.event_type == "input") input_mask |= (1ULL << handler.element_id);
+            else if (handler.event_type == "change") change_mask |= (1ULL << handler.element_id);
+            else if (handler.event_type == "keydown") keydown_mask |= (1ULL << handler.element_id);
+        }
+    }
+    if (click_mask) ss << "    static constexpr uint64_t _click_mask = 0x" << std::hex << click_mask << std::dec << "ULL;\n";
+    if (input_mask) ss << "    static constexpr uint64_t _input_mask = 0x" << std::hex << input_mask << std::dec << "ULL;\n";
+    if (change_mask) ss << "    static constexpr uint64_t _change_mask = 0x" << std::hex << change_mask << std::dec << "ULL;\n";
+    if (keydown_mask) ss << "    static constexpr uint64_t _keydown_mask = 0x" << std::hex << keydown_mask << std::dec << "ULL;\n";
+    
     // Child component members (for components NOT in loops)
     for(auto const& [comp_name, count] : component_members) {
         for(int i=0; i<count; ++i) {
@@ -2096,8 +2111,24 @@ std::string Component::to_webcc() {
         ss << "        _if_" << region.if_id << "_state = new_state;\n";
         ss << "        \n";
         
+        // Build sets of element IDs with each event type for quick lookup
+        std::set<int> click_els, input_els, change_els, keydown_els;
+        for (const auto& handler : event_handlers) {
+            if (handler.event_type == "click") click_els.insert(handler.element_id);
+            else if (handler.event_type == "input") input_els.insert(handler.element_id);
+            else if (handler.event_type == "change") change_els.insert(handler.element_id);
+            else if (handler.event_type == "keydown") keydown_els.insert(handler.element_id);
+        }
+        
         // Destroy old branch elements and create new ones
         ss << "        if (new_state) {\n";
+        // Unregister event handlers for else branch elements BEFORE removing them
+        for (int el_id : region.else_element_ids) {
+            if (click_els.count(el_id)) ss << "            g_dispatcher.remove(el[" << el_id << "]);\n";
+            if (input_els.count(el_id)) ss << "            g_input_dispatcher.remove(el[" << el_id << "]);\n";
+            if (change_els.count(el_id)) ss << "            g_change_dispatcher.remove(el[" << el_id << "]);\n";
+            if (keydown_els.count(el_id)) ss << "            g_keydown_dispatcher.remove(el[" << el_id << "]);\n";
+        }
         // Destroy else branch elements
         for (int el_id : region.else_element_ids) {
             ss << "            webcc::dom::remove_element(el[" << el_id << "]);\n";
@@ -2137,11 +2168,19 @@ std::string Component::to_webcc() {
             // Just destroy elements tracked in that if region
             for (const auto& nested_region : if_regions) {
                 if (nested_region.if_id == nested_if_id) {
-                    // Destroy both branches of nested if since we're removing it entirely
+                    // Unregister handlers and destroy both branches of nested if since we're removing it entirely
                     for (int el_id : nested_region.then_element_ids) {
+                        if (click_els.count(el_id)) ss << "            if (_if_" << nested_if_id << "_state) g_dispatcher.remove(el[" << el_id << "]);\n";
+                        if (input_els.count(el_id)) ss << "            if (_if_" << nested_if_id << "_state) g_input_dispatcher.remove(el[" << el_id << "]);\n";
+                        if (change_els.count(el_id)) ss << "            if (_if_" << nested_if_id << "_state) g_change_dispatcher.remove(el[" << el_id << "]);\n";
+                        if (keydown_els.count(el_id)) ss << "            if (_if_" << nested_if_id << "_state) g_keydown_dispatcher.remove(el[" << el_id << "]);\n";
                         ss << "            if (_if_" << nested_if_id << "_state) webcc::dom::remove_element(el[" << el_id << "]);\n";
                     }
                     for (int el_id : nested_region.else_element_ids) {
+                        if (click_els.count(el_id)) ss << "            if (!_if_" << nested_if_id << "_state) g_dispatcher.remove(el[" << el_id << "]);\n";
+                        if (input_els.count(el_id)) ss << "            if (!_if_" << nested_if_id << "_state) g_input_dispatcher.remove(el[" << el_id << "]);\n";
+                        if (change_els.count(el_id)) ss << "            if (!_if_" << nested_if_id << "_state) g_change_dispatcher.remove(el[" << el_id << "]);\n";
+                        if (keydown_els.count(el_id)) ss << "            if (!_if_" << nested_if_id << "_state) g_keydown_dispatcher.remove(el[" << el_id << "]);\n";
                         ss << "            if (!_if_" << nested_if_id << "_state) webcc::dom::remove_element(el[" << el_id << "]);\n";
                     }
                 }
@@ -2151,6 +2190,13 @@ std::string Component::to_webcc() {
         ss << region.then_creation_code;
         
         ss << "        } else {\n";
+        // Unregister event handlers for then branch elements BEFORE removing them
+        for (int el_id : region.then_element_ids) {
+            if (click_els.count(el_id)) ss << "            g_dispatcher.remove(el[" << el_id << "]);\n";
+            if (input_els.count(el_id)) ss << "            g_input_dispatcher.remove(el[" << el_id << "]);\n";
+            if (change_els.count(el_id)) ss << "            g_change_dispatcher.remove(el[" << el_id << "]);\n";
+            if (keydown_els.count(el_id)) ss << "            g_keydown_dispatcher.remove(el[" << el_id << "]);\n";
+        }
         // Destroy then branch elements
         for (int el_id : region.then_element_ids) {
             ss << "            webcc::dom::remove_element(el[" << el_id << "]);\n";
@@ -2188,10 +2234,19 @@ std::string Component::to_webcc() {
         for (int nested_if_id : region.then_if_ids) {
             for (const auto& nested_region : if_regions) {
                 if (nested_region.if_id == nested_if_id) {
+                    // Unregister handlers and destroy both branches of nested if
                     for (int el_id : nested_region.then_element_ids) {
+                        if (click_els.count(el_id)) ss << "            if (_if_" << nested_if_id << "_state) g_dispatcher.remove(el[" << el_id << "]);\n";
+                        if (input_els.count(el_id)) ss << "            if (_if_" << nested_if_id << "_state) g_input_dispatcher.remove(el[" << el_id << "]);\n";
+                        if (change_els.count(el_id)) ss << "            if (_if_" << nested_if_id << "_state) g_change_dispatcher.remove(el[" << el_id << "]);\n";
+                        if (keydown_els.count(el_id)) ss << "            if (_if_" << nested_if_id << "_state) g_keydown_dispatcher.remove(el[" << el_id << "]);\n";
                         ss << "            if (_if_" << nested_if_id << "_state) webcc::dom::remove_element(el[" << el_id << "]);\n";
                     }
                     for (int el_id : nested_region.else_element_ids) {
+                        if (click_els.count(el_id)) ss << "            if (!_if_" << nested_if_id << "_state) g_dispatcher.remove(el[" << el_id << "]);\n";
+                        if (input_els.count(el_id)) ss << "            if (!_if_" << nested_if_id << "_state) g_input_dispatcher.remove(el[" << el_id << "]);\n";
+                        if (change_els.count(el_id)) ss << "            if (!_if_" << nested_if_id << "_state) g_change_dispatcher.remove(el[" << el_id << "]);\n";
+                        if (keydown_els.count(el_id)) ss << "            if (!_if_" << nested_if_id << "_state) g_keydown_dispatcher.remove(el[" << el_id << "]);\n";
                         ss << "            if (!_if_" << nested_if_id << "_state) webcc::dom::remove_element(el[" << el_id << "]);\n";
                     }
                 }
@@ -2203,6 +2258,10 @@ std::string Component::to_webcc() {
         }
         
         ss << "        }\n";
+        // Re-register event handlers for newly created elements
+        if (!event_handlers.empty()) {
+            ss << "        _rebind();\n";
+        }
         ss << "    }\n";
     }
 
@@ -2320,17 +2379,50 @@ std::string Component::to_webcc() {
     if(!render_roots.empty()){
         ss << ss_render.str();
     }
-    // Register event handlers with dispatcher
-    for(auto& handler : event_handlers) {
-        if (handler.event_type == "click") {
-            ss << "        g_dispatcher.set(el[" << handler.element_id << "], [this]() { this->_handler_" << handler.element_id << "_click(); });\n";
-        } else if (handler.event_type == "input") {
-            ss << "        g_input_dispatcher.set(el[" << handler.element_id << "], [this](const webcc::string& v) { this->_handler_" << handler.element_id << "_input(v); });\n";
-        } else if (handler.event_type == "change") {
-            ss << "        g_change_dispatcher.set(el[" << handler.element_id << "], [this](const webcc::string& v) { this->_handler_" << handler.element_id << "_change(v); });\n";
-        } else if (handler.event_type == "keydown") {
-            ss << "        g_keydown_dispatcher.set(el[" << handler.element_id << "], [this](int k) { this->_handler_" << handler.element_id << "_keydown(k); });\n";
+    // Register event handlers with dispatcher using bitmasks
+    if (click_mask) {
+        ss << "        for (int i = 0; i < " << element_count << "; i++) if (_click_mask & (1ULL << i)) g_dispatcher.set(el[i], [this, i]() {\n";
+        ss << "            switch(i) {\n";
+        for (const auto& handler : event_handlers) {
+            if (handler.event_type == "click") {
+                ss << "                case " << handler.element_id << ": _handler_" << handler.element_id << "_click(); break;\n";
+            }
         }
+        ss << "            }\n";
+        ss << "        });\n";
+    }
+    if (input_mask) {
+        ss << "        for (int i = 0; i < " << element_count << "; i++) if (_input_mask & (1ULL << i)) g_input_dispatcher.set(el[i], [this, i](const webcc::string& v) {\n";
+        ss << "            switch(i) {\n";
+        for (const auto& handler : event_handlers) {
+            if (handler.event_type == "input") {
+                ss << "                case " << handler.element_id << ": _handler_" << handler.element_id << "_input(v); break;\n";
+            }
+        }
+        ss << "            }\n";
+        ss << "        });\n";
+    }
+    if (change_mask) {
+        ss << "        for (int i = 0; i < " << element_count << "; i++) if (_change_mask & (1ULL << i)) g_change_dispatcher.set(el[i], [this, i](const webcc::string& v) {\n";
+        ss << "            switch(i) {\n";
+        for (const auto& handler : event_handlers) {
+            if (handler.event_type == "change") {
+                ss << "                case " << handler.element_id << ": _handler_" << handler.element_id << "_change(v); break;\n";
+            }
+        }
+        ss << "            }\n";
+        ss << "        });\n";
+    }
+    if (keydown_mask) {
+        ss << "        for (int i = 0; i < " << element_count << "; i++) if (_keydown_mask & (1ULL << i)) g_keydown_dispatcher.set(el[i], [this, i](int k) {\n";
+        ss << "            switch(i) {\n";
+        for (const auto& handler : event_handlers) {
+            if (handler.event_type == "keydown") {
+                ss << "                case " << handler.element_id << ": _handler_" << handler.element_id << "_keydown(k); break;\n";
+            }
+        }
+        ss << "            }\n";
+        ss << "        });\n";
     }
     
     // Wire up onChange callbacks for child component pub mut members used in if conditions
@@ -2352,34 +2444,61 @@ std::string Component::to_webcc() {
     // Re-bind handlers (used after vector reallocation invalidates this pointers)
     if (!event_handlers.empty()) {
         ss << "    void _rebind() {\n";
-        for(auto& handler : event_handlers) {
-            if (handler.event_type == "click") {
-                ss << "        g_dispatcher.set(el[" << handler.element_id << "], [this]() { this->_handler_" << handler.element_id << "_click(); });\n";
-            } else if (handler.event_type == "input") {
-                ss << "        g_input_dispatcher.set(el[" << handler.element_id << "], [this](const webcc::string& v) { this->_handler_" << handler.element_id << "_input(v); });\n";
-            } else if (handler.event_type == "change") {
-                ss << "        g_change_dispatcher.set(el[" << handler.element_id << "], [this](const webcc::string& v) { this->_handler_" << handler.element_id << "_change(v); });\n";
-            } else if (handler.event_type == "keydown") {
-                ss << "        g_keydown_dispatcher.set(el[" << handler.element_id << "], [this](int k) { this->_handler_" << handler.element_id << "_keydown(k); });\n";
+        if (click_mask) {
+            ss << "        for (int i = 0; i < " << element_count << "; i++) if (_click_mask & (1ULL << i)) g_dispatcher.set(el[i], [this, i]() {\n";
+            ss << "            switch(i) {\n";
+            for (const auto& handler : event_handlers) {
+                if (handler.event_type == "click") {
+                    ss << "                case " << handler.element_id << ": _handler_" << handler.element_id << "_click(); break;\n";
+                }
             }
+            ss << "            }\n";
+            ss << "        });\n";
+        }
+        if (input_mask) {
+            ss << "        for (int i = 0; i < " << element_count << "; i++) if (_input_mask & (1ULL << i)) g_input_dispatcher.set(el[i], [this, i](const webcc::string& v) {\n";
+            ss << "            switch(i) {\n";
+            for (const auto& handler : event_handlers) {
+                if (handler.event_type == "input") {
+                    ss << "                case " << handler.element_id << ": _handler_" << handler.element_id << "_input(v); break;\n";
+                }
+            }
+            ss << "            }\n";
+            ss << "        });\n";
+        }
+        if (change_mask) {
+            ss << "        for (int i = 0; i < " << element_count << "; i++) if (_change_mask & (1ULL << i)) g_change_dispatcher.set(el[i], [this, i](const webcc::string& v) {\n";
+            ss << "            switch(i) {\n";
+            for (const auto& handler : event_handlers) {
+                if (handler.event_type == "change") {
+                    ss << "                case " << handler.element_id << ": _handler_" << handler.element_id << "_change(v); break;\n";
+                }
+            }
+            ss << "            }\n";
+            ss << "        });\n";
+        }
+        if (keydown_mask) {
+            ss << "        for (int i = 0; i < " << element_count << "; i++) if (_keydown_mask & (1ULL << i)) g_keydown_dispatcher.set(el[i], [this, i](int k) {\n";
+            ss << "            switch(i) {\n";
+            for (const auto& handler : event_handlers) {
+                if (handler.event_type == "keydown") {
+                    ss << "                case " << handler.element_id << ": _handler_" << handler.element_id << "_keydown(k); break;\n";
+                }
+            }
+            ss << "            }\n";
+            ss << "        });\n";
         }
         ss << "    }\n";
     }
     
     // Destroy method - unregisters handlers and removes the component's root element from the DOM
     ss << "    void _destroy() {\n";
-    for(auto& handler : event_handlers) {
-        if (handler.event_type == "click") {
-            ss << "        g_dispatcher.remove(el[" << handler.element_id << "]);\n";
-        } else if (handler.event_type == "input") {
-            ss << "        g_input_dispatcher.remove(el[" << handler.element_id << "]);\n";
-        } else if (handler.event_type == "change") {
-            ss << "        g_change_dispatcher.remove(el[" << handler.element_id << "]);\n";
-        } else if (handler.event_type == "keydown") {
-            ss << "        g_keydown_dispatcher.remove(el[" << handler.element_id << "]);\n";
-        }
-    }
+    if (click_mask) ss << "        for (int i = 0; i < " << element_count << "; i++) if (_click_mask & (1ULL << i)) g_dispatcher.remove(el[i]);\n";
+    if (input_mask) ss << "        for (int i = 0; i < " << element_count << "; i++) if (_input_mask & (1ULL << i)) g_input_dispatcher.remove(el[i]);\n";
+    if (change_mask) ss << "        for (int i = 0; i < " << element_count << "; i++) if (_change_mask & (1ULL << i)) g_change_dispatcher.remove(el[i]);\n";
+    if (keydown_mask) ss << "        for (int i = 0; i < " << element_count << "; i++) if (_keydown_mask & (1ULL << i)) g_keydown_dispatcher.remove(el[i]);\n";
     if (element_count > 0) {
+        ss << "        // Removing the parent automatically destroys all children in the browser\n";
         ss << "        webcc::dom::remove_element(el[0]);\n";
     }
     ss << "    }\n";
