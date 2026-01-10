@@ -40,8 +40,9 @@ build build/obj/parser.o: cxx src/parser.cc
 build build/obj/ast.o: cxx src/ast.cc || src/coi_schema.h
 build build/obj/schema_loader.o: cxx src/schema_loader.cc || src/coi_schema.h
 build build/obj/coi_schema.o: cxx src/coi_schema.cc || src/coi_schema.h
+build build/obj/type_checker.o: cxx src/type_checker.cc || src/coi_schema.h
 
 # Link Coi
-build coi: link build/obj/main.o build/obj/lexer.o build/obj/parser.o build/obj/ast.o build/obj/schema_loader.o build/obj/coi_schema.o
+build coi: link build/obj/main.o build/obj/lexer.o build/obj/parser.o build/obj/ast.o build/obj/schema_loader.o build/obj/coi_schema.o build/obj/type_checker.o
 
 default coi
