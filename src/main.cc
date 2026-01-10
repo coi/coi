@@ -356,6 +356,7 @@ int main(int argc, char **argv)
         namespace fs = std::filesystem;
         fs::path input_path(input_file);
         fs::path output_path;
+        fs::path final_output_dir;
 
         if (!output_dir.empty())
         {
@@ -369,14 +370,26 @@ int main(int argc, char **argv)
                 std::cerr << "Error: Could not create output directory " << output_dir << ": " << e.what() << std::endl;
                 return 1;
             }
-
-            output_path = out_dir_path / input_path.stem();
-            output_path += ".cc";
+            final_output_dir = out_dir_path;
         }
         else
         {
-            output_path = input_path;
-            output_path.replace_extension(".cc");
+            final_output_dir = input_path.parent_path();
+            if (final_output_dir.empty()) final_output_dir = ".";
+        }
+
+        // Create temp directory for intermediate files
+        fs::path temp_dir = fs::temp_directory_path() / "coi_build";
+        fs::create_directories(temp_dir);
+
+        // Generate .cc in temp dir (or output dir if --keep-cc)
+        if (keep_cc)
+        {
+            output_path = final_output_dir / "app.cc";
+        }
+        else
+        {
+            output_path = temp_dir / "app.cc";
         }
 
         std::string output_cc = output_path.string();
@@ -512,87 +525,6 @@ int main(int argc, char **argv)
         out << "    void* app_mem = webcc::malloc(sizeof(" << final_app_config.root_component << "));\n";
         out << "    app = new (app_mem) " << final_app_config.root_component << "();\n";
 
-        // Inject CSS
-        std::string all_css;
-        for (const auto &comp : all_components)
-        {
-            if (!comp.global_css.empty())
-            {
-                all_css += comp.global_css + "\\n";
-            }
-            if (!comp.css.empty())
-            {
-                // Simple CSS scoping: prefix selectors with [coi-scope="ComponentName"]
-                std::string scoped_css;
-                std::string raw = comp.css;
-                size_t pos = 0;
-                while (pos < raw.length())
-                {
-                    size_t brace = raw.find('{', pos);
-                    if (brace == std::string::npos)
-                    {
-                        scoped_css += raw.substr(pos);
-                        break;
-                    }
-
-                    std::string selector_group = raw.substr(pos, brace - pos);
-                    std::stringstream ss_sel(selector_group);
-                    std::string selector;
-                    bool first = true;
-                    while (std::getline(ss_sel, selector, ','))
-                    {
-                        if (!first)
-                            scoped_css += ",";
-                        size_t start = selector.find_first_not_of(" \t\n\r");
-                        size_t end = selector.find_last_not_of(" \t\n\r");
-                        if (start != std::string::npos)
-                        {
-                            std::string trimmed = selector.substr(start, end - start + 1);
-                            size_t colon = trimmed.find(':');
-                            if (colon != std::string::npos)
-                            {
-                                scoped_css += trimmed.substr(0, colon) + "[coi-scope=\"" + comp.name + "\"]" + trimmed.substr(colon);
-                            }
-                            else
-                            {
-                                scoped_css += trimmed + "[coi-scope=\"" + comp.name + "\"]";
-                            }
-                        }
-                        first = false;
-                    }
-
-                    size_t end_brace = raw.find('}', brace);
-                    if (end_brace == std::string::npos)
-                    {
-                        scoped_css += raw.substr(brace);
-                        break;
-                    }
-                    scoped_css += raw.substr(brace, end_brace - brace + 1);
-                    pos = end_brace + 1;
-                }
-                all_css += scoped_css + "\\n";
-            }
-        }
-        if (!all_css.empty())
-        {
-            // Escape quotes in CSS string for C++ string literal
-            std::string escaped_css;
-            for (char c : all_css)
-            {
-                if (c == '"')
-                    escaped_css += "\\\"";
-                else if (c == '\n')
-                    escaped_css += "\\n";
-                else
-                    escaped_css += c;
-            }
-
-            out << "    // Inject CSS\n";
-            out << "    webcc::handle style_el = webcc::dom::create_element(\"style\");\n";
-            out << "    webcc::dom::set_inner_text(style_el, \"" << escaped_css << "\");\n";
-            out << "    webcc::dom::append_child(webcc::dom::get_body(), style_el);\n";
-        }
-
         out << "    app->view();\n";
         out << "    webcc::system::set_main_loop(update_wrapper);\n";
         out << "    webcc::flush();\n";
@@ -600,31 +532,189 @@ int main(int argc, char **argv)
         out << "}\n";
 
         out.close();
-        std::cerr << "Generated " << output_cc << std::endl;
+        if (keep_cc) {
+            std::cerr << "Generated " << output_cc << std::endl;
+        }
 
         if (!cc_only)
         {
-            namespace fs = std::filesystem;
-            fs::path cwd = fs::current_path();
-            fs::path abs_output_cc = fs::absolute(output_cc);
-            fs::path abs_output_dir = output_dir.empty() ? cwd : fs::absolute(output_dir);
+        // Generate CSS file with all styles
+        {
+            fs::path css_path = final_output_dir / "app.css";
+            std::ofstream css_out(css_path);
+            if (css_out)
+            {
+                // Base styles - modern CSS reset for consistent cross-browser behavior
+                css_out << "/* Base styles */\n";
+                css_out << "*, *::before, *::after {\n";
+                css_out << "    box-sizing: border-box;\n";
+                css_out << "    -webkit-tap-highlight-color: transparent;\n";
+                css_out << "}\n\n";
+                css_out << "html {\n";
+                css_out << "    -webkit-text-size-adjust: 100%;\n";
+                css_out << "    -moz-tab-size: 4;\n";
+                css_out << "    tab-size: 4;\n";
+                css_out << "}\n\n";
+                css_out << "body {\n";
+                css_out << "    margin: 0;\n";
+                css_out << "    line-height: 1.5;\n";
+                css_out << "    -webkit-font-smoothing: antialiased;\n";
+                css_out << "    -moz-osx-font-smoothing: grayscale;\n";
+                css_out << "}\n\n";
+                css_out << "img, picture, video, canvas, svg {\n";
+                css_out << "    display: block;\n";
+                css_out << "    max-width: 100%;\n";
+                css_out << "}\n\n";
+                css_out << "input, textarea, select, button {\n";
+                css_out << "    font: inherit;\n";
+                css_out << "    color: inherit;\n";
+                css_out << "}\n\n";
+                css_out << "button {\n";
+                css_out << "    cursor: pointer;\n";
+                css_out << "}\n\n";
+                css_out << "a {\n";
+                css_out << "    color: inherit;\n";
+                css_out << "    text-decoration: inherit;\n";
+                css_out << "}\n\n";
+                css_out << "a, button {\n";
+                css_out << "    touch-action: manipulation;\n";
+                css_out << "}\n\n";
+                css_out << "p, h1, h2, h3, h4, h5, h6 {\n";
+                css_out << "    overflow-wrap: break-word;\n";
+                css_out << "}\n\n";
+                css_out << "@media (prefers-reduced-motion: reduce) {\n";
+                css_out << "    *, *::before, *::after {\n";
+                css_out << "        animation-duration: 0.01ms !important;\n";
+                css_out << "        animation-iteration-count: 1 !important;\n";
+                css_out << "        transition-duration: 0.01ms !important;\n";
+                css_out << "    }\n";
+                css_out << "}\n\n";
 
-            fs::create_directories("build/.webcc_cache");
+                // Collect all CSS from components
+                for (const auto &comp : all_components)
+                {
+                    bool has_styles = !comp.global_css.empty() || !comp.css.empty();
+                    if (has_styles)
+                    {
+                        css_out << "/* " << comp.name << " */\n";
+                    }
+                    
+                    // Global CSS (no scoping)
+                    if (!comp.global_css.empty())
+                    {
+                        css_out << comp.global_css << "\n";
+                    }
+                    
+                    // Scoped CSS: prefix selectors with [coi-scope="ComponentName"]
+                    if (!comp.css.empty())
+                    {
+                        std::string raw = comp.css;
+                        size_t pos = 0;
+                        while (pos < raw.length())
+                        {
+                            size_t brace = raw.find('{', pos);
+                            if (brace == std::string::npos)
+                            {
+                                css_out << raw.substr(pos);
+                                break;
+                            }
+
+                            std::string selector_group = raw.substr(pos, brace - pos);
+                            std::stringstream ss_sel(selector_group);
+                            std::string selector;
+                            bool first = true;
+                            while (std::getline(ss_sel, selector, ','))
+                            {
+                                if (!first)
+                                    css_out << ",";
+                                size_t start = selector.find_first_not_of(" \t\n\r");
+                                size_t end = selector.find_last_not_of(" \t\n\r");
+                                if (start != std::string::npos)
+                                {
+                                    std::string trimmed = selector.substr(start, end - start + 1);
+                                    size_t colon = trimmed.find(':');
+                                    if (colon != std::string::npos)
+                                    {
+                                        css_out << trimmed.substr(0, colon) << "[coi-scope=\"" << comp.name << "\"]" << trimmed.substr(colon);
+                                    }
+                                    else
+                                    {
+                                        css_out << trimmed << "[coi-scope=\"" << comp.name << "\"]";
+                                    }
+                                }
+                                first = false;
+                            }
+
+                            size_t end_brace = raw.find('}', brace);
+                            if (end_brace == std::string::npos)
+                            {
+                                css_out << raw.substr(brace);
+                                break;
+                            }
+                            css_out << raw.substr(brace, end_brace - brace + 1) << "\n";
+                            pos = end_brace + 1;
+                        }
+                        css_out << "\n";
+                    }
+                }
+                css_out.close();
+                std::cerr << "Generated " << css_path.string() << std::endl;
+            }
+        }
+        } // end if (!cc_only) for CSS
+
+        if (!cc_only)
+        {
+        // Generate HTML template in temp directory
+        fs::path template_path = temp_dir / "index.template.html";
+        {
+            std::ofstream tmpl_out(template_path);
+            if (tmpl_out)
+            {
+                std::string lang = final_app_config.lang.empty() ? "en" : final_app_config.lang;
+                std::string title = final_app_config.title.empty() ? "Coi App" : final_app_config.title;
+                
+                tmpl_out << "<!DOCTYPE html>\n";
+                tmpl_out << "<html lang=\"" << lang << "\">\n";
+                tmpl_out << "<head>\n";
+                tmpl_out << "    <meta charset=\"utf-8\">\n";
+                tmpl_out << "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, viewport-fit=cover\">\n";
+                tmpl_out << "    <title>" << title << "</title>\n";
+                if (!final_app_config.description.empty()) {
+                    tmpl_out << "    <meta name=\"description\" content=\"" << final_app_config.description << "\">\n";
+                }
+                // Auto-include generated CSS
+                tmpl_out << "    <link rel=\"stylesheet\" href=\"app.css\">\n";
+                tmpl_out << "</head>\n";
+                tmpl_out << "<body>\n";
+                tmpl_out << "{{script}}\n";
+                tmpl_out << "</body>\n";
+                tmpl_out << "</html>\n";
+                tmpl_out.close();
+            }
+        }
+
+            fs::path abs_output_cc = fs::absolute(output_cc);
+            fs::path abs_output_dir = fs::absolute(final_output_dir);
+            fs::path abs_template = fs::absolute(template_path);
+            fs::path cache_dir = temp_dir / "webcc_cache";
+            fs::create_directories(cache_dir);
+
             std::string cmd = "webcc " + abs_output_cc.string();
             cmd += " --out " + abs_output_dir.string();
-            cmd += " --cache-dir build/.webcc_cache";
+            cmd += " --cache-dir " + cache_dir.string();
+            cmd += " --template " + abs_template.string();
 
             std::cerr << "Running: " << cmd << std::endl;
             int ret = system(cmd.c_str());
+            
+            // Clean up temp files
+            fs::remove_all(temp_dir);
+            
             if (ret != 0)
             {
                 std::cerr << "Error: webcc compilation failed." << std::endl;
                 return 1;
-            }
-
-            if (!keep_cc)
-            {
-                fs::remove(output_cc);
             }
         }
     }

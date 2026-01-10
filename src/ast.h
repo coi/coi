@@ -469,6 +469,10 @@ struct Component : ASTNode {
 struct AppConfig {
     std::string root_component;
     std::map<std::string, std::string> routes;
+    // HTML metadata
+    std::string title;
+    std::string description;
+    std::string lang = "en";
 };
 
 struct BoolLiteral : Expression {

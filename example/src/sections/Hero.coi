@@ -21,7 +21,7 @@ component Hero {
         .logo {
             width: 180px;
             height: auto;
-            margin-bottom: 40px;
+            margin: 0 auto 40px auto;
             filter: drop-shadow(0 20px 40px rgba(148, 119, 255, 0.2));
         }
         h1 {

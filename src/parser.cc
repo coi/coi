@@ -1464,6 +1464,15 @@ void Parser::parse_app() {
             if(key == "root"){
                 app_config.root_component = current().value;
                 expect(TokenType::IDENTIFIER, "Expected component name");
+            } else if(key == "title"){
+                app_config.title = current().value;
+                expect(TokenType::STRING_LITERAL, "Expected string");
+            } else if(key == "description"){
+                app_config.description = current().value;
+                expect(TokenType::STRING_LITERAL, "Expected string");
+            } else if(key == "lang"){
+                app_config.lang = current().value;
+                expect(TokenType::STRING_LITERAL, "Expected string");
             } else if(key == "routes"){
                 expect(TokenType::LBRACE, "Expected '{'");
                 while(current().type != TokenType::RBRACE){

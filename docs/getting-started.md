@@ -97,6 +97,32 @@ component App {
 app { root = App; }
 ```
 
+### App Configuration
+
+The `app {}` block configures your application. Here are all available properties:
+
+```tsx
+app {
+    root = App;                                    // Required: Root component
+    title = "My App";                              // Page title (<title> tag)
+    description = "A description for SEO";         // Meta description
+    lang = "en";                                   // HTML lang attribute (default: "en")
+    routes = {                                     // Client-side routing (optional)
+        "/": Home,
+        "/about": About,
+        "/users/:id": UserProfile
+    };
+}
+```
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `root` | Component | Yes | The root component to render |
+| `title` | String | No | Sets the page `<title>` tag |
+| `description` | String | No | Sets `<meta name="description">` for SEO |
+| `lang` | String | No | Sets the `<html lang="">` attribute (default: `"en"`) |
+| `routes` | Object | No | Maps URL paths to components for client-side routing |
+
 Compile and run:
 
 ```bash

@@ -6,14 +6,6 @@ import "layout/Footer.coi";
 
 component App {
     style global {
-        * {
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        a, button {
-            touch-action: manipulation;
-        }
-
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             margin: 0;
@@ -58,4 +50,7 @@ component App {
 
 app {
     root = App;
+    title = "Coi - WebAssembly for the Modern Web";
+    description = "A component-based language for high-performance web apps. Fast. Minimal. Type-safe.";
+    lang = "en";
 }
