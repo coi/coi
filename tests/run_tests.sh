@@ -25,11 +25,14 @@ fi
 echo "Running tests..."
 FAILURES=0
 
-for test_file in "$SCRIPT_DIR"/*.coi; do
+# Find all .coi files recursively
+while IFS= read -r -d '' test_file; do
+    # Get relative path from tests directory for display
+    rel_path="${test_file#$SCRIPT_DIR/}"
     filename=$(basename "$test_file")
     
     if [[ "$filename" == *"_pass.coi" ]]; then
-        echo -n "Running $filename (Expect Success)... "
+        echo -n "Running $rel_path (Expect Success)... "
         OUTPUT=$($COMPILER "$test_file" --cc-only 2>&1)
         if [ $? -eq 0 ]; then
             echo -e "${GREEN}PASS${NC}"
@@ -41,7 +44,7 @@ for test_file in "$SCRIPT_DIR"/*.coi; do
             FAILURES=$((FAILURES+1))
         fi
     elif [[ "$filename" == *"_fail.coi" ]]; then
-        echo -n "Running $filename (Expect Failure)... "
+        echo -n "Running $rel_path (Expect Failure)... "
         OUTPUT=$($COMPILER "$test_file" --cc-only 2>&1)
         if [ $? -ne 0 ]; then
             echo -e "${GREEN}PASS${NC}"
@@ -50,7 +53,7 @@ for test_file in "$SCRIPT_DIR"/*.coi; do
             FAILURES=$((FAILURES+1))
         fi
     fi
-done
+done < <(find "$SCRIPT_DIR" -name "*.coi" -type f -print0 | sort -z)
 
 if [ $FAILURES -eq 0 ]; then
     echo -e "\n${GREEN}All tests passed!${NC}"
