@@ -14,8 +14,8 @@ Compiles to WASM, JS, and HTML with tiny binaries and efficient updates for DOM,
 
 </div>
 
-> [!WARNING]
-> This project is a work in progress. I don't recommend using it in production yet, as the language features and syntax are still evolving and may change.
+> [!NOTE]
+> Coi is actively evolving. Some syntax may change in future releases.
 
 ## Features
 
