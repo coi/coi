@@ -213,6 +213,28 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
         return infer_expression_type(postfix->operand.get(), scope);
     }
 
+    // Ternary operator type inference (cond ? true_expr : false_expr)
+    if (auto ternary = dynamic_cast<TernaryOp *>(expr))
+    {
+        // The result type is the type of the true/false branches (they should match)
+        std::string true_type = infer_expression_type(ternary->true_expr.get(), scope);
+        std::string false_type = infer_expression_type(ternary->false_expr.get(), scope);
+        
+        // If one side is unknown, return the other
+        if (true_type == "unknown") return false_type;
+        if (false_type == "unknown") return true_type;
+        
+        // Both sides should have compatible types
+        if (!is_compatible_type(true_type, false_type) && !is_compatible_type(false_type, true_type))
+        {
+            std::cerr << "Type error: Ternary operator branches have incompatible types '"
+                      << true_type << "' and '" << false_type << "'" << std::endl;
+            exit(1);
+        }
+        
+        return true_type;
+    }
+
     if (auto func = dynamic_cast<FunctionCall *>(expr))
     {
         std::string full_name = func->name;

@@ -384,6 +384,23 @@ void UnaryOp::collect_dependencies(std::set<std::string>& deps) {
 }
 bool UnaryOp::is_static() { return operand->is_static(); }
 
+TernaryOp::TernaryOp(std::unique_ptr<Expression> cond, std::unique_ptr<Expression> t, std::unique_ptr<Expression> f)
+    : condition(std::move(cond)), true_expr(std::move(t)), false_expr(std::move(f)) {}
+
+std::string TernaryOp::to_webcc() {
+    return "(" + condition->to_webcc() + " ? " + true_expr->to_webcc() + " : " + false_expr->to_webcc() + ")";
+}
+
+void TernaryOp::collect_dependencies(std::set<std::string>& deps) {
+    condition->collect_dependencies(deps);
+    true_expr->collect_dependencies(deps);
+    false_expr->collect_dependencies(deps);
+}
+
+bool TernaryOp::is_static() {
+    return condition->is_static() && true_expr->is_static() && false_expr->is_static();
+}
+
 std::string ArrayLiteral::to_webcc() {
     std::string code = "{";
     for (size_t i = 0; i < elements.size(); ++i) {

@@ -1,0 +1,30 @@
+// Test: ternary operator
+component TernaryTest {
+    int x = 10;
+    int y = 5;
+    
+    // Basic ternary
+    int max = x > y ? x : y;
+    
+    // Nested ternary
+    int result = x > 20 ? 100 : x > 10 ? 50 : 25;
+    
+    // Ternary with expressions
+    string msg = x > y ? "x is larger" : "y is larger or equal";
+    
+    def getMax(int a, int b) : int {
+        return a > b ? a : b;
+    }
+    
+    def getSign(int n) : string {
+        return n > 0 ? "positive" : n < 0 ? "negative" : "zero";
+    }
+
+    view {
+        <div>Max: {max}</div>
+    }
+}
+
+app {
+    root = TernaryTest;
+}

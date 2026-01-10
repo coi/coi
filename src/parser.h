@@ -20,6 +20,7 @@ class Parser{
 
         std::unique_ptr<Expression> parse_expression();
         std::unique_ptr<Expression> parse_expression_no_gt();  // Parse expression without > as comparison
+        std::unique_ptr<Expression> parse_ternary();
         std::unique_ptr<Expression> parse_or();
         std::unique_ptr<Expression> parse_and();
         std::unique_ptr<Expression> parse_equality();

@@ -245,6 +245,7 @@ std::vector<Token> Lexer::tokenize(){
             case '<': tokens.push_back(make_token(TokenType::LT, "<")); break;
             case '>': tokens.push_back(make_token(TokenType::GT, ">")); break;
             case '!': tokens.push_back(make_token(TokenType::NOT, "!")); break;
+            case '?': tokens.push_back(make_token(TokenType::QUESTION, "?")); break;
             case '(': tokens.push_back(make_token(TokenType::LPAREN, "(")); break;
             case ')': tokens.push_back(make_token(TokenType::RPAREN, ")")); break;
             case '{': tokens.push_back(make_token(TokenType::LBRACE, "{")); break;

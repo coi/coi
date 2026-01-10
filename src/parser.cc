@@ -30,7 +30,21 @@ void Parser::expect(TokenType type, const std::string& msg){
 }
 
 std::unique_ptr<Expression> Parser::parse_expression(){
-    return parse_or();
+    return parse_ternary();
+}
+
+std::unique_ptr<Expression> Parser::parse_ternary(){
+    auto expr = parse_or();
+    
+    if (current().type == TokenType::QUESTION) {
+        advance(); // skip '?'
+        auto true_expr = parse_expression();  // Allow nested ternary
+        expect(TokenType::COLON, "Expected ':' in ternary expression");
+        auto false_expr = parse_ternary();  // Right-associative
+        expr = std::make_unique<TernaryOp>(std::move(expr), std::move(true_expr), std::move(false_expr));
+    }
+    
+    return expr;
 }
 
 std::unique_ptr<Expression> Parser::parse_expression_no_gt(){

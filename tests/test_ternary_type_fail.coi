@@ -1,0 +1,15 @@
+// Test: ternary operator type mismatch should fail
+component TernaryTypeFail {
+    int x = 10;
+    
+    // Type mismatch between branches: int vs string
+    int bad = x > 5 ? 100 : "hello";
+
+    view {
+        <div>Bad: {bad}</div>
+    }
+}
+
+app {
+    root = TernaryTypeFail;
+}

@@ -122,6 +122,17 @@ struct UnaryOp : Expression {
     bool is_static() override;
 };
 
+struct TernaryOp : Expression {
+    std::unique_ptr<Expression> condition;
+    std::unique_ptr<Expression> true_expr;
+    std::unique_ptr<Expression> false_expr;
+
+    TernaryOp(std::unique_ptr<Expression> cond, std::unique_ptr<Expression> t, std::unique_ptr<Expression> f);
+    std::string to_webcc() override;
+    void collect_dependencies(std::set<std::string>& deps) override;
+    bool is_static() override;
+};
+
 struct ArrayLiteral : Expression {
     std::vector<std::unique_ptr<Expression>> elements;
     std::string element_type;  // Inferred or specified type of elements
