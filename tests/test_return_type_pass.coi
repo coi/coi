@@ -1,0 +1,26 @@
+// Test: correct return types should pass
+component ReturnTypePass {
+    def getNumber() : int {
+        return 42;
+    }
+    
+    def getMessage() : string {
+        return "hello";
+    }
+    
+    def compute(int x) : int {
+        return x * 2;
+    }
+    
+    def doNothing() : void {
+        return;  // OK: bare return in void function
+    }
+
+    view {
+        <div>{getNumber()} {getMessage()}</div>
+    }
+}
+
+app {
+    root = ReturnTypePass;
+}

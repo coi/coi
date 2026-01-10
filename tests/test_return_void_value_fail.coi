@@ -1,0 +1,14 @@
+// Test: returning value from void function should fail
+component ReturnVoidFail {
+    def doNothing() : void {
+        return 42;  // Error: cannot return value from void function
+    }
+
+    view {
+        <div>test</div>
+    }
+}
+
+app {
+    root = ReturnVoidFail;
+}

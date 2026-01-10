@@ -424,6 +424,9 @@ void validate_types(const std::vector<Component> &components)
                 method_scope[param.name] = normalize_type(param.type);
             }
 
+            // Get expected return type for this method
+            std::string expected_return = method.return_type.empty() ? "void" : normalize_type(method.return_type);
+
             std::function<void(const std::unique_ptr<Statement> &, std::map<std::string, std::string> &)> check_stmt;
             check_stmt = [&](const std::unique_ptr<Statement> &stmt, std::map<std::string, std::string> &current_scope)
             {
@@ -534,6 +537,37 @@ void validate_types(const std::vector<Component> &components)
                     {
                         std::cerr << "Type error: Array index must be numeric, got '" << index_type << "'" << std::endl;
                         exit(1);
+                    }
+                }
+                else if (auto ret_stmt = dynamic_cast<ReturnStatement *>(stmt.get()))
+                {
+                    // Validate return type matches method's declared return type
+                    if (ret_stmt->value)
+                    {
+                        // Has a return value
+                        if (expected_return == "void")
+                        {
+                            std::cerr << "Type error: Cannot return a value from void function '" 
+                                      << method.name << "'" << std::endl;
+                            exit(1);
+                        }
+                        std::string actual_return = infer_expression_type(ret_stmt->value.get(), current_scope);
+                        if (actual_return != "unknown" && !is_compatible_type(actual_return, expected_return))
+                        {
+                            std::cerr << "Type error: Function '" << method.name << "' expects return type '" 
+                                      << expected_return << "' but got '" << actual_return << "'" << std::endl;
+                            exit(1);
+                        }
+                    }
+                    else
+                    {
+                        // No return value (bare 'return;')
+                        if (expected_return != "void")
+                        {
+                            std::cerr << "Type error: Function '" << method.name 
+                                      << "' must return a value of type '" << expected_return << "'" << std::endl;
+                            exit(1);
+                        }
                     }
                 }
             };

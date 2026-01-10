@@ -1,0 +1,14 @@
+// Test: returning wrong type should fail
+component ReturnTypeFail {
+    def getValue() : int {
+        return "hello";  // Error: returning string from int function
+    }
+
+    view {
+        <div>test</div>
+    }
+}
+
+app {
+    root = ReturnTypeFail;
+}
