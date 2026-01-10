@@ -36,6 +36,8 @@ component Greeting {
 
 Bind methods to events with `on<event>`:
 
+### Click Events
+
 ```tsx
 component Button {
     mut int clicks = 0;
@@ -44,18 +46,64 @@ component Button {
         clicks += 1;
     }
     
-    def handleInput(string value) : void {
-        // Handle input change
-    }
-    
     view {
-        <div>
-            <button onclick={handleClick}>Clicked {clicks} times</button>
-            <input oninput={handleInput(value)} />
-        </div>
+        <button onclick={handleClick}>Clicked {clicks} times</button>
     }
 }
 ```
+
+### Input Events
+
+For `oninput` and `onchange`, the handler receives the input's current value as a `string`:
+
+```tsx
+component SearchBox {
+    mut string query = "";
+    
+    def handleInput(string value) : void {
+        query = value;
+    }
+    
+    view {
+        <input 
+            type="text" 
+            value={query}
+            oninput={handleInput}
+        />
+    }
+}
+```
+
+### Keyboard Events
+
+For `onkeydown`, the handler receives the key code as an `int`:
+
+```tsx
+component KeyboardInput {
+    mut string lastKey = "";
+    
+    def handleKeyDown(int keycode) : void {
+        if (keycode == 13) {
+            lastKey = "Enter";
+        } else if (keycode == 27) {
+            lastKey = "Escape";
+        }
+    }
+    
+    view {
+        <input onkeydown={handleKeyDown} />
+    }
+}
+```
+
+### Event Handler Summary
+
+| Event | Handler Signature | Description |
+|-------|-------------------|-------------|
+| `onclick` | `def handler() : void` | Mouse click |
+| `oninput` | `def handler(string value) : void` | Input value changed |
+| `onchange` | `def handler(string value) : void` | Input lost focus after change |
+| `onkeydown` | `def handler(int keycode) : void` | Key pressed |
 
 ## Element References
 

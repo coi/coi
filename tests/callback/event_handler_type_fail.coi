@@ -1,0 +1,20 @@
+// Test: event handler with wrong parameter type - should fail
+// oninput handler expects string, but handler takes int
+
+component TestEventHandlerTypeFail {
+    mut int count = 0;
+
+    def handleInput(int value) : void {
+        count = value;
+    }
+
+    view {
+        <div>
+            <input type="text" oninput={handleInput} />
+        </div>
+    }
+}
+
+app {
+    root = TestEventHandlerTypeFail;
+}

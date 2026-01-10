@@ -1,0 +1,109 @@
+component InputDemo {
+    mut string text = "";
+    mut int charCount = 0;
+
+    def handleInput(string value) : void {
+        text = value;
+        charCount = text.length();
+    }
+
+    style {
+        .input-demo {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            padding: 40px;
+            background: #fff;
+            border: 1px solid #eee;
+            border-radius: 12px;
+            width: 280px;
+        }
+        .label {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #999;
+        }
+        input {
+            width: 100%;
+            padding: 14px 16px;
+            font-size: 16px;
+            border: 2px solid #eee;
+            border-radius: 8px;
+            outline: none;
+            transition: border-color 0.2s ease;
+            box-sizing: border-box;
+        }
+        input:focus {
+            border-color: #9477ff;
+        }
+        .preview {
+            width: 100%;
+            min-height: 60px;
+            padding: 16px;
+            background: #fafafa;
+            border-radius: 8px;
+            word-break: break-word;
+            box-sizing: border-box;
+        }
+        .preview-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #999;
+            margin-bottom: 8px;
+        }
+        .preview-text {
+            font-size: 18px;
+            color: #1a1a1a;
+            font-weight: 500;
+        }
+        .empty {
+            color: #ccc;
+            font-style: italic;
+        }
+        .stats {
+            display: flex;
+            gap: 16px;
+            font-size: 13px;
+            color: #666;
+        }
+        .stat {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .stat-value {
+            font-weight: 600;
+            color: #9477ff;
+        }
+    }
+
+    view {
+        <div class="input-demo">
+            <div class="label">Input Demo</div>
+            <input 
+                type="text" 
+                placeholder="Type something..." 
+                value={text}
+                oninput={handleInput}
+            />
+            <div class="preview">
+                <div class="preview-label">Preview</div>
+                <if text.isEmpty()>
+                    <div class="preview-text empty">Start typing...</div>
+                <else>
+                    <div class="preview-text">{text}</div>
+                </else>
+                </if>
+            </div>
+            <div class="stats">
+                <div class="stat">
+                    <span>Characters:</span>
+                    <span class="stat-value">{charCount}</span>
+                </div>
+            </div>
+        </div>
+    }
+}

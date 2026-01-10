@@ -366,6 +366,52 @@ view {
 }
 ```
 
+### Event Handlers
+
+Bind methods to DOM events with `on<event>`:
+
+**Click Events:**
+```tsx
+def handleClick() : void {
+    count += 1;
+}
+
+view {
+    <button onclick={handleClick}>Click me</button>
+}
+```
+
+**Input Events** (`oninput`, `onchange`) - handler receives the input value as a `string`:
+```tsx
+def handleInput(string value) : void {
+    text = value;
+}
+
+view {
+    <input oninput={handleInput} />
+}
+```
+
+**Keyboard Events** (`onkeydown`) - handler receives the key code as an `int`:
+```tsx
+def handleKey(int keycode) : void {
+    if (keycode == 13) {  // Enter key
+        submit();
+    }
+}
+
+view {
+    <input onkeydown={handleKey} />
+}
+```
+
+| Event | Handler Signature | Description |
+|-------|-------------------|-------------|
+| `onclick` | `def handler() : void` | Mouse click |
+| `oninput` | `def handler(string value) : void` | Input value changed |
+| `onchange` | `def handler(string value) : void` | Input lost focus after change |
+| `onkeydown` | `def handler(int keycode) : void` | Key pressed |
+
 ### Operators
 ```tsx
 // Arithmetic
@@ -849,6 +895,10 @@ component TodoApp {
     mut string input = "";
     mut string saved = "";
 
+    def handleInput(string value) : void {
+        input = value;
+    }
+
     def save() : void {
         Storage.setItem("todo", input);
         saved = input;
@@ -856,7 +906,7 @@ component TodoApp {
 
     view {
         <div>
-            <input value={input} />
+            <input value={input} oninput={handleInput} />
             <button onclick={save}>Save</button>
             <p>Saved: {saved}</p>
         </div>

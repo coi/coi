@@ -2,6 +2,7 @@ import "../demos/Counter.coi";
 import "../demos/AnimatedBox.coi";
 import "../demos/CanvasDemo.coi";
 import "../demos/TodoList.coi";
+import "../demos/InputDemo.coi";
 import "../components/CodeView.coi";
 
 component DemoSection {
@@ -74,6 +75,29 @@ component DemoSection {
 
     view \{
         <canvas &=\{canvas\}></canvas>
+    \}
+\}";
+
+    string inputCode = "component InputDemo \{
+    mut string text = \"\";
+    mut int charCount = 0;
+
+    def handleInput(string s) : void \{
+        text = s;
+        charCount = text.length();
+    \}
+
+    view \{
+        <div class=\"input-demo\">
+            <input 
+                placeholder=\"Type something...\" 
+                oninput=\{handleInput\}
+            />
+            <div class=\"preview\">\{text\}</div>
+            <div class=\"stats\">
+                Characters: \{charCount\}
+            </div>
+        </div>
     \}
 \}";
 
@@ -176,6 +200,12 @@ component TodoList \{
                     <TodoList />
                 </div>
                 <CodeView code={todoCode} width="600px" />
+            </div>
+                <div class="demo-row">
+                <div class="demo-wrapper">
+                    <InputDemo />
+                </div>
+                <CodeView code={inputCode} width="600px" />
             </div>
             <div class="demo-row">
                 <div class="demo-wrapper">

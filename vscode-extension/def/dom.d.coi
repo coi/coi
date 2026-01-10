@@ -43,5 +43,14 @@ type DOMElement {
     def removeClass(cls: string): void {
         // maps to: dom::remove_class
     }
+    def addInputListener(): void {
+        // maps to: dom::add_input_listener
+    }
+    def addChangeListener(): void {
+        // maps to: dom::add_change_listener
+    }
+    def addKeydownListener(): void {
+        // maps to: dom::add_keydown_listener
+    }
 }
 

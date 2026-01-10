@@ -1,0 +1,20 @@
+// Test: event handler with no parameters - should fail
+// oninput handler expects string parameter, but handler takes none
+
+component TestEventHandlerNoParamFail {
+    mut string text = "";
+
+    def handleInput() : void {
+        text = "clicked";
+    }
+
+    view {
+        <div>
+            <input type="text" oninput={handleInput} />
+        </div>
+    }
+}
+
+app {
+    root = TestEventHandlerNoParamFail;
+}

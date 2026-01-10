@@ -214,8 +214,8 @@ std::unique_ptr<Expression> Parser::parse_primary(){
         return std::make_unique<BoolLiteral>(false);
     }
 
-    // Identifer or function call
-    if(current().type == TokenType::IDENTIFIER){
+    // Identifer or function call (also allow 'key' keyword as identifier)
+    if(current().type == TokenType::IDENTIFIER || current().type == TokenType::KEY){
         std::string name = current().value;
         advance();
         
@@ -261,9 +261,13 @@ std::unique_ptr<Expression> Parser::parse_primary(){
                             advance();
                         }
                         
-                        // Parameter name
+                        // Parameter name (allow 'key' keyword as param name)
                         arg.name = current().value;
-                        expect(TokenType::IDENTIFIER, "Expected parameter name");
+                        if (current().type == TokenType::IDENTIFIER || current().type == TokenType::KEY) {
+                            advance();
+                        } else {
+                            throw std::runtime_error("Expected parameter name at line " + std::to_string(current().line));
+                        }
                         expect(TokenType::COLON, "Expected ':' after parameter name");
                         
                         // Value
@@ -1301,7 +1305,12 @@ Component Parser::parse_component(){
                 }
 
                 std::string paramName = current().value;
-                expect(TokenType::IDENTIFIER, "Expected parameter name");
+                // Allow 'key' keyword as parameter name
+                if (current().type == TokenType::IDENTIFIER || current().type == TokenType::KEY) {
+                    advance();
+                } else {
+                    throw std::runtime_error("Expected parameter name at line " + std::to_string(current().line));
+                }
                 
                 func.params.push_back({paramType, paramName, is_mutable, is_reference});
 
@@ -1388,7 +1397,12 @@ Component Parser::parse_component(){
                 }
 
                 std::string paramName = current().value;
-                expect(TokenType::IDENTIFIER, "Expected parameter name");
+                // Allow 'key' keyword as parameter name
+                if (current().type == TokenType::IDENTIFIER || current().type == TokenType::KEY) {
+                    advance();
+                } else {
+                    throw std::runtime_error("Expected parameter name at line " + std::to_string(current().line));
+                }
                 
                 func.params.push_back({paramType, paramName, is_mutable, is_reference});
 

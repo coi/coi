@@ -6,8 +6,8 @@
 //
 // Available modules:
 //   - audio.d.coi (7 functions)
-//   - canvas.d.coi (51 functions)
-//   - dom.d.coi (11 functions)
+//   - canvas.d.coi (53 functions)
+//   - dom.d.coi (14 functions)
 //   - fetch.d.coi (2 functions)
 //   - image.d.coi (1 functions)
 //   - input.d.coi (4 functions)

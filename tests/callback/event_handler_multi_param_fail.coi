@@ -1,0 +1,20 @@
+// Test: event handler with too many parameters - should fail
+// onchange handler expects 1 string parameter, but handler takes 2
+
+component TestEventHandlerMultiParamFail {
+    mut string text = "";
+
+    def handleChange(string a, string b) : void {
+        text = a;
+    }
+
+    view {
+        <div>
+            <input type="text" onchange={handleChange} />
+        </div>
+    }
+}
+
+app {
+    root = TestEventHandlerMultiParamFail;
+}

@@ -1,0 +1,31 @@
+// Test: event handler parameter types - should pass
+// oninput/onchange/onkeydown handlers with correct string parameter
+
+component TestEventHandlerPass {
+    mut string text = "";
+    mut int count = 0;
+
+    def handleInput(string value) : void {
+        text = value;
+    }
+
+    def handleChange(string value) : void {
+        text = value;
+    }
+
+    def handleKey(string key) : void {
+        text = key;
+    }
+
+    view {
+        <div>
+            <input type="text" oninput={handleInput} />
+            <input type="text" onchange={handleChange} />
+            <input type="text" onkeydown={handleKey} />
+        </div>
+    }
+}
+
+app {
+    root = TestEventHandlerPass;
+}
