@@ -234,6 +234,18 @@ if (x > 10) {
 }
 ```
 
+**Ternary Operator:**
+```tsx
+// Basic ternary
+int max = x > y ? x : y;
+
+// Nested ternary
+string sign = n > 0 ? "positive" : n < 0 ? "negative" : "zero";
+
+// In expressions
+string msg = count > 0 ? "has items" : "empty";
+```
+
 **Loops:**
 
 Coi supports range-based loops and iterator-based foreach loops.
