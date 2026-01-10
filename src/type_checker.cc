@@ -288,6 +288,17 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
         std::string method_name = full_name;
 
         size_t dot_pos = full_name.rfind('.');
+        
+        // Handle EnumName.size() - returns int32
+        if (dot_pos != std::string::npos)
+        {
+            std::string potential_enum = full_name.substr(0, dot_pos);
+            std::string method = full_name.substr(dot_pos + 1);
+            if (method == "size" && is_enum_type(potential_enum))
+            {
+                return "int32";
+            }
+        }
         if (dot_pos != std::string::npos)
         {
             obj_name = full_name.substr(0, dot_pos);

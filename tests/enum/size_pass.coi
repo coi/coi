@@ -1,0 +1,20 @@
+// Test: Enum .size property 
+component SizeTest {
+    enum Difficulty {
+        Easy,
+        Medium,
+        Hard,
+        Expert
+    }
+
+    view {
+        <div class="test-container">
+            <h1>Game Settings</h1>
+            <p>Total Difficulty Options: {Difficulty.size}</p>
+        </div>
+    }
+}
+
+app {
+    root = SizeTest;
+}

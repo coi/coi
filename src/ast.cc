@@ -186,6 +186,22 @@ std::string FunctionCall::to_webcc() {
             std::string obj = name.substr(0, dot_pos);
             std::string method = name.substr(dot_pos + 1);
             
+            // Enum.size() - returns the number of values in the enum
+            // This is detected by the type checker setting a flag, but we can also
+            // check if the object starts with uppercase (convention for enum types)
+            if (method == "size" && args.size() == 0 && !obj.empty() && std::isupper(obj[0])) {
+                // Check if there's another dot (Component.EnumName.size())
+                size_t first_dot = obj.find('.');
+                if (first_dot != std::string::npos) {
+                    // Component.EnumName -> Component::EnumName::_COUNT
+                    std::string comp = obj.substr(0, first_dot);
+                    std::string enum_name = obj.substr(first_dot + 1);
+                    return "static_cast<int>(" + comp + "::" + enum_name + "::_COUNT)";
+                }
+                // Simple EnumName -> EnumName::_COUNT
+                return "static_cast<int>(" + obj + "::_COUNT)";
+            }
+            
             // String methods - map to webcc::string methods
             if (method == "length") {
                 return obj + ".length()";
@@ -744,10 +760,10 @@ std::string EnumDef::to_webcc() {
     std::stringstream ss;
     ss << "enum class " << name << " {\n";
     for(size_t i = 0; i < values.size(); i++){
-        ss << "    " << values[i];
-        if(i < values.size() - 1) ss << ",";
-        ss << "\n";
+        ss << "    " << values[i] << ",\n";
     }
+    // Add _COUNT sentinel for .size() support
+    ss << "    _COUNT\n";
     ss << "};\n";
     return ss.str();
 }
