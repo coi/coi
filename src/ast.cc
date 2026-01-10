@@ -778,7 +778,7 @@ std::string TextNode::to_webcc() { return "\"" + text + "\""; }
 std::string ComponentInstantiation::to_webcc() { return ""; }
 
 void ComponentInstantiation::generate_code(std::stringstream& ss, const std::string& parent, int& counter, 
-                  std::vector<std::tuple<int, std::string, bool>>& click_handlers,
+                  std::vector<EventHandler>& event_handlers,
                   std::vector<Binding>& bindings,
                   std::map<std::string, int>& component_counters,
                   const std::set<std::string>& method_names,
@@ -896,7 +896,7 @@ void ComponentInstantiation::collect_dependencies(std::set<std::string>& deps) {
 std::string HTMLElement::to_webcc() { return ""; }
 
 void HTMLElement::generate_code(std::stringstream& ss, const std::string& parent, int& counter, 
-                  std::vector<std::tuple<int, std::string, bool>>& click_handlers,
+                  std::vector<EventHandler>& event_handlers,
                   std::vector<Binding>& bindings,
                   std::map<std::string, int>& component_counters,
                   const std::set<std::string>& method_names,
@@ -929,9 +929,20 @@ void HTMLElement::generate_code(std::stringstream& ss, const std::string& parent
     for(auto& attr : attributes){
         if(attr.name == "onclick"){
              ss << "        webcc::dom::add_click_listener(" << var << ");\n";
-             // Store handler for later generation
              bool is_call = dynamic_cast<FunctionCall*>(attr.value.get()) != nullptr;
-             click_handlers.push_back({my_id, attr.value->to_webcc(), is_call});
+             event_handlers.push_back({my_id, "click", attr.value->to_webcc(), is_call});
+        } else if(attr.name == "oninput"){
+             ss << "        webcc::dom::add_input_listener(" << var << ");\n";
+             bool is_call = dynamic_cast<FunctionCall*>(attr.value.get()) != nullptr;
+             event_handlers.push_back({my_id, "input", attr.value->to_webcc(), is_call});
+        } else if(attr.name == "onchange"){
+             ss << "        webcc::dom::add_change_listener(" << var << ");\n";
+             bool is_call = dynamic_cast<FunctionCall*>(attr.value.get()) != nullptr;
+             event_handlers.push_back({my_id, "change", attr.value->to_webcc(), is_call});
+        } else if(attr.name == "onkeydown"){
+             ss << "        webcc::dom::add_keydown_listener(" << var << ");\n";
+             bool is_call = dynamic_cast<FunctionCall*>(attr.value.get()) != nullptr;
+             event_handlers.push_back({my_id, "keydown", attr.value->to_webcc(), is_call});
         } else {
              std::string val = attr.value->to_webcc();
              ss << "        webcc::dom::set_attribute(" << var << ", \"" << attr.name << "\", " << val << ");\n";
@@ -965,15 +976,15 @@ void HTMLElement::generate_code(std::stringstream& ss, const std::string& parent
     if(has_elements){
          for(auto& child : children){
              if(auto el = dynamic_cast<HTMLElement*>(child.get())){
-                 el->generate_code(ss, var, counter, click_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter);
+                 el->generate_code(ss, var, counter, event_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter);
              } else if(auto comp = dynamic_cast<ComponentInstantiation*>(child.get())){
-                 comp->generate_code(ss, var, counter, click_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter);
+                 comp->generate_code(ss, var, counter, event_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter);
              } else if(auto viewIf = dynamic_cast<ViewIfStatement*>(child.get())){
-                 viewIf->generate_code(ss, var, counter, click_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter);
+                 viewIf->generate_code(ss, var, counter, event_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter);
              } else if(auto viewFor = dynamic_cast<ViewForRangeStatement*>(child.get())){
-                 viewFor->generate_code(ss, var, counter, click_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter);
+                 viewFor->generate_code(ss, var, counter, event_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter);
              } else if(auto viewForEach = dynamic_cast<ViewForEachStatement*>(child.get())){
-                 viewForEach->generate_code(ss, var, counter, click_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter);
+                 viewForEach->generate_code(ss, var, counter, event_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter);
              }
          }
     } else {
@@ -1026,7 +1037,7 @@ void HTMLElement::collect_dependencies(std::set<std::string>& deps) {
 
 // ViewIfStatement - conditional rendering in view
 void ViewIfStatement::generate_code(std::stringstream& ss, const std::string& parent, int& counter, 
-                  std::vector<std::tuple<int, std::string, bool>>& click_handlers,
+                  std::vector<EventHandler>& event_handlers,
                   std::vector<Binding>& bindings,
                   std::map<std::string, int>& component_counters,
                   const std::set<std::string>& method_names,
@@ -1045,26 +1056,26 @@ void ViewIfStatement::generate_code(std::stringstream& ss, const std::string& pa
         ss << "        if (" << condition->to_webcc() << ") {\n";
         for(auto& child : then_children) {
             if(auto el = dynamic_cast<HTMLElement*>(child.get())){
-                el->generate_code(ss, parent, counter, click_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter);
+                el->generate_code(ss, parent, counter, event_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter);
             } else if(auto comp = dynamic_cast<ComponentInstantiation*>(child.get())){
-                comp->generate_code(ss, parent, counter, click_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter);
+                comp->generate_code(ss, parent, counter, event_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter);
             } else if(auto viewIf = dynamic_cast<ViewIfStatement*>(child.get())){
-                viewIf->generate_code(ss, parent, counter, click_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter);
+                viewIf->generate_code(ss, parent, counter, event_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter);
             } else if(auto viewFor = dynamic_cast<ViewForRangeStatement*>(child.get())){
-                viewFor->generate_code(ss, parent, counter, click_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter);
+                viewFor->generate_code(ss, parent, counter, event_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter);
             }
         }
         if (!else_children.empty()) {
             ss << "        } else {\n";
             for(auto& child : else_children) {
                 if(auto el = dynamic_cast<HTMLElement*>(child.get())){
-                    el->generate_code(ss, parent, counter, click_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter);
+                    el->generate_code(ss, parent, counter, event_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter);
                 } else if(auto comp = dynamic_cast<ComponentInstantiation*>(child.get())){
-                    comp->generate_code(ss, parent, counter, click_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter);
+                    comp->generate_code(ss, parent, counter, event_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter);
                 } else if(auto viewIf = dynamic_cast<ViewIfStatement*>(child.get())){
-                    viewIf->generate_code(ss, parent, counter, click_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter);
+                    viewIf->generate_code(ss, parent, counter, event_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter);
                 } else if(auto viewFor = dynamic_cast<ViewForRangeStatement*>(child.get())){
-                    viewFor->generate_code(ss, parent, counter, click_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter);
+                    viewFor->generate_code(ss, parent, counter, event_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter);
                 }
             }
         }
@@ -1105,13 +1116,13 @@ void ViewIfStatement::generate_code(std::stringstream& ss, const std::string& pa
     std::vector<Binding> then_bindings;
     for(auto& child : then_children) {
         if(auto el = dynamic_cast<HTMLElement*>(child.get())){
-            el->generate_code(then_ss, if_parent, counter, click_handlers, then_bindings, component_counters, method_names, parent_component_name, false, loop_regions, loop_counter, if_regions, if_counter);
+            el->generate_code(then_ss, if_parent, counter, event_handlers, then_bindings, component_counters, method_names, parent_component_name, false, loop_regions, loop_counter, if_regions, if_counter);
         } else if(auto comp = dynamic_cast<ComponentInstantiation*>(child.get())){
-            comp->generate_code(then_ss, if_parent, counter, click_handlers, then_bindings, component_counters, method_names, parent_component_name, false, loop_regions, loop_counter, if_regions, if_counter);
+            comp->generate_code(then_ss, if_parent, counter, event_handlers, then_bindings, component_counters, method_names, parent_component_name, false, loop_regions, loop_counter, if_regions, if_counter);
         } else if(auto viewIf = dynamic_cast<ViewIfStatement*>(child.get())){
-            viewIf->generate_code(then_ss, if_parent, counter, click_handlers, then_bindings, component_counters, method_names, parent_component_name, false, loop_regions, loop_counter, if_regions, if_counter);
+            viewIf->generate_code(then_ss, if_parent, counter, event_handlers, then_bindings, component_counters, method_names, parent_component_name, false, loop_regions, loop_counter, if_regions, if_counter);
         } else if(auto viewFor = dynamic_cast<ViewForRangeStatement*>(child.get())){
-            viewFor->generate_code(then_ss, if_parent, counter, click_handlers, then_bindings, component_counters, method_names, parent_component_name, false, loop_regions, loop_counter, if_regions, if_counter);
+            viewFor->generate_code(then_ss, if_parent, counter, event_handlers, then_bindings, component_counters, method_names, parent_component_name, false, loop_regions, loop_counter, if_regions, if_counter);
         }
     }
     int counter_after_then = counter;
@@ -1151,13 +1162,13 @@ void ViewIfStatement::generate_code(std::stringstream& ss, const std::string& pa
     if (!else_children.empty()) {
         for(auto& child : else_children) {
             if(auto el = dynamic_cast<HTMLElement*>(child.get())){
-                el->generate_code(else_ss, if_parent, counter, click_handlers, else_bindings, component_counters, method_names, parent_component_name, false, loop_regions, loop_counter, if_regions, if_counter);
+                el->generate_code(else_ss, if_parent, counter, event_handlers, else_bindings, component_counters, method_names, parent_component_name, false, loop_regions, loop_counter, if_regions, if_counter);
             } else if(auto comp = dynamic_cast<ComponentInstantiation*>(child.get())){
-                comp->generate_code(else_ss, if_parent, counter, click_handlers, else_bindings, component_counters, method_names, parent_component_name, false, loop_regions, loop_counter, if_regions, if_counter);
+                comp->generate_code(else_ss, if_parent, counter, event_handlers, else_bindings, component_counters, method_names, parent_component_name, false, loop_regions, loop_counter, if_regions, if_counter);
             } else if(auto viewIf = dynamic_cast<ViewIfStatement*>(child.get())){
-                viewIf->generate_code(else_ss, if_parent, counter, click_handlers, else_bindings, component_counters, method_names, parent_component_name, false, loop_regions, loop_counter, if_regions, if_counter);
+                viewIf->generate_code(else_ss, if_parent, counter, event_handlers, else_bindings, component_counters, method_names, parent_component_name, false, loop_regions, loop_counter, if_regions, if_counter);
             } else if(auto viewFor = dynamic_cast<ViewForRangeStatement*>(child.get())){
-                viewFor->generate_code(else_ss, if_parent, counter, click_handlers, else_bindings, component_counters, method_names, parent_component_name, false, loop_regions, loop_counter, if_regions, if_counter);
+                viewFor->generate_code(else_ss, if_parent, counter, event_handlers, else_bindings, component_counters, method_names, parent_component_name, false, loop_regions, loop_counter, if_regions, if_counter);
             }
         }
     }
@@ -1236,7 +1247,7 @@ void ViewIfStatement::collect_dependencies(std::set<std::string>& deps) {
 
 // Helper to generate code for a view child node
 static void generate_view_child(ASTNode* child, std::stringstream& ss, const std::string& parent, int& counter,
-                                std::vector<std::tuple<int, std::string, bool>>& click_handlers,
+                                std::vector<EventHandler>& event_handlers,
                                 std::vector<Binding>& bindings,
                                 std::map<std::string, int>& component_counters,
                                 const std::set<std::string>& method_names,
@@ -1247,21 +1258,21 @@ static void generate_view_child(ASTNode* child, std::stringstream& ss, const std
                                 std::vector<IfRegion>* if_regions = nullptr,
                                 int* if_counter = nullptr) {
     if(auto el = dynamic_cast<HTMLElement*>(child)){
-        el->generate_code(ss, parent, counter, click_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter);
+        el->generate_code(ss, parent, counter, event_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter);
     } else if(auto comp = dynamic_cast<ComponentInstantiation*>(child)){
-        comp->generate_code(ss, parent, counter, click_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter);
+        comp->generate_code(ss, parent, counter, event_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter);
     } else if(auto viewIf = dynamic_cast<ViewIfStatement*>(child)){
-        viewIf->generate_code(ss, parent, counter, click_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter);
+        viewIf->generate_code(ss, parent, counter, event_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter);
     } else if(auto viewFor = dynamic_cast<ViewForRangeStatement*>(child)){
-        viewFor->generate_code(ss, parent, counter, click_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter);
+        viewFor->generate_code(ss, parent, counter, event_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter);
     } else if(auto viewForEach = dynamic_cast<ViewForEachStatement*>(child)){
-        viewForEach->generate_code(ss, parent, counter, click_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter);
+        viewForEach->generate_code(ss, parent, counter, event_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter);
     }
 }
 
 // ViewForRangeStatement - for i in 0:10 in view
 void ViewForRangeStatement::generate_code(std::stringstream& ss, const std::string& parent, int& counter, 
-                  std::vector<std::tuple<int, std::string, bool>>& click_handlers,
+                  std::vector<EventHandler>& event_handlers,
                   std::vector<Binding>& bindings,
                   std::map<std::string, int>& component_counters,
                   const std::set<std::string>& method_names,
@@ -1277,7 +1288,7 @@ void ViewForRangeStatement::generate_code(std::stringstream& ss, const std::stri
         ss << "        for (int " << var_name << " = " << start->to_webcc() << "; " 
            << var_name << " < " << end->to_webcc() << "; " << var_name << "++) {\n";
         for(auto& child : children) {
-            generate_view_child(child.get(), ss, parent, counter, click_handlers, bindings, component_counters, method_names, parent_component_name, true, nullptr, nullptr, nullptr, nullptr);
+            generate_view_child(child.get(), ss, parent, counter, event_handlers, bindings, component_counters, method_names, parent_component_name, true, nullptr, nullptr, nullptr, nullptr);
         }
         ss << "        }\n";
         return;
@@ -1326,7 +1337,7 @@ void ViewForRangeStatement::generate_code(std::stringstream& ss, const std::stri
     int root_element_id = temp_counter;
     
     for(auto& child : children) {
-        generate_view_child(child.get(), item_ss, loop_parent_var, temp_counter, click_handlers, bindings, temp_comp_counters, method_names, parent_component_name, true, nullptr, nullptr);
+        generate_view_child(child.get(), item_ss, loop_parent_var, temp_counter, event_handlers, bindings, temp_comp_counters, method_names, parent_component_name, true, nullptr, nullptr);
     }
     region.item_creation_code = item_ss.str();
     
@@ -1397,7 +1408,7 @@ void ViewForRangeStatement::collect_dependencies(std::set<std::string>& deps) {
 
 // ViewForEachStatement - for item in items in view
 void ViewForEachStatement::generate_code(std::stringstream& ss, const std::string& parent, int& counter, 
-                  std::vector<std::tuple<int, std::string, bool>>& click_handlers,
+                  std::vector<EventHandler>& event_handlers,
                   std::vector<Binding>& bindings,
                   std::map<std::string, int>& component_counters,
                   const std::set<std::string>& method_names,
@@ -1412,7 +1423,7 @@ void ViewForEachStatement::generate_code(std::stringstream& ss, const std::strin
     if (in_loop || !key_expr || !loop_regions || !loop_counter) {
         ss << "        for (auto& " << var_name << " : " << iterable->to_webcc() << ") {\n";
         for(auto& child : children) {
-            generate_view_child(child.get(), ss, parent, counter, click_handlers, bindings, component_counters, method_names, parent_component_name, true, nullptr, nullptr, nullptr, nullptr);
+            generate_view_child(child.get(), ss, parent, counter, event_handlers, bindings, component_counters, method_names, parent_component_name, true, nullptr, nullptr, nullptr, nullptr);
         }
         ss << "        }\n";
         return;
@@ -1457,7 +1468,7 @@ void ViewForEachStatement::generate_code(std::stringstream& ss, const std::strin
     int root_element_id = temp_counter;
     
     for(auto& child : children) {
-        generate_view_child(child.get(), item_ss, loop_parent_var, temp_counter, click_handlers, bindings, temp_comp_counters, method_names, parent_component_name, true, nullptr, nullptr);
+        generate_view_child(child.get(), item_ss, loop_parent_var, temp_counter, event_handlers, bindings, temp_comp_counters, method_names, parent_component_name, true, nullptr, nullptr);
     }
     region.item_creation_code = item_ss.str();
     
@@ -1614,7 +1625,7 @@ void Component::collect_child_updates(ASTNode* node, std::map<std::string, std::
 
 std::string Component::to_webcc() {
     std::stringstream ss;
-    std::vector<std::tuple<int, std::string, bool>> click_handlers;
+    std::vector<EventHandler> event_handlers;
     std::vector<Binding> bindings;
     std::map<std::string, int> component_counters; // For generating code
     std::map<std::string, int> component_members; // For declaring members
@@ -1654,15 +1665,15 @@ std::string Component::to_webcc() {
     std::stringstream ss_render;
     for(auto& root : render_roots){
         if(auto el = dynamic_cast<HTMLElement*>(root.get())){
-            el->generate_code(ss_render, "parent", element_count, click_handlers, bindings, component_counters, method_names, name, false, &loop_regions, &loop_counter, &if_regions, &if_counter);
+            el->generate_code(ss_render, "parent", element_count, event_handlers, bindings, component_counters, method_names, name, false, &loop_regions, &loop_counter, &if_regions, &if_counter);
         } else if(auto comp = dynamic_cast<ComponentInstantiation*>(root.get())){
-            comp->generate_code(ss_render, "parent", element_count, click_handlers, bindings, component_counters, method_names, name, false, &loop_regions, &loop_counter, &if_regions, &if_counter);
+            comp->generate_code(ss_render, "parent", element_count, event_handlers, bindings, component_counters, method_names, name, false, &loop_regions, &loop_counter, &if_regions, &if_counter);
         } else if(auto viewIf = dynamic_cast<ViewIfStatement*>(root.get())){
-            viewIf->generate_code(ss_render, "parent", element_count, click_handlers, bindings, component_counters, method_names, name, false, &loop_regions, &loop_counter, &if_regions, &if_counter);
+            viewIf->generate_code(ss_render, "parent", element_count, event_handlers, bindings, component_counters, method_names, name, false, &loop_regions, &loop_counter, &if_regions, &if_counter);
         } else if(auto viewFor = dynamic_cast<ViewForRangeStatement*>(root.get())){
-            viewFor->generate_code(ss_render, "parent", element_count, click_handlers, bindings, component_counters, method_names, name, false, &loop_regions, &loop_counter, &if_regions, &if_counter);
+            viewFor->generate_code(ss_render, "parent", element_count, event_handlers, bindings, component_counters, method_names, name, false, &loop_regions, &loop_counter, &if_regions, &if_counter);
         } else if(auto viewForEach = dynamic_cast<ViewForEachStatement*>(root.get())){
-            viewForEach->generate_code(ss_render, "parent", element_count, click_handlers, bindings, component_counters, method_names, name, false, &loop_regions, &loop_counter, &if_regions, &if_counter);
+            viewForEach->generate_code(ss_render, "parent", element_count, event_handlers, bindings, component_counters, method_names, name, false, &loop_regions, &loop_counter, &if_regions, &if_counter);
         }
     }
 
@@ -2258,15 +2269,36 @@ std::string Component::to_webcc() {
         generate_method(method);
     }
 
-    // Generated handlers
-    for(auto& handler : click_handlers) {
-        ss << "    void _handler_" << std::get<0>(handler) << "() {\n";
-        if (std::get<2>(handler)) {
-            ss << "        " << std::get<1>(handler) << ";\n";
-        } else {
-            ss << "        " << std::get<1>(handler) << "();\n";
+    // Generated event handlers
+    for(auto& handler : event_handlers) {
+        if (handler.event_type == "click") {
+            // Click handlers take no arguments
+            ss << "    void _handler_" << handler.element_id << "_click() {\n";
+            if (handler.is_function_call) {
+                ss << "        " << handler.handler_code << ";\n";
+            } else {
+                ss << "        " << handler.handler_code << "();\n";
+            }
+            ss << "    }\n";
+        } else if (handler.event_type == "input" || handler.event_type == "change") {
+            // Input/change handlers receive string value
+            ss << "    void _handler_" << handler.element_id << "_" << handler.event_type << "(const webcc::string& _value) {\n";
+            if (handler.is_function_call) {
+                ss << "        " << handler.handler_code << ";\n";
+            } else {
+                ss << "        " << handler.handler_code << "(_value);\n";
+            }
+            ss << "    }\n";
+        } else if (handler.event_type == "keydown") {
+            // Keydown handlers receive int keycode
+            ss << "    void _handler_" << handler.element_id << "_keydown(int _keycode) {\n";
+            if (handler.is_function_call) {
+                ss << "        " << handler.handler_code << ";\n";
+            } else {
+                ss << "        " << handler.handler_code << "(_keycode);\n";
+            }
+            ss << "    }\n";
         }
-        ss << "    }\n";
     }
 
     // View method (Initialization only)
@@ -2281,9 +2313,17 @@ std::string Component::to_webcc() {
     if(!render_roots.empty()){
         ss << ss_render.str();
     }
-    // Register handlers
-    for(auto& handler : click_handlers) {
-        ss << "        g_dispatcher.set(el_" << std::get<0>(handler) << ", [this]() { this->_handler_" << std::get<0>(handler) << "(); });\n";
+    // Register event handlers with dispatcher
+    for(auto& handler : event_handlers) {
+        if (handler.event_type == "click") {
+            ss << "        g_dispatcher.set(el_" << handler.element_id << ", [this]() { this->_handler_" << handler.element_id << "_click(); });\n";
+        } else if (handler.event_type == "input") {
+            ss << "        g_input_dispatcher.set(el_" << handler.element_id << ", [this](const webcc::string& v) { this->_handler_" << handler.element_id << "_input(v); });\n";
+        } else if (handler.event_type == "change") {
+            ss << "        g_change_dispatcher.set(el_" << handler.element_id << ", [this](const webcc::string& v) { this->_handler_" << handler.element_id << "_change(v); });\n";
+        } else if (handler.event_type == "keydown") {
+            ss << "        g_keydown_dispatcher.set(el_" << handler.element_id << ", [this](int k) { this->_handler_" << handler.element_id << "_keydown(k); });\n";
+        }
     }
     
     // Wire up onChange callbacks for child component pub mut members used in if conditions
@@ -2303,18 +2343,34 @@ std::string Component::to_webcc() {
     ss << "    }\n";
     
     // Re-bind handlers (used after vector reallocation invalidates this pointers)
-    if (!click_handlers.empty()) {
+    if (!event_handlers.empty()) {
         ss << "    void _rebind() {\n";
-        for(auto& handler : click_handlers) {
-            ss << "        g_dispatcher.set(el_" << std::get<0>(handler) << ", [this]() { this->_handler_" << std::get<0>(handler) << "(); });\n";
+        for(auto& handler : event_handlers) {
+            if (handler.event_type == "click") {
+                ss << "        g_dispatcher.set(el_" << handler.element_id << ", [this]() { this->_handler_" << handler.element_id << "_click(); });\n";
+            } else if (handler.event_type == "input") {
+                ss << "        g_input_dispatcher.set(el_" << handler.element_id << ", [this](const webcc::string& v) { this->_handler_" << handler.element_id << "_input(v); });\n";
+            } else if (handler.event_type == "change") {
+                ss << "        g_change_dispatcher.set(el_" << handler.element_id << ", [this](const webcc::string& v) { this->_handler_" << handler.element_id << "_change(v); });\n";
+            } else if (handler.event_type == "keydown") {
+                ss << "        g_keydown_dispatcher.set(el_" << handler.element_id << ", [this](int k) { this->_handler_" << handler.element_id << "_keydown(k); });\n";
+            }
         }
         ss << "    }\n";
     }
     
     // Destroy method - unregisters handlers and removes the component's root element from the DOM
     ss << "    void _destroy() {\n";
-    for(auto& handler : click_handlers) {
-        ss << "        g_dispatcher.remove(el_" << std::get<0>(handler) << ");\n";
+    for(auto& handler : event_handlers) {
+        if (handler.event_type == "click") {
+            ss << "        g_dispatcher.remove(el_" << handler.element_id << ");\n";
+        } else if (handler.event_type == "input") {
+            ss << "        g_input_dispatcher.remove(el_" << handler.element_id << ");\n";
+        } else if (handler.event_type == "change") {
+            ss << "        g_change_dispatcher.remove(el_" << handler.element_id << ");\n";
+        } else if (handler.event_type == "keydown") {
+            ss << "        g_keydown_dispatcher.remove(el_" << handler.element_id << ");\n";
+        }
     }
     if (element_count > 0) {
         ss << "        webcc::dom::remove_element(el_0);\n";

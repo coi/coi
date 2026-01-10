@@ -333,6 +333,14 @@ struct HTMLAttribute {
     std::unique_ptr<Expression> value;
 };
 
+// Event handler for DOM events (onclick, oninput, onchange, onkeydown)
+struct EventHandler {
+    int element_id;              // ID of the element this handler is attached to
+    std::string event_type;      // "click", "input", "change", "keydown"
+    std::string handler_code;    // The handler function/method to call
+    bool is_function_call;       // True if handler_code is already a function call
+};
+
 struct Binding {
     int element_id;
     std::string type; // "attr" or "text"
@@ -397,7 +405,7 @@ struct ComponentInstantiation : ASTNode {
     std::string to_webcc() override;
 
     void generate_code(std::stringstream& ss, const std::string& parent, int& counter, 
-                      std::vector<std::tuple<int, std::string, bool>>& click_handlers,
+                      std::vector<EventHandler>& event_handlers,
                       std::vector<Binding>& bindings,
                       std::map<std::string, int>& component_counters,
                       const std::set<std::string>& method_names,
@@ -420,7 +428,7 @@ struct HTMLElement : ASTNode {
     std::string to_webcc() override;
 
     void generate_code(std::stringstream& ss, const std::string& parent, int& counter, 
-                      std::vector<std::tuple<int, std::string, bool>>& click_handlers,
+                      std::vector<EventHandler>& event_handlers,
                       std::vector<Binding>& bindings,
                       std::map<std::string, int>& component_counters,
                       const std::set<std::string>& method_names,
@@ -472,7 +480,7 @@ struct ViewIfStatement : ASTNode {
 
     std::string to_webcc() override { return ""; }
     void generate_code(std::stringstream& ss, const std::string& parent, int& counter, 
-                      std::vector<std::tuple<int, std::string, bool>>& click_handlers,
+                      std::vector<EventHandler>& event_handlers,
                       std::vector<Binding>& bindings,
                       std::map<std::string, int>& component_counters,
                       const std::set<std::string>& method_names,
@@ -495,7 +503,7 @@ struct ViewForRangeStatement : ASTNode {
 
     std::string to_webcc() override { return ""; }
     void generate_code(std::stringstream& ss, const std::string& parent, int& counter, 
-                      std::vector<std::tuple<int, std::string, bool>>& click_handlers,
+                      std::vector<EventHandler>& event_handlers,
                       std::vector<Binding>& bindings,
                       std::map<std::string, int>& component_counters,
                       const std::set<std::string>& method_names,
@@ -518,7 +526,7 @@ struct ViewForEachStatement : ASTNode {
 
     std::string to_webcc() override { return ""; }
     void generate_code(std::stringstream& ss, const std::string& parent, int& counter, 
-                      std::vector<std::tuple<int, std::string, bool>>& click_handlers,
+                      std::vector<EventHandler>& event_handlers,
                       std::vector<Binding>& bindings,
                       std::map<std::string, int>& component_counters,
                       const std::set<std::string>& method_names,

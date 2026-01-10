@@ -321,17 +321,18 @@ int main(int argc, char **argv)
         out << "#include \"webcc/core/vector.h\"\n";
         out << "#include \"webcc/core/unordered_map.h\"\n\n";
 
-        out << "struct EventDispatcher {\n";
-        out << "    static constexpr int MAX_LISTENERS = 128;\n";
-        out << "    int32_t handles[MAX_LISTENERS];\n";
-        out << "    webcc::function<void()> callbacks[MAX_LISTENERS];\n";
+        // Generic event dispatcher template
+        out << "template<typename Callback, int MaxListeners = 64>\n";
+        out << "struct Dispatcher {\n";
+        out << "    int32_t handles[MaxListeners];\n";
+        out << "    Callback callbacks[MaxListeners];\n";
         out << "    int count = 0;\n";
-        out << "    void set(webcc::handle h, webcc::function<void()> cb) {\n";
+        out << "    void set(webcc::handle h, Callback cb) {\n";
         out << "        int32_t hid = (int32_t)h;\n";
         out << "        for (int i = 0; i < count; i++) {\n";
         out << "            if (handles[i] == hid) { callbacks[i] = cb; return; }\n";
         out << "        }\n";
-        out << "        if (count < MAX_LISTENERS) {\n";
+        out << "        if (count < MaxListeners) {\n";
         out << "            handles[count] = hid;\n";
         out << "            callbacks[count] = cb;\n";
         out << "            count++;\n";
@@ -348,22 +349,19 @@ int main(int argc, char **argv)
         out << "            }\n";
         out << "        }\n";
         out << "    }\n";
-        out << "    void dispatch(const webcc::Event* events, uint32_t event_count) {\n";
-        out << "        for (uint32_t i = 0; i < event_count; i++) {\n";
-        out << "            const auto& e = events[i];\n";
-        out << "            if (e.opcode == webcc::dom::ClickEvent::OPCODE) {\n";
-        out << "                auto click = e.as<webcc::dom::ClickEvent>();\n";
-        out << "                if (click) {\n";
-        out << "                    int32_t hid = (int32_t)click->handle;\n";
-        out << "                    for (int j = 0; j < count; j++) {\n";
-        out << "                        if (handles[j] == hid) { callbacks[j](); break; }\n";
-        out << "                    }\n";
-        out << "                }\n";
-        out << "            }\n";
+        out << "    template<typename... Args>\n";
+        out << "    bool dispatch(webcc::handle h, Args&&... args) {\n";
+        out << "        int32_t hid = (int32_t)h;\n";
+        out << "        for (int i = 0; i < count; i++) {\n";
+        out << "            if (handles[i] == hid) { callbacks[i](args...); return true; }\n";
         out << "        }\n";
+        out << "        return false;\n";
         out << "    }\n";
-        out << "};\n";
-        out << "EventDispatcher g_dispatcher;\n\n";
+        out << "};\n\n";
+        out << "Dispatcher<webcc::function<void()>, 128> g_dispatcher;\n";
+        out << "Dispatcher<webcc::function<void(const webcc::string&)>> g_input_dispatcher;\n";
+        out << "Dispatcher<webcc::function<void(const webcc::string&)>> g_change_dispatcher;\n";
+        out << "Dispatcher<webcc::function<void(int)>> g_keydown_dispatcher;\n\n";
 
         // Sort components topologically so dependencies come first
         auto sorted_components = topological_sort_components(all_components);
@@ -396,6 +394,20 @@ int main(int argc, char **argv)
 
         out << "\n"
             << final_app_config.root_component << "* app = nullptr;\n";
+        out << "void dispatch_events(const webcc::Event* events, uint32_t event_count) {\n";
+        out << "    for (uint32_t i = 0; i < event_count; i++) {\n";
+        out << "        const auto& e = events[i];\n";
+        out << "        if (e.opcode == webcc::dom::ClickEvent::OPCODE) {\n";
+        out << "            if (auto evt = e.as<webcc::dom::ClickEvent>()) g_dispatcher.dispatch(evt->handle);\n";
+        out << "        } else if (e.opcode == webcc::dom::InputEvent::OPCODE) {\n";
+        out << "            if (auto evt = e.as<webcc::dom::InputEvent>()) g_input_dispatcher.dispatch(evt->handle, webcc::string(evt->value));\n";
+        out << "        } else if (e.opcode == webcc::dom::ChangeEvent::OPCODE) {\n";
+        out << "            if (auto evt = e.as<webcc::dom::ChangeEvent>()) g_change_dispatcher.dispatch(evt->handle, webcc::string(evt->value));\n";
+        out << "        } else if (e.opcode == webcc::dom::KeydownEvent::OPCODE) {\n";
+        out << "            if (auto evt = e.as<webcc::dom::KeydownEvent>()) g_keydown_dispatcher.dispatch(evt->handle, evt->keycode);\n";
+        out << "        }\n";
+        out << "    }\n";
+        out << "}\n\n";
         out << "void update_wrapper(float time) {\n";
         out << "    static float last_time = 0;\n";
         out << "    float dt = (time - last_time) / 1000.0f;\n";
@@ -407,7 +419,7 @@ int main(int argc, char **argv)
         out << "    while (webcc::poll_event(e) && count < 64) {\n";
         out << "        events[count++] = e;\n";
         out << "    }\n";
-        out << "    g_dispatcher.dispatch(events, count);\n";
+        out << "    dispatch_events(events, count);\n";
         out << "    if (app) app->tick(dt);\n";
         out << "    webcc::flush();\n";
         out << "}\n\n";
