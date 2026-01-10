@@ -134,6 +134,42 @@ std::string infer_expression_type(Expression* expr, const std::map<std::string, 
         return "unknown"; 
     }
 
+    // Member access type inference (e.g., obj.field)
+    if (auto member = dynamic_cast<MemberAccess*>(expr)) {
+        std::string obj_type = infer_expression_type(member->object.get(), scope);
+        if (obj_type == "unknown") return "unknown";
+        
+        // Check if it's a schema type with known fields/properties
+        // For now, return unknown - could be extended to check schema for field types
+        return "unknown";
+    }
+
+    // Unary operator type inference (e.g., -x, !x)
+    if (auto unary = dynamic_cast<UnaryOp*>(expr)) {
+        std::string operand_type = infer_expression_type(unary->operand.get(), scope);
+        if (unary->op == "!") {
+            return "bool";
+        }
+        // Unary +/- only makes sense on numeric types
+        if (unary->op == "-" || unary->op == "+") {
+            if (operand_type == "int32" || operand_type == "float32") {
+                return operand_type;
+            }
+            if (operand_type != "unknown") {
+                std::cerr << "Error: Unary '" << unary->op << "' operator requires numeric type, got '" 
+                          << operand_type << "' at line " << unary->line << std::endl;
+                exit(1);
+            }
+            return "unknown";
+        }
+        return "unknown";
+    }
+
+    // Postfix operator type inference (e.g., i++, i--)
+    if (auto postfix = dynamic_cast<PostfixOp*>(expr)) {
+        return infer_expression_type(postfix->operand.get(), scope);
+    }
+
     if (auto func = dynamic_cast<FunctionCall*>(expr)) {
         std::string full_name = func->name;
         std::string obj_name;
@@ -204,8 +240,19 @@ std::string infer_expression_type(Expression* expr, const std::map<std::string, 
     }
 
     if (auto bin = dynamic_cast<BinaryOp*>(expr)) {
+        std::string op = bin->op;
         std::string l = infer_expression_type(bin->left.get(), scope);
         std::string r = infer_expression_type(bin->right.get(), scope);
+        
+        // Comparison operators return bool
+        if (op == "==" || op == "!=" || op == "<" || op == ">" || op == "<=" || op == ">=") {
+            return "bool";
+        }
+        // Logical operators return bool
+        if (op == "&&" || op == "||") {
+            return "bool";
+        }
+        // Arithmetic operators
         if (l == r) return l;
         if (l == "int32" && r == "float32") return "float32";
         if (l == "float32" && r == "int32") return "float32";
