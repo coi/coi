@@ -526,7 +526,14 @@ void Assignment::collect_dependencies(std::set<std::string>& deps) {
 }
 
 std::string IndexAssignment::to_webcc() {
-    return array->to_webcc() + "[" + index->to_webcc() + "] = " + value->to_webcc() + ";";
+    if (compound_op.empty()) {
+        return array->to_webcc() + "[" + index->to_webcc() + "] = " + value->to_webcc() + ";";
+    } else {
+        // Compound assignment: arr[i] += x  =>  arr[i] = arr[i] + x
+        std::string arr = array->to_webcc();
+        std::string idx = index->to_webcc();
+        return arr + "[" + idx + "] = " + arr + "[" + idx + "] " + compound_op + " " + value->to_webcc() + ";";
+    }
 }
 void IndexAssignment::collect_dependencies(std::set<std::string>& deps) {
     array->collect_dependencies(deps);

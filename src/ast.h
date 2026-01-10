@@ -206,6 +206,7 @@ struct IndexAssignment : Statement {
     std::unique_ptr<Expression> array;
     std::unique_ptr<Expression> index;
     std::unique_ptr<Expression> value;
+    std::string compound_op;  // Empty for =, or "+", "-", "*", "/", "%" for compound assignments
 
     std::string to_webcc() override;
     void collect_dependencies(std::set<std::string>& deps) override;

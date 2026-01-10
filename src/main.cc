@@ -17,146 +17,188 @@
 // MAIN COMPILER
 // =========================================================
 
-std::string normalize_type(const std::string& type) {
+std::string normalize_type(const std::string &type)
+{
     // Handle dynamic array types: T[]
-    if (type.ends_with("[]")) {
+    if (type.ends_with("[]"))
+    {
         std::string elem_type = type.substr(0, type.length() - 2);
         return normalize_type(elem_type) + "[]";
     }
     // Handle fixed-size array types: T[N]
     size_t bracket_pos = type.rfind('[');
-    if (bracket_pos != std::string::npos && type.back() == ']') {
+    if (bracket_pos != std::string::npos && type.back() == ']')
+    {
         std::string size_str = type.substr(bracket_pos + 1, type.length() - bracket_pos - 2);
         bool is_number = !size_str.empty() && std::all_of(size_str.begin(), size_str.end(), ::isdigit);
-        if (is_number) {
+        if (is_number)
+        {
             std::string elem_type = type.substr(0, bracket_pos);
             return normalize_type(elem_type) + "[" + size_str + "]";
         }
     }
-    if (type == "int") return "int32";
-    if (type == "float") return "float32";
-    if (type == "bool") return "bool";
-    if (type == "string") return "string";
+    if (type == "int")
+        return "int32";
+    if (type == "float")
+        return "float32";
+    if (type == "bool")
+        return "bool";
+    if (type == "string")
+        return "string";
     return type;
 }
 
-bool is_compatible_type(const std::string& source, const std::string& target) {
-    if (source == target) return true;
-    if (source == "unknown" || target == "unknown") return true;
-    
+bool is_compatible_type(const std::string &source, const std::string &target)
+{
+    if (source == target)
+        return true;
+    if (source == "unknown" || target == "unknown")
+        return true;
+
     // Handle dynamic array type compatibility: T[]
-    if (source.ends_with("[]") && target.ends_with("[]")) {
+    if (source.ends_with("[]") && target.ends_with("[]"))
+    {
         std::string src_elem = source.substr(0, source.length() - 2);
         std::string tgt_elem = target.substr(0, target.length() - 2);
         return is_compatible_type(src_elem, tgt_elem);
     }
     // Allow unknown[] to match any array type (for empty array literals)
-    if (source == "unknown[]" && target.ends_with("[]")) return true;
-    
+    if (source == "unknown[]" && target.ends_with("[]"))
+        return true;
+
     // Handle fixed-size array type compatibility: T[N]
     // Extract element type and size from both source and target
-    auto extract_fixed_array = [](const std::string& t) -> std::pair<std::string, std::string> {
+    auto extract_fixed_array = [](const std::string &t) -> std::pair<std::string, std::string>
+    {
         size_t bracket_pos = t.rfind('[');
-        if (bracket_pos != std::string::npos && t.back() == ']' && !t.ends_with("[]")) {
+        if (bracket_pos != std::string::npos && t.back() == ']' && !t.ends_with("[]"))
+        {
             std::string size_str = t.substr(bracket_pos + 1, t.length() - bracket_pos - 2);
             std::string elem = t.substr(0, bracket_pos);
             return {elem, size_str};
         }
         return {"", ""};
     };
-    
+
     auto [src_elem, src_size] = extract_fixed_array(source);
     auto [tgt_elem, tgt_size] = extract_fixed_array(target);
-    
-    if (!src_elem.empty() && !tgt_elem.empty()) {
+
+    if (!src_elem.empty() && !tgt_elem.empty())
+    {
         // Both are fixed-size arrays - check element type and size match
         return src_size == tgt_size && is_compatible_type(src_elem, tgt_elem);
     }
-    
+
     // Allow fixed-size array T[N] to be assigned to T[] declaration
     // (the actual type will be determined by VarDeclaration::to_webcc)
-    if (!src_elem.empty() && target.ends_with("[]")) {
+    if (!src_elem.empty() && target.ends_with("[]"))
+    {
         std::string tgt_elem = target.substr(0, target.length() - 2);
         return is_compatible_type(src_elem, tgt_elem);
     }
-    
+
     // Allow upcast (derived -> base), e.g., Canvas -> DOMElement
-    if (SchemaLoader::instance().is_assignable_to(source, target)) return true;
+    if (SchemaLoader::instance().is_assignable_to(source, target))
+        return true;
     // Allow downcast from base to derived types (e.g., DOMElement -> Canvas)
     // This is needed for getElementById which returns DOMElement but you know it's a Canvas/etc
     // Uses the HANDLE_INHERITANCE table to check if target derives from source
-    if (SchemaLoader::instance().is_assignable_to(target, source)) return true;
+    if (SchemaLoader::instance().is_assignable_to(target, source))
+        return true;
     // Numeric conversions
-    if (source == "int32" && (target == "float32" || target == "uint8")) return true;
+    if (source == "int32" && (target == "float32" || target == "uint8"))
+        return true;
     // int32 can be used as handle (for raw handle values)
-    if (source == "int32" && SchemaLoader::instance().is_handle(target)) return true;
+    if (source == "int32" && SchemaLoader::instance().is_handle(target))
+        return true;
     return false;
 }
 
-std::string infer_expression_type(Expression* expr, const std::map<std::string, std::string>& scope) {
-    if (dynamic_cast<IntLiteral*>(expr)) return "int32";
-    if (dynamic_cast<FloatLiteral*>(expr)) return "float32";
-    if (dynamic_cast<StringLiteral*>(expr)) return "string";
-    if (dynamic_cast<BoolLiteral*>(expr)) return "bool";
-    
+std::string infer_expression_type(Expression *expr, const std::map<std::string, std::string> &scope)
+{
+    if (dynamic_cast<IntLiteral *>(expr))
+        return "int32";
+    if (dynamic_cast<FloatLiteral *>(expr))
+        return "float32";
+    if (dynamic_cast<StringLiteral *>(expr))
+        return "string";
+    if (dynamic_cast<BoolLiteral *>(expr))
+        return "bool";
+
     // Array literal type inference (dynamic array)
-    if (auto arr = dynamic_cast<ArrayLiteral*>(expr)) {
-        if (arr->elements.empty()) return "unknown[]";
+    if (auto arr = dynamic_cast<ArrayLiteral *>(expr))
+    {
+        if (arr->elements.empty())
+            return "unknown[]";
         // Infer type from first element
         std::string elem_type = infer_expression_type(arr->elements[0].get(), scope);
         return elem_type + "[]";
     }
-    
+
     // Array repeat literal type inference: [value; count] -> fixed-size array
-    if (auto arr = dynamic_cast<ArrayRepeatLiteral*>(expr)) {
+    if (auto arr = dynamic_cast<ArrayRepeatLiteral *>(expr))
+    {
         std::string elem_type = infer_expression_type(arr->value.get(), scope);
         return elem_type + "[" + std::to_string(arr->count) + "]";
     }
-    
+
     // Index access type inference
-    if (auto idx = dynamic_cast<IndexAccess*>(expr)) {
+    if (auto idx = dynamic_cast<IndexAccess *>(expr))
+    {
         std::string arr_type = infer_expression_type(idx->array.get(), scope);
         // If it's a dynamic array type (e.g., int[]), return the element type
-        if (arr_type.ends_with("[]")) {
+        if (arr_type.ends_with("[]"))
+        {
             return arr_type.substr(0, arr_type.length() - 2);
         }
         // If it's a fixed-size array type (e.g., int[100]), return the element type
         size_t bracket_pos = arr_type.rfind('[');
-        if (bracket_pos != std::string::npos && arr_type.back() == ']') {
+        if (bracket_pos != std::string::npos && arr_type.back() == ']')
+        {
             return arr_type.substr(0, bracket_pos);
         }
         return "unknown";
     }
-    
-    if (auto id = dynamic_cast<Identifier*>(expr)) {
-        if (scope.count(id->name)) return scope.at(id->name);
-        if (SchemaLoader::instance().is_handle(id->name)) return id->name;
-        return "unknown"; 
+
+    if (auto id = dynamic_cast<Identifier *>(expr))
+    {
+        if (scope.count(id->name))
+            return scope.at(id->name);
+        if (SchemaLoader::instance().is_handle(id->name))
+            return id->name;
+        return "unknown";
     }
 
     // Member access type inference (e.g., obj.field)
-    if (auto member = dynamic_cast<MemberAccess*>(expr)) {
+    if (auto member = dynamic_cast<MemberAccess *>(expr))
+    {
         std::string obj_type = infer_expression_type(member->object.get(), scope);
-        if (obj_type == "unknown") return "unknown";
-        
+        if (obj_type == "unknown")
+            return "unknown";
+
         // Check if it's a schema type with known fields/properties
         // For now, return unknown - could be extended to check schema for field types
         return "unknown";
     }
 
     // Unary operator type inference (e.g., -x, !x)
-    if (auto unary = dynamic_cast<UnaryOp*>(expr)) {
+    if (auto unary = dynamic_cast<UnaryOp *>(expr))
+    {
         std::string operand_type = infer_expression_type(unary->operand.get(), scope);
-        if (unary->op == "!") {
+        if (unary->op == "!")
+        {
             return "bool";
         }
         // Unary +/- only makes sense on numeric types
-        if (unary->op == "-" || unary->op == "+") {
-            if (operand_type == "int32" || operand_type == "float32") {
+        if (unary->op == "-" || unary->op == "+")
+        {
+            if (operand_type == "int32" || operand_type == "float32")
+            {
                 return operand_type;
             }
-            if (operand_type != "unknown") {
-                std::cerr << "Error: Unary '" << unary->op << "' operator requires numeric type, got '" 
+            if (operand_type != "unknown")
+            {
+                std::cerr << "Error: Unary '" << unary->op << "' operator requires numeric type, got '"
                           << operand_type << "' at line " << unary->line << std::endl;
                 exit(1);
             }
@@ -166,156 +208,194 @@ std::string infer_expression_type(Expression* expr, const std::map<std::string, 
     }
 
     // Postfix operator type inference (e.g., i++, i--)
-    if (auto postfix = dynamic_cast<PostfixOp*>(expr)) {
+    if (auto postfix = dynamic_cast<PostfixOp *>(expr))
+    {
         return infer_expression_type(postfix->operand.get(), scope);
     }
 
-    if (auto func = dynamic_cast<FunctionCall*>(expr)) {
+    if (auto func = dynamic_cast<FunctionCall *>(expr))
+    {
         std::string full_name = func->name;
         std::string obj_name;
         std::string method_name = full_name;
-        
+
         size_t dot_pos = full_name.rfind('.');
-        if (dot_pos != std::string::npos) {
+        if (dot_pos != std::string::npos)
+        {
             obj_name = full_name.substr(0, dot_pos);
             method_name = full_name.substr(dot_pos + 1);
         }
 
         std::string snake_method = SchemaLoader::to_snake_case(method_name);
-        const auto* entry = SchemaLoader::instance().lookup(snake_method);
-        
-        if (entry) {
-             size_t expected_args = entry->params.size();
-             size_t actual_args = func->args.size();
-             size_t param_offset = 0;
-             
-             bool implicit_obj = false;
-             if (!obj_name.empty()) {
-                  if (scope.count(obj_name)) {
-                      // Only treat as implicit object if function actually expects a handle as first arg
-                      if (!entry->params.empty()) {
-                            std::string first_param_type = entry->params[0].type;
-                            if (SchemaLoader::instance().is_handle(first_param_type)) {
-                                std::string obj_type = scope.at(obj_name);
-                                if (is_compatible_type(obj_type, first_param_type)) {
-                                    implicit_obj = true;
-                                }
+        const auto *entry = SchemaLoader::instance().lookup(snake_method);
+
+        if (entry)
+        {
+            size_t expected_args = entry->params.size();
+            size_t actual_args = func->args.size();
+            size_t param_offset = 0;
+
+            bool implicit_obj = false;
+            if (!obj_name.empty())
+            {
+                if (scope.count(obj_name))
+                {
+                    // Only treat as implicit object if function actually expects a handle as first arg
+                    if (!entry->params.empty())
+                    {
+                        std::string first_param_type = entry->params[0].type;
+                        if (SchemaLoader::instance().is_handle(first_param_type))
+                        {
+                            std::string obj_type = scope.at(obj_name);
+                            if (is_compatible_type(obj_type, first_param_type))
+                            {
+                                implicit_obj = true;
                             }
-                      }
-                  }
-             }
-             
-             if (implicit_obj) {
-                 param_offset = 1;
-             }
-             
-             if (actual_args != (expected_args - param_offset)) {
-                  std::cerr << "Error: Function '" << full_name << "' expects " << (expected_args - param_offset) 
-                            << " arguments but got " << actual_args << " line " << func->line << std::endl;
-                  exit(1);
-             }
-             
-             for (size_t i = 0; i < actual_args; ++i) {
-                 std::string arg_type = infer_expression_type(func->args[i].get(), scope);
-                 std::string expected_type = entry->params[i + param_offset].type;
-                 
-                 if (!is_compatible_type(arg_type, expected_type)) {
-                     std::cerr << "Error: Argument " << (i+1) << " of '" << full_name << "' expects '" << expected_type 
-                               << "' but got '" << arg_type << "' line " << func->line << std::endl;
-                     exit(1);
-                 }
-             }
-             
-             return entry->return_type.empty() ? "void" : entry->return_type;
-        } else {
-            if (!obj_name.empty() && scope.count(obj_name)) {
-                 std::string type = scope.at(obj_name);
-                 if (SchemaLoader::instance().is_handle(type)) {
-                      std::cerr << "Error: Method '" << method_name << "' not found for type '" << type << "' line " << func->line << std::endl;
-                      exit(1);
-                 }
+                        }
+                    }
+                }
+            }
+
+            if (implicit_obj)
+            {
+                param_offset = 1;
+            }
+
+            if (actual_args != (expected_args - param_offset))
+            {
+                std::cerr << "Error: Function '" << full_name << "' expects " << (expected_args - param_offset)
+                          << " arguments but got " << actual_args << " line " << func->line << std::endl;
+                exit(1);
+            }
+
+            for (size_t i = 0; i < actual_args; ++i)
+            {
+                std::string arg_type = infer_expression_type(func->args[i].get(), scope);
+                std::string expected_type = entry->params[i + param_offset].type;
+
+                if (!is_compatible_type(arg_type, expected_type))
+                {
+                    std::cerr << "Error: Argument " << (i + 1) << " of '" << full_name << "' expects '" << expected_type
+                              << "' but got '" << arg_type << "' line " << func->line << std::endl;
+                    exit(1);
+                }
+            }
+
+            return entry->return_type.empty() ? "void" : entry->return_type;
+        }
+        else
+        {
+            if (!obj_name.empty() && scope.count(obj_name))
+            {
+                std::string type = scope.at(obj_name);
+                if (SchemaLoader::instance().is_handle(type))
+                {
+                    std::cerr << "Error: Method '" << method_name << "' not found for type '" << type << "' line " << func->line << std::endl;
+                    exit(1);
+                }
             }
         }
         return "unknown";
     }
 
-    if (auto bin = dynamic_cast<BinaryOp*>(expr)) {
+    if (auto bin = dynamic_cast<BinaryOp *>(expr))
+    {
         std::string op = bin->op;
         std::string l = infer_expression_type(bin->left.get(), scope);
         std::string r = infer_expression_type(bin->right.get(), scope);
-        
+
         // Comparison operators return bool
-        if (op == "==" || op == "!=" || op == "<" || op == ">" || op == "<=" || op == ">=") {
+        if (op == "==" || op == "!=" || op == "<" || op == ">" || op == "<=" || op == ">=")
+        {
             return "bool";
         }
         // Logical operators return bool
-        if (op == "&&" || op == "||") {
+        if (op == "&&" || op == "||")
+        {
             return "bool";
         }
         // Arithmetic operators
-        if (l == r) return l;
-        if (l == "int32" && r == "float32") return "float32";
-        if (l == "float32" && r == "int32") return "float32";
+        if (l == r)
+            return l;
+        if (l == "int32" && r == "float32")
+            return "float32";
+        if (l == "float32" && r == "int32")
+            return "float32";
         return "unknown";
     }
 
     return "unknown";
 }
 
-void validate_types(const std::vector<Component>& components) {
+void validate_types(const std::vector<Component> &components)
+{
     std::set<std::string> component_names;
-    for (const auto& c : components) component_names.insert(c.name);
+    for (const auto &c : components)
+        component_names.insert(c.name);
 
-    for (const auto& comp : components) {
+    for (const auto &comp : components)
+    {
         std::map<std::string, std::string> scope;
-        
+
         // Check component parameter types and their default values
-        for (const auto& param : comp.params) {
+        for (const auto &param : comp.params)
+        {
             std::string type = normalize_type(param->type);
-            
+
             // Disallow pub on reference parameters - references point to parent's data
             // and should never be exposed to third parties
-            if (param->is_public && param->is_reference) {
+            if (param->is_public && param->is_reference)
+            {
                 std::cerr << "Error: Reference parameter '" << param->name << "' cannot be public. "
                           << "References point to the parent's data and exposing them would break encapsulation." << std::endl;
                 exit(1);
             }
-            
-            if (param->default_value) {
+
+            if (param->default_value)
+            {
                 std::string init = infer_expression_type(param->default_value.get(), scope);
-                if (init != "unknown" && !is_compatible_type(init, type)) {
+                if (init != "unknown" && !is_compatible_type(init, type))
+                {
                     std::cerr << "Error: Parameter '" << param->name << "' expects '" << type << "' but initialized with '" << init << "'" << std::endl;
                     exit(1);
                 }
             }
             scope[param->name] = type;
         }
-        
-        for (const auto& var : comp.state) {
+
+        for (const auto &var : comp.state)
+        {
             std::string type = normalize_type(var->type);
-            
+
             // Disallow pub on reference state variables for the same reason
-            if (var->is_public && var->is_reference) {
+            if (var->is_public && var->is_reference)
+            {
                 std::cerr << "Error: Reference variable '" << var->name << "' cannot be public. "
                           << "References point to other data and exposing them would break encapsulation." << std::endl;
                 exit(1);
             }
 
             // Disallow uninitialized references (they must be bound immediately)
-            if (var->is_reference && !var->initializer) {
+            if (var->is_reference && !var->initializer)
+            {
                 std::cerr << "Error: Reference variable '" << var->name << "' must be initialized. References cannot be left unbound." << std::endl;
                 exit(1);
             }
 
             // Disallow storing references to child component properties (upward references)
-            if (var->is_reference && var->initializer) {
-                if (auto member = dynamic_cast<MemberAccess*>(var->initializer.get())) {
-                    if (auto id = dynamic_cast<Identifier*>(member->object.get())) {
+            if (var->is_reference && var->initializer)
+            {
+                if (auto member = dynamic_cast<MemberAccess *>(var->initializer.get()))
+                {
+                    if (auto id = dynamic_cast<Identifier *>(member->object.get()))
+                    {
                         auto it = scope.find(id->name);
-                        if (it != scope.end()) {
+                        if (it != scope.end())
+                        {
                             std::string owner_type = it->second;
-                            if (component_names.count(owner_type)) {
-                                std::cerr << "Error: Storing reference to child component property is not allowed (upward reference): " 
+                            if (component_names.count(owner_type))
+                            {
+                                std::cerr << "Error: Storing reference to child component property is not allowed (upward reference): "
                                           << var->name << " = " << id->name << "." << member->member << std::endl;
                                 exit(1);
                             }
@@ -324,119 +404,160 @@ void validate_types(const std::vector<Component>& components) {
                 }
             }
 
-            if (var->initializer) {
+            if (var->initializer)
+            {
                 std::string init = infer_expression_type(var->initializer.get(), scope);
-                if (init != "unknown" && !is_compatible_type(init, type)) {
-                     std::cerr << "Error: Variable '" << var->name << "' expects '" << type << "' but initialized with '" << init << "'" << std::endl;
-                     exit(1);
+                if (init != "unknown" && !is_compatible_type(init, type))
+                {
+                    std::cerr << "Error: Variable '" << var->name << "' expects '" << type << "' but initialized with '" << init << "'" << std::endl;
+                    exit(1);
                 }
             }
             scope[var->name] = type;
         }
-        
-        for (const auto& method : comp.methods) {
+
+        for (const auto &method : comp.methods)
+        {
             std::map<std::string, std::string> method_scope = scope;
-            for (const auto& param : method.params) {
+            for (const auto &param : method.params)
+            {
                 method_scope[param.name] = normalize_type(param.type);
             }
-            
-            std::function<void(const std::unique_ptr<Statement>&, std::map<std::string, std::string>&)> check_stmt;
-            check_stmt = [&](const std::unique_ptr<Statement>& stmt, std::map<std::string, std::string>& current_scope) {
-                    if (auto block = dynamic_cast<BlockStatement*>(stmt.get())) {
-                        for (const auto& s : block->statements) check_stmt(s, current_scope);
-                    } else if (auto decl = dynamic_cast<VarDeclaration*>(stmt.get())) {
-                        std::string type = normalize_type(decl->type);
-                        if (decl->initializer) {
-                             std::string init = infer_expression_type(decl->initializer.get(), current_scope);
-                              if (init != "unknown" && !is_compatible_type(init, type)) {
-                                 std::cerr << "Error: Variable '" << decl->name << "' expects '" << type << "' but got '" << init << "' line " << decl->line << std::endl;
-                                 exit(1);
-                             }
+
+            std::function<void(const std::unique_ptr<Statement> &, std::map<std::string, std::string> &)> check_stmt;
+            check_stmt = [&](const std::unique_ptr<Statement> &stmt, std::map<std::string, std::string> &current_scope)
+            {
+                if (auto block = dynamic_cast<BlockStatement *>(stmt.get()))
+                {
+                    for (const auto &s : block->statements)
+                        check_stmt(s, current_scope);
+                }
+                else if (auto decl = dynamic_cast<VarDeclaration *>(stmt.get()))
+                {
+                    std::string type = normalize_type(decl->type);
+                    if (decl->initializer)
+                    {
+                        std::string init = infer_expression_type(decl->initializer.get(), current_scope);
+                        if (init != "unknown" && !is_compatible_type(init, type))
+                        {
+                            std::cerr << "Error: Variable '" << decl->name << "' expects '" << type << "' but got '" << init << "' line " << decl->line << std::endl;
+                            exit(1);
                         }
-                        current_scope[decl->name] = type;
-                    } else if (auto assign = dynamic_cast<Assignment*>(stmt.get())) {
-                         std::string var_type = current_scope.count(assign->name) ? current_scope.at(assign->name) : "unknown";
-                         std::string val_type = infer_expression_type(assign->value.get(), current_scope);
-                         
-                         // Store the target type for code generation (needed for handle casts)
-                         assign->target_type = var_type;
-                         
-                         if (var_type != "unknown" && val_type != "unknown") {
-                             if (!is_compatible_type(val_type, var_type)) {
-                                 std::cerr << "Error: Assigning '" << val_type << "' to '" << assign->name << "' of type '" << var_type << "' line " << assign->line << std::endl;
-                                 exit(1);
-                             }
-                         }
-                    } else if (auto expr_stmt = dynamic_cast<ExpressionStatement*>(stmt.get())) {
-                        infer_expression_type(expr_stmt->expression.get(), current_scope);
-                    } else if (auto if_stmt = dynamic_cast<IfStatement*>(stmt.get())) {
-                        check_stmt(if_stmt->then_branch, current_scope);
-                        if(if_stmt->else_branch) check_stmt(if_stmt->else_branch, current_scope);
-                    } else if (auto for_range = dynamic_cast<ForRangeStatement*>(stmt.get())) {
-                        // Validate range expressions
-                        infer_expression_type(for_range->start.get(), current_scope);
-                        infer_expression_type(for_range->end.get(), current_scope);
-                        // Create new scope with loop variable
-                        std::map<std::string, std::string> loop_scope = current_scope;
-                        loop_scope[for_range->var_name] = "int32";
-                        check_stmt(for_range->body, loop_scope);
-                    } else if (auto for_each = dynamic_cast<ForEachStatement*>(stmt.get())) {
-                        // Validate iterable and infer element type
-                        std::string iterable_type = infer_expression_type(for_each->iterable.get(), current_scope);
-                        std::map<std::string, std::string> loop_scope = current_scope;
-                        if (iterable_type.ends_with("[]")) {
-                            loop_scope[for_each->var_name] = iterable_type.substr(0, iterable_type.length() - 2);
-                        } else {
-                            loop_scope[for_each->var_name] = "unknown";
-                        }
-                        check_stmt(for_each->body, loop_scope);
                     }
+                    current_scope[decl->name] = type;
+                }
+                else if (auto assign = dynamic_cast<Assignment *>(stmt.get()))
+                {
+                    std::string var_type = current_scope.count(assign->name) ? current_scope.at(assign->name) : "unknown";
+                    std::string val_type = infer_expression_type(assign->value.get(), current_scope);
+
+                    // Store the target type for code generation (needed for handle casts)
+                    assign->target_type = var_type;
+
+                    if (var_type != "unknown" && val_type != "unknown")
+                    {
+                        if (!is_compatible_type(val_type, var_type))
+                        {
+                            std::cerr << "Error: Assigning '" << val_type << "' to '" << assign->name << "' of type '" << var_type << "' line " << assign->line << std::endl;
+                            exit(1);
+                        }
+                    }
+                }
+                else if (auto expr_stmt = dynamic_cast<ExpressionStatement *>(stmt.get()))
+                {
+                    infer_expression_type(expr_stmt->expression.get(), current_scope);
+                }
+                else if (auto if_stmt = dynamic_cast<IfStatement *>(stmt.get()))
+                {
+                    check_stmt(if_stmt->then_branch, current_scope);
+                    if (if_stmt->else_branch)
+                        check_stmt(if_stmt->else_branch, current_scope);
+                }
+                else if (auto for_range = dynamic_cast<ForRangeStatement *>(stmt.get()))
+                {
+                    // Validate range expressions
+                    infer_expression_type(for_range->start.get(), current_scope);
+                    infer_expression_type(for_range->end.get(), current_scope);
+                    // Create new scope with loop variable
+                    std::map<std::string, std::string> loop_scope = current_scope;
+                    loop_scope[for_range->var_name] = "int32";
+                    check_stmt(for_range->body, loop_scope);
+                }
+                else if (auto for_each = dynamic_cast<ForEachStatement *>(stmt.get()))
+                {
+                    // Validate iterable and infer element type
+                    std::string iterable_type = infer_expression_type(for_each->iterable.get(), current_scope);
+                    std::map<std::string, std::string> loop_scope = current_scope;
+                    if (iterable_type.ends_with("[]"))
+                    {
+                        loop_scope[for_each->var_name] = iterable_type.substr(0, iterable_type.length() - 2);
+                    }
+                    else
+                    {
+                        loop_scope[for_each->var_name] = "unknown";
+                    }
+                    check_stmt(for_each->body, loop_scope);
+                }
             };
-            
-            for (const auto& stmt : method.body) {
+
+            for (const auto &stmt : method.body)
+            {
                 check_stmt(stmt, method_scope);
             }
         }
     }
 }
 
-void validate_mutability(const std::vector<Component>& components) {
-    for (const auto& comp : components) {
+void validate_mutability(const std::vector<Component> &components)
+{
+    for (const auto &comp : components)
+    {
         // Build set of mutable state variables
         std::set<std::string> mutable_vars;
-        for (const auto& var : comp.state) {
-            if (var->is_mutable) {
+        for (const auto &var : comp.state)
+        {
+            if (var->is_mutable)
+            {
                 mutable_vars.insert(var->name);
             }
         }
-        for (const auto& param : comp.params) {
-            if (param->is_mutable) {
+        for (const auto &param : comp.params)
+        {
+            if (param->is_mutable)
+            {
                 mutable_vars.insert(param->name);
             }
         }
 
         // Check all methods for modifications to non-mutable variables
-        for (const auto& method : comp.methods) {
+        for (const auto &method : comp.methods)
+        {
             std::set<std::string> modified_vars;
             method.collect_modifications(modified_vars);
-            
-            for (const auto& var_name : modified_vars) {
+
+            for (const auto &var_name : modified_vars)
+            {
                 // Check if this variable exists in state and is not mutable
                 bool is_known_var = false;
                 bool is_mutable = false;
                 bool is_param = false;
 
-                for (const auto& var : comp.state) {
-                    if (var->name == var_name) {
+                for (const auto &var : comp.state)
+                {
+                    if (var->name == var_name)
+                    {
                         is_known_var = true;
                         is_mutable = var->is_mutable;
                         break;
                     }
                 }
-                
-                if (!is_known_var) {
-                    for (const auto& param : comp.params) {
-                        if (param->name == var_name) {
+
+                if (!is_known_var)
+                {
+                    for (const auto &param : comp.params)
+                    {
+                        if (param->name == var_name)
+                        {
                             is_known_var = true;
                             is_param = true;
                             is_mutable = param->is_mutable;
@@ -444,14 +565,18 @@ void validate_mutability(const std::vector<Component>& components) {
                         }
                     }
                 }
-                
-                if (is_known_var && !is_mutable) {
-                    if (is_param) {
-                        throw std::runtime_error("Cannot modify parameter '" + var_name + "' in component '" + comp.name + 
-                            "': parameter is not mutable. Add 'mut' keyword to parameter declaration: mut " + var_name);
-                    } else {
-                        throw std::runtime_error("Cannot modify '" + var_name + "' in component '" + comp.name + 
-                            "': variable is not mutable. Add 'mut' keyword to make it mutable: mut " + var_name);
+
+                if (is_known_var && !is_mutable)
+                {
+                    if (is_param)
+                    {
+                        throw std::runtime_error("Cannot modify parameter '" + var_name + "' in component '" + comp.name +
+                                                 "': parameter is not mutable. Add 'mut' keyword to parameter declaration: mut " + var_name);
+                    }
+                    else
+                    {
+                        throw std::runtime_error("Cannot modify '" + var_name + "' in component '" + comp.name +
+                                                 "': variable is not mutable. Add 'mut' keyword to make it mutable: mut " + var_name);
                     }
                 }
             }
@@ -459,27 +584,35 @@ void validate_mutability(const std::vector<Component>& components) {
     }
 }
 
-void validate_view_hierarchy(const std::vector<Component>& components) {
-    std::map<std::string, const Component*> component_map;
-    for (const auto& comp : components) {
+void validate_view_hierarchy(const std::vector<Component> &components)
+{
+    std::map<std::string, const Component *> component_map;
+    for (const auto &comp : components)
+    {
         component_map[comp.name] = &comp;
     }
 
     // Build scope for a component (params + state + methods)
     // Methods are stored as "method(param_types):return_type" for validation
-    auto build_scope = [&](const Component* comp) -> std::map<std::string, std::string> {
+    auto build_scope = [&](const Component *comp) -> std::map<std::string, std::string>
+    {
         std::map<std::string, std::string> scope;
-        for (const auto& param : comp->params) {
+        for (const auto &param : comp->params)
+        {
             scope[param->name] = normalize_type(param->type);
         }
-        for (const auto& var : comp->state) {
+        for (const auto &var : comp->state)
+        {
             scope[var->name] = normalize_type(var->type);
         }
         // Methods are stored with their full signature for callback validation
-        for (const auto& method : comp->methods) {
+        for (const auto &method : comp->methods)
+        {
             std::string sig = "method(";
-            for (size_t i = 0; i < method.params.size(); ++i) {
-                if (i > 0) sig += ",";
+            for (size_t i = 0; i < method.params.size(); ++i)
+            {
+                if (i > 0)
+                    sig += ",";
                 sig += normalize_type(method.params[i].type);
             }
             sig += "):" + (method.return_type.empty() ? "void" : normalize_type(method.return_type));
@@ -488,236 +621,311 @@ void validate_view_hierarchy(const std::vector<Component>& components) {
         return scope;
     };
 
-    std::function<void(ASTNode*, const std::string&, std::map<std::string, std::string>&)> validate_node = 
-        [&](ASTNode* node, const std::string& parent_comp_name, std::map<std::string, std::string>& scope) {
-        if (!node) return;
+    std::function<void(ASTNode *, const std::string &, std::map<std::string, std::string> &)> validate_node =
+        [&](ASTNode *node, const std::string &parent_comp_name, std::map<std::string, std::string> &scope)
+    {
+        if (!node)
+            return;
 
-        if (auto* comp_inst = dynamic_cast<ComponentInstantiation*>(node)) {
+        if (auto *comp_inst = dynamic_cast<ComponentInstantiation *>(node))
+        {
             auto it = component_map.find(comp_inst->component_name);
-            if (it != component_map.end()) {
-                if (it->second->render_roots.empty()) {
-                     throw std::runtime_error("Component '" + comp_inst->component_name + "' is used in a view but has no view definition (logic-only component) at line " + std::to_string(comp_inst->line));
+            if (it != component_map.end())
+            {
+                if (it->second->render_roots.empty())
+                {
+                    throw std::runtime_error("Component '" + comp_inst->component_name + "' is used in a view but has no view definition (logic-only component) at line " + std::to_string(comp_inst->line));
                 }
-                
+
                 // Validate reference params
-                const Component* target_comp = it->second;
+                const Component *target_comp = it->second;
                 std::set<std::string> passed_param_names;
 
-                for (auto& passed_prop : comp_inst->props) {
+                for (auto &passed_prop : comp_inst->props)
+                {
                     passed_param_names.insert(passed_prop.name);
                     // Find the param declaration in the target component
                     bool param_found = false;
-                    for (const auto& declared_param : target_comp->params) {
-                        if (declared_param->name == passed_prop.name) {
+                    for (const auto &declared_param : target_comp->params)
+                    {
+                        if (declared_param->name == passed_prop.name)
+                        {
                             param_found = true;
                             passed_prop.is_mutable_def = declared_param->is_mutable;
-                            if (declared_param->is_reference && !passed_prop.is_reference) {
+                            if (declared_param->is_reference && !passed_prop.is_reference)
+                            {
                                 throw std::runtime_error(
-                                    "Parameter '" + passed_prop.name + "' in component '" + comp_inst->component_name + 
-                                    "' expects a reference. Use '&" + passed_prop.name + "={...}' syntax at line " + 
+                                    "Parameter '" + passed_prop.name + "' in component '" + comp_inst->component_name +
+                                    "' expects a reference. Use '&" + passed_prop.name + "={...}' syntax at line " +
                                     std::to_string(comp_inst->line));
                             }
-                            if (!declared_param->is_reference && passed_prop.is_reference) {
+                            if (!declared_param->is_reference && passed_prop.is_reference)
+                            {
                                 // Allow & syntax for function params (webcc::function)
-                                if (declared_param->type.find("webcc::function") == 0) {
+                                if (declared_param->type.find("webcc::function") == 0)
+                                {
                                     // OK - but also validate callback argument types
-                                } else {
+                                }
+                                else
+                                {
                                     throw std::runtime_error(
-                                        "Parameter '" + passed_prop.name + "' in component '" + comp_inst->component_name + 
-                                        "' does not expect a reference. Remove '&' prefix at line " + 
+                                        "Parameter '" + passed_prop.name + "' in component '" + comp_inst->component_name +
+                                        "' does not expect a reference. Remove '&' prefix at line " +
                                         std::to_string(comp_inst->line));
                                 }
                             }
-                            
+
                             // Validate callback argument types
-                            if (declared_param->is_callback && passed_prop.value) {
+                            if (declared_param->is_callback && passed_prop.value)
+                            {
                                 // The passed value should be a function call
-                                if (auto* func_call = dynamic_cast<FunctionCall*>(passed_prop.value.get())) {
+                                if (auto *func_call = dynamic_cast<FunctionCall *>(passed_prop.value.get()))
+                                {
                                     // Check argument count
-                                    if (func_call->args.size() != declared_param->callback_param_types.size()) {
+                                    if (func_call->args.size() != declared_param->callback_param_types.size())
+                                    {
                                         throw std::runtime_error(
-                                            "Callback parameter '" + passed_prop.name + "' in component '" + comp_inst->component_name + 
-                                            "' expects " + std::to_string(declared_param->callback_param_types.size()) + 
-                                            " argument(s) but got " + std::to_string(func_call->args.size()) + 
+                                            "Callback parameter '" + passed_prop.name + "' in component '" + comp_inst->component_name +
+                                            "' expects " + std::to_string(declared_param->callback_param_types.size()) +
+                                            " argument(s) but got " + std::to_string(func_call->args.size()) +
                                             " at line " + std::to_string(comp_inst->line));
                                     }
-                                    
+
                                     // Check each argument type
-                                    for (size_t i = 0; i < func_call->args.size(); ++i) {
+                                    for (size_t i = 0; i < func_call->args.size(); ++i)
+                                    {
                                         std::string arg_type = infer_expression_type(func_call->args[i].get(), scope);
                                         std::string expected_type = normalize_type(declared_param->callback_param_types[i]);
-                                        if (arg_type != "unknown" && !is_compatible_type(arg_type, expected_type)) {
+                                        if (arg_type != "unknown" && !is_compatible_type(arg_type, expected_type))
+                                        {
                                             throw std::runtime_error(
                                                 "Callback parameter '" + passed_prop.name + "' argument " + std::to_string(i + 1) +
-                                                " expects type '" + expected_type + "' but got '" + arg_type + 
+                                                " expects type '" + expected_type + "' but got '" + arg_type +
                                                 "' at line " + std::to_string(comp_inst->line));
                                         }
                                     }
-                                } else if (declared_param->callback_param_types.empty()) {
-                                    // No-argument callback, value can be an identifier (method reference) 
+                                }
+                                else if (declared_param->callback_param_types.empty())
+                                {
+                                    // No-argument callback, value can be an identifier (method reference)
                                     // or a function call with no args - this is OK
-                                } else {
+                                }
+                                else
+                                {
                                     // Callback expects arguments but wasn't given a function call
                                     throw std::runtime_error(
-                                        "Callback parameter '" + passed_prop.name + "' in component '" + comp_inst->component_name + 
-                                        "' expects " + std::to_string(declared_param->callback_param_types.size()) + 
-                                        " argument(s). Use syntax like '&" + passed_prop.name + "={handler(arg)}' at line " + 
+                                        "Callback parameter '" + passed_prop.name + "' in component '" + comp_inst->component_name +
+                                        "' expects " + std::to_string(declared_param->callback_param_types.size()) +
+                                        " argument(s). Use syntax like '&" + passed_prop.name + "={handler(arg)}' at line " +
                                         std::to_string(comp_inst->line));
                                 }
                             }
                             break;
                         }
                     }
-                    if (!param_found) {
+                    if (!param_found)
+                    {
                         // Warn or error about unknown param?
                         // For now we focus on missing required params.
                     }
                 }
 
                 // Check for missing required reference params
-                for (const auto& declared_param : target_comp->params) {
-                    if (declared_param->is_reference && passed_param_names.find(declared_param->name) == passed_param_names.end()) {
+                for (const auto &declared_param : target_comp->params)
+                {
+                    if (declared_param->is_reference && passed_param_names.find(declared_param->name) == passed_param_names.end())
+                    {
                         throw std::runtime_error("Missing required reference parameter '&" + declared_param->name + "' for component '" + comp_inst->component_name + "' at line " + std::to_string(comp_inst->line));
                     }
                     // Note: Callbacks without defaults are optional - they may not always be needed
                     // (e.g., Button can use href without onclick)
                 }
             }
-        } else if (auto* el = dynamic_cast<HTMLElement*>(node)) {
-            for (const auto& child : el->children) {
+        }
+        else if (auto *el = dynamic_cast<HTMLElement *>(node))
+        {
+            for (const auto &child : el->children)
+            {
                 validate_node(child.get(), parent_comp_name, scope);
             }
-        } else if (auto* viewIf = dynamic_cast<ViewIfStatement*>(node)) {
-            for (const auto& child : viewIf->then_children) {
+        }
+        else if (auto *viewIf = dynamic_cast<ViewIfStatement *>(node))
+        {
+            for (const auto &child : viewIf->then_children)
+            {
                 validate_node(child.get(), parent_comp_name, scope);
             }
-            for (const auto& child : viewIf->else_children) {
+            for (const auto &child : viewIf->else_children)
+            {
                 validate_node(child.get(), parent_comp_name, scope);
             }
-        } else if (auto* viewFor = dynamic_cast<ViewForRangeStatement*>(node)) {
+        }
+        else if (auto *viewFor = dynamic_cast<ViewForRangeStatement *>(node))
+        {
             // Add loop variable to scope
             std::map<std::string, std::string> loop_scope = scope;
-            loop_scope[viewFor->var_name] = "int32";  // Range loops always use int32
-            for (const auto& child : viewFor->children) {
+            loop_scope[viewFor->var_name] = "int32"; // Range loops always use int32
+            for (const auto &child : viewFor->children)
+            {
                 validate_node(child.get(), parent_comp_name, loop_scope);
             }
-        } else if (auto* viewForEach = dynamic_cast<ViewForEachStatement*>(node)) {
+        }
+        else if (auto *viewForEach = dynamic_cast<ViewForEachStatement *>(node))
+        {
             // Add loop variable to scope with inferred type from iterable
             std::map<std::string, std::string> loop_scope = scope;
             std::string iterable_type = infer_expression_type(viewForEach->iterable.get(), scope);
-            if (iterable_type.ends_with("[]")) {
+            if (iterable_type.ends_with("[]"))
+            {
                 loop_scope[viewForEach->var_name] = iterable_type.substr(0, iterable_type.size() - 2);
-            } else {
+            }
+            else
+            {
                 loop_scope[viewForEach->var_name] = "unknown";
             }
-            for (const auto& child : viewForEach->children) {
+            for (const auto &child : viewForEach->children)
+            {
                 validate_node(child.get(), parent_comp_name, loop_scope);
             }
         }
     };
 
-    for (const auto& comp : components) {
+    for (const auto &comp : components)
+    {
         std::map<std::string, std::string> scope = build_scope(&comp);
-        for (const auto& root : comp.render_roots) {
+        for (const auto &root : comp.render_roots)
+        {
             validate_node(root.get(), comp.name, scope);
         }
     }
 }
 
 // Collect child component names from a node
-void collect_component_deps(ASTNode* node, std::set<std::string>& deps) {
-    if (!node) return;
-    if (auto* comp_inst = dynamic_cast<ComponentInstantiation*>(node)) {
+void collect_component_deps(ASTNode *node, std::set<std::string> &deps)
+{
+    if (!node)
+        return;
+    if (auto *comp_inst = dynamic_cast<ComponentInstantiation *>(node))
+    {
         deps.insert(comp_inst->component_name);
-    } else if (auto* el = dynamic_cast<HTMLElement*>(node)) {
-        for (const auto& child : el->children) {
+    }
+    else if (auto *el = dynamic_cast<HTMLElement *>(node))
+    {
+        for (const auto &child : el->children)
+        {
             collect_component_deps(child.get(), deps);
         }
-    } else if (auto* viewIf = dynamic_cast<ViewIfStatement*>(node)) {
-        for (const auto& child : viewIf->then_children) {
+    }
+    else if (auto *viewIf = dynamic_cast<ViewIfStatement *>(node))
+    {
+        for (const auto &child : viewIf->then_children)
+        {
             collect_component_deps(child.get(), deps);
         }
-        for (const auto& child : viewIf->else_children) {
+        for (const auto &child : viewIf->else_children)
+        {
             collect_component_deps(child.get(), deps);
         }
-    } else if (auto* viewFor = dynamic_cast<ViewForRangeStatement*>(node)) {
-        for (const auto& child : viewFor->children) {
+    }
+    else if (auto *viewFor = dynamic_cast<ViewForRangeStatement *>(node))
+    {
+        for (const auto &child : viewFor->children)
+        {
             collect_component_deps(child.get(), deps);
         }
-    } else if (auto* viewForEach = dynamic_cast<ViewForEachStatement*>(node)) {
-        for (const auto& child : viewForEach->children) {
+    }
+    else if (auto *viewForEach = dynamic_cast<ViewForEachStatement *>(node))
+    {
+        for (const auto &child : viewForEach->children)
+        {
             collect_component_deps(child.get(), deps);
         }
     }
 }
 
 // Topologically sort components so dependencies come first
-std::vector<Component*> topological_sort_components(std::vector<Component>& components) {
-    std::map<std::string, Component*> comp_map;
+std::vector<Component *> topological_sort_components(std::vector<Component> &components)
+{
+    std::map<std::string, Component *> comp_map;
     std::map<std::string, std::set<std::string>> dependencies;
     std::map<std::string, int> in_degree;
-    
-    for (auto& comp : components) {
+
+    for (auto &comp : components)
+    {
         comp_map[comp.name] = &comp;
         in_degree[comp.name] = 0;
     }
-    
+
     // Build dependency graph
-    for (auto& comp : components) {
+    for (auto &comp : components)
+    {
         std::set<std::string> deps;
-        for (const auto& root : comp.render_roots) {
+        for (const auto &root : comp.render_roots)
+        {
             collect_component_deps(root.get(), deps);
         }
         dependencies[comp.name] = deps;
     }
-    
+
     // Calculate in-degrees
-    for (auto& [name, deps] : dependencies) {
-        for (auto& dep : deps) {
-            if (comp_map.count(dep)) {
+    for (auto &[name, deps] : dependencies)
+    {
+        for (auto &dep : deps)
+        {
+            if (comp_map.count(dep))
+            {
                 in_degree[name]++;
             }
         }
     }
-    
+
     // Kahn's algorithm
     std::queue<std::string> queue;
-    for (auto& [name, degree] : in_degree) {
-        if (degree == 0) {
+    for (auto &[name, degree] : in_degree)
+    {
+        if (degree == 0)
+        {
             queue.push(name);
         }
     }
-    
-    std::vector<Component*> sorted;
-    while (!queue.empty()) {
+
+    std::vector<Component *> sorted;
+    while (!queue.empty())
+    {
         std::string curr = queue.front();
         queue.pop();
         sorted.push_back(comp_map[curr]);
-        
+
         // For each component that depends on curr, decrease in-degree
-        for (auto& [name, deps] : dependencies) {
-            if (deps.count(curr)) {
+        for (auto &[name, deps] : dependencies)
+        {
+            if (deps.count(curr))
+            {
                 in_degree[name]--;
-                if (in_degree[name] == 0) {
+                if (in_degree[name] == 0)
+                {
                     queue.push(name);
                 }
             }
         }
     }
-    
+
     // Check for cycles
-    if (sorted.size() != components.size()) {
+    if (sorted.size() != components.size())
+    {
         throw std::runtime_error("Circular dependency detected among components");
     }
-    
+
     return sorted;
 }
 
-int main(int argc, char** argv){
+int main(int argc, char **argv)
+{
     // Initialize SchemaLoader with embedded schema
     SchemaLoader::instance().init();
-    
-    if(argc < 2){
+
+    if (argc < 2)
+    {
         std::cerr << "Usage: " << argv[0] << " <input.coi> [--cc-only] [--keep-cc] [--out <dir> | -o <dir>]" << std::endl;
         return 1;
     }
@@ -727,26 +935,36 @@ int main(int argc, char** argv){
     bool cc_only = false;
     bool keep_cc = false;
 
-    for(int i=1; i<argc; ++i) {
+    for (int i = 1; i < argc; ++i)
+    {
         std::string arg = argv[i];
-        if(arg == "--cc-only") cc_only = true;
-        else if(arg == "--keep-cc") keep_cc = true;
-        else if(arg == "--out" || arg == "-o") {
-            if(i+1 < argc) {
+        if (arg == "--cc-only")
+            cc_only = true;
+        else if (arg == "--keep-cc")
+            keep_cc = true;
+        else if (arg == "--out" || arg == "-o")
+        {
+            if (i + 1 < argc)
+            {
                 output_dir = argv[++i];
-            } else {
+            }
+            else
+            {
                 std::cerr << "Error: --out requires an argument" << std::endl;
                 return 1;
             }
         }
-        else if(input_file.empty()) input_file = arg;
-        else {
+        else if (input_file.empty())
+            input_file = arg;
+        else
+        {
             std::cerr << "Unknown argument or multiple input files: " << arg << std::endl;
             return 1;
         }
     }
 
-    if(input_file.empty()) {
+    if (input_file.empty())
+    {
         std::cerr << "No input file specified." << std::endl;
         return 1;
     }
@@ -757,25 +975,32 @@ int main(int argc, char** argv){
     std::queue<std::string> file_queue;
 
     namespace fs = std::filesystem;
-    try {
+    try
+    {
         file_queue.push(fs::canonical(input_file).string());
-    } catch (const std::exception& e) {
+    }
+    catch (const std::exception &e)
+    {
         std::cerr << "Error resolving input file path: " << e.what() << std::endl;
         return 1;
     }
 
-    try {
-        while(!file_queue.empty()){
+    try
+    {
+        while (!file_queue.empty())
+        {
             std::string current_file_path = file_queue.front();
             file_queue.pop();
 
-            if(processed_files.count(current_file_path)) continue;
+            if (processed_files.count(current_file_path))
+                continue;
             processed_files.insert(current_file_path);
 
             std::cerr << "Processing " << current_file_path << "..." << std::endl;
 
             std::ifstream file(current_file_path);
-            if(!file){
+            if (!file)
+            {
                 std::cerr << "Error: Could not open file " << current_file_path << std::endl;
                 return 1;
             }
@@ -788,24 +1013,30 @@ int main(int argc, char** argv){
             // Parsing
             Parser parser(tokens);
             parser.parse_file();
-            
+
             all_components.insert(all_components.end(), std::make_move_iterator(parser.components.begin()), std::make_move_iterator(parser.components.end()));
-            
-            if(!parser.app_config.root_component.empty()){
-                 final_app_config = parser.app_config;
+
+            if (!parser.app_config.root_component.empty())
+            {
+                final_app_config = parser.app_config;
             }
-            
+
             fs::path current_path(current_file_path);
             fs::path parent_path = current_path.parent_path();
 
-            for(const auto& import_path_str : parser.imports){
+            for (const auto &import_path_str : parser.imports)
+            {
                 fs::path import_path = parent_path / import_path_str;
-                try {
+                try
+                {
                     std::string abs_path = fs::canonical(import_path).string();
-                    if(processed_files.find(abs_path) == processed_files.end()){
+                    if (processed_files.find(abs_path) == processed_files.end())
+                    {
                         file_queue.push(abs_path);
                     }
-                } catch (const std::exception& e) {
+                }
+                catch (const std::exception &e)
+                {
                     std::cerr << "Error resolving import path " << import_path_str << ": " << e.what() << std::endl;
                     return 1;
                 }
@@ -823,18 +1054,24 @@ int main(int argc, char** argv){
         fs::path input_path(input_file);
         fs::path output_path;
 
-        if(!output_dir.empty()) {
+        if (!output_dir.empty())
+        {
             fs::path out_dir_path(output_dir);
-            try {
+            try
+            {
                 fs::create_directories(out_dir_path);
-            } catch(const fs::filesystem_error& e) {
-                 std::cerr << "Error: Could not create output directory " << output_dir << ": " << e.what() << std::endl;
-                 return 1;
             }
-            
+            catch (const fs::filesystem_error &e)
+            {
+                std::cerr << "Error: Could not create output directory " << output_dir << ": " << e.what() << std::endl;
+                return 1;
+            }
+
             output_path = out_dir_path / input_path.stem();
             output_path += ".cc";
-        } else {
+        }
+        else
+        {
             output_path = input_path;
             output_path.replace_extension(".cc");
         }
@@ -842,9 +1079,10 @@ int main(int argc, char** argv){
         std::string output_cc = output_path.string();
 
         std::ofstream out(output_cc);
-        if(!out) {
-             std::cerr << "Error: Could not open output file " << output_cc << std::endl;
-             return 1;
+        if (!out)
+        {
+            std::cerr << "Error: Could not open output file " << output_cc << std::endl;
+            return 1;
         }
 
         // Code generation
@@ -907,118 +1145,140 @@ int main(int argc, char** argv){
         auto sorted_components = topological_sort_components(all_components);
 
         // Forward declarations
-        for(auto* comp : sorted_components) {
+        for (auto *comp : sorted_components)
+        {
             out << "class " << comp->name << ";\n";
         }
         out << "\n";
 
-        for(auto* comp : sorted_components) {
+        for (auto *comp : sorted_components)
+        {
             out << comp->to_webcc();
         }
 
-        if(final_app_config.root_component.empty()) {
-             std::cerr << "Error: No root component defined. Use 'app { root = ComponentName }' to define the entry point." << std::endl;
-             return 1;
+        if (final_app_config.root_component.empty())
+        {
+            std::cerr << "Error: No root component defined. Use 'app { root = ComponentName }' to define the entry point." << std::endl;
+            return 1;
         }
 
-        out << "\n" << final_app_config.root_component << "* app = nullptr;\n";
+        out << "\n"
+            << final_app_config.root_component << "* app = nullptr;\n";
         out << "void update_wrapper(float time) {\n";
-            out << "    static float last_time = 0;\n";
-            out << "    float dt = (time - last_time) / 1000.0f;\n";
-            out << "    last_time = time;\n";
-            out << "    if (dt > 0.1f) dt = 0.1f; // Cap dt to avoid huge jumps\n";
-            out << "    static webcc::Event events[64];\n";
-            out << "    uint32_t count = 0;\n";
-            out << "    webcc::Event e;\n";
-            out << "    while (webcc::poll_event(e) && count < 64) {\n";
-            out << "        events[count++] = e;\n";
-            out << "    }\n";
-            out << "    g_dispatcher.dispatch(events, count);\n";
-            out << "    if (app) app->tick(dt);\n";
-            out << "    webcc::flush();\n";
-            out << "}\n\n";
+        out << "    static float last_time = 0;\n";
+        out << "    float dt = (time - last_time) / 1000.0f;\n";
+        out << "    last_time = time;\n";
+        out << "    if (dt > 0.1f) dt = 0.1f; // Cap dt to avoid huge jumps\n";
+        out << "    static webcc::Event events[64];\n";
+        out << "    uint32_t count = 0;\n";
+        out << "    webcc::Event e;\n";
+        out << "    while (webcc::poll_event(e) && count < 64) {\n";
+        out << "        events[count++] = e;\n";
+        out << "    }\n";
+        out << "    g_dispatcher.dispatch(events, count);\n";
+        out << "    if (app) app->tick(dt);\n";
+        out << "    webcc::flush();\n";
+        out << "}\n\n";
 
-            out << "int main() {\n";
-            out << "    // We allocate the app on the heap because the stack is destroyed when main() returns.\n";
-            out << "    // The app needs to persist for the event loop (update_wrapper).\n";
-            out << "    // We use webcc::malloc to ensure memory is tracked by the framework.\n";
-            out << "    void* app_mem = webcc::malloc(sizeof(" << final_app_config.root_component << "));\n";
-            out << "    app = new (app_mem) " << final_app_config.root_component << "();\n";
-            
-            // Inject CSS
-            std::string all_css;
-            for(const auto& comp : all_components) {
-                if(!comp.global_css.empty()) {
-                    all_css += comp.global_css + "\\n";
-                }
-                if(!comp.css.empty()) {
-                    // Simple CSS scoping: prefix selectors with [coi-scope="ComponentName"]
-                    std::string scoped_css;
-                    std::string raw = comp.css;
-                    size_t pos = 0;
-                    while (pos < raw.length()) {
-                        size_t brace = raw.find('{', pos);
-                        if (brace == std::string::npos) {
-                            scoped_css += raw.substr(pos);
-                            break;
-                        }
-                        
-                        std::string selector_group = raw.substr(pos, brace - pos);
-                        std::stringstream ss_sel(selector_group);
-                        std::string selector;
-                        bool first = true;
-                        while (std::getline(ss_sel, selector, ',')) {
-                            if (!first) scoped_css += ",";
-                            size_t start = selector.find_first_not_of(" \t\n\r");
-                            size_t end = selector.find_last_not_of(" \t\n\r");
-                            if (start != std::string::npos) {
-                                std::string trimmed = selector.substr(start, end - start + 1);
-                                size_t colon = trimmed.find(':');
-                                if (colon != std::string::npos) {
-                                    scoped_css += trimmed.substr(0, colon) + "[coi-scope=\"" + comp.name + "\"]" + trimmed.substr(colon);
-                                } else {
-                                    scoped_css += trimmed + "[coi-scope=\"" + comp.name + "\"]";
-                                }
-                            }
-                            first = false;
-                        }
-                        
-                        size_t end_brace = raw.find('}', brace);
-                        if (end_brace == std::string::npos) {
-                            scoped_css += raw.substr(brace);
-                            break;
-                        }
-                        scoped_css += raw.substr(brace, end_brace - brace + 1);
-                        pos = end_brace + 1;
+        out << "int main() {\n";
+        out << "    // We allocate the app on the heap because the stack is destroyed when main() returns.\n";
+        out << "    // The app needs to persist for the event loop (update_wrapper).\n";
+        out << "    // We use webcc::malloc to ensure memory is tracked by the framework.\n";
+        out << "    void* app_mem = webcc::malloc(sizeof(" << final_app_config.root_component << "));\n";
+        out << "    app = new (app_mem) " << final_app_config.root_component << "();\n";
+
+        // Inject CSS
+        std::string all_css;
+        for (const auto &comp : all_components)
+        {
+            if (!comp.global_css.empty())
+            {
+                all_css += comp.global_css + "\\n";
+            }
+            if (!comp.css.empty())
+            {
+                // Simple CSS scoping: prefix selectors with [coi-scope="ComponentName"]
+                std::string scoped_css;
+                std::string raw = comp.css;
+                size_t pos = 0;
+                while (pos < raw.length())
+                {
+                    size_t brace = raw.find('{', pos);
+                    if (brace == std::string::npos)
+                    {
+                        scoped_css += raw.substr(pos);
+                        break;
                     }
-                    all_css += scoped_css + "\\n";
+
+                    std::string selector_group = raw.substr(pos, brace - pos);
+                    std::stringstream ss_sel(selector_group);
+                    std::string selector;
+                    bool first = true;
+                    while (std::getline(ss_sel, selector, ','))
+                    {
+                        if (!first)
+                            scoped_css += ",";
+                        size_t start = selector.find_first_not_of(" \t\n\r");
+                        size_t end = selector.find_last_not_of(" \t\n\r");
+                        if (start != std::string::npos)
+                        {
+                            std::string trimmed = selector.substr(start, end - start + 1);
+                            size_t colon = trimmed.find(':');
+                            if (colon != std::string::npos)
+                            {
+                                scoped_css += trimmed.substr(0, colon) + "[coi-scope=\"" + comp.name + "\"]" + trimmed.substr(colon);
+                            }
+                            else
+                            {
+                                scoped_css += trimmed + "[coi-scope=\"" + comp.name + "\"]";
+                            }
+                        }
+                        first = false;
+                    }
+
+                    size_t end_brace = raw.find('}', brace);
+                    if (end_brace == std::string::npos)
+                    {
+                        scoped_css += raw.substr(brace);
+                        break;
+                    }
+                    scoped_css += raw.substr(brace, end_brace - brace + 1);
+                    pos = end_brace + 1;
                 }
+                all_css += scoped_css + "\\n";
             }
-            if(!all_css.empty()) {
-                // Escape quotes in CSS string for C++ string literal
-                std::string escaped_css;
-                for(char c : all_css) {
-                    if(c == '"') escaped_css += "\\\"";
-                    else if(c == '\n') escaped_css += "\\n";
-                    else escaped_css += c;
-                }
-                
-                out << "    // Inject CSS\n";
-                out << "    webcc::handle style_el = webcc::dom::create_element(\"style\");\n";
-                out << "    webcc::dom::set_inner_text(style_el, \"" << escaped_css << "\");\n";
-                out << "    webcc::dom::append_child(webcc::dom::get_body(), style_el);\n";
+        }
+        if (!all_css.empty())
+        {
+            // Escape quotes in CSS string for C++ string literal
+            std::string escaped_css;
+            for (char c : all_css)
+            {
+                if (c == '"')
+                    escaped_css += "\\\"";
+                else if (c == '\n')
+                    escaped_css += "\\n";
+                else
+                    escaped_css += c;
             }
 
-            out << "    app->view();\n";
-            out << "    webcc::system::set_main_loop(update_wrapper);\n";
-            out << "    webcc::flush();\n";
-            out << "    return 0;\n";
-            out << "}\n";
-        
+            out << "    // Inject CSS\n";
+            out << "    webcc::handle style_el = webcc::dom::create_element(\"style\");\n";
+            out << "    webcc::dom::set_inner_text(style_el, \"" << escaped_css << "\");\n";
+            out << "    webcc::dom::append_child(webcc::dom::get_body(), style_el);\n";
+        }
+
+        out << "    app->view();\n";
+        out << "    webcc::system::set_main_loop(update_wrapper);\n";
+        out << "    webcc::flush();\n";
+        out << "    return 0;\n";
+        out << "}\n";
+
         out.close();
         std::cerr << "Generated " << output_cc << std::endl;
 
-        if (!cc_only) {
+        if (!cc_only)
+        {
             namespace fs = std::filesystem;
             fs::path cwd = fs::current_path();
             fs::path abs_output_cc = fs::absolute(output_cc);
@@ -1031,17 +1291,20 @@ int main(int argc, char** argv){
 
             std::cerr << "Running: " << cmd << std::endl;
             int ret = system(cmd.c_str());
-            if (ret != 0) {
+            if (ret != 0)
+            {
                 std::cerr << "Error: webcc compilation failed." << std::endl;
                 return 1;
             }
-            
-            if (!keep_cc) {
+
+            if (!keep_cc)
+            {
                 fs::remove(output_cc);
             }
         }
-
-    } catch(const std::exception& e){
+    }
+    catch (const std::exception &e)
+    {
         std::cerr << "Error: " << e.what() << std::endl;
         return 1;
     }

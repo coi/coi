@@ -1,6 +1,7 @@
 #include "parser.h"
 #include <stdexcept>
 #include <iostream>
+#include <limits>
 
 Parser::Parser(const std::vector<Token>& toks) : tokens(toks){}
 
@@ -152,14 +153,32 @@ std::unique_ptr<Expression> Parser::parse_multiplicative(){
 std::unique_ptr<Expression> Parser::parse_primary(){
     // Integer literal
     if(current().type == TokenType::INT_LITERAL){
-        int value = std::stoi(current().value);
+        int value;
+        try {
+            long long ll_value = std::stoll(current().value);
+            if (ll_value > std::numeric_limits<int>::max() || ll_value < std::numeric_limits<int>::min()) {
+                throw std::out_of_range("overflow");
+            }
+            value = static_cast<int>(ll_value);
+        } catch (const std::out_of_range&) {
+            throw std::runtime_error("Integer literal '" + current().value + "' is too large at line " + std::to_string(current().line));
+        } catch (const std::invalid_argument&) {
+            throw std::runtime_error("Invalid integer literal '" + current().value + "' at line " + std::to_string(current().line));
+        }
         advance();
         return std::make_unique<IntLiteral>(value);
     }
 
     // Float literal
     if(current().type == TokenType::FLOAT_LITERAL){
-        float value = std::stof(current().value);
+        float value;
+        try {
+            value = std::stof(current().value);
+        } catch (const std::out_of_range&) {
+            throw std::runtime_error("Float literal '" + current().value + "' is too large at line " + std::to_string(current().line));
+        } catch (const std::invalid_argument&) {
+            throw std::runtime_error("Invalid float literal '" + current().value + "' at line " + std::to_string(current().line));
+        }
         advance();
         return std::make_unique<FloatLiteral>(value);
     }
@@ -462,7 +481,7 @@ std::unique_ptr<Statement> Parser::parse_statement(){
         throw std::runtime_error("Expected type after 'mut'");
     }
 
-    // Assignment to array element: arr[i] = value
+    // Assignment to array element: arr[i] = value or arr[i] += value etc.
     if(current().type == TokenType::IDENTIFIER && peek().type == TokenType::LBRACKET) {
         // Could be an index assignment or an expression statement with index access
         // Need to look ahead to see if there's an assignment operator after the bracket
@@ -479,8 +498,14 @@ std::unique_ptr<Statement> Parser::parse_statement(){
             advance();
         }
         
-        // Check if followed by assignment operator
-        bool is_index_assign = (current().type == TokenType::ASSIGN);
+        // Check if followed by assignment operator (including compound assignments)
+        TokenType assign_op = current().type;
+        bool is_index_assign = (assign_op == TokenType::ASSIGN ||
+                                assign_op == TokenType::PLUS_ASSIGN ||
+                                assign_op == TokenType::MINUS_ASSIGN ||
+                                assign_op == TokenType::STAR_ASSIGN ||
+                                assign_op == TokenType::SLASH_ASSIGN ||
+                                assign_op == TokenType::PERCENT_ASSIGN);
         
         // Restore position
         pos = saved_pos;
@@ -491,12 +516,20 @@ std::unique_ptr<Statement> Parser::parse_statement(){
             auto index_expr = parse_expression();
             expect(TokenType::RBRACKET, "Expected ']'");
             
-            expect(TokenType::ASSIGN, "Expected '='");
+            TokenType opType = current().type;
+            advance(); // skip assignment operator
             
             auto idx_assign = std::make_unique<IndexAssignment>();
             idx_assign->array = std::make_unique<Identifier>(name);
             idx_assign->index = std::move(index_expr);
             idx_assign->value = parse_expression();
+            
+            // Set compound operator if not plain assignment
+            if (opType == TokenType::PLUS_ASSIGN) idx_assign->compound_op = "+";
+            else if (opType == TokenType::MINUS_ASSIGN) idx_assign->compound_op = "-";
+            else if (opType == TokenType::STAR_ASSIGN) idx_assign->compound_op = "*";
+            else if (opType == TokenType::SLASH_ASSIGN) idx_assign->compound_op = "/";
+            else if (opType == TokenType::PERCENT_ASSIGN) idx_assign->compound_op = "%";
             
             expect(TokenType::SEMICOLON, "Expected ';'");
             return idx_assign;

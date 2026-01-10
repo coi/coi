@@ -1,0 +1,12 @@
+// Test: integer overflow should produce a helpful error
+component IntOverflowFail {
+    mut int x = 99999999999999999;
+
+    view {
+        <div>{x}</div>
+    }
+}
+
+app {
+    root = IntOverflowFail;
+}
