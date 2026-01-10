@@ -87,7 +87,12 @@ component App {
     }
 }
 
-app { root = App; }
+app {
+    root = App;
+    title = "My Counter App";
+    description = "A simple counter built with Coi";
+    lang = "en";
+}
 ```
 
 ## Quick Start
