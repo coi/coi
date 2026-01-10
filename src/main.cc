@@ -444,8 +444,8 @@ int main(int argc, char **argv)
         // Sort components topologically so dependencies come first
         auto sorted_components = topological_sort_components(all_components);
 
-        // Clear tick tracking before generating code
-        clear_tick_tracking();
+        // Create compiler session for cross-component state
+        CompilerSession session;
 
         // Output global enums (defined outside components)
         for (const auto& enum_def : all_global_enums) {
@@ -464,7 +464,7 @@ int main(int argc, char **argv)
 
         for (auto *comp : sorted_components)
         {
-            out << comp->to_webcc();
+            out << comp->to_webcc(session);
         }
 
         if (final_app_config.root_component.empty())

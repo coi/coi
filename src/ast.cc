@@ -3,15 +3,9 @@
 #include <cctype>
 #include <algorithm>
 
-// Global context for tracking reference props (which are stored as pointers)
+// Per-component context for tracking reference props (which are stored as pointers)
+// This is set at the start of Component::to_webcc() and cleared at the end
 static std::set<std::string> g_ref_props;
-
-// Global context for tracking which components have tick methods
-static std::set<std::string> g_components_with_tick;
-
-void clear_tick_tracking() {
-    g_components_with_tick.clear();
-}
 
 std::string convert_type(const std::string& type) {
     if (type == "string") return "webcc::string";
@@ -1637,7 +1631,7 @@ void Component::collect_child_updates(ASTNode* node, std::map<std::string, std::
     // if(auto viewForEach = dynamic_cast<ViewForEachStatement*>(node)) { ... }
 }
 
-std::string Component::to_webcc() {
+std::string Component::to_webcc(CompilerSession& session) {
     std::stringstream ss;
     std::vector<EventHandler> event_handlers;
     std::vector<Binding> bindings;
@@ -2517,7 +2511,7 @@ std::string Component::to_webcc() {
     // Check if any child components have tick
     bool has_child_with_tick = false;
     for(auto const& [comp_name, count] : component_members) {
-        if(g_components_with_tick.count(comp_name)) {
+        if(session.components_with_tick.count(comp_name)) {
             has_child_with_tick = true;
             break;
         }
@@ -2526,7 +2520,7 @@ std::string Component::to_webcc() {
     // Only generate tick method if needed
     bool needs_tick = has_user_tick || has_child_with_tick;
     if(needs_tick) {
-        g_components_with_tick.insert(name);
+        session.components_with_tick.insert(name);
         ss << "    void tick(float dt) {\n";
         
         // Call user tick if exists
@@ -2534,7 +2528,7 @@ std::string Component::to_webcc() {
 
         // Update children that have tick
         for(auto const& [comp_name, count] : component_members) {
-            if(g_components_with_tick.count(comp_name)) {
+            if(session.components_with_tick.count(comp_name)) {
                 for(int i=0; i<count; ++i) {
                     ss << "        " << comp_name << "_" << i << ".tick(dt);\n";
                 }
@@ -2545,7 +2539,7 @@ std::string Component::to_webcc() {
 
     ss << "};\n";
 
-    // Clear global context
+    // Clear per-component context
     g_ref_props.clear();
     
     return ss.str();

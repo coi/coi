@@ -11,8 +11,10 @@
 
 std::string convert_type(const std::string& type);
 
-// Clear global tick tracking state (call before generating code)
-void clear_tick_tracking();
+// Cross-component state that persists across all components in one compilation
+struct CompilerSession {
+    std::set<std::string> components_with_tick;  // Components that have tick methods
+};
 
 // Represents a dependency on a member of an object (e.g., net.connected)
 struct MemberDependency {
@@ -459,8 +461,10 @@ struct Component : ASTNode {
 
     void collect_child_components(ASTNode* node, std::map<std::string, int>& counts);
     void collect_child_updates(ASTNode* node, std::map<std::string, std::vector<std::string>>& updates, std::map<std::string, int>& counters);
-    std::string to_webcc() override;
+    std::string to_webcc() override { static CompilerSession s; return to_webcc(s); }
+    std::string to_webcc(CompilerSession& session);
 };
+
 
 struct AppConfig {
     std::string root_component;
