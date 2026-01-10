@@ -921,7 +921,7 @@ void HTMLElement::generate_code(std::stringstream& ss, const std::string& parent
         var = "_el_" + std::to_string(my_id);
         ss << "        webcc::handle " << var << " = webcc::dom::create_element(\"" << tag << "\");\n";
     } else {
-        var = "el_" + std::to_string(my_id);
+        var = "el[" + std::to_string(my_id) + "]";
         ss << "        " << var << " = webcc::dom::create_element(\"" << tag << "\");\n";
     }
     
@@ -1744,8 +1744,8 @@ std::string Component::to_webcc() {
     }
 
     // Element handles
-    for(int i=0; i<element_count; ++i) {
-        ss << "    webcc::handle el_" << i << ";\n";
+    if (element_count > 0) {
+        ss << "    webcc::handle el[" << element_count << "];\n";
     }
     
     // Child component members (for components NOT in loops)
@@ -1792,7 +1792,7 @@ std::string Component::to_webcc() {
     
     for(const auto& binding : bindings) {
         for(const auto& dep : binding.dependencies) {
-            std::string el_var = "el_" + std::to_string(binding.element_id);
+            std::string el_var = "el[" + std::to_string(binding.element_id) + "]";
             std::string update_line;
             
             bool optimized = false;
@@ -2100,7 +2100,7 @@ std::string Component::to_webcc() {
         ss << "        if (new_state) {\n";
         // Destroy else branch elements
         for (int el_id : region.else_element_ids) {
-            ss << "            webcc::dom::remove_element(el_" << el_id << ");\n";
+            ss << "            webcc::dom::remove_element(el[" << el_id << "]);\n";
         }
         // Destroy else branch components
         for (const auto& [comp_name, inst_id] : region.else_components) {
@@ -2139,10 +2139,10 @@ std::string Component::to_webcc() {
                 if (nested_region.if_id == nested_if_id) {
                     // Destroy both branches of nested if since we're removing it entirely
                     for (int el_id : nested_region.then_element_ids) {
-                        ss << "            if (_if_" << nested_if_id << "_state) webcc::dom::remove_element(el_" << el_id << ");\n";
+                        ss << "            if (_if_" << nested_if_id << "_state) webcc::dom::remove_element(el[" << el_id << "]);\n";
                     }
                     for (int el_id : nested_region.else_element_ids) {
-                        ss << "            if (!_if_" << nested_if_id << "_state) webcc::dom::remove_element(el_" << el_id << ");\n";
+                        ss << "            if (!_if_" << nested_if_id << "_state) webcc::dom::remove_element(el[" << el_id << "]);\n";
                     }
                 }
             }
@@ -2153,7 +2153,7 @@ std::string Component::to_webcc() {
         ss << "        } else {\n";
         // Destroy then branch elements
         for (int el_id : region.then_element_ids) {
-            ss << "            webcc::dom::remove_element(el_" << el_id << ");\n";
+            ss << "            webcc::dom::remove_element(el[" << el_id << "]);\n";
         }
         // Destroy then branch components
         for (const auto& [comp_name, inst_id] : region.then_components) {
@@ -2189,10 +2189,10 @@ std::string Component::to_webcc() {
             for (const auto& nested_region : if_regions) {
                 if (nested_region.if_id == nested_if_id) {
                     for (int el_id : nested_region.then_element_ids) {
-                        ss << "            if (_if_" << nested_if_id << "_state) webcc::dom::remove_element(el_" << el_id << ");\n";
+                        ss << "            if (_if_" << nested_if_id << "_state) webcc::dom::remove_element(el[" << el_id << "]);\n";
                     }
                     for (int el_id : nested_region.else_element_ids) {
-                        ss << "            if (!_if_" << nested_if_id << "_state) webcc::dom::remove_element(el_" << el_id << ");\n";
+                        ss << "            if (!_if_" << nested_if_id << "_state) webcc::dom::remove_element(el[" << el_id << "]);\n";
                     }
                 }
             }
@@ -2323,13 +2323,13 @@ std::string Component::to_webcc() {
     // Register event handlers with dispatcher
     for(auto& handler : event_handlers) {
         if (handler.event_type == "click") {
-            ss << "        g_dispatcher.set(el_" << handler.element_id << ", [this]() { this->_handler_" << handler.element_id << "_click(); });\n";
+            ss << "        g_dispatcher.set(el[" << handler.element_id << "], [this]() { this->_handler_" << handler.element_id << "_click(); });\n";
         } else if (handler.event_type == "input") {
-            ss << "        g_input_dispatcher.set(el_" << handler.element_id << ", [this](const webcc::string& v) { this->_handler_" << handler.element_id << "_input(v); });\n";
+            ss << "        g_input_dispatcher.set(el[" << handler.element_id << "], [this](const webcc::string& v) { this->_handler_" << handler.element_id << "_input(v); });\n";
         } else if (handler.event_type == "change") {
-            ss << "        g_change_dispatcher.set(el_" << handler.element_id << ", [this](const webcc::string& v) { this->_handler_" << handler.element_id << "_change(v); });\n";
+            ss << "        g_change_dispatcher.set(el[" << handler.element_id << "], [this](const webcc::string& v) { this->_handler_" << handler.element_id << "_change(v); });\n";
         } else if (handler.event_type == "keydown") {
-            ss << "        g_keydown_dispatcher.set(el_" << handler.element_id << ", [this](int k) { this->_handler_" << handler.element_id << "_keydown(k); });\n";
+            ss << "        g_keydown_dispatcher.set(el[" << handler.element_id << "], [this](int k) { this->_handler_" << handler.element_id << "_keydown(k); });\n";
         }
     }
     
@@ -2354,13 +2354,13 @@ std::string Component::to_webcc() {
         ss << "    void _rebind() {\n";
         for(auto& handler : event_handlers) {
             if (handler.event_type == "click") {
-                ss << "        g_dispatcher.set(el_" << handler.element_id << ", [this]() { this->_handler_" << handler.element_id << "_click(); });\n";
+                ss << "        g_dispatcher.set(el[" << handler.element_id << "], [this]() { this->_handler_" << handler.element_id << "_click(); });\n";
             } else if (handler.event_type == "input") {
-                ss << "        g_input_dispatcher.set(el_" << handler.element_id << ", [this](const webcc::string& v) { this->_handler_" << handler.element_id << "_input(v); });\n";
+                ss << "        g_input_dispatcher.set(el[" << handler.element_id << "], [this](const webcc::string& v) { this->_handler_" << handler.element_id << "_input(v); });\n";
             } else if (handler.event_type == "change") {
-                ss << "        g_change_dispatcher.set(el_" << handler.element_id << ", [this](const webcc::string& v) { this->_handler_" << handler.element_id << "_change(v); });\n";
+                ss << "        g_change_dispatcher.set(el[" << handler.element_id << "], [this](const webcc::string& v) { this->_handler_" << handler.element_id << "_change(v); });\n";
             } else if (handler.event_type == "keydown") {
-                ss << "        g_keydown_dispatcher.set(el_" << handler.element_id << ", [this](int k) { this->_handler_" << handler.element_id << "_keydown(k); });\n";
+                ss << "        g_keydown_dispatcher.set(el[" << handler.element_id << "], [this](int k) { this->_handler_" << handler.element_id << "_keydown(k); });\n";
             }
         }
         ss << "    }\n";
@@ -2370,17 +2370,17 @@ std::string Component::to_webcc() {
     ss << "    void _destroy() {\n";
     for(auto& handler : event_handlers) {
         if (handler.event_type == "click") {
-            ss << "        g_dispatcher.remove(el_" << handler.element_id << ");\n";
+            ss << "        g_dispatcher.remove(el[" << handler.element_id << "]);\n";
         } else if (handler.event_type == "input") {
-            ss << "        g_input_dispatcher.remove(el_" << handler.element_id << ");\n";
+            ss << "        g_input_dispatcher.remove(el[" << handler.element_id << "]);\n";
         } else if (handler.event_type == "change") {
-            ss << "        g_change_dispatcher.remove(el_" << handler.element_id << ");\n";
+            ss << "        g_change_dispatcher.remove(el[" << handler.element_id << "]);\n";
         } else if (handler.event_type == "keydown") {
-            ss << "        g_keydown_dispatcher.remove(el_" << handler.element_id << ");\n";
+            ss << "        g_keydown_dispatcher.remove(el[" << handler.element_id << "]);\n";
         }
     }
     if (element_count > 0) {
-        ss << "        webcc::dom::remove_element(el_0);\n";
+        ss << "        webcc::dom::remove_element(el[0]);\n";
     }
     ss << "    }\n";
 
