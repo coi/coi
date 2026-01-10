@@ -6,6 +6,13 @@
 // Global context for tracking reference props (which are stored as pointers)
 static std::set<std::string> g_ref_props;
 
+// Global context for tracking which components have tick methods
+static std::set<std::string> g_components_with_tick;
+
+void clear_tick_tracking() {
+    g_components_with_tick.clear();
+}
+
 std::string convert_type(const std::string& type) {
     if (type == "string") return "webcc::string";
     // Handle Component.EnumName type syntax - convert to Component::EnumName
@@ -2503,21 +2510,38 @@ std::string Component::to_webcc() {
     }
     ss << "    }\n";
 
-    // Update method for event loop
-    ss << "    void tick(float dt) {\n";
+    // Check if this component has tick
+    bool has_user_tick = false;
+    for(auto& m : methods) if(m.name == "tick") has_user_tick = true;
     
-    // Call user tick if exists
-    bool has_tick = false;
-    for(auto& m : methods) if(m.name == "tick") has_tick = true;
-    if(has_tick) ss << "        _user_tick(dt);\n";
-
-    // Update children
+    // Check if any child components have tick
+    bool has_child_with_tick = false;
     for(auto const& [comp_name, count] : component_members) {
-        for(int i=0; i<count; ++i) {
-            ss << "        " << comp_name << "_" << i << ".tick(dt);\n";
+        if(g_components_with_tick.count(comp_name)) {
+            has_child_with_tick = true;
+            break;
         }
     }
-    ss << "    }\n";
+    
+    // Only generate tick method if needed
+    bool needs_tick = has_user_tick || has_child_with_tick;
+    if(needs_tick) {
+        g_components_with_tick.insert(name);
+        ss << "    void tick(float dt) {\n";
+        
+        // Call user tick if exists
+        if(has_user_tick) ss << "        _user_tick(dt);\n";
+
+        // Update children that have tick
+        for(auto const& [comp_name, count] : component_members) {
+            if(g_components_with_tick.count(comp_name)) {
+                for(int i=0; i<count; ++i) {
+                    ss << "        " << comp_name << "_" << i << ".tick(dt);\n";
+                }
+            }
+        }
+        ss << "    }\n";
+    }
 
     ss << "};\n";
 

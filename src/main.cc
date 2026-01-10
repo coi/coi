@@ -444,6 +444,9 @@ int main(int argc, char **argv)
         // Sort components topologically so dependencies come first
         auto sorted_components = topological_sort_components(all_components);
 
+        // Clear tick tracking before generating code
+        clear_tick_tracking();
+
         // Output global enums (defined outside components)
         for (const auto& enum_def : all_global_enums) {
             out << enum_def->to_webcc();

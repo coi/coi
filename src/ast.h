@@ -11,6 +11,9 @@
 
 std::string convert_type(const std::string& type);
 
+// Clear global tick tracking state (call before generating code)
+void clear_tick_tracking();
+
 // Represents a dependency on a member of an object (e.g., net.connected)
 struct MemberDependency {
     std::string object;   // e.g., "net"
