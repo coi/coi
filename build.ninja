@@ -1,5 +1,5 @@
 builddir = build
-cxx = g++
+cxx = clang++
 cflags = -std=c++20 -O0 -Isrc
 ldflags = 
 
@@ -13,12 +13,12 @@ rule link
   description = LINK $out
 
 rule gen_schema_cxx
-  command = $cxx -std=c++20 -O0 -Ideps/webcc/src/cli -MD -MF $out.d -c $in -o $out
+  command = clang++ -std=c++20 -O0 -Ideps/webcc/src/cli -MD -MF $out.d -c $in -o $out
   depfile = $out.d
   description = CXX_GEN $in
 
 rule gen_schema_link
-  command = $cxx -o $out $in
+  command = clang++ -o $out $in
   description = LINK_GEN $out
 
 rule generate_schema
