@@ -145,7 +145,7 @@ component TodoList \{
                 id=\{todo.id\}
                 text=\{todo.text\}
                 done=\{todo.done\}
-                &onRemove=\{removeTodo(id)\}
+                &onRemove=\{removeTodo\}
             />
         </for>
     \}

@@ -17,7 +17,7 @@ component InputDemo {
             background: #fff;
             border: 1px solid #eee;
             border-radius: 12px;
-            width: 280px;
+            width: 340px;
         }
         .label {
             font-size: 12px;
