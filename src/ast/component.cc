@@ -4,6 +4,28 @@
 #include <cctype>
 #include <algorithm>
 
+
+/*  TODO (simplifing or outsourced into seperate functions): 
+    - Event handle bitmask calcuation (click_mask, input_mask, change_mask, and keydown_mask can be moved to a helper function)
+    - Child component member and loop vector declarations
+    - Loop region and if region tracking declarations
+    - Update method code generation (logic for building _update_{varname}() methods)
+    - Sync loop and sync if method generation (code for generating _sync_loop_X() and _sync_if_X())
+    - Child update collection ( (collect_child_updates) could be made more modular)
+    - Method code generation (generate_method could be a standalone function)
+    - Event handler method generation (_handler_X_event() methods can be extracted)
+    - View method event handler registration ( registering event handlers in the view method can be moved to a helper)
+    - Rebind and destroy method generation (_rebind() and _destroy() methods can be split out)
+    - Tick method generation (tick method can be moved to a helper)
+    - Callback name generation (The repeated logic for generating callback names (e.g., "on" + std::toupper(...) + ... + "Change") can be a utility function)
+    - Formatter block generation  (generating formatter blocks for attributes and text can be centralized) (see formatter.cc)
+    - Parsing and splitting argument strings 
+    - Global context management (The logic for managing g_ref_props can be encapsulated)
+
+    ... phew  ._.
+*/
+
+
 // Per-component context for tracking reference props
 std::set<std::string> g_ref_props;
 
