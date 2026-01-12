@@ -1,6 +1,26 @@
 #include "view.h"
 #include "formatter.h"
 
+// Helper to build lambda parameter list from function call args
+static std::string build_lambda_params(FunctionCall *func_call)
+{
+    std::string params;
+    for (size_t i = 0; i < func_call->args.size(); i++)
+    {
+        if (i > 0)
+            params += ", ";
+        if (auto *id = dynamic_cast<Identifier *>(func_call->args[i].get()))
+        {
+            params += "int32_t " + id->name;
+        }
+        else
+        {
+            params += "int32_t _arg" + std::to_string(i);
+        }
+    }
+    return params;
+}
+
 std::string TextNode::to_webcc() { return "\"" + text + "\""; }
 
 std::string ComponentInstantiation::to_webcc() { return ""; }
@@ -46,28 +66,8 @@ void ComponentInstantiation::generate_code(std::stringstream &ss, const std::str
         {
             if (auto *func_call = dynamic_cast<FunctionCall *>(prop.value.get()))
             {
-                if (func_call->args.empty())
-                {
-                    ss << "        " << instance_name << "." << prop.name << " = [this]() { this->" << val << "; };\n";
-                }
-                else
-                {
-                    std::string lambda_params;
-                    for (size_t i = 0; i < func_call->args.size(); i++)
-                    {
-                        if (i > 0)
-                            lambda_params += ", ";
-                        if (auto *id = dynamic_cast<Identifier *>(func_call->args[i].get()))
-                        {
-                            lambda_params += "int32_t " + id->name;
-                        }
-                        else
-                        {
-                            lambda_params += "int32_t _arg" + std::to_string(i);
-                        }
-                    }
-                    ss << "        " << instance_name << "." << prop.name << " = [this](" << lambda_params << ") { this->" << val << "; };\n";
-                }
+                std::string lambda_params = build_lambda_params(func_call);
+                ss << "        " << instance_name << "." << prop.name << " = [this](" << lambda_params << ") { this->" << val << "; };\n";
             }
             else
             {
@@ -372,26 +372,6 @@ void HTMLElement::collect_dependencies(std::set<std::string> &deps)
     {
         child->collect_dependencies(deps);
     }
-}
-
-// Helper to build lambda parameter list from function call args
-static std::string build_lambda_params(FunctionCall *func_call)
-{
-    std::string params;
-    for (size_t i = 0; i < func_call->args.size(); i++)
-    {
-        if (i > 0)
-            params += ", ";
-        if (auto *id = dynamic_cast<Identifier *>(func_call->args[i].get()))
-        {
-            params += "int32_t " + id->name;
-        }
-        else
-        {
-            params += "int32_t _arg" + std::to_string(i);
-        }
-    }
-    return params;
 }
 
 // Helper to generate prop update code for loop components
