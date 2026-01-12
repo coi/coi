@@ -460,14 +460,9 @@ void ViewIfStatement::generate_code(std::stringstream& ss, const std::string& pa
     ss << "        if (" << region.condition_code << ") {\n";
     ss << "        _if_" << my_if_id << "_state = true;\n";
     ss << then_ss.str();
-    if (!else_children.empty()) {
-        ss << "        } else {\n";
-        ss << "        _if_" << my_if_id << "_state = false;\n";
-        ss << else_ss.str();
-    } else {
-        ss << "        } else {\n";
-        ss << "        _if_" << my_if_id << "_state = false;\n";
-    }
+    ss << "        } else {\n";
+    ss << "        _if_" << my_if_id << "_state = false;\n";
+    ss << else_ss.str();
     ss << "        }\n";
     
     if (loop_counter && loop_regions) {
