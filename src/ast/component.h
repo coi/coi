@@ -29,6 +29,3 @@ struct AppConfig {
     std::string description;
     std::string lang = "en";
 };
-
-// Per-component context for tracking reference props (stored as pointers)
-extern std::set<std::string> g_ref_props;

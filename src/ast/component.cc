@@ -3,31 +3,177 @@
 #include "../schema_loader.h"
 #include <cctype>
 #include <algorithm>
-
-
-/*  TODO (simplifing or outsourced into seperate functions): 
-    - Event handle bitmask calcuation (click_mask, input_mask, change_mask, and keydown_mask can be moved to a helper function)
-    - Child component member and loop vector declarations
-    - Loop region and if region tracking declarations
-    - Update method code generation (logic for building _update_{varname}() methods)
-    - Sync loop and sync if method generation (code for generating _sync_loop_X() and _sync_if_X())
-    - Child update collection ( (collect_child_updates) could be made more modular)
-    - Method code generation (generate_method could be a standalone function)
-    - Event handler method generation (_handler_X_event() methods can be extracted)
-    - View method event handler registration ( registering event handlers in the view method can be moved to a helper)
-    - Rebind and destroy method generation (_rebind() and _destroy() methods can be split out)
-    - Tick method generation (tick method can be moved to a helper)
-    - Callback name generation (The repeated logic for generating callback names (e.g., "on" + std::toupper(...) + ... + "Change") can be a utility function)
-    - Formatter block generation  (generating formatter blocks for attributes and text can be centralized) (see formatter.cc)
-    - Parsing and splitting argument strings 
-    - Global context management (The logic for managing g_ref_props can be encapsulated)
-
-    ... phew  ._.
-*/
-
+#include <sstream>
 
 // Per-component context for tracking reference props
 std::set<std::string> g_ref_props;
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
+// Generate callback name from variable name (e.g., "count" -> "onCountChange")
+static std::string make_callback_name(const std::string& var_name) {
+    return "on" + std::string(1, std::toupper(var_name[0])) + var_name.substr(1) + "Change";
+}
+
+// Trim whitespace from both ends of a string
+static void trim(std::string& s) {
+    while (!s.empty() && s.front() == ' ') s.erase(0, 1);
+    while (!s.empty() && s.back() == ' ') s.pop_back();
+}
+
+// Parse comma-separated arguments respecting parentheses depth
+static std::vector<std::string> parse_concat_args(const std::string& args_str) {
+    std::vector<std::string> args;
+    int paren_depth = 0;
+    std::string current;
+    
+    for (size_t i = 0; i < args_str.size(); ++i) {
+        char c = args_str[i];
+        if (c == '(') paren_depth++;
+        else if (c == ')') paren_depth--;
+        else if (c == ',' && paren_depth == 0) {
+            trim(current);
+            if (!current.empty()) args.push_back(current);
+            current.clear();
+            continue;
+        }
+        current += c;
+    }
+    trim(current);
+    if (!current.empty()) args.push_back(current);
+    
+    return args;
+}
+
+// Indent a multi-line code block
+static std::string indent_code(const std::string& code, const std::string& prefix = "        ") {
+    std::stringstream indented;
+    std::istringstream iss(code);
+    std::string line;
+    while (std::getline(iss, line)) {
+        if (!line.empty()) {
+            indented << prefix << line << "\n";
+        }
+    }
+    return indented.str();
+}
+
+// ============================================================================
+// Event Handler Bitmask Helpers
+// ============================================================================
+
+struct EventMasks {
+    uint64_t click = 0;
+    uint64_t input = 0;
+    uint64_t change = 0;
+    uint64_t keydown = 0;
+};
+
+static EventMasks compute_event_masks(const std::vector<EventHandler>& handlers) {
+    EventMasks masks;
+    for (const auto& handler : handlers) {
+        if (handler.element_id < 64) {
+            uint64_t bit = 1ULL << handler.element_id;
+            if (handler.event_type == "click") masks.click |= bit;
+            else if (handler.event_type == "input") masks.input |= bit;
+            else if (handler.event_type == "change") masks.change |= bit;
+            else if (handler.event_type == "keydown") masks.keydown |= bit;
+        }
+    }
+    return masks;
+}
+
+static std::set<int> get_elements_for_event(const std::vector<EventHandler>& handlers, const std::string& event_type) {
+    std::set<int> elements;
+    for (const auto& handler : handlers) {
+        if (handler.event_type == event_type) {
+            elements.insert(handler.element_id);
+        }
+    }
+    return elements;
+}
+
+// ============================================================================
+// Code Generation Helpers
+// ============================================================================
+
+static void emit_event_mask_constants(std::stringstream& ss, const EventMasks& masks) {
+    if (masks.click) ss << "    static constexpr uint64_t _click_mask = 0x" << std::hex << masks.click << std::dec << "ULL;\n";
+    if (masks.input) ss << "    static constexpr uint64_t _input_mask = 0x" << std::hex << masks.input << std::dec << "ULL;\n";
+    if (masks.change) ss << "    static constexpr uint64_t _change_mask = 0x" << std::hex << masks.change << std::dec << "ULL;\n";
+    if (masks.keydown) ss << "    static constexpr uint64_t _keydown_mask = 0x" << std::hex << masks.keydown << std::dec << "ULL;\n";
+}
+
+static void emit_component_members(std::stringstream& ss, const std::map<std::string, int>& component_members) {
+    for (const auto& [comp_name, count] : component_members) {
+        for (int i = 0; i < count; ++i) {
+            ss << "    " << comp_name << " " << comp_name << "_" << i << ";\n";
+        }
+    }
+}
+
+static void emit_loop_vector_members(std::stringstream& ss, const std::set<std::string>& loop_component_types) {
+    for (const auto& comp_name : loop_component_types) {
+        ss << "    webcc::vector<" << comp_name << "> _loop_" << comp_name << "s;\n";
+    }
+}
+
+static void emit_loop_region_members(std::stringstream& ss, const std::vector<LoopRegion>& loop_regions) {
+    for (const auto& region : loop_regions) {
+        ss << "    webcc::handle _loop_" << region.loop_id << "_parent;\n";
+        if (region.is_keyed) {
+            ss << "    webcc::unordered_map<" << region.key_type << ", int> _loop_" << region.loop_id << "_map;\n";
+        } else {
+            ss << "    int _loop_" << region.loop_id << "_count = 0;\n";
+        }
+        if (region.is_html_loop) {
+            ss << "    webcc::vector<webcc::handle> _loop_" << region.loop_id << "_elements;\n";
+        }
+    }
+}
+
+static void emit_if_region_members(std::stringstream& ss, const std::vector<IfRegion>& if_regions) {
+    for (const auto& region : if_regions) {
+        ss << "    webcc::handle _if_" << region.if_id << "_parent;\n";
+        ss << "    bool _if_" << region.if_id << "_state = false;\n";
+    }
+}
+
+// Generate event handler switch cases for a specific event type
+static void emit_handler_switch_cases(std::stringstream& ss, 
+                                       const std::vector<EventHandler>& handlers, 
+                                       const std::string& event_type,
+                                       const std::string& suffix = "") {
+    for (const auto& handler : handlers) {
+        if (handler.event_type == event_type) {
+            ss << "                case " << handler.element_id << ": _handler_" 
+               << handler.element_id << "_" << event_type << "(" << suffix << "); break;\n";
+        }
+    }
+}
+
+// Generate event dispatcher registration for a specific event type
+static void emit_event_registration(std::stringstream& ss,
+                                    int element_count,
+                                    const std::vector<EventHandler>& handlers,
+                                    const std::string& event_type,
+                                    const std::string& mask_name,
+                                    const std::string& dispatcher_name,
+                                    const std::string& lambda_params,
+                                    const std::string& call_suffix) {
+    ss << "        for (int i = 0; i < " << element_count << "; i++) if (" << mask_name 
+       << " & (1ULL << i)) " << dispatcher_name << ".set(el[i], [this, i](" << lambda_params << ") {\n";
+    ss << "            switch(i) {\n";
+    emit_handler_switch_cases(ss, handlers, event_type, call_suffix);
+    ss << "            }\n";
+    ss << "        });\n";
+}
+
+// ============================================================================
+// Tree Traversal Functions  
+// ============================================================================
 
 void Component::collect_child_components(ASTNode* node, std::map<std::string, int>& counts) {
     if(auto comp = dynamic_cast<ComponentInstantiation*>(node)) {
@@ -191,8 +337,7 @@ std::string Component::to_webcc(CompilerSession& session) {
         ss << ";\n";
         
         if(param->is_reference && param->is_mutable) {
-            std::string callback_name = "on" + std::string(1, std::toupper(param->name[0])) + param->name.substr(1) + "Change";
-            ss << "    webcc::function<void()> " << callback_name << ";\n";
+            ss << "    webcc::function<void()> " << make_callback_name(param->name) << ";\n";
         }
     }
     
@@ -211,8 +356,7 @@ std::string Component::to_webcc(CompilerSession& session) {
         ss << ";\n";
         
         if(var->is_public && var->is_mutable) {
-            std::string callback_name = "on" + std::string(1, std::toupper(var->name[0])) + var->name.substr(1) + "Change";
-            ss << "    webcc::function<void()> " << callback_name << ";\n";
+            ss << "    webcc::function<void()> " << make_callback_name(var->name) << ";\n";
         }
     }
 
@@ -222,50 +366,20 @@ std::string Component::to_webcc(CompilerSession& session) {
     }
     
     // Event handler bitmasks
-    uint64_t click_mask = 0, input_mask = 0, change_mask = 0, keydown_mask = 0;
-    for (const auto& handler : event_handlers) {
-        if (handler.element_id < 64) {
-            if (handler.event_type == "click") click_mask |= (1ULL << handler.element_id);
-            else if (handler.event_type == "input") input_mask |= (1ULL << handler.element_id);
-            else if (handler.event_type == "change") change_mask |= (1ULL << handler.element_id);
-            else if (handler.event_type == "keydown") keydown_mask |= (1ULL << handler.element_id);
-        }
-    }
-    if (click_mask) ss << "    static constexpr uint64_t _click_mask = 0x" << std::hex << click_mask << std::dec << "ULL;\n";
-    if (input_mask) ss << "    static constexpr uint64_t _input_mask = 0x" << std::hex << input_mask << std::dec << "ULL;\n";
-    if (change_mask) ss << "    static constexpr uint64_t _change_mask = 0x" << std::hex << change_mask << std::dec << "ULL;\n";
-    if (keydown_mask) ss << "    static constexpr uint64_t _keydown_mask = 0x" << std::hex << keydown_mask << std::dec << "ULL;\n";
+    EventMasks masks = compute_event_masks(event_handlers);
+    emit_event_mask_constants(ss, masks);
     
     // Child component members
-    for(auto const& [comp_name, count] : component_members) {
-        for(int i=0; i<count; ++i) {
-            ss << "    " << comp_name << " " << comp_name << "_" << i << ";\n";
-        }
-    }
+    emit_component_members(ss, component_members);
     
     // Vector members for components in loops
-    for(const auto& comp_name : loop_component_types) {
-        ss << "    webcc::vector<" << comp_name << "> _loop_" << comp_name << "s;\n";
-    }
+    emit_loop_vector_members(ss, loop_component_types);
     
     // Loop region tracking
-    for(const auto& region : loop_regions) {
-        ss << "    webcc::handle _loop_" << region.loop_id << "_parent;\n";
-        if (region.is_keyed) {
-            ss << "    webcc::unordered_map<" << region.key_type << ", int> _loop_" << region.loop_id << "_map;\n";
-        } else {
-            ss << "    int _loop_" << region.loop_id << "_count = 0;\n";
-        }
-        if (region.is_html_loop) {
-            ss << "    webcc::vector<webcc::handle> _loop_" << region.loop_id << "_elements;\n";
-        }
-    }
+    emit_loop_region_members(ss, loop_regions);
     
     // If region tracking
-    for(const auto& region : if_regions) {
-        ss << "    webcc::handle _if_" << region.if_id << "_parent;\n";
-        ss << "    bool _if_" << region.if_id << "_state = false;\n";
-    }
+    emit_if_region_members(ss, if_regions);
 
     // Build update entries map
     struct UpdateEntry {
@@ -279,17 +393,14 @@ std::string Component::to_webcc(CompilerSession& session) {
         for(const auto& dep : binding.dependencies) {
             std::string el_var = "el[" + std::to_string(binding.element_id) + "]";
             std::string update_line;
+            std::string dom_call = (binding.type == "attr") 
+                ? "webcc::dom::set_attribute(" + el_var + ", \"" + binding.name + "\", "
+                : "webcc::dom::set_inner_text(" + el_var + ", ";
             
             bool optimized = false;
             if(binding.expr) {
                 if(auto strLit = dynamic_cast<StringLiteral*>(binding.expr)) {
-                    if(binding.type == "attr") {
-                        update_line = generate_formatter_block_from_string_literal(strLit,
-                            "webcc::dom::set_attribute(" + el_var + ", \"" + binding.name + "\", ");
-                    } else {
-                        update_line = generate_formatter_block_from_string_literal(strLit,
-                            "webcc::dom::set_inner_text(" + el_var + ", ");
-                    }
+                    update_line = generate_formatter_block_from_string_literal(strLit, dom_call);
                     optimized = true;
                 }
             }
@@ -298,53 +409,17 @@ std::string Component::to_webcc(CompilerSession& session) {
                 std::string args_str = binding.value_code.substr(22);
                 if(!args_str.empty() && args_str.back() == ')') args_str.pop_back();
                 
-                std::vector<std::string> args;
-                int paren_depth = 0;
-                std::string current;
-                for(size_t i = 0; i < args_str.size(); ++i) {
-                    char c = args_str[i];
-                    if(c == '(') paren_depth++;
-                    else if(c == ')') paren_depth--;
-                    else if(c == ',' && paren_depth == 0) {
-                        while(!current.empty() && current.front() == ' ') current.erase(0, 1);
-                        while(!current.empty() && current.back() == ' ') current.pop_back();
-                        if(!current.empty()) args.push_back(current);
-                        current.clear();
-                        continue;
-                    }
-                    current += c;
-                }
-                while(!current.empty() && current.front() == ' ') current.erase(0, 1);
-                while(!current.empty() && current.back() == ' ') current.pop_back();
-                if(!current.empty()) args.push_back(current);
-                
-                if(binding.type == "attr") {
-                    update_line = generate_formatter_block(args,
-                        "webcc::dom::set_attribute(" + el_var + ", \"" + binding.name + "\", ");
-                } else {
-                    update_line = generate_formatter_block(args,
-                        "webcc::dom::set_inner_text(" + el_var + ", ");
-                }
+                std::vector<std::string> args = parse_concat_args(args_str);
+                update_line = generate_formatter_block(args, dom_call);
                 optimized = true;
             }
             
             if(!optimized) {
-                if(binding.type == "attr") {
-                    bool is_string_literal = !binding.value_code.empty() && binding.value_code.front() == '"';
-                    if (is_string_literal) {
-                        update_line = "webcc::dom::set_attribute(" + el_var + ", \"" + binding.name + "\", " + binding.value_code + ");";
-                    } else {
-                        update_line = generate_formatter_block({binding.value_code},
-                            "webcc::dom::set_attribute(" + el_var + ", \"" + binding.name + "\", ");
-                    }
-                } else if(binding.type == "text") {
-                    bool is_string_literal = !binding.value_code.empty() && binding.value_code.front() == '"';
-                    if (is_string_literal) {
-                        update_line = "webcc::dom::set_inner_text(" + el_var + ", " + binding.value_code + ");";
-                    } else {
-                        update_line = generate_formatter_block({binding.value_code},
-                            "webcc::dom::set_inner_text(" + el_var + ", ");
-                    }
+                bool is_string_literal = !binding.value_code.empty() && binding.value_code.front() == '"';
+                if (is_string_literal) {
+                    update_line = dom_call + binding.value_code + ");";
+                } else {
+                    update_line = generate_formatter_block({binding.value_code}, dom_call);
                 }
             }
             
@@ -411,7 +486,7 @@ std::string Component::to_webcc(CompilerSession& session) {
             }
             
             if(pub_mut_vars.count(var_name)) {
-                std::string callback_name = "on" + std::string(1, std::toupper(var_name[0])) + var_name.substr(1) + "Change";
+                std::string callback_name = make_callback_name(var_name);
                 ss << "        if(" << callback_name << ") " << callback_name << "();\n";
             }
             ss << "    }\n";
@@ -422,7 +497,7 @@ std::string Component::to_webcc(CompilerSession& session) {
     // Generate _update methods for pub mut variables without UI bindings
     for(const auto& var_name : pub_mut_vars) {
         if(generated_updaters.find(var_name) == generated_updaters.end()) {
-            std::string callback_name = "on" + std::string(1, std::toupper(var_name[0])) + var_name.substr(1) + "Change";
+            std::string callback_name = make_callback_name(var_name);
             ss << "    void _update_" << var_name << "() {\n";
             ss << "        if(" << callback_name << ") " << callback_name << "();\n";
             ss << "    }\n";
@@ -601,13 +676,10 @@ std::string Component::to_webcc(CompilerSession& session) {
         ss << "        _if_" << region.if_id << "_state = new_state;\n";
         ss << "        \n";
         
-        std::set<int> click_els, input_els, change_els, keydown_els;
-        for (const auto& handler : event_handlers) {
-            if (handler.event_type == "click") click_els.insert(handler.element_id);
-            else if (handler.event_type == "input") input_els.insert(handler.element_id);
-            else if (handler.event_type == "change") change_els.insert(handler.element_id);
-            else if (handler.event_type == "keydown") keydown_els.insert(handler.element_id);
-        }
+        std::set<int> click_els = get_elements_for_event(event_handlers, "click");
+        std::set<int> input_els = get_elements_for_event(event_handlers, "input");
+        std::set<int> change_els = get_elements_for_event(event_handlers, "change");
+        std::set<int> keydown_els = get_elements_for_event(event_handlers, "keydown");
         
         ss << "        if (new_state) {\n";
         for (int el_id : region.else_element_ids) {
@@ -769,7 +841,7 @@ std::string Component::to_webcc(CompilerSession& session) {
         
         for(const auto& mod : modified_vars) {
             if(g_ref_props.count(mod)) {
-                std::string callback_name = "on" + std::string(1, std::toupper(mod[0])) + mod.substr(1) + "Change";
+                std::string callback_name = make_callback_name(mod);
                 updates += "        if(" + callback_name + ") " + callback_name + "();\n";
             }
         }
@@ -835,55 +907,23 @@ std::string Component::to_webcc(CompilerSession& session) {
         ss << ss_render.str();
     }
     // Register event handlers
-    if (click_mask) {
-        ss << "        for (int i = 0; i < " << element_count << "; i++) if (_click_mask & (1ULL << i)) g_dispatcher.set(el[i], [this, i]() {\n";
-        ss << "            switch(i) {\n";
-        for (const auto& handler : event_handlers) {
-            if (handler.event_type == "click") {
-                ss << "                case " << handler.element_id << ": _handler_" << handler.element_id << "_click(); break;\n";
-            }
-        }
-        ss << "            }\n";
-        ss << "        });\n";
+    if (masks.click) {
+        emit_event_registration(ss, element_count, event_handlers, "click", "_click_mask", "g_dispatcher", "", "");
     }
-    if (input_mask) {
-        ss << "        for (int i = 0; i < " << element_count << "; i++) if (_input_mask & (1ULL << i)) g_input_dispatcher.set(el[i], [this, i](const webcc::string& v) {\n";
-        ss << "            switch(i) {\n";
-        for (const auto& handler : event_handlers) {
-            if (handler.event_type == "input") {
-                ss << "                case " << handler.element_id << ": _handler_" << handler.element_id << "_input(v); break;\n";
-            }
-        }
-        ss << "            }\n";
-        ss << "        });\n";
+    if (masks.input) {
+        emit_event_registration(ss, element_count, event_handlers, "input", "_input_mask", "g_input_dispatcher", "const webcc::string& v", "v");
     }
-    if (change_mask) {
-        ss << "        for (int i = 0; i < " << element_count << "; i++) if (_change_mask & (1ULL << i)) g_change_dispatcher.set(el[i], [this, i](const webcc::string& v) {\n";
-        ss << "            switch(i) {\n";
-        for (const auto& handler : event_handlers) {
-            if (handler.event_type == "change") {
-                ss << "                case " << handler.element_id << ": _handler_" << handler.element_id << "_change(v); break;\n";
-            }
-        }
-        ss << "            }\n";
-        ss << "        });\n";
+    if (masks.change) {
+        emit_event_registration(ss, element_count, event_handlers, "change", "_change_mask", "g_change_dispatcher", "const webcc::string& v", "v");
     }
-    if (keydown_mask) {
-        ss << "        for (int i = 0; i < " << element_count << "; i++) if (_keydown_mask & (1ULL << i)) g_keydown_dispatcher.set(el[i], [this, i](int k) {\n";
-        ss << "            switch(i) {\n";
-        for (const auto& handler : event_handlers) {
-            if (handler.event_type == "keydown") {
-                ss << "                case " << handler.element_id << ": _handler_" << handler.element_id << "_keydown(k); break;\n";
-            }
-        }
-        ss << "            }\n";
-        ss << "        });\n";
+    if (masks.keydown) {
+        emit_event_registration(ss, element_count, event_handlers, "keydown", "_keydown_mask", "g_keydown_dispatcher", "int k", "k");
     }
     
     // Wire up onChange callbacks for child component pub mut members
     for(const auto& region : if_regions) {
         for(const auto& mem_dep : region.member_dependencies) {
-            std::string callback_name = "on" + std::string(1, std::toupper(mem_dep.member[0])) + mem_dep.member.substr(1) + "Change";
+            std::string callback_name = make_callback_name(mem_dep.member);
             ss << "        " << mem_dep.object << "." << callback_name << " = [this]() { _sync_if_" << region.if_id << "(); };\n";
         }
     }
@@ -894,59 +934,27 @@ std::string Component::to_webcc(CompilerSession& session) {
     // Rebind method
     if (!event_handlers.empty()) {
         ss << "    void _rebind() {\n";
-        if (click_mask) {
-            ss << "        for (int i = 0; i < " << element_count << "; i++) if (_click_mask & (1ULL << i)) g_dispatcher.set(el[i], [this, i]() {\n";
-            ss << "            switch(i) {\n";
-            for (const auto& handler : event_handlers) {
-                if (handler.event_type == "click") {
-                    ss << "                case " << handler.element_id << ": _handler_" << handler.element_id << "_click(); break;\n";
-                }
-            }
-            ss << "            }\n";
-            ss << "        });\n";
+        if (masks.click) {
+            emit_event_registration(ss, element_count, event_handlers, "click", "_click_mask", "g_dispatcher", "", "");
         }
-        if (input_mask) {
-            ss << "        for (int i = 0; i < " << element_count << "; i++) if (_input_mask & (1ULL << i)) g_input_dispatcher.set(el[i], [this, i](const webcc::string& v) {\n";
-            ss << "            switch(i) {\n";
-            for (const auto& handler : event_handlers) {
-                if (handler.event_type == "input") {
-                    ss << "                case " << handler.element_id << ": _handler_" << handler.element_id << "_input(v); break;\n";
-                }
-            }
-            ss << "            }\n";
-            ss << "        });\n";
+        if (masks.input) {
+            emit_event_registration(ss, element_count, event_handlers, "input", "_input_mask", "g_input_dispatcher", "const webcc::string& v", "v");
         }
-        if (change_mask) {
-            ss << "        for (int i = 0; i < " << element_count << "; i++) if (_change_mask & (1ULL << i)) g_change_dispatcher.set(el[i], [this, i](const webcc::string& v) {\n";
-            ss << "            switch(i) {\n";
-            for (const auto& handler : event_handlers) {
-                if (handler.event_type == "change") {
-                    ss << "                case " << handler.element_id << ": _handler_" << handler.element_id << "_change(v); break;\n";
-                }
-            }
-            ss << "            }\n";
-            ss << "        });\n";
+        if (masks.change) {
+            emit_event_registration(ss, element_count, event_handlers, "change", "_change_mask", "g_change_dispatcher", "const webcc::string& v", "v");
         }
-        if (keydown_mask) {
-            ss << "        for (int i = 0; i < " << element_count << "; i++) if (_keydown_mask & (1ULL << i)) g_keydown_dispatcher.set(el[i], [this, i](int k) {\n";
-            ss << "            switch(i) {\n";
-            for (const auto& handler : event_handlers) {
-                if (handler.event_type == "keydown") {
-                    ss << "                case " << handler.element_id << ": _handler_" << handler.element_id << "_keydown(k); break;\n";
-                }
-            }
-            ss << "            }\n";
-            ss << "        });\n";
+        if (masks.keydown) {
+            emit_event_registration(ss, element_count, event_handlers, "keydown", "_keydown_mask", "g_keydown_dispatcher", "int k", "k");
         }
         ss << "    }\n";
     }
     
     // Destroy method
     ss << "    void _destroy() {\n";
-    if (click_mask) ss << "        for (int i = 0; i < " << element_count << "; i++) if (_click_mask & (1ULL << i)) g_dispatcher.remove(el[i]);\n";
-    if (input_mask) ss << "        for (int i = 0; i < " << element_count << "; i++) if (_input_mask & (1ULL << i)) g_input_dispatcher.remove(el[i]);\n";
-    if (change_mask) ss << "        for (int i = 0; i < " << element_count << "; i++) if (_change_mask & (1ULL << i)) g_change_dispatcher.remove(el[i]);\n";
-    if (keydown_mask) ss << "        for (int i = 0; i < " << element_count << "; i++) if (_keydown_mask & (1ULL << i)) g_keydown_dispatcher.remove(el[i]);\n";
+    if (masks.click) ss << "        for (int i = 0; i < " << element_count << "; i++) if (_click_mask & (1ULL << i)) g_dispatcher.remove(el[i]);\n";
+    if (masks.input) ss << "        for (int i = 0; i < " << element_count << "; i++) if (_input_mask & (1ULL << i)) g_input_dispatcher.remove(el[i]);\n";
+    if (masks.change) ss << "        for (int i = 0; i < " << element_count << "; i++) if (_change_mask & (1ULL << i)) g_change_dispatcher.remove(el[i]);\n";
+    if (masks.keydown) ss << "        for (int i = 0; i < " << element_count << "; i++) if (_keydown_mask & (1ULL << i)) g_keydown_dispatcher.remove(el[i]);\n";
     if (element_count > 0) {
         ss << "        webcc::dom::remove_element(el[0]);\n";
     }
