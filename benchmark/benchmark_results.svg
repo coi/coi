@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 380" width="100%" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa;">
+<rect width="100%" height="100%" fill="#f8f9fa"/>
+<text x="400.0" y="45" text-anchor="middle" fill="#212529" font-size="26" font-weight="bold">Bundle Size Comparison</text>
+<text x="400.0" y="75" text-anchor="middle" fill="#6c757d" font-size="16">Counter App Implementation</text>
+<rect x="220.0" y="115" width="15" height="15" fill="#9477ff" rx="3"/>
+<text x="245.0" y="128" fill="#212529" font-size="14" font-weight="600">Coi</text>
+<rect x="340.0" y="115" width="15" height="15" fill="#00d8ff" rx="3"/>
+<text x="365.0" y="128" fill="#212529" font-size="14" font-weight="600">React</text>
+<rect x="460.0" y="115" width="15" height="15" fill="#42b883" rx="3"/>
+<text x="485.0" y="128" fill="#212529" font-size="14" font-weight="600">Vue</text>
+<text x="205" y="202" text-anchor="end" fill="#212529" font-size="15" font-weight="bold">Coi</text>
+<rect x="220" y="180" width="53.19542538047328" height="32" fill="#9477ff" rx="4"/>
+<text x="283.1954253804733" y="202" fill="#212529" font-size="14" font-weight="bold">18.9 KB ★</text>
+<text x="205" y="246" text-anchor="end" fill="#212529" font-size="15" font-weight="bold">Vue</text>
+<rect x="220" y="224" width="173.420167662694" height="32" fill="#42b883" rx="4"/>
+<text x="403.420167662694" y="246" fill="#212529" font-size="14" font-weight="normal">61.6 KB</text>
+<text x="205" y="290" text-anchor="end" fill="#212529" font-size="15" font-weight="bold">React</text>
+<rect x="220" y="268" width="400.0" height="32" fill="#00d8ff" rx="4"/>
+<text x="630.0" y="290" fill="#212529" font-size="14" font-weight="normal">142.0 KB</text>
+</svg>

@@ -1,0 +1,11 @@
+{
+    "coi": {
+        "bundle_size": 19338
+    },
+    "vue": {
+        "bundle_size": 63043
+    },
+    "react": {
+        "bundle_size": 145411
+    }
+}

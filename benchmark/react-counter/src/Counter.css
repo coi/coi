@@ -1,0 +1,28 @@
+.counter {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 16px;
+  background: #f5f5f5;
+  border-radius: 8px;
+}
+
+.counter .label {
+  font-weight: 500;
+  min-width: 100px;
+}
+
+.counter button {
+  padding: 8px 16px;
+  font-size: 1rem;
+  cursor: pointer;
+  border: none;
+  border-radius: 4px;
+  background: #1a73e8;
+  color: white;
+  transition: background 0.2s;
+}
+
+.counter button:hover {
+  background: #1557b0;
+}

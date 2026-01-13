@@ -1,0 +1,44 @@
+import "components/Counter.coi";
+
+component App {
+    mut int score = 0;
+
+    style {
+        .app {
+            padding: 24px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #1a73e8;
+            margin-bottom: 24px;
+        }
+        .win {
+            color: #34a853;
+            font-weight: bold;
+            font-size: 1.25rem;
+            margin-top: 16px;
+            padding: 12px;
+            background: #e8f5e9;
+            border-radius: 8px;
+        }
+    }
+
+    view {
+        <div class="app">
+            <h1>Score: {score}</h1>
+            <Counter label="Player" &value={score} />
+            <if score >= 10>
+                <p class="win">🎉 You win!</p>
+            </if>
+        </div>
+    }
+}
+
+app {
+    root = App;
+    title = "Counter Benchmark - Coi";
+    description = "A counter app built with Coi for benchmarking";
+    lang = "en";
+}

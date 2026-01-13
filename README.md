@@ -96,6 +96,20 @@ app {
 }
 ```
 
+## Benchmarks
+
+Coi is designed for high-performance and minimal footprint. In a [counter benchmark](benchmark/) comparing Coi, React, and Vue:
+
+- **Bundle Size**: Coi produces significantly smaller bundles (~19KB) compared to Vue (~63KB) and React (~145KB).
+- **Performance**: More efficient DOM updates with zero Virtual DOM overhead.
+- **Memory**: Lower memory consumption due to its fine-grained reactivity and minimal WASM runtime.
+
+<p align="center">
+  <img src="benchmark/benchmark_results.svg" alt="Benchmark Results" width="600">
+</p>
+
+See the [benchmark/](benchmark/) directory for details and instructions on how to run it yourself.
+
 ## Quick Start
 
 ### Install
