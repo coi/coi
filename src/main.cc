@@ -533,8 +533,8 @@ int main(int argc, char **argv)
         out << "#include \"webcc/core/function.h\"\n";
         out << "#include \"webcc/core/allocator.h\"\n";
         out << "#include \"webcc/core/new.h\"\n";
-        out << "#include \"webcc/core/vector.h\"\n";
-        out << "#include \"webcc/core/unordered_map.h\"\n\n";
+        out << "#include \"webcc/core/array.h\"\n";
+        out << "#include \"webcc/core/vector.h\"\n\n";
 
         // Generic event dispatcher template
         out << "template<typename Callback, int MaxListeners = 64>\n";
