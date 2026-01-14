@@ -520,6 +520,7 @@ std::unique_ptr<Statement> Parser::parse_statement(){
     }
 
     // Assignment to array element: arr[i] = value or arr[i] += value etc.
+    // Also handles arr[i].member = value (member assignment on array element)
     if(current().type == TokenType::IDENTIFIER && peek().type == TokenType::LBRACKET) {
         // Could be an index assignment or an expression statement with index access
         // Need to look ahead to see if there's an assignment operator after the bracket
@@ -537,13 +538,31 @@ std::unique_ptr<Statement> Parser::parse_statement(){
         }
         
         // Check if followed by assignment operator (including compound assignments)
-        TokenType assign_op = current().type;
-        bool is_index_assign = (assign_op == TokenType::ASSIGN ||
-                                assign_op == TokenType::PLUS_ASSIGN ||
-                                assign_op == TokenType::MINUS_ASSIGN ||
-                                assign_op == TokenType::STAR_ASSIGN ||
-                                assign_op == TokenType::SLASH_ASSIGN ||
-                                assign_op == TokenType::PERCENT_ASSIGN);
+        TokenType after_bracket = current().type;
+        bool is_index_assign = (after_bracket == TokenType::ASSIGN ||
+                                after_bracket == TokenType::PLUS_ASSIGN ||
+                                after_bracket == TokenType::MINUS_ASSIGN ||
+                                after_bracket == TokenType::STAR_ASSIGN ||
+                                after_bracket == TokenType::SLASH_ASSIGN ||
+                                after_bracket == TokenType::PERCENT_ASSIGN);
+        
+        // Check if followed by .member = value (member assignment on array element)
+        bool is_index_member_assign = false;
+        if (after_bracket == TokenType::DOT) {
+            // Skip through member chain to see if there's an assignment at the end
+            while (current().type == TokenType::DOT) {
+                advance(); // skip '.'
+                if (current().type != TokenType::IDENTIFIER) break;
+                advance(); // skip member name
+            }
+            TokenType assign_op = current().type;
+            is_index_member_assign = (assign_op == TokenType::ASSIGN ||
+                                      assign_op == TokenType::PLUS_ASSIGN ||
+                                      assign_op == TokenType::MINUS_ASSIGN ||
+                                      assign_op == TokenType::STAR_ASSIGN ||
+                                      assign_op == TokenType::SLASH_ASSIGN ||
+                                      assign_op == TokenType::PERCENT_ASSIGN);
+        }
         
         // Restore position
         pos = saved_pos;
@@ -571,6 +590,112 @@ std::unique_ptr<Statement> Parser::parse_statement(){
             
             expect(TokenType::SEMICOLON, "Expected ';'");
             return idx_assign;
+        }
+        
+        if (is_index_member_assign) {
+            // Parse arr[i].member = value as MemberAssignment with IndexAccess as object
+            advance(); // skip identifier
+            expect(TokenType::LBRACKET, "Expected '['");
+            auto index_expr = parse_expression();
+            expect(TokenType::RBRACKET, "Expected ']'");
+            
+            // Build object as IndexAccess
+            std::unique_ptr<Expression> obj_expr = std::make_unique<IndexAccess>(
+                std::make_unique<Identifier>(name), std::move(index_expr));
+            
+            // Now parse the member chain
+            expect(TokenType::DOT, "Expected '.'");
+            std::string last_member = current().value;
+            expect(TokenType::IDENTIFIER, "Expected member name");
+            
+            // Handle chained member access (arr[i].a.b = value)
+            while (current().type == TokenType::DOT) {
+                advance(); // skip '.'
+                obj_expr = std::make_unique<MemberAccess>(std::move(obj_expr), last_member);
+                last_member = current().value;
+                expect(TokenType::IDENTIFIER, "Expected member name");
+            }
+            
+            TokenType opType = current().type;
+            advance(); // skip assignment operator
+            
+            auto member_assign = std::make_unique<MemberAssignment>();
+            member_assign->object = std::move(obj_expr);
+            member_assign->member = last_member;
+            member_assign->value = parse_expression();
+            
+            // Set compound operator if not plain assignment
+            if (opType == TokenType::PLUS_ASSIGN) member_assign->compound_op = "+";
+            else if (opType == TokenType::MINUS_ASSIGN) member_assign->compound_op = "-";
+            else if (opType == TokenType::STAR_ASSIGN) member_assign->compound_op = "*";
+            else if (opType == TokenType::SLASH_ASSIGN) member_assign->compound_op = "/";
+            else if (opType == TokenType::PERCENT_ASSIGN) member_assign->compound_op = "%";
+            
+            expect(TokenType::SEMICOLON, "Expected ';'");
+            return member_assign;
+        }
+    }
+
+    // Member assignment: obj.member = value or obj.a.b = value
+    if(current().type == TokenType::IDENTIFIER && peek().type == TokenType::DOT) {
+        // Look ahead to find if this is a member assignment
+        size_t saved_pos = pos;
+        advance(); // skip identifier
+        
+        // Track the chain of member accesses
+        while (current().type == TokenType::DOT) {
+            advance(); // skip '.'
+            if (current().type != TokenType::IDENTIFIER) break;
+            advance(); // skip member name
+        }
+        
+        // Check if followed by assignment operator
+        TokenType assign_op = current().type;
+        bool is_member_assign = (assign_op == TokenType::ASSIGN ||
+                                 assign_op == TokenType::PLUS_ASSIGN ||
+                                 assign_op == TokenType::MINUS_ASSIGN ||
+                                 assign_op == TokenType::STAR_ASSIGN ||
+                                 assign_op == TokenType::SLASH_ASSIGN ||
+                                 assign_op == TokenType::PERCENT_ASSIGN);
+        
+        // Restore position
+        pos = saved_pos;
+        
+        if (is_member_assign) {
+            // Parse the object part (all but the last member)
+            std::unique_ptr<Expression> obj_expr = std::make_unique<Identifier>(current().value);
+            advance(); // skip first identifier
+            advance(); // skip first '.'
+            
+            std::string last_member = current().value;
+            expect(TokenType::IDENTIFIER, "Expected member name");
+            
+            // Handle chained member access (a.b.c = value means object is a.b, member is c)
+            while (current().type == TokenType::DOT) {
+                advance(); // skip '.'
+                // Previous member becomes part of the object
+                obj_expr = std::make_unique<MemberAccess>(std::move(obj_expr), last_member);
+                last_member = current().value;
+                expect(TokenType::IDENTIFIER, "Expected member name");
+            }
+            
+            TokenType opType = current().type;
+            advance(); // skip assignment operator
+            
+            auto member_assign = std::make_unique<MemberAssignment>();
+            member_assign->object = std::move(obj_expr);
+            member_assign->member = last_member;
+            member_assign->value = parse_expression();
+            
+            // Set compound operator if not plain assignment
+            if (opType == TokenType::PLUS_ASSIGN) member_assign->compound_op = "+";
+            else if (opType == TokenType::MINUS_ASSIGN) member_assign->compound_op = "-";
+            else if (opType == TokenType::STAR_ASSIGN) member_assign->compound_op = "*";
+            else if (opType == TokenType::SLASH_ASSIGN) member_assign->compound_op = "/";
+            else if (opType == TokenType::PERCENT_ASSIGN) member_assign->compound_op = "%";
+            
+            expect(TokenType::SEMICOLON, "Expected ';'");
+            return member_assign;
         }
     }
 
@@ -735,11 +860,21 @@ std::unique_ptr<ASTNode> Parser::parse_html_element(){
     std::string tag = current().value;
     expect(TokenType::IDENTIFIER, "Expected tag name");
 
-    // Check if component
-    if(std::isupper(tag[0])){
+    // Check if component (uppercase) or member reference to a component (lowercase but in component_member_types)
+    bool is_component = std::isupper(tag[0]);
+    bool is_member_ref = !is_component && component_member_types.count(tag) > 0;
+    
+    if(is_component || is_member_ref){
         auto comp = std::make_unique<ComponentInstantiation>();
         comp->line = start_line;
-        comp->component_name = tag;
+        
+        if (is_member_ref) {
+            comp->is_member_reference = true;
+            comp->member_name = tag;
+            comp->component_name = component_member_types[tag];
+        } else {
+            comp->component_name = tag;
+        }
 
         // Props
         while(current().type == TokenType::IDENTIFIER || current().type == TokenType::AMPERSAND){
@@ -1047,12 +1182,28 @@ std::unique_ptr<ASTNode> Parser::parse_view_for() {
         
         expect(TokenType::GT, "Expected '>'");
         
+        // If iterating over a component array, temporarily add loop var to component_member_types
+        // so that <var_name/> syntax works inside the loop
+        std::string loop_var_comp_type;
+        if (auto* ident = dynamic_cast<Identifier*>(viewForEach->iterable.get())) {
+            auto it = component_array_types.find(ident->name);
+            if (it != component_array_types.end()) {
+                loop_var_comp_type = it->second;
+                component_member_types[var_name] = loop_var_comp_type;
+            }
+        }
+        
         // Parse children until </for>
         while (current().type != TokenType::END_OF_FILE) {
             if (current().type == TokenType::LT && peek().type == TokenType::SLASH && peek(2).type == TokenType::FOR) {
                 break;
             }
             viewForEach->children.push_back(parse_view_node());
+        }
+        
+        // Remove the temporary loop variable from component_member_types
+        if (!loop_var_comp_type.empty()) {
+            component_member_types.erase(var_name);
         }
         
         // </for>
@@ -1067,6 +1218,10 @@ std::unique_ptr<ASTNode> Parser::parse_view_for() {
 
 Component Parser::parse_component(){
     Component comp;
+    
+    // Clear component member types from previous component
+    component_member_types.clear();
+    component_array_types.clear();
 
     expect(TokenType::COMPONENT, "Expected 'component'");
     comp.name = current().value;
@@ -1257,6 +1412,21 @@ Component Parser::parse_component(){
 
             if (var_decl->is_reference && !var_decl->initializer) {
                 throw std::runtime_error("Reference variable '" + var_decl->name + "' must be initialized immediately.");
+            }
+
+            // Track component-type members for view parsing (e.g., "mut Test a;" -> can use <a/> in view)
+            // Component types start with uppercase and are not arrays
+            if (!var_decl->type.empty() && std::isupper(var_decl->type[0]) && 
+                var_decl->type.find('[') == std::string::npos) {
+                component_member_types[var_decl->name] = var_decl->type;
+            }
+            
+            // Track component array types (e.g., "Row[] rows" -> can use <row/> in for loops)
+            if (!var_decl->type.empty() && var_decl->type.ends_with("[]")) {
+                std::string elem_type = var_decl->type.substr(0, var_decl->type.length() - 2);
+                if (!elem_type.empty() && std::isupper(elem_type[0])) {
+                    component_array_types[var_decl->name] = elem_type;
+                }
             }
 
             expect(TokenType::SEMICOLON, "Expected ';'");

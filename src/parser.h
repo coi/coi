@@ -5,12 +5,19 @@
 #include <vector>
 #include <memory>
 #include <string>
+#include <map>
 
 class Parser{
     private:
         std::vector<Token> tokens;
         size_t pos = 0;
         bool allow_gt_comparison = true;  // When false, > is not treated as comparison op
+        
+        // Maps member variable names to their component types (for detecting <memberName/> in views)
+        std::map<std::string, std::string> component_member_types;
+        
+        // Maps member variable names to their component array element types (e.g., "rows" -> "Row" for Row[] rows)
+        std::map<std::string, std::string> component_array_types;
 
         Token current();
         Token peek(int offset = 1);
