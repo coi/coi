@@ -4,6 +4,8 @@ Components are the building blocks of Coi applications. This guide covers compon
 
 ## Basic Structure
 
+Component names **must start with an uppercase letter**:
+
 ```tsx
 component Counter {
     mut int count = 0;

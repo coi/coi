@@ -226,6 +226,8 @@ view {
 
 ## Child Components
 
+Component names **must start with an uppercase letter** to distinguish them from HTML elements.
+
 ### Basic Usage
 
 ```tsx
@@ -253,9 +255,9 @@ component App {
 <ListItem &onRemove={handleRemove(id)} />
 ```
 
-### Dynamic Components
+### Component Member References
 
-Components declared as members can be referenced:
+Components declared as members can be rendered using `<{member}/>` syntax:
 
 ```tsx
 component App {
@@ -263,10 +265,27 @@ component App {
     
     view {
         <div>
-            <editor />  // References the member
+            <{editor} />  // Renders the editor member
         </div>
     }
 }
+```
+
+This is especially useful in loops where each item is a component:
+
+```tsx
+component TodoList {
+    mut TodoItem[] todos;
+    
+    view {
+        <for todo in todos key={todo.id}>
+            <{todo} &onRemove={removeTodo} />
+        </for>
+    }
+}
+```
+
+With `<{todo}/>`, props like `id`, `text`, and `done` are automatically bound from the component instance. You only need to pass additional props like callbacks.
 ```
 
 ## Dynamic Styles
