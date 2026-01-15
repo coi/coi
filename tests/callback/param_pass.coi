@@ -38,9 +38,9 @@ component TestCallbackParamPass {
 
     view {
         <div>
-            <ChildOne &onAction={handleAction(count)} />
-            <ChildTwo &onUpdate={handleUpdate(text, count)} />
-            <ChildThree &onSimple={handleSimple()} />
+            <ChildOne &onAction={handleAction} />
+            <ChildTwo &onUpdate={handleUpdate} />
+            <ChildThree &onSimple={handleSimple} />
         </div>
     }
 }

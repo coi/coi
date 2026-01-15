@@ -1,5 +1,42 @@
 #include "view.h"
 #include "formatter.h"
+#include "../schema_loader.h"
+
+// Helper to map Coi types to C++ types for lambda params
+static std::string coi_type_to_cpp(const std::string& type) {
+    if (type == "int" || type == "int32") return "int32_t";
+    if (type == "float" || type == "float64") return "double";
+    if (type == "float32") return "float";
+    if (type == "bool") return "bool";
+    if (type == "string") return "const std::string&";
+    return "int32_t";  // default
+}
+
+// Helper to build lambda parameter list from callback param types
+static std::string build_lambda_params_from_types(const std::vector<std::string>& param_types)
+{
+    std::string params;
+    for (size_t i = 0; i < param_types.size(); i++)
+    {
+        if (i > 0)
+            params += ", ";
+        params += coi_type_to_cpp(param_types[i]) + " _arg" + std::to_string(i);
+    }
+    return params;
+}
+
+// Helper to build function call args list for forwarding
+static std::string build_forward_args(size_t count)
+{
+    std::string args;
+    for (size_t i = 0; i < count; i++)
+    {
+        if (i > 0)
+            args += ", ";
+        args += "_arg" + std::to_string(i);
+    }
+    return args;
+}
 
 // Helper to build lambda parameter list from function call args
 static std::string build_lambda_params(FunctionCall *func_call)
@@ -106,22 +143,22 @@ void ComponentInstantiation::generate_code(std::stringstream &ss, const std::str
         for (auto &prop : props)
         {
             std::string val = prop.value->to_webcc();
-            if (method_names.count(val))
+            if (prop.is_callback && !prop.callback_param_types.empty())
             {
+                // Callback with params: generate lambda that forwards args
+                std::string lambda_params = build_lambda_params_from_types(prop.callback_param_types);
+                std::string forward_args = build_forward_args(prop.callback_param_types.size());
+                ss << "        " << instance_name << "." << prop.name << " = [this](" << lambda_params << ") { this->" << val << "(" << forward_args << "); };\n";
+            }
+            else if (method_names.count(val) || prop.is_callback)
+            {
+                // No-param callback or method reference
                 ss << "        " << instance_name << "." << prop.name << " = [this]() { this->" << val << "(); };\n";
             }
             else if (prop.is_reference)
             {
-                if (auto *func_call = dynamic_cast<FunctionCall *>(prop.value.get()))
-                {
-                    std::string lambda_params = build_lambda_params(func_call);
-                    std::string lambda_call = build_lambda_call(func_call);
-                    ss << "        " << instance_name << "." << prop.name << " = [this](" << lambda_params << ") { this->" << lambda_call << "; };\n";
-                }
-                else
-                {
-                    ss << "        " << instance_name << "." << prop.name << " = &(" << val << ");\n";
-                }
+                // Actual reference: pointer to variable
+                ss << "        " << instance_name << "." << prop.name << " = &(" << val << ");\n";
             }
             else
             {
@@ -160,22 +197,22 @@ void ComponentInstantiation::generate_code(std::stringstream &ss, const std::str
     for (auto &prop : props)
     {
         std::string val = prop.value->to_webcc();
-        if (method_names.count(val))
+        if (prop.is_callback && !prop.callback_param_types.empty())
         {
+            // Callback with params: generate lambda that forwards args
+            std::string lambda_params = build_lambda_params_from_types(prop.callback_param_types);
+            std::string forward_args = build_forward_args(prop.callback_param_types.size());
+            ss << "        " << instance_name << "." << prop.name << " = [this](" << lambda_params << ") { this->" << val << "(" << forward_args << "); };\n";
+        }
+        else if (method_names.count(val) || prop.is_callback)
+        {
+            // No-param callback or method reference
             ss << "        " << instance_name << "." << prop.name << " = [this]() { this->" << val << "(); };\n";
         }
         else if (prop.is_reference)
         {
-            if (auto *func_call = dynamic_cast<FunctionCall *>(prop.value.get()))
-            {
-                std::string lambda_params = build_lambda_params(func_call);
-                std::string lambda_call = build_lambda_call(func_call);
-                ss << "        " << instance_name << "." << prop.name << " = [this](" << lambda_params << ") { this->" << lambda_call << "; };\n";
-            }
-            else
-            {
-                ss << "        " << instance_name << "." << prop.name << " = &(" << val << ");\n";
-            }
+            // Actual reference: pointer to variable
+            ss << "        " << instance_name << "." << prop.name << " = &(" << val << ");\n";
         }
         else
         {
@@ -492,23 +529,23 @@ static void generate_prop_update_code(std::stringstream &ss, ComponentInstantiat
         std::string val = prop.value->to_webcc();
         std::string prefix = "            " + inst_ref + "." + prop.name + " = ";
 
-        if (method_names.count(val))
+        if (prop.is_callback && !prop.callback_param_types.empty())
         {
+            // Callback with params: generate lambda that forwards args
+            std::string lambda_params = build_lambda_params_from_types(prop.callback_param_types);
+            std::string forward_args = build_forward_args(prop.callback_param_types.size());
+            ss << prefix << "[this](" << lambda_params << ") { this->" << val << "(" << forward_args << "); };\n";
+        }
+        else if (method_names.count(val) || prop.is_callback)
+        {
+            // No-param callback or method reference
             ss << prefix << "[this]() { this->" << val << "(); };\n";
         }
         else if (prop.is_reference)
         {
-            if (auto *func_call = dynamic_cast<FunctionCall *>(prop.value.get()))
-            {
-                std::string params = build_lambda_params(func_call);
-                std::string lambda_call = build_lambda_call(func_call);
-                ss << prefix << "[this](" << params << ") { this->" << lambda_call << "; };\n";
-            }
-            else
-            {
-                ss << prefix << "&(" << val << ");\n";
-                ss << "            " << inst_ref << "._update_" << prop.name << "();\n";
-            }
+            // Actual reference: pointer to variable
+            ss << prefix << "&(" << val << ");\n";
+            ss << "            " << inst_ref << "._update_" << prop.name << "();\n";
         }
         else
         {

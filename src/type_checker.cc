@@ -906,6 +906,8 @@ void validate_view_hierarchy(const std::vector<Component> &components)
                         {
                             param_found = true;
                             passed_prop.is_mutable_def = declared_param->is_mutable;
+                            passed_prop.is_callback = declared_param->is_callback;
+                            passed_prop.callback_param_types = declared_param->callback_param_types;
                             if (declared_param->is_reference && !passed_prop.is_reference)
                             {
                                 throw std::runtime_error(
@@ -932,47 +934,28 @@ void validate_view_hierarchy(const std::vector<Component> &components)
                             // Validate callback argument types
                             if (declared_param->is_callback && passed_prop.value)
                             {
-                                // The passed value should be a function call
+                                // For callbacks that expect arguments:
+                                // - Only allow identifier (handler reference): &onRemove={removeTodo}
+                                // - Disallow any parentheses: &onRemove={removeTodo()} or &onRemove={removeTodo(arg)}
+                                //   because args are provided at call site inside the component
+                                // For no-argument callbacks:
+                                // - Allow identifier or empty function call: &onclick={toggle} or &onclick={toggle()}
                                 if (auto *func_call = dynamic_cast<FunctionCall *>(passed_prop.value.get()))
                                 {
-                                    // Check argument count
-                                    if (func_call->args.size() != declared_param->callback_param_types.size())
+                                    if (!declared_param->callback_param_types.empty())
                                     {
+                                        // Callback expects arguments but got parentheses - not allowed
                                         throw std::runtime_error(
                                             "Callback parameter '" + passed_prop.name + "' in component '" + comp_inst->component_name +
                                             "' expects " + std::to_string(declared_param->callback_param_types.size()) +
-                                            " argument(s) but got " + std::to_string(func_call->args.size()) +
-                                            " at line " + std::to_string(comp_inst->line));
+                                            " argument(s) provided by the component. Use '&" + passed_prop.name + 
+                                            "={handler}' without parentheses at line " +
+                                            std::to_string(comp_inst->line));
                                     }
-
-                                    // Check each argument type
-                                    for (size_t i = 0; i < func_call->args.size(); ++i)
-                                    {
-                                        std::string arg_type = infer_expression_type(func_call->args[i].get(), scope);
-                                        std::string expected_type = normalize_type(declared_param->callback_param_types[i]);
-                                        if (arg_type != "unknown" && !is_compatible_type(arg_type, expected_type))
-                                        {
-                                            throw std::runtime_error(
-                                                "Callback parameter '" + passed_prop.name + "' argument " + std::to_string(i + 1) +
-                                                " expects type '" + expected_type + "' but got '" + arg_type +
-                                                "' at line " + std::to_string(comp_inst->line));
-                                        }
-                                    }
+                                    // No-argument callback with empty () is OK
                                 }
-                                else if (declared_param->callback_param_types.empty())
-                                {
-                                    // No-argument callback, value can be an identifier (method reference)
-                                    // or a function call with no args - this is OK
-                                }
-                                else
-                                {
-                                    // Callback expects arguments but wasn't given a function call
-                                    throw std::runtime_error(
-                                        "Callback parameter '" + passed_prop.name + "' in component '" + comp_inst->component_name +
-                                        "' expects " + std::to_string(declared_param->callback_param_types.size()) +
-                                        " argument(s). Use syntax like '&" + passed_prop.name + "={handler(arg)}' at line " +
-                                        std::to_string(comp_inst->line));
-                                }
+                                // Identifier (no parentheses) is always allowed - args are provided at call site
+                                // e.g., &onRemove={removeTodo} is valid, component calls onRemove(id) internally
                             }
                             // Validate regular (non-callback) prop types
                             else if (!declared_param->is_callback && passed_prop.value)
