@@ -279,7 +279,7 @@ component TodoList {
     
     view {
         <for todo in todos key={todo.id}>
-            <{todo} &onRemove={removeTodo} />
+            <{todo} &onRemove={removeTodo(todo.id)} />
         </for>
     }
 }
