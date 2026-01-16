@@ -17,7 +17,7 @@
 #include "../deps/webcc/src/cli/schema.h"
 #include "../deps/webcc/src/cli/webcc_schema.h"
 
-// Functions that are handled by COI language constructs (not exposed directly)
+// Functions that are handled by Coi language constructs (not exposed directly)
 static const std::set<std::string> EXCLUDED_FUNCTIONS = {
     "set_main_loop",       // Handled by tick {}
     "add_click_listener",  // Handled by onClick attribute
@@ -25,7 +25,7 @@ static const std::set<std::string> EXCLUDED_FUNCTIONS = {
     // Add more as needed
 };
 
-// Convert snake_case to camelCase for COI function names
+// Convert snake_case to camelCase for Coi function names
 std::string to_camel_case(const std::string& snake) {
     std::string result;
     bool capitalize_next = false;
@@ -44,7 +44,7 @@ std::string to_camel_case(const std::string& snake) {
     return result;
 }
 
-// Convert webcc type to COI type
+// Convert webcc type to Coi type
 std::string to_coi_type(const std::string& type, const std::string& handle_type) {
     if (type == "handle" && !handle_type.empty()) {
         return handle_type;
@@ -64,7 +64,7 @@ int main() {
     std::set<std::string> handles;
 
     // Force rebuild by touching this file
-    std::cout << "[COI] Regenerating schema..." << std::endl;
+    std::cout << "[Coi] Regenerating schema..." << std::endl;
 
     // Collect all handle types from commands
     for (const auto* c = webcc::SCHEMA_COMMANDS; !c->ns.empty(); ++c) {
@@ -99,7 +99,7 @@ int main() {
     {
         std::ofstream out("src/coi_schema.h");
         if (!out) {
-            std::cerr << "[COI] Error: Cannot create src/coi_schema.h" << std::endl;
+            std::cerr << "[Coi] Error: Cannot create src/coi_schema.h" << std::endl;
             return 1;
         }
 
@@ -142,7 +142,7 @@ extern const std::pair<const char*, const char*> HANDLE_INHERITANCE[];
     {
         std::ofstream out("src/coi_schema.cc");
         if (!out) {
-            std::cerr << "[COI] Error: Cannot create src/coi_schema.cc" << std::endl;
+            std::cerr << "[Coi] Error: Cannot create src/coi_schema.cc" << std::endl;
             return 1;
         }
 
@@ -203,7 +203,7 @@ const SchemaEntry SCHEMA[] = {
         out << "} // namespace coi\n";
         out.close();
         
-        std::cout << "[COI] Generated coi_schema.h and coi_schema.cc with " << count << " entries and " << handles.size() << " handles" << std::endl;
+        std::cout << "[Coi] Generated coi_schema.h and coi_schema.cc with " << count << " entries and " << handles.size() << " handles" << std::endl;
     }
 
     // =========================================================
@@ -223,7 +223,7 @@ const SchemaEntry SCHEMA[] = {
         if (EXCLUDED_FUNCTIONS.count(c->func_name)) {
             continue;
         }
-        // Skip functions with func_ptr params (not supported in COI)
+        // Skip functions with func_ptr params (not supported in Coi)
         bool has_func_ptr = false;
         for (const auto& p : c->params) {
             if (p.type == "func_ptr") {
@@ -276,7 +276,7 @@ const SchemaEntry SCHEMA[] = {
         std::string filename = "def/" + ns + ".d.coi";
         std::ofstream out(filename);
         if (!out) {
-            std::cerr << "[COI] Error: Cannot create " << filename << std::endl;
+            std::cerr << "[Coi] Error: Cannot create " << filename << std::endl;
             continue;
         }
         
@@ -284,7 +284,7 @@ const SchemaEntry SCHEMA[] = {
         std::string ns_type = capitalize(ns);  // e.g., "storage" -> "Storage"
         
         out << "// GENERATED FILE - DO NOT EDIT\n";
-        out << "// COI definitions for " << ns << " namespace\n";
+        out << "// Coi definitions for " << ns << " namespace\n";
         out << "// Maps to: " << header_file << "\n";
         out << "\n";
         
@@ -460,7 +460,7 @@ const SchemaEntry SCHEMA[] = {
         }
         
         out.close();
-        std::cout << "[COI] Generated " << filename << " with " << commands.size() << " functions" << std::endl;
+        std::cout << "[Coi] Generated " << filename << " with " << commands.size() << " functions" << std::endl;
     }
     
     // =========================================================
@@ -469,14 +469,14 @@ const SchemaEntry SCHEMA[] = {
     {
         std::ofstream out("def/index.d.coi");
         if (!out) {
-            std::cerr << "[COI] Error: Cannot create def/index.d.coi" << std::endl;
+            std::cerr << "[Coi] Error: Cannot create def/index.d.coi" << std::endl;
             return 1;
         }
         
         out << "// GENERATED FILE - DO NOT EDIT\n";
-        out << "// COI Standard Library Index\n";
+        out << "// Coi Standard Library Index\n";
         out << "//\n";
-        out << "// This file lists all available COI definitions.\n";
+        out << "// This file lists all available Coi definitions.\n";
         out << "// These map to the webcc library for web platform access.\n";
         out << "//\n";
         out << "// Available modules:\n";
@@ -509,10 +509,10 @@ const SchemaEntry SCHEMA[] = {
         }
         
         out << "// =========================================================\n";
-        out << "// Language Constructs (built into COI)\n";
+        out << "// Language Constructs (built into Coi)\n";
         out << "// =========================================================\n";
         out << "//\n";
-        out << "// The following functionality is handled by COI language constructs:\n";
+        out << "// The following functionality is handled by Coi language constructs:\n";
         out << "//\n";
         out << "// - init { ... }          : Runs once when component mounts\n";
         out << "// - tick { ... }          : Main loop (replaces setMainLoop)\n";
@@ -526,7 +526,7 @@ const SchemaEntry SCHEMA[] = {
         out << "//\n";
         
         out.close();
-        std::cout << "[COI] Generated def/index.d.coi" << std::endl;
+        std::cout << "[Coi] Generated def/index.d.coi" << std::endl;
     }
     
     // =========================================================
@@ -535,14 +535,14 @@ const SchemaEntry SCHEMA[] = {
     {
         std::ofstream out("def/types.d.coi");
         if (!out) {
-            std::cerr << "[COI] Error: Cannot create def/types.d.coi" << std::endl;
+            std::cerr << "[Coi] Error: Cannot create def/types.d.coi" << std::endl;
             return 1;
         }
         
         out << "// GENERATED FILE - DO NOT EDIT\n";
-        out << "// COI Built-in Types\n";
+        out << "// Coi Built-in Types\n";
         out << "//\n";
-        out << "// These are the primitive types available in COI.\n";
+        out << "// These are the primitive types available in Coi.\n";
         out << "\n";
         out << "// =========================================================\n";
         out << "// Primitive Types\n";
@@ -557,7 +557,7 @@ const SchemaEntry SCHEMA[] = {
         out << "//\n";
         out << "\n";
         out << "// =========================================================\n";
-        out << "// Type Mappings (COI -> WebAssembly)\n";
+        out << "// Type Mappings (Coi -> WebAssembly)\n";
         out << "// =========================================================\n";
         out << "//\n";
         out << "// int       -> i32\n";
@@ -569,7 +569,7 @@ const SchemaEntry SCHEMA[] = {
         out << "//\n";
         
         out.close();
-        std::cout << "[COI] Generated def/types.d.coi" << std::endl;
+        std::cout << "[Coi] Generated def/types.d.coi" << std::endl;
     }
 
     return 0;
