@@ -147,7 +147,7 @@ def measure_bundle_sizes() -> dict:
 
 async def run_dom_benchmark(page, button_id: str) -> float:
     """Run a single DOM benchmark operation and read the app's self-reported time."""
-    result = await page.evaluate('''(buttonId) => {
+    result = await page.evaluate(r'''(buttonId) => {
         return new Promise((resolve) => {
             const button = document.getElementById(buttonId);
             if (!button) {
@@ -337,25 +337,26 @@ def print_dom_results(results: dict):
     # Results
     for bench in benchmarks:
         row = f"{bench:<22}"
-        # Collect values for sorting
-        vals = []
+        # Collect values
+        vals = {}
         for fw in FRAMEWORKS:
             if fw in results and bench in results[fw]:
                 val = results[fw][bench].get('mean', -1)
                 if val > 0:
-                    vals.append((fw, val))
+                    vals[fw] = val
         
-        # Sort by fastest (lowest time)
-        vals.sort(key=lambda x: x[1])
+        # Find minimum value for winner detection
+        min_val = min(vals.values()) if vals else 0
         
-        # Find minimum value(s) for tie detection
-        min_val = vals[0][1] if vals else 0
-        
-        # Print sorted results
-        for fw, val in vals:
-            is_winner = (val == min_val)
-            star = " ★" if is_winner else ""
-            row += f" | {val:>7.1f}ms{star}" if val > 0 else " |       N/A"
+        # Print in framework order (matching header)
+        for fw in FRAMEWORKS:
+            val = vals.get(fw, -1)
+            if val > 0:
+                is_winner = (val == min_val)
+                star = " ★" if is_winner else ""
+                row += f" | {val:>7.1f}ms{star}"
+            else:
+                row += " |       N/A"
         print(row)
     
     print("-" * 60)
@@ -365,7 +366,7 @@ def generate_svg_report(bundle_sizes: dict, dom_results: dict, browser_name: str
     """Generate combined SVG visualization."""
     has_dom = bool(dom_results)
     width = 800
-    height = 550 if has_dom else 280
+    height = 750 if has_dom else 280
     
     bg_color, text_main, text_sub = "#f8f9fa", "#212529", "#6c757d"
     
@@ -415,14 +416,14 @@ def generate_svg_report(bundle_sizes: dict, dom_results: dict, browser_name: str
     
     # DOM Performance Section (if available)
     if has_dom:
-        y += 25
+        y += 30
         svg.append(f'<text x="{width/2}" y="{y}" text-anchor="middle" fill="{text_main}" font-size="16" font-weight="bold">DOM Performance</text>')
         svg.append(f'<text x="{width/2}" y="{y + 18}" text-anchor="middle" fill="{text_sub}" font-size="12">Rows App - Lower is better (ms)</text>')
         
-        y += 40
+        y += 45
         benchmarks = ['Create 1,000 rows', 'Update 1,000 rows', 'Swap rows', 'Clear rows']
         
-        # Find max value
+        # Find max value for scaling
         max_val = 1
         for fw in FRAMEWORKS:
             if fw in dom_results:
@@ -432,13 +433,16 @@ def generate_svg_report(bundle_sizes: dict, dom_results: dict, browser_name: str
                         if val > max_val:
                             max_val = val
         
-        bar_height = 10
-        group_height = 42
+        bar_height = 18
+        bar_gap = 4
+        group_gap = 25
+        max_bar_width = 380
         
         for bench in benchmarks:
-            svg.append(f'<text x="{chart_x - 12}" y="{y + 18}" text-anchor="end" fill="{text_main}" font-size="11" font-weight="bold">{bench}</text>')
+            # Benchmark label
+            svg.append(f'<text x="{chart_x - 12}" y="{y + bar_height + 6}" text-anchor="end" fill="{text_main}" font-size="12" font-weight="bold">{bench}</text>')
             
-            # Collect and sort by fastest (lowest time)
+            # Get values and find winner, sorted fastest first
             bench_vals = []
             for fw in FRAMEWORKS:
                 if fw in dom_results and bench in dom_results[fw]:
@@ -446,23 +450,25 @@ def generate_svg_report(bundle_sizes: dict, dom_results: dict, browser_name: str
                     if v > 0:
                         bench_vals.append((fw, v))
             
-            # Sort by fastest
-            bench_vals.sort(key=lambda x: x[1])
-            min_bench_val = bench_vals[0][1] if bench_vals else 0
+            bench_vals.sort(key=lambda x: x[1])  # Sort by time, fastest first
+            min_val = bench_vals[0][1] if bench_vals else 0
             
+            # Draw bars for each framework (sorted)
             bar_y = y
             for fw, val in bench_vals:
                 bar_w = (val / max_val) * max_bar_width
-                is_winner = (val == min_bench_val)
+                is_winner = (val == min_val)
+                
+                svg.append(f'<rect x="{chart_x}" y="{bar_y}" width="{bar_w}" height="{bar_height}" fill="{COLORS[fw]}" rx="3"/>')
+                
+                # Value label
                 star = " ★" if is_winner else ""
                 weight = "bold" if is_winner else "normal"
-                txt_color = text_main if is_winner else text_sub
+                svg.append(f'<text x="{chart_x + bar_w + 8}" y="{bar_y + 13}" fill="{text_main}" font-size="11" font-weight="{weight}">{val:.1f}ms{star}</text>')
                 
-                svg.append(f'<rect x="{chart_x}" y="{bar_y}" width="{bar_w}" height="{bar_height}" fill="{COLORS[fw]}" rx="2"/>')
-                svg.append(f'<text x="{chart_x + bar_w + 4}" y="{bar_y + 8}" fill="{txt_color}" font-size="9" font-weight="{weight}">{val:.1f} ms{star}</text>')
-                bar_y += bar_height + 2
+                bar_y += bar_height + bar_gap
             
-            y += group_height
+            y += (bar_height + bar_gap) * 3 + group_gap
     
     svg.append('</svg>')
     

@@ -1,141 +1,141 @@
 {
   "browser": "Chrome 143.0.0.0",
   "bundle_sizes": {
-    "coi": 21523,
+    "coi": 21530,
     "react": 145411,
     "vue": 63043
   },
   "dom_performance": {
     "coi": {
       "Create 1,000 rows": {
-        "mean": 36.52,
-        "median": 33.5,
-        "min": 31.4,
-        "max": 44.7,
-        "stddev": 6.050371889396554
+        "mean": 47.08,
+        "median": 43.9,
+        "min": 41.7,
+        "max": 54.6,
+        "stddev": 6.2142577996088955
       },
       "Clear rows": {
-        "mean": 4.3,
-        "median": 4.3,
-        "min": 4.3,
-        "max": 4.3,
-        "stddev": 0
+        "mean": 4.25,
+        "median": 4.25,
+        "min": 0.1,
+        "max": 8.4,
+        "stddev": 5.868986283848344
       },
       "Create 1,000 rows (2nd)": {
-        "mean": 45.74,
-        "median": 48.2,
-        "min": 32.2,
-        "max": 52.3,
-        "stddev": 7.8602162820115815
+        "mean": 51.58,
+        "median": 51.9,
+        "min": 42.7,
+        "max": 68.3,
+        "stddev": 10.374584329022534
       },
       "Update 1,000 rows": {
-        "mean": 10.64,
-        "median": 10.2,
-        "min": 7.3,
-        "max": 17.8,
-        "stddev": 4.294531406335271
+        "mean": 10.6,
+        "median": 11.35,
+        "min": 6.7,
+        "max": 13,
+        "stddev": 2.7215191835933594
       },
       "Swap rows": {
-        "mean": 0.175,
-        "median": 0.15000000000000002,
-        "min": 0.1,
-        "max": 0.3,
-        "stddev": 0.0957427107756338
+        "mean": 0.4,
+        "median": 0.4,
+        "min": 0.4,
+        "max": 0.4,
+        "stddev": 0
       },
       "Clear rows (2nd)": {
-        "mean": 14.2,
-        "median": 14.2,
-        "min": 14.2,
-        "max": 14.2,
-        "stddev": 0
+        "mean": 2.9666666666666663,
+        "median": 0.1,
+        "min": 0.1,
+        "max": 8.7,
+        "stddev": 4.965212315030781
       }
     },
     "react": {
       "Create 1,000 rows": {
-        "mean": 76.46000000000001,
-        "median": 73,
-        "min": 71.4,
-        "max": 84.9,
-        "stddev": 6.184496745896146
+        "mean": 79.78,
+        "median": 77,
+        "min": 73.6,
+        "max": 86.8,
+        "stddev": 5.628676576247741
       },
       "Clear rows": {
-        "mean": 9.0,
-        "median": 6.5,
-        "min": 5,
-        "max": 20.5,
-        "stddev": 6.46297145282261
+        "mean": 4.96,
+        "median": 1.4,
+        "min": 0.8,
+        "max": 19.6,
+        "stddev": 8.19042123458861
       },
       "Create 1,000 rows (2nd)": {
-        "mean": 73.78,
-        "median": 73.5,
-        "min": 71.3,
-        "max": 77.2,
-        "stddev": 2.2129166274399066
+        "mean": 72.96,
+        "median": 73.3,
+        "min": 65.1,
+        "max": 83.2,
+        "stddev": 7.0592492518680805
       },
       "Update 1,000 rows": {
-        "mean": 45.46,
-        "median": 48.7,
-        "min": 27.4,
-        "max": 53.5,
-        "stddev": 10.309364674896315
+        "mean": 46.16,
+        "median": 46.4,
+        "min": 42.9,
+        "max": 50.8,
+        "stddev": 3.2377461296401853
       },
       "Swap rows": {
-        "mean": 79.28,
-        "median": 79.7,
-        "min": 70,
-        "max": 87,
-        "stddev": 6.177944642031037
+        "mean": 72.22,
+        "median": 74.6,
+        "min": 61.8,
+        "max": 75.6,
+        "stddev": 5.8661742217564585
       },
       "Clear rows (2nd)": {
-        "mean": 4.68,
-        "median": 1.4,
-        "min": 1.2,
-        "max": 18.2,
-        "stddev": 7.558571293571292
+        "mean": 4.06,
+        "median": 1.7,
+        "min": 0.5,
+        "max": 15.5,
+        "stddev": 6.424017434596516
       }
     },
     "vue": {
       "Create 1,000 rows": {
-        "mean": 74.53999999999999,
-        "median": 72.3,
-        "min": 71.6,
-        "max": 84,
-        "stddev": 5.315825429789809
+        "mean": 72.7,
+        "median": 76,
+        "min": 55.2,
+        "max": 85.9,
+        "stddev": 11.639158045150861
       },
       "Clear rows": {
-        "mean": 3.18,
-        "median": 2.1,
-        "min": 1.2,
-        "max": 9,
-        "stddev": 3.288920795641026
+        "mean": 6.02,
+        "median": 6.1,
+        "min": 0.8,
+        "max": 15.4,
+        "stddev": 5.890840347522584
       },
       "Create 1,000 rows (2nd)": {
-        "mean": 86.42,
-        "median": 76.1,
-        "min": 70.8,
-        "max": 134.5,
-        "stddev": 27.015125393009008
+        "mean": 73.78,
+        "median": 75.2,
+        "min": 69.2,
+        "max": 77,
+        "stddev": 3.44267337980239
       },
       "Update 1,000 rows": {
-        "mean": 40.42,
-        "median": 32.2,
-        "min": 29.8,
-        "max": 55.5,
-        "stddev": 12.561329547464313
+        "mean": 56.12,
+        "median": 55.8,
+        "min": 53.9,
+        "max": 60,
+        "stddev": 2.386838913709931
       },
       "Swap rows": {
-        "mean": 17.04,
-        "median": 17.4,
-        "min": 14.1,
-        "max": 20.8,
-        "stddev": 2.5851498989420327
+        "mean": 15.22,
+        "median": 15.1,
+        "min": 13.3,
+        "max": 18.9,
+        "stddev": 2.268700068321063
       },
       "Clear rows (2nd)": {
-        "mean": 3.7600000000000002,
-        "median": 2.4,
-        "min": 1.3,
-        "max": 10.3,
-        "stddev": 3.6929662874172036
+        "mean": 4.575,
+        "median": 2.0,
+        "min": 1.2,
+        "max": 13.1,
+        "stddev": 5.696417002525944
       }
     }
   }
