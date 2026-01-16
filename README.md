@@ -34,14 +34,6 @@ Compiles to WASM, JS, and HTML with tiny binaries and efficient updates for DOM,
 ## Benchmarks
 
 Coi is designed for high-performance and minimal footprint. In [benchmarks](benchmark/) comparing Coi, React, and Vue:
-
-| Metric | Coi | React | Vue |
-|--------|-----|-------|-----|
-| **Bundle Size** | 21 KB ★ | 142 KB | 62 KB |
-| **Create 1,000 rows** | 37 ms ★ | 76 ms | 75 ms |
-| **Update 1,000 rows** | 11 ms ★ | 45 ms | 40 ms |
-| **Swap rows** | 0.2 ms ★ | 79 ms | 17 ms |
-
 Coi's fine-grained reactivity and minimal WASM runtime deliver smaller bundles and faster DOM updates with no Virtual DOM overhead.
 
 <p align="center">
