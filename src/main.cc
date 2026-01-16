@@ -596,7 +596,7 @@ int main(int argc, char **argv)
         // Forward declarations
         for (auto *comp : sorted_components)
         {
-            out << "class " << comp->name << ";\n";
+            out << "struct " << comp->name << ";\n";
         }
         out << "\n";
 

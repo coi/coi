@@ -50,7 +50,7 @@ std::string StructDef::to_webcc() {
 
 std::string EnumDef::to_webcc() {
     std::stringstream ss;
-    ss << "enum class " << name << " {\n";
+    ss << "enum struct " << name << " {\n";
     for(size_t i = 0; i < values.size(); i++){
         ss << "    " << values[i] << ",\n";
     }

@@ -481,9 +481,8 @@ std::string Component::to_webcc(CompilerSession &session)
         }
     }
 
-    // Generate component as a class
-    ss << "class " << name << " {\n";
-    ss << "public:\n";
+    // Generate component as a struct
+    ss << "struct " << name << " {\n";
 
     // Structs
     for (auto &s : structs)
