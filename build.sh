@@ -22,7 +22,7 @@ for arg in "$@"; do
             echo "  --help            Show this help message"
             exit 0
             ;;
-    esacs
+    esac
 done
 
 # Force rebuild webcc if requested
