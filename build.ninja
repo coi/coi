@@ -36,7 +36,7 @@ build src/coi_schema.h src/coi_schema.cc: generate_schema build/gen_schema
 # Coi Compiler source objects
 build build/obj/main.o: cxx src/main.cc || src/coi_schema.h
 build build/obj/lexer.o: cxx src/lexer.cc
-build build/obj/parser.o: cxx src/parser.cc
+build build/obj/parser.o: cxx src/parser.cc || src/coi_schema.h
 build build/obj/schema_loader.o: cxx src/schema_loader.cc || src/coi_schema.h
 build build/obj/coi_schema.o: cxx src/coi_schema.cc || src/coi_schema.h
 build build/obj/type_checker.o: cxx src/type_checker.cc || src/coi_schema.h
