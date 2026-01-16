@@ -50,11 +50,29 @@ std::string StructDef::to_webcc() {
 
 std::string EnumDef::to_webcc() {
     std::stringstream ss;
-    ss << "enum struct " << name << " {\n";
-    for(size_t i = 0; i < values.size(); i++){
-        ss << "    " << values[i] << ",\n";
+    size_t total_values = values.size() + 1; // Including _COUNT
+
+    // Explicitly select the smallest possible type for ALL sizes
+    ss << "enum struct " << name << " : ";
+    
+    if (total_values <= 256) {
+        ss << "uint8_t";
+    } else if (total_values <= 65536) {
+        ss << "uint16_t";
+    } else {
+        ss << "uint32_t"; // Fallback for massive enums
     }
+    
+    ss << " {\n";
+
+    // Generate entries
+    for (const auto& val : values) {
+        ss << "    " << val << ",\n";
+    }
+
+    // Add _COUNT and close
     ss << "    _COUNT\n";
     ss << "};\n";
+    
     return ss.str();
 }
