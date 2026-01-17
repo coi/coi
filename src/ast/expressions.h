@@ -36,6 +36,7 @@ struct StringLiteral : Expression {
     std::string to_webcc() override;
     bool is_static() override;
     void collect_dependencies(std::set<std::string>& deps) override;
+    void collect_member_dependencies(std::set<MemberDependency>& member_deps) override;
 };
 
 struct Identifier : Expression {

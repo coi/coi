@@ -438,6 +438,16 @@ std::string Component::to_webcc(CompilerSession &session)
         }
     }
 
+    // Track pub mut params (for parent notification callbacks)
+    std::set<std::string> pub_mut_params;
+    for (auto &param : params)
+    {
+        if (param->is_public && param->is_mutable)
+        {
+            pub_mut_params.insert(param->name);
+        }
+    }
+
     std::stringstream ss_render;
     for (auto &root : render_roots)
     {
@@ -496,7 +506,7 @@ std::string Component::to_webcc(CompilerSession &session)
         ss << e->to_webcc() << "\n";
     }
 
-    // Component parameters
+    // Component parameters (data members only - callbacks emitted later for proper aggregate init order)
     for (auto &param : params)
     {
         ss << "    " << convert_type(param->type);
@@ -513,14 +523,9 @@ std::string Component::to_webcc(CompilerSession &session)
             }
         }
         ss << ";\n";
-
-        if (param->is_reference && param->is_mutable)
-        {
-            ss << "    webcc::function<void()> " << make_callback_name(param->name) << ";\n";
-        }
     }
 
-    // State variables
+    // State variables (data members only - callbacks emitted later)
     for (auto &var : state)
     {
         // Special handling for array literals
@@ -539,11 +544,6 @@ std::string Component::to_webcc(CompilerSession &session)
                     if (var->is_reference)
                         ss << "&";
                     ss << " " << var->name << " = " << arr_lit->to_webcc() << ";\n";
-
-                    if (var->is_public)
-                    {
-                        ss << "    webcc::function<void()> " << make_callback_name(var->name) << ";\n";
-                    }
                 }
                 else
                 {
@@ -571,6 +571,38 @@ std::string Component::to_webcc(CompilerSession &session)
             }
         }
         ss << ";\n";
+    }
+
+    // Reactivity callbacks for params (emitted after all data members for proper aggregate init)
+    for (auto &param : params)
+    {
+        // Generate callback for reference mut params
+        if (param->is_reference && param->is_mutable)
+        {
+            ss << "    webcc::function<void()> " << make_callback_name(param->name) << ";\n";
+        }
+        // Generate callback for pub mut params (for parent-child reactivity)
+        else if (param->is_public && param->is_mutable)
+        {
+            ss << "    webcc::function<void()> " << make_callback_name(param->name) << ";\n";
+        }
+    }
+
+    // Reactivity callbacks for state variables
+    for (auto &var : state)
+    {
+        // Skip array literals that were already handled
+        if (auto arr_lit = dynamic_cast<ArrayLiteral *>(var->initializer.get()))
+        {
+            if (var->type.ends_with("[]"))
+            {
+                if (var->is_mutable && var->is_public)
+                {
+                    ss << "    webcc::function<void()> " << make_callback_name(var->name) << ";\n";
+                }
+                continue;
+            }
+        }
 
         if (var->is_public && var->is_mutable)
         {
@@ -735,7 +767,14 @@ std::string Component::to_webcc(CompilerSession &session)
                 }
             }
 
+            // Call callback for pub mut state vars
             if (pub_mut_vars.count(var_name))
+            {
+                std::string callback_name = make_callback_name(var_name);
+                ss << "        if(" << callback_name << ") " << callback_name << "();\n";
+            }
+            // Call callback for pub mut params
+            if (pub_mut_params.count(var_name))
             {
                 std::string callback_name = make_callback_name(var_name);
                 ss << "        if(" << callback_name << ") " << callback_name << "();\n";
@@ -747,6 +786,19 @@ std::string Component::to_webcc(CompilerSession &session)
 
     // Generate _update methods for pub mut variables without UI bindings
     for (const auto &var_name : pub_mut_vars)
+    {
+        if (generated_updaters.find(var_name) == generated_updaters.end())
+        {
+            std::string callback_name = make_callback_name(var_name);
+            ss << "    void _update_" << var_name << "() {\n";
+            ss << "        if(" << callback_name << ") " << callback_name << "();\n";
+            ss << "    }\n";
+            generated_updaters.insert(var_name);
+        }
+    }
+
+    // Generate _update methods for pub mut params without UI bindings
+    for (const auto &var_name : pub_mut_params)
     {
         if (generated_updaters.find(var_name) == generated_updaters.end())
         {
@@ -1290,14 +1342,30 @@ std::string Component::to_webcc(CompilerSession &session)
         }
     }
 
+    // Wire up nested component reactivity (e.g., Vector.x/y -> Ball._update_x/y)
+    for (const auto &param : params)
+    {
+        // Check if this param is a component type with pub_mut_members
+        auto it = session.component_info.find(param->type);
+        if (it != session.component_info.end() && !it->second.pub_mut_members.empty())
+        {
+            // Wire each pub_mut_member's onChange to our _update_{member}() method
+            for (const auto &member : it->second.pub_mut_members)
+            {
+                std::string callback_name = make_callback_name(member);
+                ss << "        " << param->name << "." << callback_name << " = [this]() { _update_" << member << "(); };\n";
+            }
+        }
+    }
+
     if (has_mount)
         ss << "        _user_mount();\n";
     ss << "    }\n";
 
-    // Rebind method
+    // Rebind method (always generated, even if empty, for component array reallocation)
+    ss << "    void _rebind() {\n";
     if (!event_handlers.empty())
     {
-        ss << "    void _rebind() {\n";
         if (masks.click)
         {
             emit_event_registration(ss, element_count, event_handlers, "click", "_click_mask", "g_dispatcher", "", "");
@@ -1314,8 +1382,23 @@ std::string Component::to_webcc(CompilerSession &session)
         {
             emit_event_registration(ss, element_count, event_handlers, "keydown", "_keydown_mask", "g_keydown_dispatcher", "int k", "k");
         }
-        ss << "    }\n";
     }
+    
+    // Re-wire nested component reactivity after reallocation
+    for (const auto &param : params)
+    {
+        auto it = session.component_info.find(param->type);
+        if (it != session.component_info.end() && !it->second.pub_mut_members.empty())
+        {
+            for (const auto &member : it->second.pub_mut_members)
+            {
+                std::string callback_name = make_callback_name(member);
+                ss << "        " << param->name << "." << callback_name << " = [this]() { _update_" << member << "(); };\n";
+            }
+        }
+    }
+    
+    ss << "    }\n";
 
     // Destroy method
     ss << "    void _destroy() {\n";

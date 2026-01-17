@@ -54,7 +54,10 @@ std::string VarDeclaration::to_webcc()
         }
     }
 
-    std::string result = (is_mutable ? "" : "const ") + convert_type(type);
+    // Don't make component types const by default (they need to call mutating methods on members)
+    // Component types start with uppercase and are not handles
+    bool is_component = !type.empty() && std::isupper(type[0]) && !type.ends_with("[]") && !SchemaLoader::instance().is_handle(type);
+    std::string result = (is_mutable || is_component ? "" : "const ") + convert_type(type);
     if (is_reference)
         result += "&";
     result += " " + name;
@@ -260,7 +263,7 @@ std::string ExpressionStatement::to_webcc()
                     result += arr_name + ".push_back(" + item_expr + ");\n";
                     // Only render view if parent container exists (not during init)
                     result += "if (" + parent_var + ".is_valid()) {\n";
-                    // Rebind all existing items in case vector reallocated
+                    // (IMPORTANT!!!) Rebind all existing items in case vector reallocated
                     result += "    for (int _i = 0; _i < _old_count; _i++) " + arr_name + "[_i]._rebind();\n";
                     result += "    auto& " + var + " = " + arr_name + "[" + arr_name + ".size() - 1];\n";
                     // Inject the item creation code (callback bindings + view call)

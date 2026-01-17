@@ -12,9 +12,15 @@
 struct Expression;
 struct Statement;
 
+// Info about a component's pub mut members (for parent-child reactivity wiring)
+struct ComponentMemberInfo {
+    std::set<std::string> pub_mut_members;  // Names of pub mut params (e.g., "x", "y" for Vector)
+};
+
 // Cross-component state that persists across all components in one compilation
 struct CompilerSession {
     std::set<std::string> components_with_tick;  // Components that have tick methods
+    std::map<std::string, ComponentMemberInfo> component_info;  // Component name -> member info
 };
 
 // Represents a dependency on a member of an object (e.g., net.connected)

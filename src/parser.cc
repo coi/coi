@@ -218,6 +218,7 @@ std::unique_ptr<Expression> Parser::parse_primary(){
     // Identifer or function call (also allow 'key' keyword as identifier)
     if(current().type == TokenType::IDENTIFIER || current().type == TokenType::KEY){
         std::string name = current().value;
+        int identifier_line = current().line;
         advance();
         
         // Check for enum access: EnumName::Value
@@ -285,6 +286,7 @@ std::unique_ptr<Expression> Parser::parse_primary(){
                 } else {
                     // Regular function call with positional arguments
                     auto call = std::make_unique<FunctionCall>(expr->to_webcc());
+                    call->line = identifier_line;
                     
                     while(current().type != TokenType::RPAREN){
                         call->args.push_back(parse_expression());

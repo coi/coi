@@ -233,6 +233,15 @@ void collect_component_deps(ASTNode *node, std::set<std::string> &deps)
     }
 }
 
+// Extract base type name from array types (e.g., "Ball[]" -> "Ball")
+static std::string extract_base_type_name(const std::string& type) {
+    size_t bracket = type.find('[');
+    if (bracket != std::string::npos) {
+        return type.substr(0, bracket);
+    }
+    return type;
+}
+
 // Topologically sort components so dependencies come first
 std::vector<Component *> topological_sort_components(std::vector<Component> &components)
 {
@@ -250,9 +259,26 @@ std::vector<Component *> topological_sort_components(std::vector<Component> &com
     for (auto &comp : components)
     {
         std::set<std::string> deps;
+        // Collect dependencies from view
         for (const auto &root : comp.render_roots)
         {
             collect_component_deps(root.get(), deps);
+        }
+        // Collect dependencies from parameter types (e.g., Vector pos)
+        for (const auto &param : comp.params)
+        {
+            std::string base_type = extract_base_type_name(param->type);
+            if (comp_map.count(base_type)) {
+                deps.insert(base_type);
+            }
+        }
+        // Collect dependencies from state variable types
+        for (const auto &var : comp.state)
+        {
+            std::string base_type = extract_base_type_name(var->type);
+            if (comp_map.count(base_type)) {
+                deps.insert(base_type);
+            }
         }
         dependencies[comp.name] = deps;
     }
@@ -546,6 +572,7 @@ int main(int argc, char **argv)
         out << "#include \"webcc/core/new.h\"\n";
         out << "#include \"webcc/core/array.h\"\n";
         out << "#include \"webcc/core/vector.h\"\n\n";
+        out << "#include \"webcc/core/random.h\"\n\n";
 
         // Generic event dispatcher template
         out << "template<typename Callback, int MaxListeners = 64>\n";
@@ -596,6 +623,20 @@ int main(int argc, char **argv)
 
         // Create compiler session for cross-component state
         CompilerSession session;
+
+        // Populate component info for parent-child reactivity wiring
+        for (auto *comp : sorted_components)
+        {
+            ComponentMemberInfo info;
+            for (const auto& param : comp->params)
+            {
+                if (param->is_public && param->is_mutable)
+                {
+                    info.pub_mut_members.insert(param->name);
+                }
+            }
+            session.component_info[comp->name] = info;
+        }
 
         // Output global enums (defined outside components)
         for (const auto& enum_def : all_global_enums) {

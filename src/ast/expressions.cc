@@ -127,6 +127,40 @@ void StringLiteral::collect_dependencies(std::set<std::string>& deps) {
     }
 }
 
+void StringLiteral::collect_member_dependencies(std::set<MemberDependency>& member_deps) {
+    auto parts = parse();
+    for(auto& p : parts) {
+        if(p.is_expr) {
+            // Parse expressions like "pos.x" to extract object.member pairs
+            std::string expr = p.content;
+            size_t pos = 0;
+            while (pos < expr.length()) {
+                // Skip non-identifier chars
+                while (pos < expr.length() && !isalnum(expr[pos]) && expr[pos] != '_') pos++;
+                if (pos >= expr.length()) break;
+                
+                // Extract identifier
+                std::string obj;
+                while (pos < expr.length() && (isalnum(expr[pos]) || expr[pos] == '_')) {
+                    obj += expr[pos++];
+                }
+                
+                // Check if followed by '.'
+                if (pos < expr.length() && expr[pos] == '.') {
+                    pos++; // skip '.'
+                    std::string member;
+                    while (pos < expr.length() && (isalnum(expr[pos]) || expr[pos] == '_')) {
+                        member += expr[pos++];
+                    }
+                    if (!obj.empty() && !member.empty() && !isdigit(obj[0])) {
+                        member_deps.insert({obj, member});
+                    }
+                }
+            }
+        }
+    }
+}
+
 std::string Identifier::to_webcc() { 
     if(g_ref_props.count(name)) {
         return "(*" + name + ")";
@@ -169,6 +203,16 @@ std::string FunctionCall::args_to_string() {
 }
 
 std::string FunctionCall::to_webcc() {
+    // Handle System.random() - built-in wasm random number generator
+    if (name == "System.random") {
+        if (args.empty()) {
+            return "webcc::random()";
+        } else if (args.size() == 1) {
+            // Seed and return random: random_seed(seed); return random()
+            return "(webcc::random_seed(" + args[0]->to_webcc() + "), webcc::random())";
+        }
+    }
+    
     // Handle Input state methods (isKeyDown, isKeyUp, isMouseDown, etc.)
     {
         size_t dot_pos = name.rfind('.');

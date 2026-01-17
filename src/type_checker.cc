@@ -23,6 +23,15 @@ static bool is_enum_type(const std::string &t) {
     return false;
 }
 
+// Convert normalized type back to user-friendly display name for error messages
+static std::string display_type_name(const std::string &normalized_type)
+{
+    if (normalized_type == "int32") return "int";
+    if (normalized_type == "float64") return "float";
+    // float32 stays as float32 (explicit)
+    return normalized_type;
+}
+
 std::string normalize_type(const std::string &type)
 {
     // Handle Component.EnumName type syntax - extract just the enum name for comparison
@@ -251,7 +260,7 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
             }
             if (operand_type != "unknown")
             {
-                std::cerr << "Error: Unary '" << unary->op << "' operator requires numeric type, got '"
+                std::cerr << "\033[1;31mError:\033[0m Unary '" << unary->op << "' operator requires numeric type, got '"
                           << operand_type << "' at line " << unary->line << std::endl;
                 exit(1);
             }
@@ -367,6 +376,64 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                         }
                     }
                 }
+                else
+                {
+                    // obj_name is NOT in scope - it's a type name or namespace
+                    // Check if this is a valid static call
+                    
+                    bool is_valid_call = false;
+                    
+                    // Check if obj_name is a known handle type
+                    bool is_handle_type = SchemaLoader::instance().is_handle(obj_name);
+                    
+                    if (!entry->params.empty() && SchemaLoader::instance().is_handle(entry->params[0].type))
+                    {
+                        // Method expects a handle as first param (instance method)
+                        // Only allow if obj_name matches the expected handle type
+                        if (is_handle_type && is_compatible_type(obj_name, entry->params[0].type))
+                        {
+                            // Valid: DOMElement.createElement() where first param is DOMElement
+                            is_valid_call = true;
+                        }
+                        else
+                        {
+                            // Invalid: trying to call instance method statically with wrong type
+                            std::cerr << "\033[1;31mError:\033[0m '" << method_name << "' is an instance method on '" 
+                                      << entry->params[0].type << "' and cannot be called on '" << obj_name 
+                                      << "'. Use instance." << method_name << "(...) instead at line " << func->line << std::endl;
+                            exit(1);
+                        }
+                    }
+                    else
+                    {
+                        // True static method (no handle as first param)
+                        // Two valid cases:
+                        // 1. Called via namespace: namespace.method() where obj_name matches entry->ns
+                        // 2. Called via handle type: HandleType.method() where return type matches handle type
+                        //    This supports "shared def" pattern (static factory methods)
+                        std::string expected_ns = obj_name;
+                        std::transform(expected_ns.begin(), expected_ns.end(), expected_ns.begin(), ::tolower);
+                        
+                        if (entry->ns == expected_ns)
+                        {
+                            // Case 1: namespace.method()
+                            is_valid_call = true;
+                        }
+                        else if (is_handle_type && !entry->return_type.empty() && 
+                                 is_compatible_type(entry->return_type, obj_name))
+                        {
+                            // Case 2: HandleType.method() where method returns that handle type
+                            // This is a "shared def" / static factory method pattern
+                            is_valid_call = true;
+                        }
+                        else
+                        {
+                            std::cerr << "\033[1;31mError:\033[0m Method '" << method_name << "' does not belong to '" 
+                                      << obj_name << "'. It belongs to the '" << entry->ns << "' namespace at line " << func->line << std::endl;
+                            exit(1);
+                        }
+                    }
+                }
             }
 
             if (implicit_obj)
@@ -376,8 +443,8 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
 
             if (actual_args != (expected_args - param_offset))
             {
-                std::cerr << "Error: Function '" << full_name << "' expects " << (expected_args - param_offset)
-                          << " arguments but got " << actual_args << " line " << func->line << std::endl;
+                std::cerr << "\033[1;31mError:\033[0m Function '" << full_name << "' expects " << (expected_args - param_offset)
+                          << " arguments but got " << actual_args << " at line " << func->line << std::endl;
                 exit(1);
             }
 
@@ -388,8 +455,8 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
 
                 if (!is_compatible_type(arg_type, expected_type))
                 {
-                    std::cerr << "Error: Argument " << (i + 1) << " of '" << full_name << "' expects '" << expected_type
-                              << "' but got '" << arg_type << "' line " << func->line << std::endl;
+                    std::cerr << "\033[1;31mError:\033[0m Argument " << (i + 1) << " of '" << full_name << "' expects '" << expected_type
+                              << "' but got '" << arg_type << "' at line " << func->line << std::endl;
                     exit(1);
                 }
             }
@@ -403,7 +470,7 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                 std::string type = scope.at(obj_name);
                 if (SchemaLoader::instance().is_handle(type))
                 {
-                    std::cerr << "Error: Method '" << method_name << "' not found for type '" << type << "' line " << func->line << std::endl;
+                    std::cerr << "\033[1;31mError:\033[0m Method '" << method_name << "' not found for type '" << type << "' at line " << func->line << std::endl;
                     exit(1);
                 }
             }
@@ -583,7 +650,7 @@ void validate_types(const std::vector<Component> &components, const std::vector<
                         std::string init = infer_expression_type(decl->initializer.get(), current_scope);
                         if (init != "unknown" && !is_compatible_type(init, type))
                         {
-                            std::cerr << "Error: Variable '" << decl->name << "' expects '" << type << "' but got '" << init << "' line " << decl->line << std::endl;
+                    std::cerr << "\033[1;31mError:\033[0m Variable '" << decl->name << "' expects '" << type << "' but got '" << init << "' at line " << decl->line << std::endl;
                             exit(1);
                         }
                     }
@@ -601,7 +668,7 @@ void validate_types(const std::vector<Component> &components, const std::vector<
                     {
                         if (!is_compatible_type(val_type, var_type))
                         {
-                            std::cerr << "Error: Assigning '" << val_type << "' to '" << assign->name << "' of type '" << var_type << "' line " << assign->line << std::endl;
+                            std::cerr << "\033[1;31mError:\033[0m Assigning '" << val_type << "' to '" << assign->name << "' of type '" << var_type << "' at line " << assign->line << std::endl;
                             exit(1);
                         }
                     }
@@ -1009,35 +1076,54 @@ void validate_view_hierarchy(const std::vector<Component> &components)
         }
         else if (auto *el = dynamic_cast<HTMLElement *>(node))
         {
-            // Validate event handler parameter types
+            // Validate attribute types
             for (const auto &attr : el->attributes)
             {
-                // oninput/onchange/onkeydown pass a string to the handler
-                if (attr.name == "oninput" || attr.name == "onchange" || attr.name == "onkeydown")
+                // Check if this is an event handler (starts with "on")
+                bool is_event_handler = attr.name.size() > 2 && attr.name[0] == 'o' && attr.name[1] == 'n';
+                
+                if (is_event_handler)
                 {
-                    std::string handler_name;
-                    if (auto *func = dynamic_cast<FunctionCall *>(attr.value.get()))
-                        handler_name = func->name;
-                    else if (auto *id = dynamic_cast<Identifier *>(attr.value.get()))
-                        handler_name = id->name;
-                    
-                    if (!handler_name.empty() && scope.count(handler_name))
+                    // Validate event handler parameter types
+                    // oninput/onchange pass a string, onkeydown passes an int (keycode)
+                    if (attr.name == "oninput" || attr.name == "onchange" || attr.name == "onkeydown")
                     {
-                        std::string sig = scope.at(handler_name);
-                        // sig format: "method(param_types):return_type"
-                        if (sig.starts_with("method(") && sig.find("):") != std::string::npos)
+                        std::string handler_name;
+                        if (auto *func = dynamic_cast<FunctionCall *>(attr.value.get()))
+                            handler_name = func->name;
+                        else if (auto *id = dynamic_cast<Identifier *>(attr.value.get()))
+                            handler_name = id->name;
+                        
+                        if (!handler_name.empty() && scope.count(handler_name))
                         {
-                            std::string params = sig.substr(7, sig.find("):") - 7);
-                            if (params.empty())
-                                throw std::runtime_error("Event '" + attr.name + "' handler '" + handler_name + 
-                                    "' needs 1 string parameter at line " + std::to_string(el->line));
-                            if (params.find(',') != std::string::npos)
-                                throw std::runtime_error("Event '" + attr.name + "' handler '" + handler_name + 
-                                    "' should have 1 parameter, not multiple at line " + std::to_string(el->line));
-                            if (!is_compatible_type("string", normalize_type(params)))
-                                throw std::runtime_error("Event '" + attr.name + "' handler '" + handler_name + 
-                                    "' parameter must be string, not '" + params + "' at line " + std::to_string(el->line));
+                            std::string sig = scope.at(handler_name);
+                            // sig format: "method(param_types):return_type"
+                            if (sig.starts_with("method(") && sig.find("):") != std::string::npos)
+                            {
+                                std::string params = sig.substr(7, sig.find("):") - 7);
+                                std::string expected_type = (attr.name == "onkeydown") ? "int32" : "string";
+                                
+                                if (params.empty())
+                                    throw std::runtime_error("Event '" + attr.name + "' handler '" + handler_name + 
+                                        "' needs 1 " + expected_type + " parameter at line " + std::to_string(el->line));
+                                if (params.find(',') != std::string::npos)
+                                    throw std::runtime_error("Event '" + attr.name + "' handler '" + handler_name + 
+                                        "' should have 1 parameter, not multiple at line " + std::to_string(el->line));
+                                if (!is_compatible_type(expected_type, normalize_type(params)))
+                                    throw std::runtime_error("Event '" + attr.name + "' handler '" + handler_name + 
+                                        "' parameter must be " + expected_type + ", not '" + params + "' at line " + std::to_string(el->line));
+                            }
                         }
+                    }
+                }
+                else
+                {
+                    // Non-event attributes must be strings
+                    std::string attr_type = normalize_type(infer_expression_type(attr.value.get(), scope));
+                    if (attr_type != "string" && attr_type != "unknown")
+                    {
+                        throw std::runtime_error("HTML attribute '" + attr.name + "' requires string, got '" + 
+                            display_type_name(attr_type) + "'. Use \"{" + attr.value->to_webcc() + "}\" at line " + std::to_string(el->line));
                     }
                 }
             }
