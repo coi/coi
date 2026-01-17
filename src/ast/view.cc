@@ -431,6 +431,7 @@ void HTMLElement::generate_code(std::stringstream &ss, const std::string &parent
                 b.value_code = val;
                 b.expr = attr.value.get();
                 attr.value->collect_dependencies(b.dependencies);
+                attr.value->collect_member_dependencies(b.member_dependencies);
                 bindings.push_back(b);
             }
         }
@@ -543,8 +544,10 @@ void HTMLElement::generate_code(std::stringstream &ss, const std::string &parent
                 first = false;
             }
             b.value_code = (children.size() == 1) ? children[0]->to_webcc() : "webcc::string::concat(" + args + ")";
-            for (auto &child : children)
+            for (auto &child : children) {
                 child->collect_dependencies(b.dependencies);
+                child->collect_member_dependencies(b.member_dependencies);
+            }
             bindings.push_back(b);
         }
     }

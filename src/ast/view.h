@@ -28,6 +28,7 @@ struct Binding {
     std::string name;            // attribute name
     std::string value_code;
     std::set<std::string> dependencies;
+    std::set<MemberDependency> member_dependencies;  // tracks object.member pairs
     Expression* expr = nullptr;
     int if_region_id = -1;
     bool in_then_branch = true;
