@@ -69,21 +69,71 @@ std::string to_coi_type(const std::string& type, const std::string& handle_type)
 
 int main() {
     std::set<std::string> handles;
+    std::map<std::string, std::string> type_to_ns;  // Type name -> namespace (e.g., "DOMElement" -> "dom")
 
     // Force rebuild by touching this file
     std::cout << "[Coi] Regenerating schema..." << std::endl;
 
-    // Collect all handle types from commands
+    // Collect all handle types from commands and map them to namespaces
     for (const auto* c = webcc::SCHEMA_COMMANDS; !c->ns.empty(); ++c) {
         // Check return handle type
         if (!c->return_handle_type.empty()) {
             handles.insert(c->return_handle_type);
+            // Map handle type to namespace (first occurrence wins)
+            if (type_to_ns.find(c->return_handle_type) == type_to_ns.end()) {
+                type_to_ns[c->return_handle_type] = c->ns;
+            }
         }
-        // Check param handle types
-        for (const auto& p : c->params) {
+        // Check param handle types - if first param is a handle, map it to this namespace
+        for (size_t i = 0; i < c->params.size(); ++i) {
+            const auto& p = c->params[i];
             if (!p.handle_type.empty()) {
                 handles.insert(p.handle_type);
+                // First param handle type defines the receiver type for instance methods
+                if (i == 0 && type_to_ns.find(p.handle_type) == type_to_ns.end()) {
+                    type_to_ns[p.handle_type] = c->ns;
+                }
             }
+        }
+    }
+    
+    // Add utility/static-only namespaces as types (e.g., System -> system, Input -> input)
+    // These are namespaces that have functions but NO associated handle types
+    // Don't add for namespaces like "dom" which have DOMElement, "canvas" which has Canvas, etc.
+    std::set<std::string> namespaces_with_funcs;
+    std::set<std::string> namespaces_with_handles;  // Namespaces that have handle types
+    for (const auto* c = webcc::SCHEMA_COMMANDS; !c->ns.empty(); ++c) {
+        namespaces_with_funcs.insert(c->ns);
+        // If this command has handle types, mark the namespace as having handles
+        if (!c->return_handle_type.empty()) {
+            namespaces_with_handles.insert(c->ns);
+        }
+        for (const auto& p : c->params) {
+            if (!p.handle_type.empty()) {
+                namespaces_with_handles.insert(c->ns);
+            }
+        }
+    }
+    
+    // Helper to capitalize first letter
+    auto capitalize = [](const std::string& s) -> std::string {
+        if (s.empty()) return s;
+        std::string result = s;
+        result[0] = std::toupper(result[0]);
+        return result;
+    };
+    
+    // For utility-only namespaces (no handles), add capitalized name as a type
+    // e.g., System -> system, Storage -> storage, Input -> input
+    // But NOT Dom -> dom (because dom has DOMElement)
+    for (const auto& ns : namespaces_with_funcs) {
+        // Skip namespaces that have handle types - users must use the handle type name
+        if (namespaces_with_handles.count(ns)) {
+            continue;
+        }
+        std::string type_name = capitalize(ns);
+        if (type_to_ns.find(type_name) == type_to_ns.end()) {
+            type_to_ns[type_name] = ns;
         }
     }
 
@@ -139,6 +189,10 @@ extern const size_t HANDLE_COUNT;
 // Handle inheritance: maps derived type -> base type
 // e.g., Canvas -> DOMElement means Canvas can be used where DOMElement is expected
 extern const std::pair<const char*, const char*> HANDLE_INHERITANCE[];
+
+// Type to namespace mapping: maps type names (e.g., "DOMElement", "System") to their namespace
+// This allows validation of Type.method() calls (e.g., DOMElement.getBody() -> dom::get_body)
+extern const std::pair<const char*, const char*> TYPE_TO_NAMESPACE[];
 
 } // namespace coi
 )";
@@ -207,10 +261,19 @@ const SchemaEntry SCHEMA[] = {
         out << "    { nullptr, nullptr }\n";
         out << "};\n\n";
 
+        // Generate type-to-namespace mapping
+        out << "const std::pair<const char*, const char*> TYPE_TO_NAMESPACE[] = {\n";
+        for (const auto& [type_name, ns] : type_to_ns) {
+            out << "    { \"" << type_name << "\", \"" << ns << "\" },\n";
+        }
+        out << "    { nullptr, nullptr }\n";
+        out << "};\n\n";
+
         out << "} // namespace coi\n";
         out.close();
         
-        std::cout << "[Coi] Generated coi_schema.h and coi_schema.cc with " << count << " entries and " << handles.size() << " handles" << std::endl;
+        std::cout << "[Coi] Generated coi_schema.h and coi_schema.cc with " << count << " entries, " 
+                  << handles.size() << " handles, and " << type_to_ns.size() << " type mappings" << std::endl;
     }
 
     // =========================================================
@@ -268,14 +331,6 @@ const SchemaEntry SCHEMA[] = {
     struct MethodInfo {
         const webcc::SchemaCommand* cmd;
         std::string receiver_type;  // Empty if standalone function
-    };
-    
-    // Helper to capitalize first letter
-    auto capitalize = [](const std::string& s) -> std::string {
-        if (s.empty()) return s;
-        std::string result = s;
-        result[0] = std::toupper(result[0]);
-        return result;
     };
     
     // Generate a .coi file for each namespace

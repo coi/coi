@@ -641,59 +641,149 @@ std::string Component::to_webcc(CompilerSession &session)
     };
     std::map<std::string, std::vector<UpdateEntry>> var_update_entries;
 
+    // Group bindings by element+attribute to generate shared update methods
+    struct ElementAttrKey
+    {
+        int element_id;
+        std::string type;  // "attr" or "text"
+        std::string name;  // attribute name (or "" for text)
+        int if_region_id;
+        bool in_then_branch;
+        
+        bool operator<(const ElementAttrKey &other) const
+        {
+            if (element_id != other.element_id) return element_id < other.element_id;
+            if (type != other.type) return type < other.type;
+            if (name != other.name) return name < other.name;
+            if (if_region_id != other.if_region_id) return if_region_id < other.if_region_id;
+            return in_then_branch < other.in_then_branch;
+        }
+    };
+    
+    struct ElementAttrBinding
+    {
+        std::string update_code;
+        std::set<std::string> dependencies;
+        std::string method_name;
+    };
+    
+    std::map<ElementAttrKey, ElementAttrBinding> element_attr_bindings;
+
+    // Collect bindings grouped by element+attribute
     for (const auto &binding : bindings)
     {
-        for (const auto &dep : binding.dependencies)
+        ElementAttrKey key;
+        key.element_id = binding.element_id;
+        key.type = binding.type;
+        key.name = binding.name;
+        key.if_region_id = binding.if_region_id;
+        key.in_then_branch = binding.in_then_branch;
+        
+        std::string el_var = "el[" + std::to_string(binding.element_id) + "]";
+        std::string update_line;
+        std::string dom_call = (binding.type == "attr")
+                                   ? "webcc::dom::set_attribute(" + el_var + ", \"" + binding.name + "\", "
+                                   : "webcc::dom::set_inner_text(" + el_var + ", ";
+
+        bool optimized = false;
+        if (binding.expr)
         {
-            std::string el_var = "el[" + std::to_string(binding.element_id) + "]";
-            std::string update_line;
-            std::string dom_call = (binding.type == "attr")
-                                       ? "webcc::dom::set_attribute(" + el_var + ", \"" + binding.name + "\", "
-                                       : "webcc::dom::set_inner_text(" + el_var + ", ";
-
-            bool optimized = false;
-            if (binding.expr)
+            if (auto strLit = dynamic_cast<StringLiteral *>(binding.expr))
             {
-                if (auto strLit = dynamic_cast<StringLiteral *>(binding.expr))
-                {
-                    update_line = generate_formatter_block_from_string_literal(strLit, dom_call);
-                    optimized = true;
-                }
-            }
-
-            if (!optimized && binding.value_code.find("webcc::string::concat(") == 0)
-            {
-                std::string args_str = binding.value_code.substr(22);
-                if (!args_str.empty() && args_str.back() == ')')
-                    args_str.pop_back();
-
-                std::vector<std::string> args = parse_concat_args(args_str);
-                update_line = generate_formatter_block(args, dom_call);
+                update_line = generate_formatter_block_from_string_literal(strLit, dom_call);
                 optimized = true;
             }
+        }
 
-            if (!optimized)
+        if (!optimized && binding.value_code.find("webcc::string::concat(") == 0)
+        {
+            std::string args_str = binding.value_code.substr(22);
+            if (!args_str.empty() && args_str.back() == ')')
+                args_str.pop_back();
+
+            std::vector<std::string> args = parse_concat_args(args_str);
+            update_line = generate_formatter_block(args, dom_call);
+            optimized = true;
+        }
+
+        if (!optimized)
+        {
+            bool is_string_literal = !binding.value_code.empty() && binding.value_code.front() == '"';
+            if (is_string_literal)
             {
-                bool is_string_literal = !binding.value_code.empty() && binding.value_code.front() == '"';
-                if (is_string_literal)
-                {
-                    update_line = dom_call + binding.value_code + ");";
-                }
-                else
-                {
-                    update_line = generate_formatter_block({binding.value_code}, dom_call);
-                }
+                update_line = dom_call + binding.value_code + ");";
             }
-
-            if (!update_line.empty())
+            else
             {
-                UpdateEntry entry;
-                entry.code = update_line;
-                entry.if_region_id = binding.if_region_id;
-                entry.in_then_branch = binding.in_then_branch;
-                var_update_entries[dep].push_back(entry);
+                update_line = generate_formatter_block({binding.value_code}, dom_call);
             }
         }
+
+        if (!update_line.empty())
+        {
+            element_attr_bindings[key].update_code = update_line;
+            for (const auto &dep : binding.dependencies)
+            {
+                element_attr_bindings[key].dependencies.insert(dep);
+            }
+        }
+    }
+    
+    // Generate shared element+attribute update methods
+    int shared_update_counter = 0;
+    for (auto &[key, binding] : element_attr_bindings)
+    {
+        std::string method_name;
+        if (key.type == "attr" && !key.name.empty())
+        {
+            method_name = "_update_el" + std::to_string(key.element_id) + "_" + key.name;
+        }
+        else if (key.type == "text")
+        {
+            method_name = "_update_el" + std::to_string(key.element_id) + "_text";
+        }
+        else
+        {
+            method_name = "_update_shared_" + std::to_string(shared_update_counter++);
+        }
+        
+        binding.method_name = method_name;
+        
+        // Add this shared method to each dependency's update list
+        for (const auto &dep : binding.dependencies)
+        {
+            UpdateEntry entry;
+            entry.code = method_name + "();";
+            entry.if_region_id = key.if_region_id;
+            entry.in_then_branch = key.in_then_branch;
+            var_update_entries[dep].push_back(entry);
+        }
+    }
+    
+    // Generate shared element+attribute update methods first
+    for (const auto &[key, binding] : element_attr_bindings)
+    {
+        ss << "    void " << binding.method_name << "() {\n";
+        if (key.if_region_id < 0)
+        {
+            ss << "        " << binding.update_code << "\n";
+        }
+        else
+        {
+            if (key.in_then_branch)
+            {
+                ss << "        if (_if_" << key.if_region_id << "_state) {\n";
+                ss << "            " << binding.update_code << "\n";
+                ss << "        }\n";
+            }
+            else
+            {
+                ss << "        if (!_if_" << key.if_region_id << "_state) {\n";
+                ss << "            " << binding.update_code << "\n";
+                ss << "        }\n";
+            }
+        }
+        ss << "    }\n";
     }
 
     // Generate _update_{varname}() methods
@@ -704,26 +794,32 @@ std::string Component::to_webcc(CompilerSession &session)
         {
             ss << "    void _update_" << var_name << "() {\n";
 
+            // Deduplicate entries outside if regions
+            std::set<std::string> non_if_calls;
             for (const auto &entry : entries)
             {
                 if (entry.if_region_id < 0)
                 {
-                    ss << "        " << entry.code << "\n";
+                    non_if_calls.insert(entry.code);
                 }
             }
+            for (const auto &code : non_if_calls)
+            {
+                ss << "        " << code << "\n";
+            }
 
-            std::map<int, std::pair<std::vector<std::string>, std::vector<std::string>>> if_grouped;
+            std::map<int, std::pair<std::set<std::string>, std::set<std::string>>> if_grouped;
             for (const auto &entry : entries)
             {
                 if (entry.if_region_id >= 0)
                 {
                     if (entry.in_then_branch)
                     {
-                        if_grouped[entry.if_region_id].first.push_back(entry.code);
+                        if_grouped[entry.if_region_id].first.insert(entry.code);
                     }
                     else
                     {
-                        if_grouped[entry.if_region_id].second.push_back(entry.code);
+                        if_grouped[entry.if_region_id].second.insert(entry.code);
                     }
                 }
             }

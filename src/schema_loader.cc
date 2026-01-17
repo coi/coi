@@ -19,6 +19,10 @@ void SchemaLoader::init() {
     for (const auto* kv = coi::HANDLE_INHERITANCE; kv->first != nullptr; ++kv) {
         handle_inheritance_[kv->first] = kv->second;
     }
+    // Load type-to-namespace mapping
+    for (const auto* kv = coi::TYPE_TO_NAMESPACE; kv->first != nullptr; ++kv) {
+        type_to_ns_[kv->first] = kv->second;
+    }
 }
 
 const coi::SchemaEntry* SchemaLoader::lookup(const std::string& func_name) const {
@@ -31,6 +35,14 @@ const coi::SchemaEntry* SchemaLoader::lookup(const std::string& func_name) const
 
 bool SchemaLoader::is_handle(const std::string& type) const {
     return handles_.count(type) > 0;  
+}
+
+std::string SchemaLoader::get_namespace_for_type(const std::string& type_name) const {
+    auto it = type_to_ns_.find(type_name);
+    if (it != type_to_ns_.end()) {
+        return it->second;
+    }
+    return "";
 }
 
 bool SchemaLoader::is_assignable_to(const std::string& derived, const std::string& base) const {

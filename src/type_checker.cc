@@ -234,6 +234,17 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
     // Member access type inference (e.g., obj.field)
     if (auto member = dynamic_cast<MemberAccess *>(expr))
     {
+        // First check if the object identifier exists in scope
+        if (auto id = dynamic_cast<Identifier *>(member->object.get()))
+        {
+            if (scope.find(id->name) == scope.end())
+            {
+                std::cerr << "\033[1;31mError:\033[0m Undefined variable '" << id->name 
+                          << "' in member access at line " << member->line << std::endl;
+                exit(1);
+            }
+        }
+        
         std::string obj_type = infer_expression_type(member->object.get(), scope);
         if (obj_type == "unknown")
             return "unknown";
@@ -319,6 +330,57 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
         {
             obj_name = full_name.substr(0, dot_pos);
             method_name = full_name.substr(dot_pos + 1);
+            
+            // Only validate simple identifiers (not complex expressions like array access)
+            // Complex expressions like balls[i] contain brackets, so skip those
+            bool is_simple_identifier = (obj_name.find('[') == std::string::npos) && 
+                                       (obj_name.find('(') == std::string::npos);
+            
+            if (is_simple_identifier && !obj_name.empty() && scope.find(obj_name) == scope.end())
+            {
+                // Check if it's a handle type or enum - those are validated by schema lookup below
+                bool is_handle = SchemaLoader::instance().is_handle(obj_name);
+                bool is_enum = is_enum_type(obj_name);
+                
+                // Check if obj_name is a valid type with a namespace mapping (e.g., DOMElement -> dom, System -> system)
+                // Also walk the inheritance chain (e.g., Canvas -> DOMElement means check canvas:: then dom::)
+                std::string snake_method = SchemaLoader::to_snake_case(method_name);
+                bool is_valid_schema_call = false;
+                
+                std::string current_type = obj_name;
+                while (!current_type.empty() && !is_valid_schema_call) {
+                    std::string type_ns = SchemaLoader::instance().get_namespace_for_type(current_type);
+                    if (!type_ns.empty()) {
+                        const auto *entry = SchemaLoader::instance().lookup(snake_method);
+                        if (entry && entry->ns == type_ns) {
+                            is_valid_schema_call = true;
+                            break;
+                        }
+                    }
+                    // Walk up inheritance chain (e.g., Canvas -> DOMElement)
+                    // Check if current_type has a parent in HANDLE_INHERITANCE
+                    std::string parent_type;
+                    if (SchemaLoader::instance().is_handle(current_type)) {
+                        // Try to find parent - is_assignable_to won't help directly, 
+                        // we need to check inheritance table
+                        for (const auto* kv = coi::HANDLE_INHERITANCE; kv->first != nullptr; ++kv) {
+                            if (current_type == kv->first) {
+                                parent_type = kv->second;
+                                break;
+                            }
+                        }
+                    }
+                    current_type = parent_type;
+                }
+                
+                // If not in scope and not a handle/enum/schema-namespace, it's undefined
+                if (!is_handle && !is_enum && !is_valid_schema_call)
+                {
+                    std::cerr << "\033[1;31mError:\033[0m Undefined variable '" << obj_name 
+                              << "' in method call at line " << func->line << std::endl;
+                    exit(1);
+                }
+            }
         }
 
         // Handle array/vector/string methods BEFORE schema lookup
