@@ -353,6 +353,20 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                     if (!type_ns.empty()) {
                         const auto *entry = SchemaLoader::instance().lookup(snake_method);
                         if (entry && entry->ns == type_ns) {
+                            // Found method in this namespace - but is it callable statically?
+                            // Instance methods have a handle as first param and can't be called on the type name
+                            bool is_instance_method = !entry->params.empty() && 
+                                                      SchemaLoader::instance().is_handle(entry->params[0].type);
+                            
+                            if (is_instance_method) {
+                                // Instance method called statically - error with helpful message
+                                std::cerr << "\033[1;31mError:\033[0m '" << method_name 
+                                          << "' is an instance method on '" << entry->params[0].type 
+                                          << "' and cannot be called on '" << obj_name 
+                                          << "'. Use instance." << method_name << "(...) instead at line " 
+                                          << func->line << std::endl;
+                                exit(1);
+                            }
                             is_valid_schema_call = true;
                             break;
                         }
