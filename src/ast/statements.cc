@@ -39,17 +39,27 @@ std::string VarDeclaration::to_webcc()
         if (type.ends_with("[]"))
         {
             std::string elem_type = type.substr(0, type.length() - 2);
+            
+            // Optimization: If immutable and initialized with literal, use fixed-size array
+            // No need for dynamic allocation if we know the size at compile time and can't modify
+            if (!is_mutable)
+            {
+                size_t count = arr_lit->elements.size();
+                std::string arr_type = "webcc::array<" + convert_type(elem_type) + ", " + std::to_string(count) + ">";
+                std::string result = "const " + arr_type;
+                if (is_reference)
+                    result += "&";
+                result += " " + name + " = " + arr_lit->to_webcc() + ";";
+                return result;
+            }
+            
+            // Mutable dynamic array - use vector with brace init (variadic constructor)
             std::string vec_type = "webcc::vector<" + convert_type(elem_type) + ">";
 
-            std::string result = (is_mutable ? "" : "const ") + vec_type;
+            std::string result = vec_type;
             if (is_reference)
                 result += "&";
-            result += " " + name + " = [](){ " + vec_type + " _v; ";
-            for (size_t i = 0; i < arr_lit->elements.size(); ++i)
-            {
-                result += "_v.push_back(" + arr_lit->elements[i]->to_webcc() + "); ";
-            }
-            result += "return _v; }();";
+            result += " " + name + " = " + arr_lit->to_webcc() + ";";
             return result;
         }
     }
@@ -433,11 +443,13 @@ void collect_mods_recursive(Statement *stmt, std::set<std::string> &mods)
             if (dot_pos != std::string::npos)
             {
                 std::string method = call->name.substr(dot_pos + 1);
-                if (method == "push" || method == "push_back" ||
-                    method == "pop" || method == "pop_back" ||
-                    method == "clear")
+                std::string obj = call->name.substr(0, dot_pos);
+                
+                // Check if this is a mutating array method via DefSchema
+                // Array methods that return void are mutating (push, pop, clear, sort, remove, fill, etc.)
+                auto* method_def = DefSchema::instance().lookup_method("array", method);
+                if (method_def && method_def->return_type == "void")
                 {
-                    std::string obj = call->name.substr(0, dot_pos);
                     mods.insert(obj);
                 }
             }

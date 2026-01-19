@@ -139,6 +139,15 @@ bool is_compatible_type(const std::string &source, const std::string &target)
         return is_compatible_type(src_elem, tgt_elem);
     }
 
+    // Allow dynamic array literal T[] to be assigned to fixed-size array T[N]
+    // (e.g., int[5] x = [1, 2, 3, 4, 5] - the literal infers as int[] but target is int[5])
+    // Size validation happens at code generation time
+    if (source.ends_with("[]") && !tgt_elem.empty())
+    {
+        std::string src_elem_type = source.substr(0, source.length() - 2);
+        return is_compatible_type(src_elem_type, tgt_elem);
+    }
+
     // Allow upcast (derived -> base), e.g., Canvas -> DOMElement
     if (DefSchema::instance().inherits_from(source, target))
         return true;
@@ -396,24 +405,37 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
         {
             std::string obj_type = scope.at(obj_name);
             
-            // Array/vector methods
-            if (obj_type.ends_with("[]"))
-            {
-                if (method_name == "push" && func->args.size() == 1) return "void";
-                if (method_name == "pop" && func->args.size() == 0) return "void";
-                if (method_name == "size" && func->args.size() == 0) return "int32";
-                if (method_name == "clear" && func->args.size() == 0) return "void";
-                if (method_name == "isEmpty" && func->args.size() == 0) return "bool";
+            // Check if it's any array type (dynamic [] or fixed-size [N])
+            bool is_dynamic_array = obj_type.ends_with("[]");
+            bool is_fixed_array = false;
+            if (!is_dynamic_array) {
+                size_t bracket_pos = obj_type.rfind('[');
+                if (bracket_pos != std::string::npos && obj_type.back() == ']') {
+                    std::string size_str = obj_type.substr(bracket_pos + 1, obj_type.length() - bracket_pos - 2);
+                    is_fixed_array = !size_str.empty() && std::all_of(size_str.begin(), size_str.end(), ::isdigit);
+                }
             }
             
-            // String methods
+            // Use DefSchema for array method lookups
+            if (is_dynamic_array || is_fixed_array)
+            {
+                if (auto* method_def = DefSchema::instance().lookup_method("array", method_name)) {
+                    if (method_def->params.size() == func->args.size()) {
+                        return method_def->return_type.empty() ? "void" : normalize_type(method_def->return_type);
+                    }
+                }
+            }
+            
+            // Use DefSchema for string method lookups
             if (obj_type == "string")
             {
-                if (method_name == "length" && func->args.size() == 0) return "int32";
-                if (method_name == "at" && func->args.size() == 1) return "string";
-                if (method_name == "substr" && (func->args.size() == 1 || func->args.size() == 2)) return "string";
-                if (method_name == "contains" && func->args.size() == 1) return "bool";
-                if (method_name == "isEmpty" && func->args.size() == 0) return "bool";
+                if (auto* method_def = DefSchema::instance().lookup_method("string", method_name)) {
+                    if (method_def->params.size() == func->args.size() ||
+                        // Handle overloaded methods like substr(start) and substr(start, len)
+                        (method_name == "subStr" && (func->args.size() == 1 || func->args.size() == 2))) {
+                        return method_def->return_type.empty() ? "void" : normalize_type(method_def->return_type);
+                    }
+                }
             }
         }
 

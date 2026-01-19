@@ -467,7 +467,7 @@ std::unique_ptr<Statement> Parser::parse_statement(){
         is_type = true;
     } else if (current().type == TokenType::IDENTIFIER) {
         // Distinguish between Variable Declaration and other statements starting with Identifier
-        // Declaration: Type Name ... | Type[] Name ... | Type& Name ...
+        // Declaration: Type Name ... | Type[] Name ... | Type[N] Name ... | Type& Name ...
         // Assignment:  Name = ... | Name[index] = ...
         // Call:        Name(...)
 
@@ -477,9 +477,11 @@ std::unique_ptr<Statement> Parser::parse_statement(){
         } else if (next.type == TokenType::AMPERSAND) {
             is_type = true; // "Type& Name"
         } else if (next.type == TokenType::LBRACKET) {
-            // Check for "Type[] Name"
+            // Check for "Type[] Name" (dynamic) or "Type[N] Name" (fixed-size)
             if (peek(2).type == TokenType::RBRACKET && peek(3).type == TokenType::IDENTIFIER) {
-                is_type = true;
+                is_type = true; // Type[] Name
+            } else if (peek(2).type == TokenType::INT_LITERAL && peek(3).type == TokenType::RBRACKET && peek(4).type == TokenType::IDENTIFIER) {
+                is_type = true; // Type[N] Name
             }
         }
     }
@@ -499,8 +501,17 @@ std::unique_ptr<Statement> Parser::parse_statement(){
         // Handle array type
         if(current().type == TokenType::LBRACKET){
             advance();
-            expect(TokenType::RBRACKET, "Expected ']'");
-            type += "[]";
+            if (current().type == TokenType::INT_LITERAL) {
+                // Fixed-size array: Type[N]
+                std::string size = current().value;
+                advance();
+                expect(TokenType::RBRACKET, "Expected ']'");
+                type += "[" + size + "]";
+            } else {
+                // Dynamic array: Type[]
+                expect(TokenType::RBRACKET, "Expected ']'");
+                type += "[]";
+            }
         }
 
         std::string name = current().value;
@@ -1511,8 +1522,17 @@ Component Parser::parse_component(){
 
             if(current().type == TokenType::LBRACKET){
                 advance();
-                expect(TokenType::RBRACKET, "Expected ']'");
-                var_decl->type += "[]";
+                if (current().type == TokenType::INT_LITERAL) {
+                    // Fixed-size array: Type[N]
+                    std::string size = current().value;
+                    advance();
+                    expect(TokenType::RBRACKET, "Expected ']'");
+                    var_decl->type += "[" + size + "]";
+                } else {
+                    // Dynamic array: Type[]
+                    expect(TokenType::RBRACKET, "Expected ']'");
+                    var_decl->type += "[]";
+                }
             }
 
             var_decl->name = current().value;

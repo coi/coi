@@ -77,22 +77,31 @@ static std::vector<std::string> parse_concat_args(const std::string &args_str)
 {
     std::vector<std::string> args;
     int paren_depth = 0;
+    bool in_string = false;
     std::string current;
 
     for (size_t i = 0; i < args_str.size(); ++i)
     {
         char c = args_str[i];
-        if (c == '(')
-            paren_depth++;
-        else if (c == ')')
-            paren_depth--;
-        else if (c == ',' && paren_depth == 0)
+        // Track string literals (handle escaped quotes)
+        if (c == '"' && (i == 0 || args_str[i - 1] != '\\'))
         {
-            trim(current);
-            if (!current.empty())
-                args.push_back(current);
-            current.clear();
-            continue;
+            in_string = !in_string;
+        }
+        if (!in_string)
+        {
+            if (c == '(')
+                paren_depth++;
+            else if (c == ')')
+                paren_depth--;
+            else if (c == ',' && paren_depth == 0)
+            {
+                trim(current);
+                if (!current.empty())
+                    args.push_back(current);
+                current.clear();
+                continue;
+            }
         }
         current += c;
     }
@@ -538,7 +547,7 @@ std::string Component::to_webcc(CompilerSession &session)
 
                 if (var->is_mutable)
                 {
-                    // Mutable: use vector with brace init
+                    // Mutable: use vector with brace init (variadic constructor)
                     std::string vec_type = "webcc::vector<" + convert_type(elem_type) + ">";
                     ss << "    " << vec_type;
                     if (var->is_reference)
