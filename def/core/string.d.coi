@@ -3,22 +3,31 @@
 
 @builtin
 type string {
-    // String methods - these inline directly to C++ std::string methods
+    // String methods - these inline directly to webcc::string methods
     @inline("${this}.length()")
     def length(): int
 
     @inline("${this}.at(${0})")
-    def at(int index): int
+    def charAt(int index): int
 
     @inline("${this}.substr(${0})")
-    def substr(int start): string
+    def subStr(int start): string
 
     @inline("${this}.substr(${0}, ${1})")
-    def substr(int start, int length): string
+    def subStr(int start, int length): string
 
     @inline("${this}.contains(${0})")
     def contains(string needle): bool
 
     @inline("${this}.empty()")
     def isEmpty(): bool
+
+    @inline("${this}.trim()")
+    def trim(): string
+
+    @inline("${this}.trim_start()")
+    def trimStart(): string
+
+    @inline("${this}.trim_end()")
+    def trimEnd(): string
 }
