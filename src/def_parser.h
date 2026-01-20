@@ -38,6 +38,7 @@ struct TypeDef
 {
     std::string name;
     bool is_builtin = false; // @builtin types like string, array
+    bool is_nocopy = false;  // @nocopy - type cannot be copied, only moved or referenced
     std::string extends;     // Parent type (for handle inheritance)
     std::string alias_of;    // @alias("target") - this type is an alias for another
     std::vector<MethodDef> methods;
@@ -144,6 +145,10 @@ public:
 
     // Check if a type is a handle (has methods defined in def files from webcc)
     bool is_handle(const std::string &type_name) const;
+
+    // Check if a type is nocopy (can only be moved or referenced, not copied)
+    // Returns true if the type or any of its parent types has @nocopy annotation
+    bool is_nocopy(const std::string &type_name) const;
 
     // Resolve type alias (e.g., "int" -> "int32", "float" -> "float64")
     // Returns the canonical type name, or the input if not an alias

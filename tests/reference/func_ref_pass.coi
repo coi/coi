@@ -1,0 +1,28 @@
+// Test: passing by reference to function (&value)
+component FuncRefTest {
+    mut int score = 10;
+
+    def increment(mut int& value) : void {
+        value++;
+    }
+
+    def doubleIt(mut int& value) : void {
+        value = value * 2;
+    }
+
+    def testRefs() : void {
+        increment(&score);
+        doubleIt(&score);
+    }
+
+    view {
+        <div>
+            <button onclick={testRefs}>Test References</button>
+            <span>Score: {score}</span>
+        </div>
+    }
+}
+
+app {
+    root = FuncRefTest;
+}

@@ -62,7 +62,7 @@ Components receive data through constructor-style parameters:
 
 ```tsx
 component Editor(
-    string label,           // Value parameter (required)
+    string label,           // Value parameter (copied by default, can be moved with :)
     mut int& value,         // Reference parameter (two-way binding)
     int step = 1,           // Value parameter with default
     def onChange : void     // Function parameter (callback)
@@ -76,7 +76,31 @@ component Editor(
         <button onclick={increment}>{label}</button>
     }
 }
+
+// Usage examples:
+component App {
+    mut string text = "Label";
+    mut int count = 0;
+    
+    view {
+        <div>
+            // Default: copies text
+            <Editor label={text} &value={count} &onChange={handleChange} />
+            
+            // Move: transfers ownership of text
+            <Editor :label={text} &value={count} &onChange={handleChange} />
+        </div>
+    }
+}
 ```
+
+### Parameter Passing Modes
+
+| Syntax | Mode | Usage in Call | Description |
+|--------|------|---------------|-------------|
+| `Type name` | Value | `comp(value)` or `comp(:value)` | Copied by default, can be moved with `:` |
+| `mut Type& name` | Reference | `comp(&value)` | Component can read/modify parent's state |
+| `def name(args) : ret` | Callback | `comp(&callback)` | Function passed from parent |
 
 ### Reference Parameters (`&`)
 
@@ -105,6 +129,22 @@ component App {
         </div>
     }
 }
+```
+
+### Move Semantics (`:`)
+
+Use `:` to transfer ownership of a value to the child component. The parent's variable becomes invalid after the move:
+
+```tsx
+<Editor :content={document} />
+```
+
+In code, use `:=` for move assignment:
+
+```tsx
+string source = "Hello";
+string dest := source;  // Move assignment
+// source is now invalid
 ```
 
 ### Function Parameters (`def`)

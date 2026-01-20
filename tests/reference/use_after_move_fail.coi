@@ -1,0 +1,24 @@
+// Test: Error - using moved variable
+component UseAfterMoveFail {
+    mut string text = "Hello";
+
+    def consume(string val) : void {
+        // Takes ownership
+    }
+
+    def test() : void {
+        consume(:text);
+        // ERROR: text was moved, cannot use it anymore
+        string copy = text;
+    }
+
+    view {
+        <div>
+            <button onclick={test}>Test</button>
+        </div>
+    }
+}
+
+app {
+    root = UseAfterMoveFail;
+}

@@ -10,6 +10,7 @@ struct VarDeclaration : Statement {
     bool is_mutable = false;
     bool is_reference = false;
     bool is_public = false;
+    bool is_move = false;  // true if initialized with &expr (move semantics)
 
     std::string to_webcc() override;
 };
@@ -32,6 +33,7 @@ struct Assignment : Statement {
     std::string name;
     std::unique_ptr<Expression> value;
     std::string target_type;
+    bool is_move = false;  // true if assigned with &expr (move semantics)
 
     std::string to_webcc() override;
     void collect_dependencies(std::set<std::string>& deps) override;
@@ -42,6 +44,7 @@ struct IndexAssignment : Statement {
     std::unique_ptr<Expression> index;
     std::unique_ptr<Expression> value;
     std::string compound_op;
+    bool is_move = false;  // true if assigned with &expr (move semantics)
 
     std::string to_webcc() override;
     void collect_dependencies(std::set<std::string>& deps) override;
@@ -52,6 +55,7 @@ struct MemberAssignment : Statement {
     std::string member;
     std::unique_ptr<Expression> value;
     std::string compound_op;
+    bool is_move = false;  // true if assigned with &expr (move semantics)
 
     std::string to_webcc() override;
     void collect_dependencies(std::set<std::string>& deps) override;

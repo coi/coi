@@ -1,0 +1,25 @@
+// Test: component prop with move (:value)
+component Consumer(string data) {
+    view {
+        <div>Data: {data}</div>
+    }
+}
+
+component MoveCompPropTest {
+    mut string text = "Original";
+
+    def reset() : void {
+        text = "Reset";
+    }
+
+    view {
+        <div>
+            <Consumer :data={text} />
+            <button onclick={reset}>Reset</button>
+        </div>
+    }
+}
+
+app {
+    root = MoveCompPropTest;
+}

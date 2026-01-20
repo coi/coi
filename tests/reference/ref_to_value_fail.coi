@@ -1,0 +1,23 @@
+// Test: Error - passing reference (&) when function expects value
+component RefToValueFail {
+    mut int value = 5;
+
+    def takeValue(int val) : void {
+        // This function expects a value, not a reference
+        val = 10;
+    }
+
+    def test() : void {
+        takeValue(&value);  // ERROR: Cannot pass &value to non-reference parameter
+    }
+
+    view {
+        <div>
+            <button onclick={test}>Test</button>
+        </div>
+    }
+}
+
+app {
+    root = RefToValueFail;
+}

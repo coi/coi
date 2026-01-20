@@ -56,9 +56,19 @@ struct BinaryOp : Expression {
     void collect_dependencies(std::set<std::string>& deps) override;
 };
 
+// Unified argument for function calls and component construction
+// Supports both positional and named arguments with reference/move semantics
+struct CallArg {
+    std::string name;  // Empty for positional arguments
+    std::unique_ptr<Expression> value;
+    bool is_reference = false;
+    bool is_move = false;
+};
+
 struct FunctionCall : Expression {
     std::string name;
-    std::vector<std::unique_ptr<Expression>> args;
+    std::vector<CallArg> args;
+    int line = 0;
 
     FunctionCall(const std::string& n) : name(n){}
     std::string args_to_string();
@@ -94,6 +104,26 @@ struct UnaryOp : Expression {
     std::string to_webcc() override;
     void collect_dependencies(std::set<std::string>& deps) override;
     bool is_static() override;
+};
+
+// Reference expression: &expr - explicitly passes by reference (borrow)
+struct ReferenceExpression : Expression {
+    std::unique_ptr<Expression> operand;
+
+    ReferenceExpression(std::unique_ptr<Expression> expr) : operand(std::move(expr)) {}
+    std::string to_webcc() override;
+    void collect_dependencies(std::set<std::string>& deps) override;
+    bool is_static() override { return false; }
+};
+
+// Move expression: :expr - explicitly transfers ownership
+struct MoveExpression : Expression {
+    std::unique_ptr<Expression> operand;
+
+    MoveExpression(std::unique_ptr<Expression> expr) : operand(std::move(expr)) {}
+    std::string to_webcc() override;
+    void collect_dependencies(std::set<std::string>& deps) override;
+    bool is_static() override { return false; }
 };
 
 struct TernaryOp : Expression {
@@ -149,16 +179,14 @@ struct EnumAccess : Expression {
     bool is_static() override { return true; }
 };
 
-// Component construction expression: NetworkManager(&url: currentUrl, port: 8080)
-struct ComponentArg {
-    std::string name;
-    std::unique_ptr<Expression> value;
-    bool is_reference = false;
-};
+// ComponentArg is now an alias for CallArg for backwards compatibility
+using ComponentArg = CallArg;
 
+// Component construction expression: NetworkManager(&url = currentUrl, port := 8080)
+// Also supports positional args: NetworkManager(&value, :value, value)
 struct ComponentConstruction : Expression {
     std::string component_name;
-    std::vector<ComponentArg> args;
+    std::vector<CallArg> args;
 
     ComponentConstruction(const std::string& name) : component_name(name) {}
     std::string to_webcc() override;

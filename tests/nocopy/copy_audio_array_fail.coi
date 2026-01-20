@@ -1,0 +1,23 @@
+// Test: Error - cannot copy an array of Audio elements
+// Audio[] is nocopy because Audio is @nocopy (extends DOMElement)
+component CopyAudioArrayFail {
+    mut Audio[] sounds;
+    mut Audio[] backup;
+
+    init {
+        sounds = [];
+        sounds.push(Audio.load("sound1.mp3"));
+        sounds.push(Audio.load("sound2.mp3"));
+        
+        // ERROR: Cannot copy Audio[] - elements are nocopy
+        backup = sounds;
+    }
+
+    view {
+        <div>Test</div>
+    }
+}
+
+app {
+    root = CopyAudioArrayFail;
+}

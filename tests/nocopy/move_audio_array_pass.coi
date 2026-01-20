@@ -1,0 +1,23 @@
+// Test: Success - moving an array of Audio elements is allowed
+component MoveAudioArrayPass {
+    mut Audio[] sounds;
+    mut Audio[] backup;
+
+    init {
+        sounds = [];
+        sounds.push(Audio.load("sound1.mp3"));
+        sounds.push(Audio.load("sound2.mp3"));
+        
+        // OK: Move ownership of the array
+        backup := sounds;
+        // Note: sounds is now invalid
+    }
+
+    view {
+        <div>Test</div>
+    }
+}
+
+app {
+    root = MoveAudioArrayPass;
+}

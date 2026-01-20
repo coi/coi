@@ -1,0 +1,23 @@
+// Test: Error - cannot copy a Canvas (handle type)
+// Canvas is @nocopy - it can only be moved or referenced
+component CopyCanvasFail {
+    mut Canvas canvas1;
+    mut Canvas canvas2;
+
+    init {
+        canvas1 = Canvas.createCanvas("main", 800.0, 600.0);
+        
+        // ERROR: Cannot copy Canvas - use :canvas1 (move) or &canvas1 (reference)
+        canvas2 = canvas1;
+    }
+
+    view {
+        <div>
+            <canvas &=canvas1 width="800" height="600"></canvas>
+        </div>
+    }
+}
+
+app {
+    root = CopyCanvasFail;
+}

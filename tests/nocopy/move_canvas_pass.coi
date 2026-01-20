@@ -1,0 +1,23 @@
+// Test: Success - moving a Canvas (handle type) is allowed
+component MoveCanvasPass {
+    mut Canvas canvas1;
+    mut Canvas canvas2;
+
+    init {
+        canvas1 = Canvas.createCanvas("main", 800.0, 600.0);
+        
+        // OK: Move ownership of canvas1 to canvas2
+        canvas2 := canvas1;
+        // Note: canvas1 is now invalid and cannot be used
+    }
+
+    view {
+        <div>
+            <canvas &={canvas2} width="800" height="600"></canvas>
+        </div>
+    }
+}
+
+app {
+    root = MoveCanvasPass;
+}

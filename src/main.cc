@@ -78,7 +78,7 @@ static void collect_types_from_expr(Expression* expr, std::set<std::string>& typ
             types.insert(call->name.substr(0, dot));
         }
         for (auto& arg : call->args) {
-            collect_types_from_expr(arg.get(), types);
+            collect_types_from_expr(arg.value.get(), types);
         }
     }
     else if (auto* member = dynamic_cast<MemberAccess*>(expr)) {

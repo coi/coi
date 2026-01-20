@@ -263,6 +263,18 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
         return "unknown";
     }
 
+    // Reference expression type inference (&expr) - returns type of operand
+    if (auto ref_expr = dynamic_cast<ReferenceExpression *>(expr))
+    {
+        return infer_expression_type(ref_expr->operand.get(), scope);
+    }
+
+    // Move expression type inference (:expr) - returns type of operand
+    if (auto move_expr = dynamic_cast<MoveExpression *>(expr))
+    {
+        return infer_expression_type(move_expr->operand.get(), scope);
+    }
+
     // Unary operator type inference (e.g., -x, !x)
     if (auto unary = dynamic_cast<UnaryOp *>(expr))
     {
@@ -541,8 +553,11 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
 
             for (size_t i = 0; i < actual_args; ++i)
             {
-                std::string arg_type = infer_expression_type(func->args[i].get(), scope);
+                std::string arg_type = infer_expression_type(func->args[i].value.get(), scope);
                 std::string expected_type = entry->method->params[i + param_offset].type;
+
+                // Note: Schema methods (external APIs) don't support reference parameters,
+                // so we don't validate &arg/:arg here. That validation happens for component methods.
 
                 if (!is_compatible_type(arg_type, expected_type))
                 {
@@ -704,6 +719,33 @@ void validate_types(const std::vector<Component> &components, const std::vector<
 
             if (var->initializer)
             {
+                // Check for move expression in initializer (:expr)
+                if (dynamic_cast<MoveExpression*>(var->initializer.get()))
+                {
+                    var->is_move = true;
+                }
+                
+                // Error: cannot create a reference to a moved value (Type& name := :expr)
+                if (var->is_reference && var->is_move)
+                {
+                    std::cerr << "\033[1;31mError:\033[0m Cannot create reference to moved value. "
+                              << "Use either 'Type& " << var->name << " = expr' (reference) or "
+                              << "'Type " << var->name << " := :expr' (move), not both. "
+                              << "At line " << var->line << std::endl;
+                    exit(1);
+                }
+                
+                // Error: cannot copy a nocopy type (must use := or &)
+                // Only applies when copying from another variable, not from function returns
+                if (!var->is_move && !var->is_reference && DefSchema::instance().is_nocopy(type)
+                    && dynamic_cast<Identifier*>(var->initializer.get()))
+                {
+                    std::cerr << "\033[1;31mError:\033[0m Cannot copy '" << type << "' - it is a nocopy type. "
+                              << "Use '" << var->name << " := :source' (move) or '" << var->name << " = &source' (reference) instead. "
+                              << "At line " << var->line << std::endl;
+                    exit(1);
+                }
+                
                 std::string init = infer_expression_type(var->initializer.get(), scope);
                 if (init != "unknown" && !is_compatible_type(init, type))
                 {
@@ -725,6 +767,121 @@ void validate_types(const std::vector<Component> &components, const std::vector<
             // Get expected return type for this method
             std::string expected_return = method.return_type.empty() ? "void" : normalize_type(method.return_type);
 
+            // Track variables that have been moved from (can no longer be used)
+            std::set<std::string> moved_vars;
+            
+            // Helper to extract variable name from expression (for move tracking)
+            auto get_var_name = [](Expression* expr) -> std::string {
+                if (auto id = dynamic_cast<Identifier*>(expr)) {
+                    return id->name;
+                }
+                return "";
+            };
+            
+            // Helper to check if an expression uses a moved variable, and track moves from :expr
+            std::function<void(Expression*, int)> check_moved_use;
+            check_moved_use = [&](Expression* expr, int line) {
+                if (!expr) return;
+                
+                if (auto id = dynamic_cast<Identifier*>(expr)) {
+                    if (moved_vars.count(id->name)) {
+                        std::cerr << "\033[1;31mError:\033[0m Use of moved variable '" << id->name 
+                                  << "' at line " << line << ". Variable was moved and can no longer be used." << std::endl;
+                        exit(1);
+                    }
+                }
+                else if (auto move_expr = dynamic_cast<MoveExpression*>(expr)) {
+                    // First check if the operand uses moved vars
+                    check_moved_use(move_expr->operand.get(), line);
+                    // Then mark the variable as moved
+                    std::string var = get_var_name(move_expr->operand.get());
+                    if (!var.empty()) {
+                        moved_vars.insert(var);
+                    }
+                }
+                else if (auto ref_expr = dynamic_cast<ReferenceExpression*>(expr)) {
+                    check_moved_use(ref_expr->operand.get(), line);
+                }
+                else if (auto bin = dynamic_cast<BinaryOp*>(expr)) {
+                    check_moved_use(bin->left.get(), line);
+                    check_moved_use(bin->right.get(), line);
+                }
+                else if (auto call = dynamic_cast<FunctionCall*>(expr)) {
+                    // Find if this is a component method call
+                    const FunctionDef* target_method = nullptr;
+                    for (const auto& m : comp.methods) {
+                        if (m.name == call->name) {
+                            target_method = &m;
+                            break;
+                        }
+                    }
+                    
+                    // Validate arguments and check for moved variables
+                    for (size_t i = 0; i < call->args.size(); ++i) {
+                        auto& arg = call->args[i];
+                        
+                        // Check if argument uses moved variables
+                        check_moved_use(arg.value.get(), line);
+                        
+                        // If arg.is_move is set (from :value syntax in CallArg), mark the variable as moved
+                        if (arg.is_move) {
+                            std::string var = get_var_name(arg.value.get());
+                            if (!var.empty()) {
+                                moved_vars.insert(var);
+                            }
+                        }
+                        
+                        // If we found the method, validate &/: usage
+                        if (target_method && i < target_method->params.size()) {
+                            bool param_is_ref = target_method->params[i].is_reference;
+                            
+                            // Check for &arg (reference expression) - either via CallArg.is_reference or ReferenceExpression
+                            bool arg_is_ref = arg.is_reference || dynamic_cast<ReferenceExpression*>(arg.value.get());
+                            bool arg_is_move = arg.is_move || dynamic_cast<MoveExpression*>(arg.value.get());
+                            
+                            if (arg_is_ref && !param_is_ref) {
+                                std::cerr << "\033[1;31mError:\033[0m Argument " << (i + 1) 
+                                          << " of '" << call->name << "' is passed by reference (&) "
+                                          << "but parameter '" << target_method->params[i].name 
+                                          << "' is not a reference type. Remove '&' or change parameter to '"
+                                          << target_method->params[i].type << "&' at line " << line << std::endl;
+                                exit(1);
+                            }
+                            // Check for :arg (move expression)
+                            else if (arg_is_move && param_is_ref) {
+                                std::cerr << "\033[1;31mError:\033[0m Argument " << (i + 1) 
+                                          << " of '" << call->name << "' is passed by move (:) "
+                                          << "but parameter '" << target_method->params[i].name 
+                                          << "' is a reference. Use '&' for reference or remove ':' at line " 
+                                          << line << std::endl;
+                                exit(1);
+                            }
+                        }
+                    }
+                }
+                else if (auto member = dynamic_cast<MemberAccess*>(expr)) {
+                    check_moved_use(member->object.get(), line);
+                }
+                else if (auto idx = dynamic_cast<IndexAccess*>(expr)) {
+                    check_moved_use(idx->array.get(), line);
+                    check_moved_use(idx->index.get(), line);
+                }
+                else if (auto unary = dynamic_cast<UnaryOp*>(expr)) {
+                    check_moved_use(unary->operand.get(), line);
+                }
+                else if (auto ternary = dynamic_cast<TernaryOp*>(expr)) {
+                    check_moved_use(ternary->condition.get(), line);
+                    check_moved_use(ternary->true_expr.get(), line);
+                    check_moved_use(ternary->false_expr.get(), line);
+                }
+                else if (auto postfix = dynamic_cast<PostfixOp*>(expr)) {
+                    check_moved_use(postfix->operand.get(), line);
+                }
+                else if (auto arr = dynamic_cast<ArrayLiteral*>(expr)) {
+                    for (auto& elem : arr->elements) check_moved_use(elem.get(), line);
+                }
+            };
+
             std::function<void(const std::unique_ptr<Statement> &, std::map<std::string, std::string> &)> check_stmt;
             check_stmt = [&](const std::unique_ptr<Statement> &stmt, std::map<std::string, std::string> &current_scope)
             {
@@ -736,8 +893,42 @@ void validate_types(const std::vector<Component> &components, const std::vector<
                 else if (auto decl = dynamic_cast<VarDeclaration *>(stmt.get()))
                 {
                     std::string type = normalize_type(decl->type);
+                    
                     if (decl->initializer)
                     {
+                        // Check initializer for use of moved variables
+                        check_moved_use(decl->initializer.get(), decl->line);
+                        
+                        // If this is a move (:=), mark the source variable as moved
+                        if (decl->is_move)
+                        {
+                            std::string moved_var = get_var_name(decl->initializer.get());
+                            if (!moved_var.empty()) {
+                                moved_vars.insert(moved_var);
+                            }
+                        }
+                        
+                        // Error: cannot create a reference to a moved value (Type& name := expr)
+                        if (decl->is_reference && decl->is_move)
+                        {
+                            std::cerr << "\033[1;31mError:\033[0m Cannot create reference to moved value. "
+                                      << "Use either 'Type& " << decl->name << " = expr' (reference) or "
+                                      << "'Type " << decl->name << " := expr' (move), not both. "
+                                      << "At line " << decl->line << std::endl;
+                            exit(1);
+                        }
+                        
+                        // Error: cannot copy a nocopy type (must use := or &)
+                        // Only applies when copying from another variable, not from function returns
+                        if (!decl->is_move && !decl->is_reference && DefSchema::instance().is_nocopy(type)
+                            && dynamic_cast<Identifier*>(decl->initializer.get()))
+                        {
+                            std::cerr << "\033[1;31mError:\033[0m Cannot copy '" << type << "' - it is a nocopy type. "
+                                      << "Use '" << decl->name << " := :source' (move) or '" << decl->name << " = &source' (reference) instead. "
+                                      << "At line " << decl->line << std::endl;
+                            exit(1);
+                        }
+                        
                         std::string init = infer_expression_type(decl->initializer.get(), current_scope);
                         if (init != "unknown" && !is_compatible_type(init, type))
                         {
@@ -749,7 +940,38 @@ void validate_types(const std::vector<Component> &components, const std::vector<
                 }
                 else if (auto assign = dynamic_cast<Assignment *>(stmt.get()))
                 {
+                    // Check if the target variable itself was moved
+                    if (moved_vars.count(assign->name)) {
+                        std::cerr << "\033[1;31mError:\033[0m Assignment to moved variable '" << assign->name 
+                                  << "' at line " << assign->line << ". Variable was moved and can no longer be used." << std::endl;
+                        exit(1);
+                    }
+                    
                     std::string var_type = current_scope.count(assign->name) ? current_scope.at(assign->name) : "unknown";
+                    
+                    // Check value for use of moved variables
+                    check_moved_use(assign->value.get(), assign->line);
+                    
+                    // If this is a move (:=), mark the source variable as moved
+                    if (assign->is_move)
+                    {
+                        std::string moved_var = get_var_name(assign->value.get());
+                        if (!moved_var.empty()) {
+                            moved_vars.insert(moved_var);
+                        }
+                    }
+                    
+                    // Error: cannot copy a nocopy type (must use :=)
+                    // Only applies when copying from another variable, not from function returns
+                    if (!assign->is_move && DefSchema::instance().is_nocopy(var_type)
+                        && dynamic_cast<Identifier*>(assign->value.get()))
+                    {
+                        std::cerr << "\033[1;31mError:\033[0m Cannot copy '" << var_type << "' - it is a nocopy type. "
+                                  << "Use '" << assign->name << " := :source' (move) instead. "
+                                  << "At line " << assign->line << std::endl;
+                        exit(1);
+                    }
+                    
                     std::string val_type = infer_expression_type(assign->value.get(), current_scope);
 
                     // Store the target type for code generation (needed for handle casts)
@@ -764,18 +986,21 @@ void validate_types(const std::vector<Component> &components, const std::vector<
                         }
                     }
                 }
-                else if (auto expr_stmt = dynamic_cast<ExpressionStatement *>(stmt.get()))
-                {
-                    infer_expression_type(expr_stmt->expression.get(), current_scope);
-                }
                 else if (auto if_stmt = dynamic_cast<IfStatement *>(stmt.get()))
                 {
+                    // Check condition for use of moved variables
+                    check_moved_use(if_stmt->condition.get(), if_stmt->line);
+                    
                     check_stmt(if_stmt->then_branch, current_scope);
                     if (if_stmt->else_branch)
                         check_stmt(if_stmt->else_branch, current_scope);
                 }
                 else if (auto for_range = dynamic_cast<ForRangeStatement *>(stmt.get()))
                 {
+                    // Check range expressions for use of moved variables
+                    check_moved_use(for_range->start.get(), for_range->line);
+                    check_moved_use(for_range->end.get(), for_range->line);
+                    
                     // Validate range expressions
                     infer_expression_type(for_range->start.get(), current_scope);
                     infer_expression_type(for_range->end.get(), current_scope);
@@ -786,6 +1011,9 @@ void validate_types(const std::vector<Component> &components, const std::vector<
                 }
                 else if (auto for_each = dynamic_cast<ForEachStatement *>(stmt.get()))
                 {
+                    // Check iterable for use of moved variables
+                    check_moved_use(for_each->iterable.get(), for_each->line);
+                    
                     // Validate iterable and infer element type
                     std::string iterable_type = infer_expression_type(for_each->iterable.get(), current_scope);
                     std::map<std::string, std::string> loop_scope = current_scope;
@@ -801,6 +1029,20 @@ void validate_types(const std::vector<Component> &components, const std::vector<
                 }
                 else if (auto idx_assign = dynamic_cast<IndexAssignment *>(stmt.get()))
                 {
+                    // Check array, index, and value for use of moved variables
+                    check_moved_use(idx_assign->array.get(), idx_assign->line);
+                    check_moved_use(idx_assign->index.get(), idx_assign->line);
+                    check_moved_use(idx_assign->value.get(), idx_assign->line);
+                    
+                    // If this is a move (:=), mark the source variable as moved
+                    if (idx_assign->is_move)
+                    {
+                        std::string moved_var = get_var_name(idx_assign->value.get());
+                        if (!moved_var.empty()) {
+                            moved_vars.insert(moved_var);
+                        }
+                    }
+                    
                     // Type check index assignment: arr[i] = value
                     std::string array_type = infer_expression_type(idx_assign->array.get(), current_scope);
                     std::string element_type = "unknown";
@@ -839,6 +1081,19 @@ void validate_types(const std::vector<Component> &components, const std::vector<
                 }
                 else if (auto member_assign = dynamic_cast<MemberAssignment *>(stmt.get()))
                 {
+                    // Check object and value for use of moved variables
+                    check_moved_use(member_assign->object.get(), member_assign->line);
+                    check_moved_use(member_assign->value.get(), member_assign->line);
+                    
+                    // If this is a move (:=), mark the source variable as moved
+                    if (member_assign->is_move)
+                    {
+                        std::string moved_var = get_var_name(member_assign->value.get());
+                        if (!moved_var.empty()) {
+                            moved_vars.insert(moved_var);
+                        }
+                    }
+                    
                     // Type check member assignment: obj.member = value
                     // Check if we're trying to assign to a child component's member (not allowed)
                     // This includes both direct access (comp.member) and indexed access (arr[i].member)
@@ -879,11 +1134,22 @@ void validate_types(const std::vector<Component> &components, const std::vector<
                     // Validate the value type
                     infer_expression_type(member_assign->value.get(), current_scope);
                 }
+                else if (auto expr_stmt = dynamic_cast<ExpressionStatement *>(stmt.get()))
+                {
+                    // Check expression for use of moved variables
+                    check_moved_use(expr_stmt->expression.get(), expr_stmt->line);
+                    
+                    // Validate expression type
+                    infer_expression_type(expr_stmt->expression.get(), current_scope);
+                }
                 else if (auto ret_stmt = dynamic_cast<ReturnStatement *>(stmt.get()))
                 {
                     // Validate return type matches method's declared return type
                     if (ret_stmt->value)
                     {
+                        // Check return value for use of moved variables
+                        check_moved_use(ret_stmt->value.get(), ret_stmt->line);
+                        
                         // Has a return value
                         if (expected_return == "void")
                         {

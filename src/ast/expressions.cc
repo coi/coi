@@ -8,7 +8,7 @@ extern std::set<std::string> g_ref_props;
 
 // Helper to expand @inline templates like "${this}.length()" or "${this}.substr(${0}, ${1})"
 static std::string expand_inline_template(const std::string& tmpl, const std::string& receiver,
-                                          const std::vector<std::unique_ptr<Expression>>& args) {
+                                          const std::vector<CallArg>& args) {
     std::string result;
     for (size_t i = 0; i < tmpl.size(); ++i) {
         if (tmpl[i] == '$' && i + 1 < tmpl.size() && tmpl[i + 1] == '{') {
@@ -21,7 +21,7 @@ static std::string expand_inline_template(const std::string& tmpl, const std::st
                     // Numeric index like ${0}, ${1}
                     int idx = std::stoi(var);
                     if (idx >= 0 && idx < (int)args.size()) {
-                        result += args[idx]->to_webcc();
+                        result += args[idx].value->to_webcc();
                     }
                 }
                 i = end;
@@ -35,18 +35,18 @@ static std::string expand_inline_template(const std::string& tmpl, const std::st
 
 // Helper to generate intrinsic code
 static std::string generate_intrinsic(const std::string& intrinsic_name,
-                                      const std::vector<std::unique_ptr<Expression>>& args) {
+                                      const std::vector<CallArg>& args) {
     if (intrinsic_name == "random") {
         return "webcc::random()";
     }
     if (intrinsic_name == "random_seeded" && args.size() == 1) {
-        return "(webcc::random_seed(" + args[0]->to_webcc() + "), webcc::random())";
+        return "(webcc::random_seed(" + args[0].value->to_webcc() + "), webcc::random())";
     }
     if (intrinsic_name == "key_down" && args.size() == 1) {
-        return "g_key_state[" + args[0]->to_webcc() + "]";
+        return "g_key_state[" + args[0].value->to_webcc() + "]";
     }
     if (intrinsic_name == "key_up" && args.size() == 1) {
-        return "!g_key_state[" + args[0]->to_webcc() + "]";
+        return "!g_key_state[" + args[0].value->to_webcc() + "]";
     }
     return "";  // Unknown intrinsic
 }
@@ -241,7 +241,7 @@ std::string FunctionCall::args_to_string() {
     std::string result = "webcc::string::concat(";
     for(size_t i = 0; i < args.size(); i++){
         if(i > 0) result += ", ";
-        result += args[i]->to_webcc();
+        result += args[i].value->to_webcc();
     }
     result += ")";
     return result;
@@ -360,7 +360,7 @@ std::string FunctionCall::to_webcc() {
         bool has_string_concat_arg = false;
         int string_concat_arg_idx = -1;
         for (size_t i = 0; i < args.size(); i++) {
-            if (is_string_expr(args[i].get()) && dynamic_cast<BinaryOp*>(args[i].get())) {
+            if (is_string_expr(args[i].value.get()) && dynamic_cast<BinaryOp*>(args[i].value.get())) {
                 has_string_concat_arg = true;
                 string_concat_arg_idx = i;
                 break;
@@ -369,7 +369,7 @@ std::string FunctionCall::to_webcc() {
 
         if (has_string_concat_arg) {
             std::vector<Expression*> parts;
-            flatten_string_concat(args[string_concat_arg_idx].get(), parts);
+            flatten_string_concat(args[string_concat_arg_idx].value.get(), parts);
 
             std::string call_prefix = "webcc::" + map_ns + "::" + map_func + "(";
             std::string call_suffix;
@@ -385,13 +385,13 @@ std::string FunctionCall::to_webcc() {
                     if ((int)i == string_concat_arg_idx) {
                         call_prefix += ", ";
                     } else if ((int)i < string_concat_arg_idx) {
-                        call_prefix += ", " + args[i]->to_webcc();
+                        call_prefix += ", " + args[i].value->to_webcc();
                     } else {
-                        call_suffix += ", " + args[i]->to_webcc();
+                        call_suffix += ", " + args[i].value->to_webcc();
                     }
                 } else {
                     if ((int)i != string_concat_arg_idx) {
-                        call_prefix += args[i]->to_webcc();
+                        call_prefix += args[i].value->to_webcc();
                     }
                 }
                 first_arg = false;
@@ -411,7 +411,7 @@ std::string FunctionCall::to_webcc() {
 
         for(size_t i = 0; i < args.size(); i++){
             if (!first_arg) code += ", ";
-            code += args[i]->to_webcc();
+            code += args[i].value->to_webcc();
             first_arg = false;
         }
         code += ")";
@@ -427,7 +427,7 @@ std::string FunctionCall::to_webcc() {
     std::string result = name + "(";
     for(size_t i = 0; i < args.size(); i++){
         if(i > 0) result += ", ";
-        result += args[i]->to_webcc();
+        result += args[i].value->to_webcc();
     }
     result += ")";
     return result;
@@ -438,7 +438,7 @@ void FunctionCall::collect_dependencies(std::set<std::string>& deps) {
     if (dot_pos != std::string::npos) {
         deps.insert(name.substr(0, dot_pos));
     }
-    for(auto& arg : args) arg->collect_dependencies(deps);
+    for(auto& arg : args) arg.value->collect_dependencies(deps);
 }
 
 MemberAccess::MemberAccess(std::unique_ptr<Expression> obj, const std::string& mem)
@@ -482,6 +482,24 @@ void UnaryOp::collect_dependencies(std::set<std::string>& deps) {
 }
 
 bool UnaryOp::is_static() { return operand->is_static(); }
+
+// ReferenceExpression - pass by reference (borrow, no ownership transfer)
+std::string ReferenceExpression::to_webcc() {
+    return operand->to_webcc();  // References are handled at call sites
+}
+
+void ReferenceExpression::collect_dependencies(std::set<std::string>& deps) {
+    operand->collect_dependencies(deps);
+}
+
+// MoveExpression - generates webcc::move() for explicit ownership transfer
+std::string MoveExpression::to_webcc() {
+    return "webcc::move(" + operand->to_webcc() + ")";
+}
+
+void MoveExpression::collect_dependencies(std::set<std::string>& deps) {
+    operand->collect_dependencies(deps);
+}
 
 TernaryOp::TernaryOp(std::unique_ptr<Expression> cond, std::unique_ptr<Expression> t, std::unique_ptr<Expression> f)
     : condition(std::move(cond)), true_expr(std::move(t)), false_expr(std::move(f)) {}
@@ -555,7 +573,13 @@ std::string EnumAccess::to_webcc() {
 }
 
 std::string ComponentConstruction::to_webcc() {
-    return component_name + "()";
+    std::string result = component_name + "(";
+    for (size_t i = 0; i < args.size(); i++) {
+        if (i > 0) result += ", ";
+        result += args[i].value->to_webcc();
+    }
+    result += ")";
+    return result;
 }
 
 void ComponentConstruction::collect_dependencies(std::set<std::string>& deps) {

@@ -73,13 +73,20 @@ std::string VarDeclaration::to_webcc()
     result += " " + name;
     if (initializer)
     {
+        std::string init_code = initializer->to_webcc();
+        // Wrap in webcc::move() if this is a move assignment (:=)
+        if (is_move)
+        {
+            init_code = "webcc::move(" + init_code + ")";
+        }
+        
         if (DefSchema::instance().is_handle(type))
         {
-            result += "{" + initializer->to_webcc() + "}";
+            result += "{" + init_code + "}";
         }
         else
         {
-            result += " = " + initializer->to_webcc();
+            result += " = " + init_code;
         }
     }
     result += ";";
@@ -100,6 +107,12 @@ std::string Assignment::to_webcc()
     }
 
     std::string rhs = value->to_webcc();
+
+    // Wrap in webcc::move() for move assignments
+    if (is_move)
+    {
+        rhs = "webcc::move(" + rhs + ")";
+    }
 
     if (!target_type.empty() && DefSchema::instance().is_handle(target_type))
     {
@@ -157,6 +170,14 @@ void Assignment::collect_dependencies(std::set<std::string> &deps)
 
 std::string IndexAssignment::to_webcc()
 {
+    std::string val = value->to_webcc();
+    
+    // Wrap in webcc::move() for move assignments
+    if (is_move)
+    {
+        val = "webcc::move(" + val + ")";
+    }
+
     // Check if this is an index assignment on a component array with inline loop
     if (auto id = dynamic_cast<Identifier *>(array.get()))
     {
@@ -173,11 +194,11 @@ std::string IndexAssignment::to_webcc()
             std::string result;
             if (compound_op.empty())
             {
-                result = arr + "[" + idx + "] = " + value->to_webcc() + ";\n";
+                result = arr + "[" + idx + "] = " + val + ";\n";
             }
             else
             {
-                result = arr + "[" + idx + "] = " + arr + "[" + idx + "] " + compound_op + " " + value->to_webcc() + ";\n";
+                result = arr + "[" + idx + "] = " + arr + "[" + idx + "] " + compound_op + " " + val + ";\n";
             }
             // Move the DOM node to correct position
             // Get the element that should be after this one (or null if at end)
@@ -192,13 +213,13 @@ std::string IndexAssignment::to_webcc()
 
     if (compound_op.empty())
     {
-        return array->to_webcc() + "[" + index->to_webcc() + "] = " + value->to_webcc() + ";";
+        return array->to_webcc() + "[" + index->to_webcc() + "] = " + val + ";";
     }
     else
     {
         std::string arr = array->to_webcc();
         std::string idx = index->to_webcc();
-        return arr + "[" + idx + "] = " + arr + "[" + idx + "] " + compound_op + " " + value->to_webcc() + ";";
+        return arr + "[" + idx + "] = " + arr + "[" + idx + "] " + compound_op + " " + val + ";";
     }
 }
 
@@ -211,14 +232,22 @@ void IndexAssignment::collect_dependencies(std::set<std::string> &deps)
 
 std::string MemberAssignment::to_webcc()
 {
+    std::string val = value->to_webcc();
+    
+    // Wrap in webcc::move() for move assignments
+    if (is_move)
+    {
+        val = "webcc::move(" + val + ")";
+    }
+
     if (compound_op.empty())
     {
-        return object->to_webcc() + "." + member + " = " + value->to_webcc() + ";";
+        return object->to_webcc() + "." + member + " = " + val + ";";
     }
     else
     {
         std::string obj = object->to_webcc();
-        return obj + "." + member + " = " + obj + "." + member + " " + compound_op + " " + value->to_webcc() + ";";
+        return obj + "." + member + " = " + obj + "." + member + " " + compound_op + " " + val + ";";
     }
 }
 
@@ -265,7 +294,7 @@ std::string ExpressionStatement::to_webcc()
                     // IMPORTANT: push_back may reallocate the vector, invalidating all existing
                     // items' `this` pointers in their registered event handlers. We must rebind
                     // all existing items after push_back to update their handler lambdas.
-                    std::string item_expr = call->args[0]->to_webcc();
+                    std::string item_expr = call->args[0].value->to_webcc();
                     std::string parent_var = "_loop_" + std::to_string(info.loop_id) + "_parent";
                     std::string count_var = "_loop_" + std::to_string(info.loop_id) + "_count";
                     result = "{\n";

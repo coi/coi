@@ -1,0 +1,36 @@
+// Test: component construction with reference and move
+component Display(mut int& refValue, string ownedText) {
+    def increment() : void {
+        refValue++;
+    }
+
+    view {
+        <div>
+            <button onclick={increment}>Increment</button>
+            <span>Ref: {refValue}, Text: {ownedText}</span>
+        </div>
+    }
+}
+
+component ConstructRefMoveTest {
+    mut int counter = 0;
+    mut string message = "Hello";
+
+    def test() : void {
+        string temp = "World";
+        // Pass counter by reference, temp by move
+        Display display = Display(&refValue = counter, ownedText := temp);
+        // temp is moved, counter is still accessible
+    }
+
+    view {
+        <div>
+            <button onclick={test}>Test</button>
+            <span>Counter: {counter}</span>
+        </div>
+    }
+}
+
+app {
+    root = ConstructRefMoveTest;
+}

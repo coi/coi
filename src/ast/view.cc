@@ -81,7 +81,7 @@ static std::string build_lambda_params(FunctionCall *func_call)
     {
         if (i > 0)
             params += ", ";
-        if (auto *id = dynamic_cast<Identifier *>(func_call->args[i].get()))
+        if (auto *id = dynamic_cast<Identifier *>(func_call->args[i].value.get()))
         {
             params += "int32_t " + id->name;
         }
@@ -104,7 +104,7 @@ static std::string build_lambda_call(FunctionCall *func_call)
     {
         if (i > 0)
             result += ", ";
-        if (auto *id = dynamic_cast<Identifier *>(func_call->args[i].get()))
+        if (auto *id = dynamic_cast<Identifier *>(func_call->args[i].value.get()))
         {
             result += id->name;
         }

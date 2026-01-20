@@ -1,0 +1,21 @@
+// Test: Error - cannot copy a DOMElement (handle type)
+// DOMElement is @nocopy - it can only be moved or referenced
+component CopyDomElementFail {
+    mut DOMElement elem1;
+    mut DOMElement elem2;
+
+    init {
+        elem1 = DOMElement.createElement("div");
+        
+        // ERROR: Cannot copy DOMElement
+        elem2 = elem1;
+    }
+
+    view {
+        <div>Test</div>
+    }
+}
+
+app {
+    root = CopyDomElementFail;
+}

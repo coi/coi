@@ -1,0 +1,26 @@
+// Test: passing by move to function (:value)
+component FuncMoveTest {
+    mut string message = "Hello";
+
+    def consume(string text) : void {
+        // Function takes ownership of text
+        message = text;
+    }
+
+    def testMove() : void {
+        string temp = "World";
+        consume(:temp);
+        // temp is moved, cannot use it anymore
+    }
+
+    view {
+        <div>
+            <button onclick={testMove}>Test Move</button>
+            <span>Message: {message}</span>
+        </div>
+    }
+}
+
+app {
+    root = FuncMoveTest;
+}

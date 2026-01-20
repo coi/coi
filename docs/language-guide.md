@@ -278,6 +278,81 @@ count++;
 count--;
 ```
 
+### Move Assignment (`:=`)
+
+The move assignment operator `:=` transfers ownership of a value:
+
+```tsx
+string original = "Hello";
+string moved := original;  // Move original into moved
+// original is now invalid and cannot be used
+```
+
+## Reference and Move Semantics
+
+Coi supports explicit reference (`&`) and move (`:`) semantics for efficient value passing.
+
+### Reference (`&`)
+
+Pass a reference to allow the callee to read or modify the original value (borrowing):
+
+```tsx
+def increment(mut int& value) : void {
+    value++;  // Modifies the original
+}
+
+mut int count = 0;
+increment(&count);  // count is now 1
+```
+
+### Move (`:`)
+
+Transfer ownership of a value to the callee. The original variable becomes invalid:
+
+```tsx
+def consume(string text) : void {
+    // Function owns the string
+    System.log(text);
+}
+
+string msg = "Hello";
+consume(:msg);  // Ownership transferred
+// msg cannot be used anymore
+```
+
+### No-Copy Types
+
+Some types **cannot be copied** at all - they can only be moved or referenced. These are platform types that represent browser resources:
+
+```tsx
+// Platform types that cannot be copied:
+// Canvas, DOMElement, Audio, Image, WebSocket, etc.
+
+mut Canvas canvas1 = Canvas.createCanvas("c1", 800.0, 600.0);
+
+// ERROR: Cannot copy
+Canvas canvas2 = canvas1;
+
+// OK: Move ownership
+Canvas canvas2 := canvas1;  // canvas1 is now invalid
+
+// OK: Reference (& is part of the type declaration)
+Canvas& ref = canvas1;  // Both valid
+
+// OK: Fresh value from factory
+Canvas canvas3 = Canvas.createCanvas("c3", 400.0, 300.0);
+```
+
+This restriction prevents accidental duplication of browser resources and ensures clear ownership.
+
+### Summary
+
+| Syntax | Meaning | Original After Call |
+|--------|---------|--------------------|
+| `func(value)` | Copy | Valid (unchanged) |
+| `func(&value)` | Borrow (reference) | Valid (may be modified) |
+| `func(:value)` | Move (transfer ownership) | Invalid |
+
 ## Functions
 
 Functions are defined with the `def` keyword:

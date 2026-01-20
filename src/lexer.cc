@@ -243,6 +243,11 @@ std::vector<Token> Lexer::tokenize(){
             advance(); advance();
             continue;
         }
+        if (current() == ':' && peek() == '=') {
+            tokens.push_back(make_token(TokenType::MOVE_ASSIGN, ":="));
+            advance(); advance();
+            continue;
+        }
 
         // Single-character tokens
         switch (current()) {

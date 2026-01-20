@@ -5,6 +5,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 # Colors for output
+COI_COLOR='\033[38;2;148;119;255m'  # #9477FF
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
@@ -24,6 +25,37 @@ fi
 
 echo "Running tests..."
 FAILURES=0
+FAILED_TESTS=()
+TOTAL=0
+PASSED=0
+
+# Count total tests
+TOTAL=$(find "$SCRIPT_DIR" -name "*_pass.coi" -o -name "*_fail.coi" | wc -l)
+
+# Function to draw progress bar
+draw_progress_bar() {
+    local current=$1
+    local total=$2
+    local width=50
+    
+    # Calculate filled width
+    local filled=$((current * width / total))
+    
+    # Build the bar
+    printf "\r["
+    
+    # Draw filled portion in coi color
+    for ((i=0; i<filled; i++)); do
+        printf "${COI_COLOR}█${NC}"
+    done
+    
+    # Draw empty portion
+    for ((i=filled; i<width; i++)); do
+        printf "░"
+    done
+    
+    printf "] %d/%d" "$current" "$total"
+}
 
 # Find all .coi files recursively
 while IFS= read -r -d '' test_file; do
@@ -35,34 +67,41 @@ while IFS= read -r -d '' test_file; do
     test_dir=$(dirname "$test_file")
     
     if [[ "$filename" == *"_pass.coi" ]]; then
-        echo -n "Running $rel_path (Expect Success)... "
         OUTPUT=$($COMPILER "$test_file" --cc-only 2>&1)
         if [ $? -eq 0 ]; then
-            echo -e "${GREEN}PASS${NC}"
+            PASSED=$((PASSED+1))
         else
-            echo -e "${RED}FAIL${NC}"
-            echo "Output: $OUTPUT"
+            FAILED_TESTS+=("$rel_path (expected success, got failure)")
             FAILURES=$((FAILURES+1))
         fi
     elif [[ "$filename" == *"_fail.coi" ]]; then
-        echo -n "Running $rel_path (Expect Failure)... "
         OUTPUT=$($COMPILER "$test_file" --cc-only 2>&1)
         if [ $? -ne 0 ]; then
-            echo -e "${GREEN}PASS${NC}"
+            PASSED=$((PASSED+1))
         else
-            echo -e "${RED}FAIL (Unexpected success)${NC}"
+            FAILED_TESTS+=("$rel_path (expected failure, got success)")
             FAILURES=$((FAILURES+1))
         fi
     fi
+    
+    # Show progress bar
+    CURRENT=$((PASSED + FAILURES))
+    draw_progress_bar "$CURRENT" "$TOTAL"
     
     # Clean up any generated .cc files
     rm -f "${test_file%.coi}.cc" "$test_dir/app.cc"
 done < <(find "$SCRIPT_DIR" -name "*.coi" -type f -print0 | sort -z)
 
+echo ""  # New line after progress
+
 if [ $FAILURES -eq 0 ]; then
-    echo -e "\n${GREEN}All tests passed!${NC}"
+    echo -e "${GREEN}All $TOTAL tests passed!${NC}"
     exit 0
 else
-    echo -e "\n${RED}$FAILURES tests failed.${NC}"
+    echo -e "${RED}$FAILURES test(s) failed:${NC}"
+    for failed_test in "${FAILED_TESTS[@]}"; do
+        echo -e "  ${RED}✗${NC} $failed_test"
+    done
+    echo -e "\n${GREEN}$PASSED passed${NC}, ${RED}$FAILURES failed${NC} out of $TOTAL tests"
     exit 1
 fi

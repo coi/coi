@@ -143,11 +143,24 @@ std::unique_ptr<Expression> Parser::parse_postfix() {
 }
 
 std::unique_ptr<Expression> Parser::parse_unary() {
+    // Unary operators: -, +, !
     if (current().type == TokenType::MINUS || current().type == TokenType::PLUS || current().type == TokenType::NOT) {
         std::string op = current().value;
         advance();
         auto operand = parse_unary();
         return std::make_unique<UnaryOp>(op, std::move(operand));
+    }
+    // Reference expression: &expr (borrow, pass by reference)
+    if (current().type == TokenType::AMPERSAND) {
+        advance();
+        auto operand = parse_unary();
+        return std::make_unique<ReferenceExpression>(std::move(operand));
+    }
+    // Move expression: :expr (transfer ownership)
+    if (current().type == TokenType::COLON) {
+        advance();
+        auto operand = parse_unary();
+        return std::make_unique<MoveExpression>(std::move(operand));
     }
     return parse_postfix();
 }
@@ -235,64 +248,82 @@ std::unique_ptr<Expression> Parser::parse_primary(){
             if(current().type == TokenType::LPAREN){
                 advance();
 
-                // Check if this is component construction (named args) or function call (positional args)
-                // Component construction: Name(&param: value) or Name(param: value)
-                // Function call: Name(value, value, ...)
-                bool is_component_construction = false;
-                if (current().type != TokenType::RPAREN) {
-                    // Look ahead to determine if this is named argument syntax
+                // Both function calls and component construction support the same argument syntax:
+                // Named args: Name(&param = value, param := value, param = value)
+                // Positional args: Name(&value, :value, value)
+                // The distinction between function call and component construction is semantic:
+                // - Component construction: simple uppercase identifier like MyComponent(...)
+                // - Function call: lowercase identifier, or any member access like obj.method() or Type.staticMethod()
+
+                // Check if this is a component construction (simple uppercase identifier)
+                // vs a function/method call (member access or lowercase identifier)
+                bool is_component = false;
+                if (dynamic_cast<Identifier*>(expr.get())) {
+                    // Simple identifier - component if uppercase
+                    is_component = std::isupper(name[0]);
+                }
+                // If expr is a MemberAccess, it's always a method call, not component construction
+
+                // Parse arguments - supports both named and positional syntax
+                std::vector<CallArg> parsed_args;
+                while (current().type != TokenType::RPAREN) {
+                    CallArg arg;
+
+                    // Check for reference prefix &
                     if (current().type == TokenType::AMPERSAND) {
-                        // &param: value syntax
-                        is_component_construction = true;
-                    } else if (current().type == TokenType::IDENTIFIER && peek().type == TokenType::COLON) {
-                        // param: value syntax
-                        is_component_construction = true;
+                        arg.is_reference = true;
+                        advance();
+                    }
+                    // Check for move prefix :
+                    else if (current().type == TokenType::COLON) {
+                        arg.is_move = true;
+                        advance();
+                    }
+
+                    // Check if this is a named argument: [&]name = value OR name := value
+                    bool is_named = false;
+                    if (current().type == TokenType::IDENTIFIER || current().type == TokenType::KEY) {
+                        if (peek().type == TokenType::ASSIGN || peek().type == TokenType::MOVE_ASSIGN) {
+                            is_named = true;
+                        }
+                    }
+
+                    if (is_named) {
+                        // Named argument
+                        arg.name = current().value;
+                        advance();
+
+                        // Check for := (move) or = (copy/reference)
+                        if (match(TokenType::MOVE_ASSIGN)) {
+                            arg.is_move = true;
+                        } else {
+                            expect(TokenType::ASSIGN, "Expected '=' or ':=' after parameter name");
+                        }
+
+                        arg.value = parse_expression();
+                    } else {
+                        // Positional argument
+                        arg.value = parse_expression();
+                    }
+
+                    parsed_args.push_back(std::move(arg));
+
+                    if (current().type == TokenType::COMMA) {
+                        advance();
                     }
                 }
+                expect(TokenType::RPAREN, "Expected ')'");
 
-                if (is_component_construction) {
-                    // Parse component construction with named arguments
+                if (is_component) {
+                    // Component construction
                     auto comp_expr = std::make_unique<ComponentConstruction>(expr->to_webcc());
-
-                    while (current().type != TokenType::RPAREN) {
-                        ComponentArg arg;
-
-                        // Check for reference prefix &
-                        if (current().type == TokenType::AMPERSAND) {
-                            arg.is_reference = true;
-                            advance();
-                        }
-
-                        // Parameter name (allow 'key' keyword as param name)
-                        arg.name = current().value;
-                        if (current().type == TokenType::IDENTIFIER || current().type == TokenType::KEY) {
-                            advance();
-                        } else {
-                            throw std::runtime_error("Expected parameter name at line " + std::to_string(current().line));
-                        }
-                        expect(TokenType::COLON, "Expected ':' after parameter name");
-
-                        // Value
-                        arg.value = parse_expression();
-
-                        comp_expr->args.push_back(std::move(arg));
-
-                        if (current().type == TokenType::COMMA) {
-                            advance();
-                        }
-                    }
-                    expect(TokenType::RPAREN, "Expected ')'");
+                    comp_expr->args = std::move(parsed_args);
                     expr = std::move(comp_expr);
                 } else {
-                    // Regular function call with positional arguments
+                    // Function call
                     auto call = std::make_unique<FunctionCall>(expr->to_webcc());
                     call->line = identifier_line;
-
-                    while(current().type != TokenType::RPAREN){
-                        call->args.push_back(parse_expression());
-                        if(current().type == TokenType::COMMA) advance();
-                    }
-                    expect(TokenType::RPAREN, "Expected ')'");
+                    call->args = std::move(parsed_args);
                     expr = std::move(call);
                 }
             }
@@ -523,7 +554,11 @@ std::unique_ptr<Statement> Parser::parse_statement(){
         var_decl->is_mutable = is_mutable;
         var_decl->is_reference = is_reference;
 
-        if(match(TokenType::ASSIGN)){
+        // Check for := (move) or = (copy)
+        if(match(TokenType::MOVE_ASSIGN)){
+            var_decl->is_move = true;
+            var_decl->initializer = parse_expression();
+        } else if(match(TokenType::ASSIGN)){
             var_decl->initializer = parse_expression();
         }
 
@@ -716,6 +751,7 @@ std::unique_ptr<Statement> Parser::parse_statement(){
     // Assignment
     if(current().type == TokenType::IDENTIFIER &&
         (peek().type == TokenType::ASSIGN ||
+        peek().type == TokenType::MOVE_ASSIGN ||
         peek().type == TokenType::PLUS_ASSIGN ||
         peek().type == TokenType::MINUS_ASSIGN ||
         peek().type == TokenType::STAR_ASSIGN ||
@@ -730,6 +766,11 @@ std::unique_ptr<Statement> Parser::parse_statement(){
 
         auto assign = std::make_unique<Assignment>();
         assign->name = name;
+        
+        // Check for move assignment
+        if (opType == TokenType::MOVE_ASSIGN) {
+            assign->is_move = true;
+        }
 
         auto val = parse_expression();
 
@@ -909,11 +950,14 @@ std::unique_ptr<ASTNode> Parser::parse_html_element(){
         comp->member_name = member_name;
         comp->component_name = component_type;
 
-        // Parse props (same as regular component props)
-        while(current().type == TokenType::IDENTIFIER || current().type == TokenType::AMPERSAND){
+        // Parse props (same as regular component props): &prop={value} = reference, :prop={value} = move
+        while(current().type == TokenType::IDENTIFIER || current().type == TokenType::AMPERSAND || current().type == TokenType::COLON){
             bool is_ref_prop = false;
+            bool is_move_prop = false;
             if(match(TokenType::AMPERSAND)){
                 is_ref_prop = true;
+            } else if(match(TokenType::COLON)){
+                is_move_prop = true;
             }
             std::string prop_name = current().value;
             advance();
@@ -952,6 +996,7 @@ std::unique_ptr<ASTNode> Parser::parse_html_element(){
             cprop.name = prop_name;
             cprop.value = std::move(prop_value);
             cprop.is_reference = is_ref_prop;
+            cprop.is_move = is_move_prop;
             comp->props.push_back(std::move(cprop));
         }
 
@@ -980,11 +1025,14 @@ std::unique_ptr<ASTNode> Parser::parse_html_element(){
         comp->line = start_line;
         comp->component_name = tag;
 
-        // Props
-        while(current().type == TokenType::IDENTIFIER || current().type == TokenType::AMPERSAND){
+        // Props: &prop={value} = reference, :prop={value} = move, prop={value} = copy
+        while(current().type == TokenType::IDENTIFIER || current().type == TokenType::AMPERSAND || current().type == TokenType::COLON){
             bool is_ref_prop = false;
+            bool is_move_prop = false;
             if(match(TokenType::AMPERSAND)){
                 is_ref_prop = true;
+            } else if(match(TokenType::COLON)){
+                is_move_prop = true;
             }
             std::string prop_name = current().value;
             advance();
@@ -1024,6 +1072,7 @@ std::unique_ptr<ASTNode> Parser::parse_html_element(){
             cprop.name = prop_name;
             cprop.value = std::move(prop_value);
             cprop.is_reference = is_ref_prop;
+            cprop.is_move = is_move_prop;
             comp->props.push_back(std::move(cprop));
         }
 

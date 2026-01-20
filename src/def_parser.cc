@@ -427,6 +427,10 @@ std::optional<TypeDef> DefParser::parse_type()
         {
             type_def.is_builtin = true;
         }
+        else if (name == "nocopy")
+        {
+            type_def.is_nocopy = true;
+        }
         else if (name == "alias")
         {
             type_def.alias_of = value;
@@ -656,6 +660,7 @@ bool DefSchema::load_cache(const std::string &cache_path)
         TypeDef type_def;
         type_def.name = read_string();
         type_def.is_builtin = file.get() != 0;
+        type_def.is_nocopy = file.get() != 0;
         type_def.extends = read_string();
         type_def.alias_of = read_string();
 
@@ -713,6 +718,7 @@ bool DefSchema::save_cache(const std::string &cache_path)
     {
         write_string(type_def.name);
         file.put(type_def.is_builtin ? 1 : 0);
+        file.put(type_def.is_nocopy ? 1 : 0);
         write_string(type_def.extends);
         write_string(type_def.alias_of);
 
@@ -810,6 +816,41 @@ bool DefSchema::is_handle(const std::string &type_name) const
     if (!type_it->second.extends.empty())
     {
         return is_handle(type_it->second.extends);
+    }
+
+    return false;
+}
+
+bool DefSchema::is_nocopy(const std::string &type_name) const
+{
+    // Handle array types - check the element type
+    std::string base_type = type_name;
+    if (type_name.ends_with("[]"))
+    {
+        base_type = type_name.substr(0, type_name.length() - 2);
+    }
+    else
+    {
+        // Check for fixed-size array T[N]
+        size_t bracket_pos = type_name.rfind('[');
+        if (bracket_pos != std::string::npos && type_name.back() == ']')
+        {
+            base_type = type_name.substr(0, bracket_pos);
+        }
+    }
+
+    auto type_it = types_.find(base_type);
+    if (type_it == types_.end())
+        return false;
+
+    // Check if this type has @nocopy
+    if (type_it->second.is_nocopy)
+        return true;
+
+    // Check parent type (inheritance)
+    if (!type_it->second.extends.empty())
+    {
+        return is_nocopy(type_it->second.extends);
     }
 
     return false;

@@ -245,15 +245,26 @@ component App {
 ### Passing Props
 
 ```tsx
-// Value props
+// Value props (copied)
 <Button label="Click me" size={24} />
 
-// Reference props (two-way binding)
+// Reference props (two-way binding with &)
 <Counter &count={score} />
 
+// Move props (transfer ownership with :)
+<Consumer :data={text} />
+
 // Callback props
-<ListItem &onRemove={handleRemove(id)} />
+<ListItem &onRemove={handleRemove} />
 ```
+
+### Prop Passing Summary
+
+| Syntax | Mode | Description |
+|--------|------|-------------|
+| `prop={value}` | Copy | Value is copied to child |
+| `&prop={value}` | Reference | Child can modify parent's value |
+| `:prop={value}` | Move | Ownership transferred to child |
 
 ### Component Member References
 

@@ -268,6 +268,12 @@ int main() {
             out << "\n";
             out << "// =========================================================\n\n";
             
+            // Add @nocopy annotation for handle types (they are browser resources
+            // that cannot be copied, only moved or referenced)
+            // Skip if it extends another type - it will inherit @nocopy from parent
+            if (extends.empty()) {
+                out << "@nocopy\n";
+            }
             out << "type " << handle_type;
             if (!extends.empty()) {
                 out << " extends " << extends;
@@ -431,6 +437,7 @@ int main() {
                 out << "type " << handle << " extends " << extends << " {}\n\n";
             } else {
                 out << "// " << handle << "\n";
+                out << "@nocopy\n";
                 out << "type " << handle << " {}\n\n";
             }
         }

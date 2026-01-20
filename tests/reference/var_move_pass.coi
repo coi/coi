@@ -1,0 +1,26 @@
+// Test: variable declaration with move assignment
+component VarMoveTest {
+    mut string result = "";
+
+    def createString() : string {
+        return "Created";
+    }
+
+    def test() : void {
+        string temp = "Temporary";
+        string moved := :temp;  // Move temp into moved
+        // temp cannot be used now
+        result = moved;
+    }
+
+    view {
+        <div>
+            <button onclick={test}>Test</button>
+            <span>Result: {result}</span>
+        </div>
+    }
+}
+
+app {
+    root = VarMoveTest;
+}

@@ -1,0 +1,23 @@
+// Test: Error - passing move (:) when function expects reference
+component MoveToRefFail {
+    mut int value = 5;
+
+    def takeRef(mut int& val) : void {
+        // This function expects a reference
+        val++;
+    }
+
+    def test() : void {
+        takeRef(:value);  // ERROR: Cannot pass :value to reference parameter
+    }
+
+    view {
+        <div>
+            <button onclick={test}>Test</button>
+        </div>
+    }
+}
+
+app {
+    root = MoveToRefFail;
+}

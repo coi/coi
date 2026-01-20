@@ -38,6 +38,7 @@ struct ComponentProp {
     std::string name;
     std::unique_ptr<Expression> value;
     bool is_reference = false;
+    bool is_move = false;
     bool is_mutable_def = false;
     bool is_callback = false;
     std::vector<std::string> callback_param_types;
