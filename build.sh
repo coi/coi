@@ -2,6 +2,18 @@
 
 set -e
 
+# Ensure git submodules are up to date (deps/webcc)
+if [ -d ".git" ] && [ -f ".gitmodules" ]; then
+    if [ -d "deps/webcc/.git" ] || grep -q "submodule.*webcc" .gitmodules; then
+        # Check if submodule is out of sync
+        GIT_SUBMODULE_STATUS=$(git submodule status -- deps/webcc 2>/dev/null || echo "")
+        if echo "$GIT_SUBMODULE_STATUS" | grep -q '^[-+]'; then
+            echo "[Coi] Updating git submodules (deps/webcc)..."
+            git submodule update --init --recursive deps/webcc
+        fi
+    fi
+fi
+
 # Parse arguments
 REBUILD_WEBCC=false
 REBUILD_SCHEMA=false
