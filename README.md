@@ -8,23 +8,42 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Us-7289da?logo=discord&logoColor=white)](https://discord.gg/KSpWx78wuR)
 
-A component-based language for high-performance web apps.  
-**Fast. Minimal. Type-safe.**
+A modern, component-based language for building reactive web apps.  
+**Type-safe. Fast. WASM-powered.**
 
-Compiles to WASM, JS, and HTML with tiny binaries and efficient updates for DOM, Canvas, and beyond.
+For developers who want the productivity of component-based frameworks with the performance of native code. Fine-grained reactivity, strict typing, and zero GC pauses.
 
 </div>
 
 > [!NOTE]
 > Coi is actively evolving. Some syntax may change in future releases.
 
+## What You Can Build
+
+Coi is designed for building reactive, interactive web applications:
+
+- **Web Apps**: Dashboards, admin panels, SPAs with real-time updates
+- **Data Visualization**: Interactive charts, graphs, analytics tools with thousands of elements
+- **Content-Heavy Sites**: Blogs, documentation sites, landing pages with dynamic components
+- **Canvas Apps**: Drawing tools, image editors, animations, or even games
+
+Whether you're building a typical web app or something graphics-intensive, Coi gives you composable components, fine-grained reactivity, type safety, and WASM performance.
+
 ## Features
 
+### Performance
 - **Fine-Grained Reactivity**: State changes map directly to DOM elements at compile-time. No Virtual DOM overhead.
-- **Type-Safe Components**: Compile-time error checking with strictly typed parameters and state.
-- **Reference Parameters**: Pass state by reference with `&` for seamless parent-child synchronization.
-- **Private by Default**: Component members are private; use `pub` to expose them.
+- **No Garbage Collector**: Deterministic memory management with zero GC pauses. Predictable performance for animations and real-time apps.
 - **Minimal Runtime**: Tiny WASM binaries with high-performance updates for DOM, Canvas, and more.
+
+### Type System & Safety
+- **Strict Typing**: Compile-time error checking with strongly typed parameters and state.
+- **Reference Parameters**: Pass state by reference with `&` for seamless parent-child synchronization.
+- **Move Semantics**: Explicit ownership transfer with `:` to prevent accidental copying.
+- **Private by Default**: Component members are private; use `pub` to expose them.
+
+### Developer Experience
+- **Component-Based**: Composable, reusable components with props, state, and lifecycle blocks.
 - **Integrated DOM & Styling**: Write HTML elements and scoped CSS directly in components.
 - **View Control Flow**: Declarative `<if>`, `<else>`, and `<for>` tags for conditional rendering and iteration.
 - **Component Lifecycle**: Built-in `init {}`, `mount {}`, and `tick {}` blocks for setup and animations.
