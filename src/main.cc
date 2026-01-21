@@ -4,6 +4,7 @@
 #include "def_parser.h"
 #include "type_checker.h"
 #include "cli.h"
+#include "error.h"
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -212,8 +213,8 @@ static void load_def_schema() {
     if (!exe_dir.empty() && fs::exists(exe_dir / "def")) {
         def_dir = (exe_dir / "def").string();
     } else {
-        std::cerr << "Error: Could not find 'def' directory next to executable" << std::endl;
-        std::cerr << "Expected location: " << (exe_dir / "def").string() << std::endl;
+        ErrorHandler::cli_error("Could not find 'def' directory next to executable",
+                               "Expected location: " + (exe_dir / "def").string());
         exit(1);
     }
     
@@ -375,7 +376,7 @@ std::vector<Component *> topological_sort_components(std::vector<Component> &com
     // Check for cycles
     if (sorted.size() != components.size())
     {
-        throw std::runtime_error("Circular dependency detected among components");
+        ErrorHandler::compiler_error("Circular dependency detected among components", -1);
     }
 
     return sorted;
@@ -415,7 +416,7 @@ int main(int argc, char **argv)
     if (first_arg == "--def-path") {
         fs::path exe_dir = get_executable_dir();
         if (exe_dir.empty()) {
-            std::cerr << "Error: could not determine executable directory" << std::endl;
+            ErrorHandler::cli_error("could not determine executable directory");
             return 1;
         }
         fs::path def_dir = exe_dir / "def";
@@ -461,7 +462,7 @@ int main(int argc, char **argv)
             }
             else
             {
-                std::cerr << "Error: --out requires an argument" << std::endl;
+                ErrorHandler::cli_error("--out requires an argument");
                 return 1;
             }
         }

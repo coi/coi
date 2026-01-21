@@ -1,6 +1,7 @@
 // Definition file parser implementation
 
 #include "def_parser.h"
+#include "error.h"
 #include <fstream>
 #include <sstream>
 #include <filesystem>

@@ -1,5 +1,6 @@
 #include "type_checker.h"
 #include "def_parser.h"
+#include "error.h"
 #include <iostream>
 #include <algorithm>
 #include <set>
@@ -248,8 +249,7 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
         {
             if (scope.find(id->name) == scope.end())
             {
-                std::cerr << "\033[1;31mError:\033[0m Undefined variable '" << id->name 
-                          << "' in member access at line " << member->line << std::endl;
+                ErrorHandler::type_error("Undefined variable '" + id->name + "' in member access", member->line);
                 exit(1);
             }
         }
@@ -292,8 +292,7 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
             }
             if (operand_type != "unknown")
             {
-                std::cerr << "\033[1;31mError:\033[0m Unary '" << unary->op << "' operator requires numeric type, got '"
-                          << operand_type << "' at line " << unary->line << std::endl;
+                ErrorHandler::type_error("Unary '" + unary->op + "' operator requires numeric type, got '" + operand_type + "'", unary->line);
                 exit(1);
             }
             return "unknown";
@@ -321,8 +320,7 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
         // Both sides should have compatible types
         if (!is_compatible_type(true_type, false_type) && !is_compatible_type(false_type, true_type))
         {
-            std::cerr << "Type error: Ternary operator branches have incompatible types '"
-                      << true_type << "' and '" << false_type << "'" << std::endl;
+            ErrorHandler::type_error("Ternary operator branches have incompatible types '" + true_type + "' and '" + false_type + "'", -1);
             exit(1);
         }
         

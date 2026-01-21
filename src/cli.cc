@@ -1,4 +1,5 @@
 #include "cli.h"
+#include "error.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -73,7 +74,7 @@ static bool copy_template_file(const fs::path& src, const fs::path& dest,
                                 const std::map<std::string, std::string>& vars) {
     std::ifstream in(src);
     if (!in) {
-        std::cerr << RED << "error" << RESET << ": Cannot read template file: " << src << std::endl;
+        ErrorHandler::cli_error("Cannot read template file: " + src.string());
         return false;
     }
     
@@ -83,7 +84,7 @@ static bool copy_template_file(const fs::path& src, const fs::path& dest,
     
     std::ofstream out(dest);
     if (!out) {
-        std::cerr << RED << "error" << RESET << ": Cannot write file: " << dest << std::endl;
+        ErrorHandler::cli_error("Cannot write file: " + dest.string());
         return false;
     }
     out << content;
@@ -105,8 +106,8 @@ static bool is_valid_project_name(const std::string& name) {
 int init_project(const std::string& project_name_arg) {
     fs::path templates_dir = get_templates_dir();
     if (templates_dir.empty() || !fs::exists(templates_dir)) {
-        std::cerr << RED << "error" << RESET << ": Could not find templates directory." << std::endl;
-        std::cerr << "Make sure you're running the coi binary from the repository." << std::endl;
+        ErrorHandler::cli_error("Could not find templates directory.",
+                               "Make sure you're running the coi binary from the repository.");
         return 1;
     }
     
@@ -138,16 +139,15 @@ int init_project(const std::string& project_name_arg) {
     
     if (!is_valid_project_name(project_name)) {
         std::cerr << std::endl;
-        std::cerr << RED << "error" << RESET << ": Invalid project name '" << project_name << "'" << std::endl;
-        std::cerr << DIM << "Project name must start with a letter or underscore, and contain only" << std::endl;
-        std::cerr << "letters, numbers, hyphens, and underscores." << RESET << std::endl;
+        ErrorHandler::cli_error("Invalid project name '" + project_name + "'",
+                               "Project name must start with a letter or underscore, and contain only\nletters, numbers, hyphens, and underscores.");
         return 1;
     }
     
     fs::path project_dir = fs::current_path() / project_name;
     
     if (fs::exists(project_dir)) {
-        std::cerr << RED << "error" << RESET << ": Directory '" << project_name << "' already exists." << std::endl;
+        ErrorHandler::cli_error("Directory '" + project_name + "' already exists.");
         return 1;
     }
     
@@ -206,8 +206,8 @@ int build_project(bool keep_cc, bool cc_only, bool silent_banner) {
     
     fs::path entry = find_entry_point();
     if (entry.empty()) {
-        std::cerr << RED << "error" << RESET << ": No " << BOLD << "src/App.coi" << RESET << " found in current directory." << std::endl;
-        std::cerr << DIM << "Make sure you're in a Coi project directory." << RESET << std::endl;
+        ErrorHandler::cli_error("No src/App.coi found in current directory.",
+                               "Make sure you're in a Coi project directory.");
         return 1;
     }
     
@@ -248,8 +248,7 @@ int build_project(bool keep_cc, bool cc_only, bool silent_banner) {
     int ret = system(cmd.c_str());
     
     if (ret != 0) {
-        std::cerr << std::endl;
-        std::cerr << RED << "✗" << RESET << " Build failed" << std::endl;
+        ErrorHandler::build_failed();
         return 1;
     }
     

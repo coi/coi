@@ -1,5 +1,6 @@
 #include "parser.h"
 #include "def_parser.h"
+#include "error.h"
 #include <stdexcept>
 #include <iostream>
 #include <limits>
@@ -26,7 +27,7 @@ bool Parser::match(TokenType type){
 
 void Parser::expect(TokenType type, const std::string& msg){
     if(!match(type)){
-        throw std::runtime_error(msg + " at line " + std::to_string(current().line));
+        ErrorHandler::compiler_error(msg, current().line);
     }
 }
 
@@ -189,9 +190,9 @@ std::unique_ptr<Expression> Parser::parse_primary(){
             }
             value = static_cast<int>(ll_value);
         } catch (const std::out_of_range&) {
-            throw std::runtime_error("Integer literal '" + current().value + "' is too large at line " + std::to_string(current().line));
+            ErrorHandler::compiler_error("Integer literal '" + current().value + "' is too large", current().line);
         } catch (const std::invalid_argument&) {
-            throw std::runtime_error("Invalid integer literal '" + current().value + "' at line " + std::to_string(current().line));
+            ErrorHandler::compiler_error("Invalid integer literal '" + current().value + "'", current().line);
         }
         advance();
         return std::make_unique<IntLiteral>(value);
@@ -203,9 +204,9 @@ std::unique_ptr<Expression> Parser::parse_primary(){
         try {
             value = std::stod(current().value);
         } catch (const std::out_of_range&) {
-            throw std::runtime_error("Float literal '" + current().value + "' is too large at line " + std::to_string(current().line));
+            ErrorHandler::compiler_error("Float literal '" + current().value + "' is too large", current().line);
         } catch (const std::invalid_argument&) {
-            throw std::runtime_error("Invalid float literal '" + current().value + "' at line " + std::to_string(current().line));
+            ErrorHandler::compiler_error("Invalid float literal '" + current().value + "'", current().line);
         }
         advance();
         return std::make_unique<FloatLiteral>(value);
@@ -378,7 +379,7 @@ std::unique_ptr<Expression> Parser::parse_primary(){
 
             // Count must be an integer literal (compile-time constant)
             if (current().type != TokenType::INT_LITERAL) {
-                throw std::runtime_error("Array repeat count must be an integer literal at line " + std::to_string(current().line));
+                ErrorHandler::compiler_error("Array repeat count must be an integer literal", current().line);
             }
             repeat->count = std::stoi(current().value);
             advance();
@@ -407,7 +408,7 @@ std::unique_ptr<Expression> Parser::parse_primary(){
         return expr;
     }
 
-    throw std::runtime_error("Unexpected token in expression: " + current().value + " (Type: " + std::to_string((int)current().type) + ") at line " + std::to_string(current().line));
+    ErrorHandler::compiler_error("Unexpected token in expression: " + current().value + " (Type: " + std::to_string((int)current().type) + ")", current().line);
 }
 
 std::unique_ptr<Statement> Parser::parse_statement(){
@@ -470,7 +471,7 @@ std::unique_ptr<Statement> Parser::parse_statement(){
             return forEach;
         }
 
-        throw std::runtime_error("Unexpected token after 'for'. Expected range 'i in start:end' or foreach 'i in array'. C-style for loops are not supported.");
+        ErrorHandler::compiler_error("Unexpected token after 'for'. Expected range 'i in start:end' or foreach 'i in array'. C-style for loops are not supported.", -1);
     }
 
     // Return
@@ -565,7 +566,7 @@ std::unique_ptr<Statement> Parser::parse_statement(){
         expect(TokenType::SEMICOLON, "Expected ';'");
         return var_decl;
     } else if (is_mutable) {
-        throw std::runtime_error("Expected type after 'mut'");
+        ErrorHandler::compiler_error("Expected type after 'mut'", -1);
     }
 
     // Assignment to array element: arr[i] = value or arr[i] += value etc.
@@ -834,7 +835,7 @@ std::unique_ptr<StructDef> Parser::parse_struct(){
             current().type == TokenType::IDENTIFIER){
             advance();
         } else {
-            throw std::runtime_error("Expected type in struct");
+            ErrorHandler::compiler_error("Expected type in struct", -1);
         }
 
         std::string fieldName = current().value;
@@ -1018,7 +1019,7 @@ std::unique_ptr<ASTNode> Parser::parse_html_element(){
     if(is_component){
         // Error if tag is a built-in handle type
         if (DefSchema::instance().is_handle(tag)) {
-            throw std::runtime_error("Type '" + tag + "' cannot be used as a component tag at line " + std::to_string(start_line));
+            ErrorHandler::compiler_error("Type '" + tag + "' cannot be used as a component tag", start_line);
         }
 
         auto comp = std::make_unique<ComponentInstantiation>();
@@ -1083,7 +1084,7 @@ std::unique_ptr<ASTNode> Parser::parse_html_element(){
         }
 
         expect(TokenType::GT, "Expected '>'");
-        throw std::runtime_error("Custom components must be self-closing for now: " + tag);
+        ErrorHandler::compiler_error("Custom components must be self-closing for now: " + tag, -1);
     }
 
     auto el = std::make_unique<HTMLElement>();
