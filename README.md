@@ -131,6 +131,12 @@ app {
 
 ### Install
 
+**Prerequisites:**
+- Clang 16+ (required for full C++20 support)
+  - Ubuntu/Debian: `sudo apt install clang-16`
+  - macOS: `brew install llvm`
+  - Fedora: `sudo dnf install clang`
+
 ```bash
 git clone https://github.com/io-eric/coi.git
 cd coi
