@@ -17,17 +17,19 @@
 #include "../deps/webcc/src/cli/webcc_schema.h"
 
 // Functions that are handled by Coi language constructs (not exposed directly)
+// Format: "namespace::function_name" to allow same function names in different namespaces
 static const std::set<std::string> EXCLUDED_FUNCTIONS = {
-    "set_main_loop",            // Handled by tick {}
-    "add_click_listener",       // Handled by onClick attribute
-    "init_keyboard",            // Called internally when Input.isKeyDown is used
-    "init_mouse",               // Handled by onMouseDown/onMouseMove/onMouseUp attributes
-    "create_element_deferred",  // Internal compiler function
-    "create_comment_deferred",  // Internal compiler function
-    "add_input_listener",       // Handled by onInput attribute
-    "add_change_listener",      // Handled by onChange attribute
-    "add_keydown_listener",     // Handled by onKeydown attribute
-    "random",                   // System.random() - built-in wasm random
+    "system::set_main_loop",            // Handled by tick {}
+    "dom::add_click_listener",          // Handled by onClick attribute
+    "input::init_keyboard",             // Called internally when Input.isKeyDown is used
+    "input::init_mouse",                // Handled by onMouseDown/onMouseMove/onMouseUp attributes
+    "dom::create_element_deferred",     // Internal compiler function
+    "dom::create_comment_deferred",     // Internal compiler function
+    "dom::add_input_listener",          // Handled by onInput attribute
+    "dom::add_change_listener",         // Handled by onChange attribute
+    "dom::add_keydown_listener",        // Handled by onKeydown attribute
+    "system::random",                   // System.random() - built-in wasm random
+    "websocket::connect",               // WebSocket.connect with callbacks handled via intrinsic
 };
 
 // Convert snake_case to camelCase for Coi function names
@@ -165,8 +167,8 @@ int main() {
     std::map<std::string, std::set<std::string>> handles_by_ns;  // Track which handles belong to which namespace
     
     for (const auto* c = webcc::SCHEMA_COMMANDS; !c->ns.empty(); ++c) {
-        // Skip excluded functions
-        if (EXCLUDED_FUNCTIONS.count(c->func_name)) {
+        // Skip excluded functions (check namespace::function_name)
+        if (EXCLUDED_FUNCTIONS.count(c->ns + "::" + c->func_name)) {
             continue;
         }
         // Skip functions with func_ptr params (not supported in Coi)
@@ -326,6 +328,28 @@ int main() {
                     
                     out << "): " << return_type << "\n\n";
                 }
+            }
+            
+            // Inject WebSocket intrinsics (connect + callback registration)
+            if (handle_type == "WebSocket") {
+                out << "    // WebSocket.connect with optional callback parameters (compiler intrinsic)\n";
+                out << "    @intrinsic(\"ws_connect\")\n";
+                out << "    shared def connect(string url, "
+                    << "def onMessage(string) : void = void, "
+                    << "def onOpen() : void = void, "
+                    << "def onClose() : void = void, "
+                    << "def onError() : void = void"
+                    << "): WebSocket\n\n";
+                
+                out << "    // WebSocket callback registration (compiler intrinsics)\n";
+                out << "    @intrinsic(\"ws_on_message\")\n";
+                out << "    def onMessage(def callback(string) : void): void\n\n";
+                out << "    @intrinsic(\"ws_on_open\")\n";
+                out << "    def onOpen(def callback : void): void\n\n";
+                out << "    @intrinsic(\"ws_on_close\")\n";
+                out << "    def onClose(def callback : void): void\n\n";
+                out << "    @intrinsic(\"ws_on_error\")\n";
+                out << "    def onError(def callback : void): void\n";
             }
             
             out << "}\n\n";

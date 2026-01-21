@@ -100,8 +100,9 @@ if [ "$REBUILD_SCHEMA" = true ]; then
     # Remove generated schema files to force regeneration
     rm -f src/coi_schema.h src/coi_schema.cc
     rm -f build/gen_schema build/obj/gen_schema.o
-    # Also regenerate .d.coi definition files
-    rm -f def/*.d.coi
+    # Also regenerate .d.coi definition files and cache
+    rm -rf def/.cache/
+    rm -rf def/web/
 fi
 
 if ! command -v ninja >/dev/null 2>&1; then

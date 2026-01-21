@@ -1,0 +1,47 @@
+// Test: WebSocket callback registration - should pass
+// Tests the new callback-based WebSocket API with named arguments
+
+component TestWebSocketCallback {
+    mut WebSocket ws;
+    mut string lastMessage = "";
+    mut bool connected = false;
+
+    def handleMessage(string msg) : void {
+        lastMessage = msg;
+    }
+
+    def handleOpen() : void {
+        connected = true;
+        ws.send("Hello server!");
+    }
+
+    def handleClose() : void {
+        connected = false;
+    }
+
+    def handleError() : void {
+        connected = false;
+    }
+
+    mount {
+        // Connect to WebSocket with callback handlers
+        ws = WebSocket.connect(
+            "ws://localhost:8080",
+            &onMessage = handleMessage,
+            &onOpen = handleOpen,
+            &onClose = handleClose,
+            &onError = handleError
+        );
+    }
+
+    view {
+        <div>
+            <p>Status: {connected ? "Connected" : "Disconnected"}</p>
+            <p>Last message: {lastMessage}</p>
+        </div>
+    }
+}
+
+app {
+    root = TestWebSocketCallback;
+}

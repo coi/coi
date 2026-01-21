@@ -679,6 +679,11 @@ int main(int argc, char **argv)
         out << "Dispatcher<webcc::function<void(const webcc::string&)>> g_input_dispatcher;\n";
         out << "Dispatcher<webcc::function<void(const webcc::string&)>> g_change_dispatcher;\n";
         out << "Dispatcher<webcc::function<void(int)>> g_keydown_dispatcher;\n";
+        out << "// WebSocket event dispatchers\n";
+        out << "Dispatcher<webcc::function<void(const webcc::string&)>> g_ws_message_dispatcher;\n";
+        out << "Dispatcher<webcc::function<void()>> g_ws_open_dispatcher;\n";
+        out << "Dispatcher<webcc::function<void()>> g_ws_close_dispatcher;\n";
+        out << "Dispatcher<webcc::function<void()>> g_ws_error_dispatcher;\n";
         out << "bool g_key_state[256] = {};\n";
         out << "int g_view_depth = 0;\n\n";
 
@@ -745,6 +750,14 @@ int main(int argc, char **argv)
         out << "            if (auto evt = e.as<webcc::input::KeyDownEvent>()) { if (evt->key_code >= 0 && evt->key_code < 256) g_key_state[evt->key_code] = true; }\n";
         out << "        } else if (e.opcode == webcc::input::KeyUpEvent::OPCODE) {\n";
         out << "            if (auto evt = e.as<webcc::input::KeyUpEvent>()) { if (evt->key_code >= 0 && evt->key_code < 256) g_key_state[evt->key_code] = false; }\n";
+        out << "        } else if (e.opcode == webcc::websocket::MessageEvent::OPCODE) {\n";
+        out << "            if (auto evt = e.as<webcc::websocket::MessageEvent>()) g_ws_message_dispatcher.dispatch(evt->handle, webcc::string(evt->data));\n";
+        out << "        } else if (e.opcode == webcc::websocket::OpenEvent::OPCODE) {\n";
+        out << "            if (auto evt = e.as<webcc::websocket::OpenEvent>()) g_ws_open_dispatcher.dispatch(evt->handle);\n";
+        out << "        } else if (e.opcode == webcc::websocket::CloseEvent::OPCODE) {\n";
+        out << "            if (auto evt = e.as<webcc::websocket::CloseEvent>()) g_ws_close_dispatcher.dispatch(evt->handle);\n";
+        out << "        } else if (e.opcode == webcc::websocket::ErrorEvent::OPCODE) {\n";
+        out << "            if (auto evt = e.as<webcc::websocket::ErrorEvent>()) g_ws_error_dispatcher.dispatch(evt->handle);\n";
         out << "        }\n";
         out << "    }\n";
         out << "}\n\n";

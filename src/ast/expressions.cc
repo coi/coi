@@ -33,6 +33,22 @@ static std::string expand_inline_template(const std::string& tmpl, const std::st
     return result;
 }
 
+// Helper to generate WebSocket dispatcher registration code
+static std::string generate_ws_dispatcher(const std::string& event_type,
+                                          const std::string& ws_obj,
+                                          const std::string& callback) {
+    if (event_type == "onMessage") {
+        return "g_ws_message_dispatcher.set(" + ws_obj + ", [this](const webcc::string& msg) { this->" + callback + "(msg); })";
+    } else if (event_type == "onOpen") {
+        return "g_ws_open_dispatcher.set(" + ws_obj + ", [this]() { this->" + callback + "(); })";
+    } else if (event_type == "onClose") {
+        return "g_ws_close_dispatcher.set(" + ws_obj + ", [this]() { this->" + callback + "(); })";
+    } else if (event_type == "onError") {
+        return "g_ws_error_dispatcher.set(" + ws_obj + ", [this]() { this->" + callback + "(); })";
+    }
+    return "";
+}
+
 // Helper to generate intrinsic code
 static std::string generate_intrinsic(const std::string& intrinsic_name,
                                       const std::vector<CallArg>& args) {
@@ -48,6 +64,33 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
     if (intrinsic_name == "key_up" && args.size() == 1) {
         return "!g_key_state[" + args[0].value->to_webcc() + "]";
     }
+    
+    // WebSocket.create with named callback arguments
+    // Usage: WebSocket.create("url", &onMessage = handler, &onOpen = handler, ...)
+    if (intrinsic_name == "ws_create") {
+        if (args.empty()) return "";
+        
+        std::string url = args[0].value->to_webcc();
+        std::string code = "[&]() {\n";
+        code += "            auto _ws = webcc::websocket::connect(" + url + ");\n";
+        
+        // Process named callback arguments
+        for (size_t i = 1; i < args.size(); i++) {
+            const auto& arg = args[i];
+            if (arg.name.empty()) continue;
+            
+            std::string callback = arg.value->to_webcc();
+            std::string dispatcher_code = generate_ws_dispatcher(arg.name, "_ws", callback);
+            if (!dispatcher_code.empty()) {
+                code += "            " + dispatcher_code + ";\n";
+            }
+        }
+        
+        code += "            return _ws;\n";
+        code += "        }()";
+        return code;
+    }
+    
     return "";  // Unknown intrinsic
 }
 
@@ -333,11 +376,13 @@ std::string FunctionCall::to_webcc() {
             for (const auto& [type_name, type_def] : DefSchema::instance().types()) {
                 if (!type_def.is_builtin && !type_def.methods.empty()) {
                     for (const auto& m : type_def.methods) {
-                        if (m.name == method_name && !m.is_shared && m.mapping_type == MappingType::Map) {
-                            map_method = &m;
-                            pass_obj = true;
-                            obj_arg = obj;
-                            break;
+                        if (m.name == method_name && !m.is_shared) {
+                            if (m.mapping_type == MappingType::Map) {
+                                map_method = &m;
+                                pass_obj = true;
+                                obj_arg = obj;
+                                break;
+                            }
                         }
                     }
                     if (map_method) break;

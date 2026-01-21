@@ -264,27 +264,76 @@ std::vector<MethodParam> DefParser::parse_params()
     {
         MethodParam param;
 
-        // Type
-        param.type = current_.value;
-        advance();
-
-        // Handle generic types like array<T>
-        if (current_.type == Token::Less)
+        // Check for function type: def name(args) : ret or def name : ret
+        if (current_.type == Token::KwDef)
         {
-            param.type += "<";
             advance();
-            param.type += current_.value;
+            
+            // Function parameter name
+            param.name = current_.value;
             advance();
-            if (current_.type == Token::Greater)
+            
+            // Build the function type signature
+            std::string func_type = "def(";
+            
+            // Check for parameter list
+            if (current_.type == Token::LParen)
             {
-                param.type += ">";
+                advance();
+                bool first_param = true;
+                while (current_.type != Token::RParen && current_.type != Token::Eof)
+                {
+                    if (!first_param) func_type += ",";
+                    first_param = false;
+                    func_type += current_.value;
+                    advance();
+                    if (current_.type == Token::Comma) advance();
+                }
+                if (current_.type == Token::RParen) advance();
+            }
+            func_type += ")";
+            
+            // Return type after ':'
+            if (current_.type == Token::Colon)
+            {
+                advance();
+                func_type += ":" + current_.value;
                 advance();
             }
+            
+            param.type = func_type;
+            
+            // Skip optional default value (= void or = something)
+            if (current_.type == Token::Identifier && current_.value == "=")
+            {
+                advance();
+                advance(); // skip the default value
+            }
         }
+        else
+        {
+            // Regular type
+            param.type = current_.value;
+            advance();
 
-        // Name
-        param.name = current_.value;
-        advance();
+            // Handle generic types like array<T>
+            if (current_.type == Token::Less)
+            {
+                param.type += "<";
+                advance();
+                param.type += current_.value;
+                advance();
+                if (current_.type == Token::Greater)
+                {
+                    param.type += ">";
+                    advance();
+                }
+            }
+
+            // Name
+            param.name = current_.value;
+            advance();
+        }
 
         params.push_back(param);
 

@@ -502,15 +502,24 @@ component DataLoader {
 
 ## WebSocket
 
-Real-time communication.
+Real-time bidirectional communication with WebSocket servers.
 
 ### Methods
 
 | Method | Description |
 |--------|-------------|
-| `WebSocket.create(string url, int events)` | Create WebSocket connection (static) |
-| `send(string msg)` | Send message |
+| `WebSocket.connect(url, &onMessage=..., &onOpen=..., &onClose=..., &onError=...)` | Create connection with callback handlers |
+| `send(string msg)` | Send message (only when connected) |
 | `close()` | Close connection |
+
+### Callback Signatures
+
+| Callback | Signature | Description |
+|----------|-----------|-------------|
+| `onMessage` | `def handler(string msg) : void` | Called when message received |
+| `onOpen` | `def handler : void` | Called when connection opens |
+| `onClose` | `def handler : void` | Called when connection closes |
+| `onError` | `def handler : void` | Called on connection error |
 
 ### Example
 
@@ -518,21 +527,41 @@ Real-time communication.
 component Chat {
     mut WebSocket ws;
     mut string[] messages;
+    mut bool connected = false;
+
+    def handleMessage(string msg) : void {
+        messages.push(msg);
+    }
+
+    def handleOpen() : void {
+        connected = true;
+        System.log("Connected!");
+        ws.send("Hello from Coi!");
+    }
+
+    def handleClose() : void {
+        connected = false;
+        System.log("Disconnected");
+    }
 
     mount {
-        ws = WebSocket.create("wss://chat.example.com", 0);
+        ws = WebSocket.connect(
+            "wss://chat.example.com",
+            &onMessage = handleMessage,
+            &onOpen = handleOpen,
+            &onClose = handleClose
+        );
     }
 
     def sendMessage(string text) : void {
-        ws.send(text);
-    }
-
-    def disconnect() : void {
-        ws.close();
+        if (connected) {
+            ws.send(text);
+        }
     }
 
     view {
         <div>
+            <p>{connected ? "🟢 Connected" : "🔴 Disconnected"}</p>
             <for msg in messages key={msg}>
                 <p>{msg}</p>
             </for>
