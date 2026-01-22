@@ -122,6 +122,7 @@ Token Lexer::read_identifier(){
         {"true", TokenType::TRUE},
         {"false", TokenType::FALSE},
         {"enum", TokenType::ENUM},
+        {"router", TokenType::ROUTER},
     };
 
     auto it = keywords.find(id);

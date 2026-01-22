@@ -1537,4 +1537,81 @@ void validate_view_hierarchy(const std::vector<Component> &components)
             validate_node(root.get(), comp.name, scope);
         }
     }
+
+    // Validate router/route relationship
+    std::function<bool(ASTNode *)> has_route_placeholder = [&](ASTNode *node) -> bool
+    {
+        if (!node)
+            return false;
+        if (dynamic_cast<RoutePlaceholder *>(node))
+            return true;
+        if (auto *el = dynamic_cast<HTMLElement *>(node))
+        {
+            for (const auto &child : el->children)
+            {
+                if (has_route_placeholder(child.get()))
+                    return true;
+            }
+        }
+        else if (auto *viewIf = dynamic_cast<ViewIfStatement *>(node))
+        {
+            for (const auto &child : viewIf->then_children)
+                if (has_route_placeholder(child.get()))
+                    return true;
+            for (const auto &child : viewIf->else_children)
+                if (has_route_placeholder(child.get()))
+                    return true;
+        }
+        else if (auto *viewFor = dynamic_cast<ViewForRangeStatement *>(node))
+        {
+            for (const auto &child : viewFor->children)
+                if (has_route_placeholder(child.get()))
+                    return true;
+        }
+        else if (auto *viewForEach = dynamic_cast<ViewForEachStatement *>(node))
+        {
+            for (const auto &child : viewForEach->children)
+                if (has_route_placeholder(child.get()))
+                    return true;
+        }
+        return false;
+    };
+
+    for (const auto &comp : components)
+    {
+        bool has_router_block = comp.router != nullptr;
+        bool has_route_in_view = false;
+        
+        for (const auto &root : comp.render_roots)
+        {
+            if (has_route_placeholder(root.get()))
+            {
+                has_route_in_view = true;
+                break;
+            }
+        }
+
+        if (has_router_block && !has_route_in_view)
+        {
+            throw std::runtime_error("Component '" + comp.name + "' has a router block but no <route /> placeholder in its view. Add <route /> where the routed component should be rendered at line " + std::to_string(comp.router->line));
+        }
+
+        if (has_route_in_view && !has_router_block)
+        {
+            throw std::runtime_error("Component '" + comp.name + "' has <route /> but no router block. Add a router block to define routes");
+        }
+
+        // Validate that route components exist
+        if (has_router_block)
+        {
+            for (const auto &route : comp.router->routes)
+            {
+                auto it = component_map.find(route.component_name);
+                if (it == component_map.end())
+                {
+                    throw std::runtime_error("Route '" + route.path + "' references unknown component '" + route.component_name + "' at line " + std::to_string(route.line));
+                }
+            }
+        }
+    }
 }

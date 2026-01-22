@@ -480,6 +480,14 @@ std::string Component::to_webcc(CompilerSession &session)
         {
             viewForEach->generate_code(ss_render, "parent", element_count, event_handlers, bindings, component_counters, method_names, name, false, &loop_regions, &loop_counter, &if_regions, &if_counter);
         }
+        else if (auto routePlaceholder = dynamic_cast<RoutePlaceholder *>(root.get()))
+        {
+            // Route placeholder - create anchor comment for inserting routed components
+            ss_render << "        _route_parent = parent;\n";
+            ss_render << "        _route_anchor = webcc::DOMElement(webcc::next_deferred_handle());\n";
+            ss_render << "        webcc::dom::create_comment_deferred(_route_anchor, \"coi-route\");\n";
+            ss_render << "        webcc::dom::append_child(parent, _route_anchor);\n";
+        }
     }
 
     // Populate global context for component array loops (for inline DOM operations)
@@ -543,23 +551,21 @@ std::string Component::to_webcc(CompilerSession &session)
             if (var->type.ends_with("[]"))
             {
                 std::string elem_type = var->type.substr(0, var->type.length() - 2);
-                size_t count = arr_lit->elements.size();
-
-                if (var->is_mutable)
-                {
-                    // Mutable: use vector with brace init (variadic constructor)
-                    std::string vec_type = "webcc::vector<" + convert_type(elem_type) + ">";
-                    ss << "    " << vec_type;
-                    if (var->is_reference)
-                        ss << "&";
-                    ss << " " << var->name << " = " << arr_lit->to_webcc() << ";\n";
-                }
-                else
-                {
-                    // Const: use fixed-size array (more efficient, size known at compile time)
-                    std::string arr_type = "webcc::array<" + convert_type(elem_type) + ", " + std::to_string(count) + ">";
-                    ss << "    const " << arr_type << " " << var->name << " = " << arr_lit->to_webcc() << ";\n";
-                }
+                
+                // Component state arrays with T[] type: always use webcc::vector (even if not mut).
+                //
+                // WHY NOT USE FIXED ARRAYS HERE?
+                // When we have `string[] items = ["a", "b", "c"]`, the array size is known
+                // at compile time (3 elements). However, if this state is passed to a child
+                // component's prop declared as `string[] items`, that prop compiles to
+                // webcc::vector<string> because the child doesn't know what size array it will
+                // receive. Using webcc::array<T, N> here would cause a type mismatch.
+          
+                std::string vec_type = "webcc::vector<" + convert_type(elem_type) + ">";
+                ss << "    " << (var->is_mutable ? "" : "const ") << vec_type;
+                if (var->is_reference)
+                    ss << "&";
+                ss << " " << var->name << " = " << arr_lit->to_webcc() << ";\n";
                 continue;
             }
         }
@@ -640,6 +646,20 @@ std::string Component::to_webcc(CompilerSession &session)
 
     // If region tracking
     emit_if_region_members(ss, if_regions);
+
+    // Router state (if router block defined)
+    if (router)
+    {
+        ss << "    webcc::string _current_route;\n";
+        ss << "    webcc::handle _route_parent;\n";
+        ss << "    webcc::handle _route_anchor;\n";
+        // Generate component pointers for each route
+        for (size_t i = 0; i < router->routes.size(); ++i)
+        {
+            const auto& route = router->routes[i];
+            ss << "    " << route.component_name << "* _route_" << i << " = nullptr;\n";
+        }
+    }
 
     // Build update entries map
     struct UpdateEntry
@@ -1522,6 +1542,20 @@ std::string Component::to_webcc(CompilerSession &session)
 
     if (has_mount)
         ss << "        _user_mount();\n";
+    // Initialize router - get initial route from URL and render
+    if (router)
+    {
+        ss << "        _current_route = webcc::system::get_pathname();\n";
+        // Default to first route if pathname doesn't match any defined routes
+        ss << "        bool _route_matched = false;\n";
+        for (size_t i = 0; i < router->routes.size(); ++i)
+        {
+            const auto& route = router->routes[i];
+            ss << "        if (_current_route == \"" << route.path << "\") _route_matched = true;\n";
+        }
+        ss << "        if (!_route_matched) _current_route = \"" << (router->routes.empty() ? "/" : router->routes[0].path) << "\";\n";
+        ss << "        _sync_route();\n";
+    }
     ss << "    }\n";
 
     // Rebind method (always generated, even if empty, for component array reallocation)
@@ -1561,6 +1595,56 @@ std::string Component::to_webcc(CompilerSession &session)
     }
 
     ss << "    }\n";
+
+    // Router methods (if router block defined)
+    if (router)
+    {
+        // navigate() method - changes route and updates browser URL
+        ss << "    void navigate(const webcc::string& route) {\n";
+        ss << "        if (_current_route == route) return;\n";
+        ss << "        _current_route = route;\n";
+        ss << "        webcc::system::push_state(route);\n";
+        ss << "        _sync_route();\n";
+        ss << "    }\n";
+
+        // _sync_route() method - destroys old component and creates new one
+        ss << "    void _sync_route() {\n";
+        // First destroy any existing route component
+        for (size_t i = 0; i < router->routes.size(); ++i)
+        {
+            ss << "        if (_route_" << i << ") { _route_" << i << "->_destroy(); delete _route_" << i << "; _route_" << i << " = nullptr; }\n";
+        }
+        // Create the component for matching route and insert before anchor
+        bool first = true;
+        for (size_t i = 0; i < router->routes.size(); ++i)
+        {
+            const auto& route = router->routes[i];
+            ss << "        " << (first ? "if" : "else if") << " (_current_route == \"" << route.path << "\") {\n";
+            ss << "            _route_" << i << " = new " << route.component_name << "{";
+            // Pass arguments if any - wrap identifiers as lambdas for callbacks
+            for (size_t j = 0; j < route.args.size(); ++j)
+            {
+                if (j > 0) ss << ", ";
+                // If arg is a simple identifier (method name), wrap as lambda
+                if (auto* ident = dynamic_cast<Identifier*>(route.args[j].get()))
+                {
+                    ss << "[this]() { " << ident->name << "(); }";
+                }
+                else
+                {
+                    ss << route.args[j]->to_webcc();
+                }
+            }
+            ss << "};\n";
+            ss << "            _route_" << i << "->view(_route_parent);\n";
+            // Move the routed component's root element before the anchor
+            ss << "            webcc::dom::insert_before(_route_parent, _route_" << i << "->_get_root_element(), _route_anchor);\n";
+            ss << "            webcc::flush();\n";
+            ss << "        }\n";
+            first = false;
+        }
+        ss << "    }\n";
+    }
 
     // Destroy method
     ss << "    void _destroy() {\n";
@@ -1728,6 +1812,14 @@ std::string Component::to_webcc(CompilerSession &session)
         if (element_count > 0)
         {
             ss << "        webcc::dom::remove_element(el[0]);\n";
+        }
+    }
+    // Cleanup route components
+    if (router)
+    {
+        for (size_t i = 0; i < router->routes.size(); ++i)
+        {
+            ss << "        if (_route_" << i << ") { _route_" << i << "->_destroy(); delete _route_" << i << "; }\n";
         }
     }
     ss << "    }\n";

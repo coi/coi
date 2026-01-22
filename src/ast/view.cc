@@ -349,6 +349,14 @@ static void generate_view_child(ASTNode *child, std::stringstream &ss, const std
     {
         viewForEach->generate_code(ss, parent, counter, event_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter, loop_var_name);
     }
+    else if (auto routePlaceholder = dynamic_cast<RoutePlaceholder *>(child))
+    {
+        // Route placeholder - create anchor comment for inserting routed components
+        ss << "        _route_parent = " << parent << ";\n";
+        ss << "        _route_anchor = webcc::DOMElement(webcc::next_deferred_handle());\n";
+        ss << "        webcc::dom::create_comment_deferred(_route_anchor, \"coi-route\");\n";
+        ss << "        webcc::dom::append_child(" << parent << ", _route_anchor);\n";
+    }
 }
 
 void HTMLElement::generate_code(std::stringstream &ss, const std::string &parent, int &counter,

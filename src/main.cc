@@ -311,6 +311,14 @@ std::vector<Component *> topological_sort_components(std::vector<Component> &com
         {
             collect_component_deps(root.get(), deps);
         }
+        // Collect dependencies from router routes
+        if (comp.router)
+        {
+            for (const auto &route : comp.router->routes)
+            {
+                deps.insert(route.component_name);
+            }
+        }
         // Collect dependencies from parameter types (e.g., Vector pos)
         for (const auto &param : comp.params)
         {
@@ -725,6 +733,10 @@ int main(int argc, char **argv)
             out << "struct " << comp->name << ";\n";
         }
         out << "\n";
+        
+        // Forward declare global navigation functions (defined after components)
+        out << "void g_app_navigate(const webcc::string& route);\n";
+        out << "webcc::string g_app_get_route();\n\n";
 
         for (auto *comp : sorted_components)
         {
@@ -739,6 +751,24 @@ int main(int argc, char **argv)
 
         out << "\n"
             << final_app_config.root_component << "* app = nullptr;\n";
+        
+        // Check if root component has a router
+        Component* root_comp = nullptr;
+        for (auto* comp : sorted_components) {
+            if (comp->name == final_app_config.root_component) {
+                root_comp = comp;
+                break;
+            }
+        }
+        if (root_comp && root_comp->router) {
+            out << "void g_app_navigate(const webcc::string& route) { if (app) app->navigate(route); }\n";
+            out << "webcc::string g_app_get_route() { return app ? app->_current_route : \"\"; }\n";
+        } else {
+            // Stub functions if no router - prevents linker errors
+            out << "void g_app_navigate(const webcc::string& route) {}\n";
+            out << "webcc::string g_app_get_route() { return \"\"; }\n";
+        }
+        
         out << "void dispatch_events(const webcc::Event* events, uint32_t event_count) {\n";
         out << "    for (uint32_t i = 0; i < event_count; i++) {\n";
         out << "        const auto& e = events[i];\n";

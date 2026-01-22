@@ -65,6 +65,14 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
         return "!g_key_state[" + args[0].value->to_webcc() + "]";
     }
     
+    // Router navigation intrinsics
+    if (intrinsic_name == "navigate" && args.size() == 1) {
+        return "g_app_navigate(" + args[0].value->to_webcc() + ")";
+    }
+    if (intrinsic_name == "get_route" && args.empty()) {
+        return "g_app_get_route()";
+    }
+    
     // WebSocket.connect with named callback arguments
     // Usage: WebSocket.connect("url", &onMessage = handler, &onOpen = handler, ...)
     if (intrinsic_name == "ws_connect") {

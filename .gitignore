@@ -11,3 +11,6 @@ node_modules/
 **/.coi_cache
 def/.cache/
 **/__pycache__
+
+
+platform/

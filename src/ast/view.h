@@ -206,3 +206,10 @@ struct ViewForEachStatement : ASTNode {
                       const std::string& loop_var_name = "");
     void collect_dependencies(std::set<std::string>& deps) override;
 };
+
+// Route placeholder for router block - <route /> in view
+struct RoutePlaceholder : ASTNode {
+    int line = 0;
+    std::string to_webcc() override { return ""; }
+    void collect_dependencies(std::set<std::string>& deps) override {}
+};

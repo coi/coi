@@ -1011,6 +1011,21 @@ std::unique_ptr<ASTNode> Parser::parse_html_element(){
     std::string tag = current().value;
     expect(TokenType::IDENTIFIER, "Expected tag name");
 
+    // Special tag: <route /> - placeholder for router
+    if (tag == "route") {
+        auto route_placeholder = std::make_unique<RoutePlaceholder>();
+        route_placeholder->line = start_line;
+        
+        // Must be self-closing
+        if (current().type != TokenType::SLASH) {
+            throw std::runtime_error("<route> must be self-closing: <route /> at line " + std::to_string(start_line));
+        }
+        expect(TokenType::SLASH, "Expected '/>'");
+        expect(TokenType::GT, "Expected '>'");
+        
+        return route_placeholder;
+    }
+
     // Components must start with uppercase
     // Lowercase tags are always HTML elements
     // Use <{var}/> syntax for component variables
@@ -1800,6 +1815,13 @@ Component Parser::parse_component(){
                 comp.css += css + "\n";
             }
         }
+        // Router block
+        else if(current().type == TokenType::ROUTER){
+            if (comp.router) {
+                throw std::runtime_error("Component '" + comp.name + "' already has a router block at line " + std::to_string(current().line));
+            }
+            comp.router = parse_router();
+        }
         else {
             advance();
         }
@@ -1815,6 +1837,68 @@ Component Parser::parse_component(){
     }
 
     return comp;
+}
+
+std::unique_ptr<RouterDef> Parser::parse_router() {
+    auto router = std::make_unique<RouterDef>();
+    router->line = current().line;
+    
+    expect(TokenType::ROUTER, "Expected 'router'");
+    expect(TokenType::LBRACE, "Expected '{'");
+    
+    while (current().type != TokenType::RBRACE && current().type != TokenType::END_OF_FILE) {
+        RouteEntry entry;
+        entry.line = current().line;
+        
+        // Parse route path (string literal)
+        if (current().type != TokenType::STRING_LITERAL) {
+            throw std::runtime_error("Expected route path string at line " + std::to_string(current().line));
+        }
+        entry.path = current().value;
+        advance();
+        
+        // Expect =>
+        if (current().type != TokenType::ARROW) {
+            throw std::runtime_error("Expected '=>' after route path at line " + std::to_string(current().line));
+        }
+        advance();
+        
+        // Parse component name
+        if (current().type != TokenType::IDENTIFIER) {
+            throw std::runtime_error("Expected component name after '=>' at line " + std::to_string(current().line));
+        }
+        entry.component_name = current().value;
+        advance();
+        
+        // Optional: parse component arguments (ComponentName(arg1, arg2))
+        if (current().type == TokenType::LPAREN) {
+            advance();
+            while (current().type != TokenType::RPAREN && current().type != TokenType::END_OF_FILE) {
+                entry.args.push_back(parse_expression());
+                if (current().type == TokenType::COMMA) {
+                    advance();
+                } else {
+                    break;
+                }
+            }
+            expect(TokenType::RPAREN, "Expected ')' after component arguments");
+        }
+        
+        router->routes.push_back(std::move(entry));
+        
+        // Optional comma between entries
+        if (current().type == TokenType::COMMA) {
+            advance();
+        }
+    }
+    
+    expect(TokenType::RBRACE, "Expected '}'");
+    
+    if (router->routes.empty()) {
+        throw std::runtime_error("Router block must have at least one route at line " + std::to_string(router->line));
+    }
+    
+    return router;
 }
 
 void Parser::parse_app() {

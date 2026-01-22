@@ -45,6 +45,7 @@ class Parser{
         std::unique_ptr<ASTNode> parse_view_node();  // Parse HTML element or view if/else/for
         std::unique_ptr<ViewIfStatement> parse_view_if();  // Parse if/else in view
         std::unique_ptr<ASTNode> parse_view_for();  // Parse for loop in view
+        std::unique_ptr<RouterDef> parse_router();  // Parse router block
         Component parse_component();
         void parse_app();
 

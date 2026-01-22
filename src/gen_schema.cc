@@ -402,6 +402,11 @@ int main() {
             }
             
             if (ns == "system") {
+                out << "\n    // Router navigation (compiler intrinsics - calls app router)\n";
+                out << "    @intrinsic(\"navigate\")\n";
+                out << "    shared def navigate(string route): void\n";
+                out << "    @intrinsic(\"get_route\")\n";
+                out << "    shared def getRoute(): string\n";
                 out << "\n    // Random number generation (compiler intrinsics)\n";
                 out << "    @intrinsic(\"random\")\n";
                 out << "    shared def random(): float\n";
