@@ -1604,6 +1604,7 @@ std::string Component::to_webcc(CompilerSession &session)
         ss << "        if (_current_route == route) return;\n";
         ss << "        _current_route = route;\n";
         ss << "        webcc::system::push_state(route);\n";
+        ss << "        webcc::dom::scroll_to_top();\n";
         ss << "        _sync_route();\n";
         ss << "    }\n";
 
