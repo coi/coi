@@ -403,7 +403,11 @@ std::unique_ptr<Expression> Parser::parse_primary(){
 
     // Parenthesized expression
     if(match(TokenType::LPAREN)){
+        // Re-enable > comparison inside parentheses since it's unambiguous
+        bool old_allow_gt = allow_gt_comparison;
+        allow_gt_comparison = true;
         auto expr = parse_expression();
+        allow_gt_comparison = old_allow_gt;
         expect(TokenType::RPAREN, "Expected ')'");
         return expr;
     }
