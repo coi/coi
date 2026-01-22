@@ -30,6 +30,9 @@
       "include": "#style-block"
     },
     {
+      "include": "#router-block"
+    },
+    {
       "include": "#view-block"
     },
     {
@@ -64,7 +67,7 @@
       "patterns": [
         {
           "name": "keyword.control.coi",
-          "match": "\\b(component|def|view|return|if|else|for|while|computed|tick|init|mount|app|import|struct|style|type|global|in|root|extends|enum|key)\\b"
+          "match": "\\b(component|def|view|return|if|else|for|while|computed|tick|init|mount|app|import|struct|style|type|global|in|root|extends|enum|key|router|route)\\b"
         },
         {
           "name": "storage.modifier.coi",
@@ -116,6 +119,10 @@
         {
           "name": "keyword.operator.arithmetic.coi",
           "match": "\\+\\+|--|\\+|-|\\*|/|%"
+        },
+        {
+          "name": "keyword.operator.arrow.coi",
+          "match": "=>"
         },
         {
           "name": "keyword.operator.move.coi",
@@ -223,9 +230,7 @@
       },
       "end": "\\}",
       "name": "meta.embedded.block.css",
-      "patterns": [
-        { "include": "source.css" }
-      ]
+      "patterns": [{ "include": "source.css" }]
     },
     "function-definition": {
       "match": "\\b(def)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\(",
@@ -233,6 +238,45 @@
         "1": { "name": "storage.type.function.coi" },
         "2": { "name": "entity.name.function.coi" }
       }
+    },
+    "router-block": {
+      "begin": "\\b(router)\\s*\\{",
+      "beginCaptures": {
+        "1": { "name": "keyword.control.coi" }
+      },
+      "end": "\\}",
+      "patterns": [
+        { "include": "#comments" },
+        {
+          "comment": "Route definition: \"/path\" => Component",
+          "match": "(\"[^\"]*\")\\s*(=>)\\s*([A-Z][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "string.quoted.double.coi" },
+            "2": { "name": "keyword.operator.arrow.coi" },
+            "3": { "name": "support.class.component.coi" }
+          }
+        },
+        {
+          "comment": "Route with props: \"/path\" => Component(props)",
+          "begin": "(\"[^\"]*\")\\s*(=>)\\s*([A-Z][A-Za-z0-9_]*)\\s*\\(",
+          "beginCaptures": {
+            "1": { "name": "string.quoted.double.coi" },
+            "2": { "name": "keyword.operator.arrow.coi" },
+            "3": { "name": "support.class.component.coi" }
+          },
+          "end": "\\)",
+          "patterns": [
+            { "include": "#operators" },
+            { "include": "#strings" },
+            { "include": "#component-reference" },
+            {
+              "name": "variable.other.coi",
+              "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b"
+            }
+          ]
+        },
+        { "include": "#strings" }
+      ]
     },
     "view-block": {
       "begin": "\\b(view)\\s*\\{",
@@ -361,9 +405,7 @@
           "endCaptures": {
             "1": { "name": "punctuation.definition.tag.coi" }
           },
-          "patterns": [
-            { "include": "#view-condition" }
-          ]
+          "patterns": [{ "include": "#view-condition" }]
         },
         {
           "comment": "Else tag",
