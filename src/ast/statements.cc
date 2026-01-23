@@ -4,6 +4,9 @@
 // Reference to per-component context for reference props
 extern std::set<std::string> g_ref_props;
 
+// Current assignment target for WebSocket lifetime tracking
+extern std::string g_ws_assignment_target;
+
 // Info for inlining DOM operations on component arrays used in for-each loops
 struct ComponentArrayLoopInfo
 {
@@ -73,7 +76,16 @@ std::string VarDeclaration::to_webcc()
     result += " " + name;
     if (initializer)
     {
+        // Set WebSocket assignment target for lifetime tracking (auto-invalidate on close/error)
+        if (type == "WebSocket") {
+            g_ws_assignment_target = name;
+        }
+        
         std::string init_code = initializer->to_webcc();
+        
+        // Clear the target after generating the initializer
+        g_ws_assignment_target.clear();
+        
         // Wrap in webcc::move() if this is a move assignment (:=)
         if (is_move)
         {
@@ -106,7 +118,15 @@ std::string Assignment::to_webcc()
         lhs = "(*" + name + ")";
     }
 
+    // Set WebSocket assignment target for lifetime tracking (auto-invalidate on close/error)
+    if (target_type == "WebSocket") {
+        g_ws_assignment_target = name;
+    }
+
     std::string rhs = value->to_webcc();
+    
+    // Clear the target after generating the RHS
+    g_ws_assignment_target.clear();
 
     // Wrap in webcc::move() for move assignments
     if (is_move)

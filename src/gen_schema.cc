@@ -341,6 +341,10 @@ int main() {
                     << "def onError() : void = void"
                     << "): WebSocket\n\n";
                 
+                out << "    // Check if the WebSocket is connected (handle is valid)\n";
+                out << "    @inline(\"$self.is_valid()\")\n";
+                out << "    def isConnected(): bool\n";
+            
                 out << "    // WebSocket callback registration (compiler intrinsics)\n";
                 out << "    @intrinsic(\"ws_on_message\")\n";
                 out << "    def onMessage(def callback(string) : void): void\n\n";

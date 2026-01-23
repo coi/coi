@@ -6,6 +6,9 @@
 // Reference to per-component context for reference props
 extern std::set<std::string> g_ref_props;
 
+// Current assignment target (set by Assignment::to_webcc for WebSocket lifetime tracking)
+std::string g_ws_assignment_target;
+
 // Helper to expand @inline templates like "${this}.length()" or "${this}.substr(${0}, ${1})"
 static std::string expand_inline_template(const std::string& tmpl, const std::string& receiver,
                                           const std::vector<CallArg>& args) {
@@ -34,17 +37,23 @@ static std::string expand_inline_template(const std::string& tmpl, const std::st
 }
 
 // Helper to generate WebSocket dispatcher registration code
+// ws_member is the member variable name (e.g., "ws") for invalidation on close/error
 static std::string generate_ws_dispatcher(const std::string& event_type,
                                           const std::string& ws_obj,
-                                          const std::string& callback) {
+                                          const std::string& callback,
+                                          const std::string& ws_member = "") {
     if (event_type == "onMessage") {
         return "g_ws_message_dispatcher.set(" + ws_obj + ", [this](const webcc::string& msg) { this->" + callback + "(msg); })";
     } else if (event_type == "onOpen") {
         return "g_ws_open_dispatcher.set(" + ws_obj + ", [this]() { this->" + callback + "(); })";
     } else if (event_type == "onClose") {
-        return "g_ws_close_dispatcher.set(" + ws_obj + ", [this]() { this->" + callback + "(); })";
+        // Invalidate the handle after calling the user's callback
+        std::string invalidate = ws_member.empty() ? "" : " this->" + ws_member + " = webcc::WebSocket(-1);";
+        return "g_ws_close_dispatcher.set(" + ws_obj + ", [this]() { this->" + callback + "();" + invalidate + " })";
     } else if (event_type == "onError") {
-        return "g_ws_error_dispatcher.set(" + ws_obj + ", [this]() { this->" + callback + "(); })";
+        // Invalidate the handle after calling the user's callback
+        std::string invalidate = ws_member.empty() ? "" : " this->" + ws_member + " = webcc::WebSocket(-1);";
+        return "g_ws_error_dispatcher.set(" + ws_obj + ", [this]() { this->" + callback + "();" + invalidate + " })";
     }
     return "";
 }
@@ -79,6 +88,7 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
         if (args.empty()) return "";
         
         std::string url = args[0].value->to_webcc();
+        std::string ws_member = g_ws_assignment_target;  // Capture the assignment target for invalidation
         std::string code = "[&]() {\n";
         code += "            auto _ws = webcc::websocket::connect(" + url + ");\n";
         
@@ -88,7 +98,7 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
             if (arg.name.empty()) continue;
             
             std::string callback = arg.value->to_webcc();
-            std::string dispatcher_code = generate_ws_dispatcher(arg.name, "_ws", callback);
+            std::string dispatcher_code = generate_ws_dispatcher(arg.name, "_ws", callback, ws_member);
             if (!dispatcher_code.empty()) {
                 code += "            " + dispatcher_code + ";\n";
             }
