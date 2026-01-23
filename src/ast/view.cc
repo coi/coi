@@ -7,7 +7,7 @@ static std::string coi_type_to_cpp(const std::string& type) {
     if (type == "float" || type == "float64") return "double";
     if (type == "float32") return "float";
     if (type == "bool") return "bool";
-    if (type == "string") return "const std::string&";
+    if (type == "string") return "const webcc::string&";
     return "int32_t";  // default
 }
 
