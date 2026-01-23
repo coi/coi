@@ -504,7 +504,7 @@ component DataLoader {
 
 ## WebSocket
 
-Real-time bidirectional communication with WebSocket servers.
+Real-time bidirectional communication with WebSocket servers. The handle is automatically invalidated when the connection closes or errors.
 
 ### Methods
 
@@ -513,6 +513,7 @@ Real-time bidirectional communication with WebSocket servers.
 | `WebSocket.connect(url, &onMessage=..., &onOpen=..., &onClose=..., &onError=...)` | Create connection with callback handlers |
 | `send(string msg)` | Send message (only when connected) |
 | `close()` | Close connection |
+| `isConnected()` | Check if WebSocket is connected (handle is valid) |
 
 ### Callback Signatures
 
