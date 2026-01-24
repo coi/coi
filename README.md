@@ -49,7 +49,7 @@ Whether you're building a typical web app or something graphics-intensive, Coi g
 - **View Control Flow**: Declarative `<if>`, `<else>`, and `<for>` tags for conditional rendering and iteration.
 - **Component Lifecycle**: Built-in `init {}`, `mount {}`, and `tick {}` blocks for setup and animations.
 - **Type-Safe Platform APIs**: Browser APIs (Canvas, Storage, Audio, etc.) defined in `.d.coi` files, auto-generated from [WebCC](https://github.com/io-eric/webcc) schema.
-- **Editor Extensions**: Syntax highlighting and completions available for **VS Code**, **Sublime Text**, and **Zed**.
+- **Editor Extensions**: Syntax highlighting and completions available for [VS Code, Sublime Text, and Zed](docs/tooling.md).
 
 ## Benchmarks
 
@@ -184,29 +184,13 @@ my-app/
 - [View Syntax](docs/view-syntax.md) — JSX-like templates, `<if>`, `<for>`, events
 - [Styling](docs/styling.md) — Scoped and global CSS
 - [Platform APIs](docs/api-reference.md) — Canvas, Storage, Audio, Fetch, and more
+- [Editor Support](docs/tooling.md) — VS Code, Sublime Text, and Zed extensions
 
-## Editor Extensions
+## Editor Support
 
-### VS Code
+Coi has syntax highlighting and language support for VS Code, Sublime Text, and Zed.
 
-The Coi Language extension provides syntax highlighting, auto-completions, hover docs, and signature help.
-
-Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=coi-lang.coi-language) or build manually:
-
-```bash
-cd vscode-extension
-npm install && npm run package
-```
-
-### Sublime Text
-
-Syntax definitions and completions for Sublime Text 4 are available at [SublimeText/Coi](https://github.com/SublimeText/Coi).
-
-Install via Package Control by searching for `Coi`, or see the repository for manual installation instructions.
-
-### Zed
-
-Language support for Zed is in development at [jturner/zed-coi](https://github.com/jturner/zed-coi). Not yet published to the extensions registry, but available for manual installation.
+See the [Editor Support & Tooling](docs/tooling.md) documentation for installation instructions and features.
 
 ## License
 
