@@ -6,8 +6,9 @@ Coi has editor support for several popular code editors, providing syntax highli
 
 ## VS Code
 
-[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/coi-lang.coi-language?label=VS%20Code%20Marketplace&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=coi-lang.coi-language)
-[![Installs](https://img.shields.io/visual-studio-marketplace/i/coi-lang.coi-language?logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=coi-lang.coi-language)
+[![VS Code Extension](https://img.shields.io/badge/VS%20Code-Extension-blue?logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=coi-lang.coi-language)
+
+Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=coi-lang.coi-language) or search for "Coi" in the Extensions view.
 
 **Repository**: [vscode-extension/](https://github.com/io-eric/coi/tree/main/vscode-extension)
 
@@ -20,9 +21,9 @@ Search for "Coi" in the Extensions view or build manually from the repository.
 [![Package Control](https://img.shields.io/badge/Package%20Control-available-success?logo=sublime-text)](https://packagecontrol.io/packages/Coi)
 [![GitHub](https://img.shields.io/github/stars/SublimeText/Coi?style=social)](https://github.com/SublimeText/Coi)
 
-**Repository**: [SublimeText/Coi](https://github.com/SublimeText/Coi)
+Install from [Package Control](https://packagecontrol.io/packages/Coi) or see the repository for manual installation instructions.
 
-See the repository for installation instructions and troubleshooting.
+**Repository**: [SublimeText/Coi](https://github.com/SublimeText/Coi)
 
 ---
 
