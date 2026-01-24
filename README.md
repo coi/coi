@@ -49,7 +49,7 @@ Whether you're building a typical web app or something graphics-intensive, Coi g
 - **View Control Flow**: Declarative `<if>`, `<else>`, and `<for>` tags for conditional rendering and iteration.
 - **Component Lifecycle**: Built-in `init {}`, `mount {}`, and `tick {}` blocks for setup and animations.
 - **Type-Safe Platform APIs**: Browser APIs (Canvas, Storage, Audio, etc.) defined in `.d.coi` files, auto-generated from [WebCC](https://github.com/io-eric/webcc) schema.
-- **VS Code Extension**: Syntax highlighting, completions, hover docs, and formatting.
+- **Editor Extensions**: Syntax highlighting and completions available for VS Code, Sublime Text, and Zed.
 
 ## Benchmarks
 
@@ -185,7 +185,9 @@ my-app/
 - [Styling](docs/styling.md) — Scoped and global CSS
 - [Platform APIs](docs/api-reference.md) — Canvas, Storage, Audio, Fetch, and more
 
-## VS Code Extension
+## Editor Extensions
+
+### VS Code
 
 The Coi Language extension provides syntax highlighting, auto-completions, hover docs, and signature help.
 
@@ -195,6 +197,16 @@ Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/item
 cd vscode-extension
 npm install && npm run package
 ```
+
+### Sublime Text
+
+Syntax definitions and completions for Sublime Text 4 are available at [SublimeText/Coi](https://github.com/SublimeText/Coi).
+
+Install via Package Control by searching for `Coi`, or see the repository for manual installation instructions.
+
+### Zed
+
+Language support for Zed is in development at [jturner/zed-coi](https://github.com/jturner/zed-coi). Not yet published to the extensions registry, but available for manual installation.
 
 ## License
 
