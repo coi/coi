@@ -49,7 +49,7 @@ Whether you're building a typical web app or something graphics-intensive, Coi g
 - **View Control Flow**: Declarative `<if>`, `<else>`, and `<for>` tags for conditional rendering and iteration.
 - **Component Lifecycle**: Built-in `init {}`, `mount {}`, and `tick {}` blocks for setup and animations.
 - **Type-Safe Platform APIs**: Browser APIs (Canvas, Storage, Audio, etc.) defined in `.d.coi` files, auto-generated from [WebCC](https://github.com/io-eric/webcc) schema.
-- **Editor Extensions**: Syntax highlighting and completions available for VS Code, Sublime Text, and Zed.
+- **Editor Extensions**: Syntax highlighting and completions available for **VS Code**, **Sublime Text**, and **Zed**.
 
 ## Benchmarks
 
