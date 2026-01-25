@@ -448,10 +448,6 @@ static void emit_feature_globals(std::ostream &out, const FeatureFlags &f)
     {
         out << "bool g_key_state[256] = {};\n";
     }
-    if (f.after_paint)
-    {
-        out << "webcc::function<void(double)> g_after_paint_callback;\n";
-    }
     if (f.router)
     {
         out << "webcc::function<void(const webcc::string&)> g_popstate_callback;\n";
@@ -506,11 +502,6 @@ static void emit_feature_event_handlers(std::ostream &out, const FeatureFlags &f
     {
         out << "        } else if (e.opcode == webcc::system::PopstateEvent::OPCODE) {\n";
         out << "            if (auto evt = e.as<webcc::system::PopstateEvent>()) { if (g_popstate_callback) g_popstate_callback(webcc::string(evt->path)); }\n";
-    }
-    if (f.after_paint)
-    {
-        out << "        } else if (e.opcode == webcc::system::AfterPaintEvent::OPCODE) {\n";
-        out << "            if (auto evt = e.as<webcc::system::AfterPaintEvent>()) { if (g_after_paint_callback) { g_after_paint_callback(evt->duration); g_after_paint_callback = nullptr; } }\n";
     }
     if (f.websocket)
     {
