@@ -16,6 +16,9 @@ type array<T> {
     @inline("${this}.clear()")
     def clear(): void
 
+    @inline("${this}.reserve(${0})")
+    def reserve(int capacity): void
+
     @inline("${this}.empty()")
     def isEmpty(): bool
 
