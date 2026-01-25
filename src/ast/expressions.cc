@@ -88,9 +88,14 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
     
     // System.measureAfterPaint with callback
     // Usage: System.measureAfterPaint(startTime, def(duration) { ... })
+    // Sets the global callback and calls the webcc function to request the measurement
+    // webcc calculates the duration internally and returns it via the AfterPaintEvent
     if (intrinsic_name == "measure_after_paint_callback" && args.size() == 2) {
         std::string start_time = args[0].value->to_webcc();
         std::string callback = args[1].value->to_webcc();
+        // The callback is a method reference, wrap it to capture 'this'
+        // Duration is already calculated by webcc (end_time - start_time)
+        return "(g_after_paint_callback = [this](double duration) { this->" + callback + "(duration); }, webcc::system::measure_after_paint(" + start_time + "))";
     }
     
     // WebSocket.connect with named callback arguments

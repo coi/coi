@@ -20,60 +20,34 @@
 
   let rows = $state([])
   let selected = $state(null)
-  let result = $state('')
-  let startTime = 0
-
-  function measureEnd(operation) {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        const duration = performance.now() - startTime
-        const msg = `${operation}: ${duration.toFixed(2)}ms`
-        result = msg
-        console.log(msg)
-        window.__benchmarkResult = { operation, duration }
-      })
-    })
-  }
 
   function create1000() {
-    startTime = performance.now()
     rows = buildData(1000)
-    measureEnd('Create 1000 rows')
   }
 
   function updateRows() {
-    startTime = performance.now()
     for (let i = 0; i < rows.length; i++) {
       rows[i].label += ' !!!'
     }
-    measureEnd('Update 1,000 rows')
   }
 
   function clear() {
-    startTime = performance.now()
     rows = []
-    measureEnd('Clear all rows')
   }
 
   function swapRows() {
     if (rows.length < 999) return
-    startTime = performance.now()
     const temp = rows[1]
     rows[1] = rows[998]
     rows[998] = temp
-    measureEnd('Swap rows')
   }
 
   function selectRow(id) {
-    startTime = performance.now()
     selected = id
-    measureEnd('Select row')
   }
 
   function removeRow(id) {
-    startTime = performance.now()
     rows = rows.filter(row => row.id !== id)
-    measureEnd('Remove row')
   }
 </script>
 
@@ -85,9 +59,6 @@
     <button id="swap" onclick={swapRows}>Swap rows</button>
     <button id="clear" onclick={clear}>Clear</button>
   </div>
-  {#if result}
-    <div class="results" id="result">{result}</div>
-  {/if}
   <ul class="row-list">
     {#each rows as item (item.id)}
       <Row 

@@ -146,7 +146,7 @@ def measure_bundle_sizes() -> dict:
 
 
 async def run_dom_benchmark(page, button_id: str) -> float:
-    """Run a single DOM benchmark operation and read the app's self-reported time."""
+    """Run a single DOM benchmark operation using double-rAF timing (same as Svelte)."""
     result = await page.evaluate(r'''(buttonId) => {
         return new Promise((resolve) => {
             const button = document.getElementById(buttonId);
@@ -155,37 +155,25 @@ async def run_dom_benchmark(page, button_id: str) -> float:
                 return;
             }
             
-            // Clear previous result
-            const resultEl = document.getElementById('result');
-            const prevText = resultEl ? resultEl.textContent : '';
-            
+            const startTime = performance.now();
             button.click();
             
-            // Poll for the result to change (app reports its own timing)
-            let attempts = 0;
-            const checkResult = () => {
-                attempts++;
-                const resultEl = document.getElementById('result');
-                if (resultEl && resultEl.textContent !== prevText) {
-                    // Parse time from text like "Create 1000 rows: 45.32ms"
-                    const match = resultEl.textContent.match(/([\d.]+)\s*ms/);
-                    if (match) {
-                        resolve(parseFloat(match[1]));
-                        return;
-                    }
-                }
-                if (attempts < 100) {
-                    requestAnimationFrame(checkResult);
-                } else {
-                    resolve(-1);  // Timeout
-                }
-            };
-            requestAnimationFrame(checkResult);
+            // Double-rAF: wait for DOM update AND paint to complete
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    const duration = performance.now() - startTime;
+                    
+                    // Debug: count rendered rows
+                    const rowCount = document.querySelectorAll('.row').length;
+                    console.log(`Rendered rows: ${rowCount}, Duration: ${duration}ms`);
+                    
+                    resolve(duration);
+                });
+            });
         });
     }''', button_id)
-    await asyncio.sleep(0.2)
+    await asyncio.sleep(0.1)
     return result
-
 
 async def benchmark_framework_dom(browser, framework: str, port: int) -> dict:
     """Run DOM benchmarks for a single framework."""
@@ -193,7 +181,10 @@ async def benchmark_framework_dom(browser, framework: str, port: int) -> dict:
     page = await browser.new_page()
     await page.goto(f'http://localhost:{port}')
     await page.wait_for_selector('.controls')
-    await asyncio.sleep(2.0)  # Let WASM/JS engines warm up
+    
+    # Wait 2 seconds for page to fully load and stabilize
+    print(f"      Waiting 2s for page to stabilize...", flush=True)
+    await asyncio.sleep(2.0)
     
     # Warmup runs - give JIT time to optimize
     for _ in range(WARMUP_RUNS):
@@ -259,10 +250,13 @@ async def run_dom_benchmarks() -> tuple:
         servers[fw] = {'process': process, 'port': port}
         print(f"    ✓ {fw.capitalize()} on port {port}")
     
-    await asyncio.sleep(1)
+    await asyncio.sleep(2)
     
     # Run benchmarks
     print("\n  Running benchmarks...")
+    print("  Waiting 2 seconds for everything to be ready...", flush=True)
+    await asyncio.sleep(2)
+    
     browser_name = "Unknown Browser"
     async with async_playwright() as p:
         # Use visible browser - headless throttles requestAnimationFrame

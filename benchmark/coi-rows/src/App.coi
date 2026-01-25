@@ -9,8 +9,6 @@ component App {
     mut Row[] rows;
     mut int nextId = 1;
     mut int selectedId = -1;
-    mut string result = "";
-    mut float startTime = 0.0;
 
     def randomLabel() : string {
         int adjIdx = nextId % 25;
@@ -19,70 +17,41 @@ component App {
         return adjectives[adjIdx] + " " + colours[colIdx] + " " + nouns[nounIdx];
     }
 
-    def onCreateMeasured(float duration) : void {
-        result = "Create 1000 rows: " + duration + "ms";
-    }
-
-    def onUpdateMeasured(float duration) : void {
-        result = "Update 1,000 rows: " + duration + "ms";
-    }
-
-    def onClearMeasured(float duration) : void {
-        result = "Clear all rows: " + duration + "ms";
-    }
-
-    def onSwapMeasured(float duration) : void {
-        result = "Swap rows: " + duration + "ms";
-    }
-
-    def onSelectMeasured(float duration) : void {
-        result = "Select row: " + duration + "ms";
-    }
-
-    def onRemoveMeasured(float duration) : void {
-        result = "Remove row: " + duration + "ms";
-    }
-
     def create1000() : void {
-        startTime = System.getTime();
         mut Row[] newRows;
         newRows.reserve(1000);
         for i in 0:1000 {
-            newRows.push(Row(nextId, randomLabel(), false));
+            int adjIdx = nextId % 25;
+            int colIdx = nextId % 11;
+            int nounIdx = nextId % 13;
+            string label = adjectives[adjIdx] + " " + colours[colIdx] + " " + nouns[nounIdx];
+            newRows.push(Row(nextId, label, false));
             nextId++;
         }
         rows = newRows;
-        System.measureAfterPaint(startTime, onCreateMeasured);
     }
 
     def updateRows() : void {
-        startTime = System.getTime();
         int len = rows.size();
         for i in 0:len {
             rows[i].label.append(" !!!");
         }
-        System.measureAfterPaint(startTime, onUpdateMeasured);
     }
 
     def clearRows() : void {
-        startTime = System.getTime();
         rows.clear();
-        System.measureAfterPaint(startTime, onClearMeasured);
     }
 
     def swapRows() : void {
         if (rows.size() < 999) {
             return;
         }
-        startTime = System.getTime();
         Row temp = rows[1];
         rows[1] = rows[998];
         rows[998] = temp;
-        System.measureAfterPaint(startTime, onSwapMeasured);
     }
 
     def selectRow(int id) : void {
-        startTime = System.getTime();
         // Deselect old
         int len = rows.size();
         for i in 0:len {
@@ -94,11 +63,9 @@ component App {
             }
         }
         selectedId = id;
-        System.measureAfterPaint(startTime, onSelectMeasured);
     }
 
     def removeRow(int id) : void {
-        startTime = System.getTime();
         mut int idx = -1;
         int len = rows.size();
         for i in 0:len {
@@ -110,7 +77,6 @@ component App {
         if (idx != -1) {
             rows.remove(idx);
         }
-        System.measureAfterPaint(startTime, onRemoveMeasured);
     }
 
     style {
@@ -172,9 +138,6 @@ component App {
                 <button id="swap" onclick={swapRows}>Swap rows</button>
                 <button id="clear" onclick={clearRows}>Clear</button>
             </div>
-            <if result != "">
-                <div class="results" id="result">{result}</div>
-            </if>
             <ul class="row-list">
                 <for row in rows key={row.id}>
                     <{row} 
