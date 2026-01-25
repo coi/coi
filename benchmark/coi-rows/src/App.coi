@@ -21,37 +21,32 @@ component App {
 
     def onCreateMeasured(float duration) : void {
         result = "Create 1000 rows: " + duration + "ms";
-        System.log(result);
     }
 
     def onUpdateMeasured(float duration) : void {
         result = "Update 1,000 rows: " + duration + "ms";
-        System.log(result);
     }
 
     def onClearMeasured(float duration) : void {
         result = "Clear all rows: " + duration + "ms";
-        System.log(result);
     }
 
     def onSwapMeasured(float duration) : void {
         result = "Swap rows: " + duration + "ms";
-        System.log(result);
     }
 
     def onSelectMeasured(float duration) : void {
         result = "Select row: " + duration + "ms";
-        System.log(result);
     }
 
     def onRemoveMeasured(float duration) : void {
         result = "Remove row: " + duration + "ms";
-        System.log(result);
     }
 
     def create1000() : void {
         startTime = System.getTime();
         mut Row[] newRows;
+        newRows.reserve(1000);
         for i in 0:1000 {
             newRows.push(Row(nextId, randomLabel(), false));
             nextId++;
@@ -64,7 +59,7 @@ component App {
         startTime = System.getTime();
         int len = rows.size();
         for i in 0:len {
-            rows[i].setLabel(rows[i].label + " !!!");
+            rows[i].label.append(" !!!");
         }
         System.measureAfterPaint(startTime, onUpdateMeasured);
     }
@@ -104,13 +99,17 @@ component App {
 
     def removeRow(int id) : void {
         startTime = System.getTime();
-        mut Row[] newRows;
-        for row in rows {
-            if (row.id != id) {
-                newRows.push(row);
+        mut int idx = -1;
+        int len = rows.size();
+        for i in 0:len {
+            if (rows[i].id == id) {
+                idx = i;
+                break;
             }
         }
-        rows = newRows;
+        if (idx != -1) {
+            rows.remove(idx);
+        }
         System.measureAfterPaint(startTime, onRemoveMeasured);
     }
 
