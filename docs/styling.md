@@ -4,7 +4,7 @@ Coi features a powerful styling system that combines the simplicity of CSS with 
 
 ## External Stylesheets
 
-Place CSS files in a `styles/` folder next to your main `.coi` file:
+Place CSS files in a `styles/` folder at the project root (next to `src/`):
 
 ```
 my-app/

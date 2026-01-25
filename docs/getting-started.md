@@ -195,9 +195,10 @@ app {
 | `title` | String | No | Sets the page `<title>` tag |
 | `description` | String | No | Sets `<meta name="description">` for SEO |
 | `lang` | String | No | Sets the `<html lang="">` attribute (default: `"en"`) |
-| `routes` | Object | No | Maps URL paths to components for client-side routing |
 
-**Note:** If you have a `styles/` folder next to your main `.coi` file, all `.css` files in it are automatically bundled into `app.css`.
+**Note:** If you have a `styles/` folder at the project root (next to `src/`), all `.css` files in it are automatically bundled into `app.css`.
+
+For client-side routing, use the `router {}` block inside your root component. See [Components](components.md#client-side-routing) for details.
 
 Compile and run:
 
