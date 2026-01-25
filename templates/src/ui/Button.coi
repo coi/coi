@@ -6,7 +6,12 @@ component Button(
 ) {
     def handleClick() : void {
         if (!href.isEmpty()) {
-            System.openUrl(href);
+            // Check if it's an internal link (starts with /)
+            if (href.subStr(0, 1) == "/") {
+                System.navigate(href);
+            } else {
+                System.openUrl(href);
+            }
         }
         onclick();
     }

@@ -403,17 +403,16 @@ std::string FunctionCall::to_webcc() {
 
         // Check for builtin type instance methods (string, array)
         // For string methods, we need to check against the "string" type
-        if (auto* method_def = DefSchema::instance().lookup_method("string", method)) {
-            if (method_def->mapping_type == MappingType::Inline &&
-                method_def->params.size() == args.size()) {
+        // Use arg_count to find the correct overload
+        if (auto* method_def = DefSchema::instance().lookup_method("string", method, args.size())) {
+            if (method_def->mapping_type == MappingType::Inline) {
                 return expand_inline_template(method_def->mapping_value, type_or_obj, args);
             }
         }
 
         // Check array methods
-        if (auto* method_def = DefSchema::instance().lookup_method("array", method)) {
-            if (method_def->mapping_type == MappingType::Inline &&
-                method_def->params.size() == args.size()) {
+        if (auto* method_def = DefSchema::instance().lookup_method("array", method, args.size())) {
+            if (method_def->mapping_type == MappingType::Inline) {
                 return expand_inline_template(method_def->mapping_value, type_or_obj, args);
             }
         }

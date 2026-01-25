@@ -1235,9 +1235,11 @@ int main(int argc, char **argv)
                 std::ofstream css_out(css_path);
                 if (css_out)
                 {
-                    // Bundle external stylesheets from styles/ folder
+                    // Bundle external stylesheets from styles/ folder at project root
+                    // Project root is the parent of src/ 
                     fs::path input_dir = fs::path(input_file).parent_path();
-                    fs::path styles_dir = input_dir / "styles";
+                    fs::path project_root = (input_dir.filename() == "src") ? input_dir.parent_path() : input_dir;
+                    fs::path styles_dir = project_root / "styles";
                     
                     if (fs::exists(styles_dir) && fs::is_directory(styles_dir))
                     {
@@ -1260,7 +1262,7 @@ int main(int argc, char **argv)
                                 std::ifstream style_file(css_path);
                                 if (style_file)
                                 {
-                                    fs::path rel_path = fs::relative(css_path, input_dir);
+                                    fs::path rel_path = fs::relative(css_path, styles_dir.parent_path());
                                     css_out << "/* " << rel_path.string() << " */\n";
                                     css_out << std::string((std::istreambuf_iterator<char>(style_file)),
                                                             std::istreambuf_iterator<char>());

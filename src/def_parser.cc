@@ -824,6 +824,29 @@ const MethodDef *DefSchema::lookup_method(const std::string &type_name, const st
     return nullptr;
 }
 
+const MethodDef *DefSchema::lookup_method(const std::string &type_name, const std::string &method_name, size_t arg_count) const
+{
+    auto type_it = types_.find(type_name);
+    if (type_it == types_.end())
+        return nullptr;
+
+    for (const auto &method : type_it->second.methods)
+    {
+        if (method.name == method_name && method.params.size() == arg_count)
+        {
+            return &method;
+        }
+    }
+
+    // Check parent type
+    if (!type_it->second.extends.empty())
+    {
+        return lookup_method(type_it->second.extends, method_name, arg_count);
+    }
+
+    return nullptr;
+}
+
 const TypeDef *DefSchema::lookup_type(const std::string &type_name) const
 {
     auto it = types_.find(type_name);

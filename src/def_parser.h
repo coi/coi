@@ -136,6 +136,7 @@ public:
 
     // Lookup methods
     const MethodDef *lookup_method(const std::string &type_name, const std::string &method_name) const;
+    const MethodDef *lookup_method(const std::string &type_name, const std::string &method_name, size_t arg_count) const;
     const TypeDef *lookup_type(const std::string &type_name) const;
 
     // Get all types

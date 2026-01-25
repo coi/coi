@@ -1,4 +1,8 @@
 component NavBar {
+    def navigateTo(string path) : void {
+        System.navigate(path);
+    }
+
     style {
         .nav {
             display: flex;
@@ -21,31 +25,45 @@ component NavBar {
             font-size: 20px;
             font-weight: 700;
             color: #1a1a1a;
+            cursor: pointer;
+        }
+        .logo:hover {
+            color: #9477ff;
         }
         .links {
             display: flex;
             gap: 24px;
+            align-items: center;
         }
-        a {
+        a, .nav-link {
             color: #666;
             text-decoration: none;
             font-weight: 500;
             font-size: 14px;
             transition: color 0.2s;
+            cursor: pointer;
         }
-        a:hover {
+        a:hover, .nav-link:hover {
             color: #9477ff;
+        }
+        .divider {
+            width: 1px;
+            height: 16px;
+            background: #ddd;
         }
     }
 
     view {
         <nav class="nav">
-            <div class="logo">
+            <span class="logo" onclick={navigateTo("/")}>
                 <span>__PROJECT_NAME__</span>
-            </div>
+            </span>
             <div class="links">
+                <span class="nav-link" onclick={navigateTo("/")}>Home</span>
+                <span class="nav-link" onclick={navigateTo("/about")}>About</span>
+                <span class="divider"></span>
                 <a href="https://github.com/io-eric/coi" target="_blank">GitHub</a>
-                <a href="https://github.com/io-eric/coi#readme" target="_blank">Docs</a>
+                <a href="https://discord.gg/KSpWx78wuR" target="_blank">Discord</a>
             </div>
         </nav>
     }

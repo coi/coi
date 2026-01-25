@@ -69,10 +69,14 @@ my-app/
 │   └── images/
 ├── src/
 │   ├── App.coi
-│   └── components/
-│       ├── Button.coi
-│       ├── Footer.coi
-│       └── NavBar.coi
+│   ├── layout/
+│   │   ├── Footer.coi
+│   │   └── NavBar.coi
+│   ├── pages/
+│   │   ├── About.coi
+│   │   └── Home.coi
+│   └── ui/
+│       └── Button.coi
 ├── styles/
 │   └── reset.css
 └── README.md
