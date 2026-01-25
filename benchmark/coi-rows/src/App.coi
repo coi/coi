@@ -19,9 +19,33 @@ component App {
         return adjectives[adjIdx] + " " + colours[colIdx] + " " + nouns[nounIdx];
     }
 
-    def measureEnd(string operation) : void {
-        float duration = System.getTime() - startTime;
-        result = operation + ": " + duration + "ms";
+    def onCreateMeasured(float duration) : void {
+        result = "Create 1000 rows: " + duration + "ms";
+        System.log(result);
+    }
+
+    def onUpdateMeasured(float duration) : void {
+        result = "Update 1,000 rows: " + duration + "ms";
+        System.log(result);
+    }
+
+    def onClearMeasured(float duration) : void {
+        result = "Clear all rows: " + duration + "ms";
+        System.log(result);
+    }
+
+    def onSwapMeasured(float duration) : void {
+        result = "Swap rows: " + duration + "ms";
+        System.log(result);
+    }
+
+    def onSelectMeasured(float duration) : void {
+        result = "Select row: " + duration + "ms";
+        System.log(result);
+    }
+
+    def onRemoveMeasured(float duration) : void {
+        result = "Remove row: " + duration + "ms";
         System.log(result);
     }
 
@@ -33,7 +57,7 @@ component App {
             nextId++;
         }
         rows = newRows;
-        measureEnd("Create 1000 rows");
+        System.measureAfterPaint(startTime, onCreateMeasured);
     }
 
     def updateRows() : void {
@@ -42,13 +66,13 @@ component App {
         for i in 0:len {
             rows[i].setLabel(rows[i].label + " !!!");
         }
-        measureEnd("Update 1,000 rows");
+        System.measureAfterPaint(startTime, onUpdateMeasured);
     }
 
     def clearRows() : void {
         startTime = System.getTime();
         rows.clear();
-        measureEnd("Clear all rows");
+        System.measureAfterPaint(startTime, onClearMeasured);
     }
 
     def swapRows() : void {
@@ -59,7 +83,7 @@ component App {
         Row temp = rows[1];
         rows[1] = rows[998];
         rows[998] = temp;
-        measureEnd("Swap rows");
+        System.measureAfterPaint(startTime, onSwapMeasured);
     }
 
     def selectRow(int id) : void {
@@ -75,7 +99,7 @@ component App {
             }
         }
         selectedId = id;
-        measureEnd("Select row");
+        System.measureAfterPaint(startTime, onSelectMeasured);
     }
 
     def removeRow(int id) : void {
@@ -87,7 +111,7 @@ component App {
             }
         }
         rows = newRows;
-        measureEnd("Remove row");
+        System.measureAfterPaint(startTime, onRemoveMeasured);
     }
 
     style {
