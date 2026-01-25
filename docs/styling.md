@@ -2,6 +2,30 @@
 
 Coi features a powerful styling system that combines the simplicity of CSS with component-level isolation.
 
+## External Stylesheets
+
+Place CSS files in a `styles/` folder next to your main `.coi` file:
+
+```
+my-app/
+├── src/
+│   └── App.coi
+├── styles/
+│   ├── reset.css
+│   ├── theme.css
+│   └── utilities.css
+└── assets/
+```
+
+All `.css` files in `styles/` are automatically bundled into `app.css` (sorted alphabetically). The `styles/` folder itself is **not** copied to `dist/` — only the bundled output.
+
+Projects created with `coi init` include a `styles/reset.css` with a modern CSS reset. You can modify or remove it as needed.
+
+This is useful for:
+- Third-party CSS libraries (normalize.css, etc.)
+- Shared design tokens and CSS variables
+- Team style guides and utility classes
+
 ## Scoped Styling
 
 By default, styles defined within a `style { ... }` block are **scoped** to that component. Coi achieves this by automatically injecting a `coi-scope` attribute into your HTML elements and rewriting your CSS selectors.

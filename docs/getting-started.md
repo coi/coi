@@ -73,6 +73,8 @@ my-app/
 │       ├── Button.coi
 │       ├── Footer.coi
 │       └── NavBar.coi
+├── styles/
+│   └── reset.css
 └── README.md
 ```
 
@@ -190,6 +192,8 @@ app {
 | `description` | String | No | Sets `<meta name="description">` for SEO |
 | `lang` | String | No | Sets the `<html lang="">` attribute (default: `"en"`) |
 | `routes` | Object | No | Maps URL paths to components for client-side routing |
+
+**Note:** If you have a `styles/` folder next to your main `.coi` file, all `.css` files in it are automatically bundled into `app.css`.
 
 Compile and run:
 
