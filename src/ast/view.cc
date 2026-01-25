@@ -1,6 +1,9 @@
 #include "view.h"
 #include "formatter.h"
 
+// Global set of components with scoped CSS (populated in main.cc before code generation)
+std::set<std::string> g_components_with_scoped_css;
+
 // Helper to map Coi types to C++ types for lambda params
 static std::string coi_type_to_cpp(const std::string& type) {
     if (type == "int" || type == "int32") return "int32_t";
@@ -375,22 +378,30 @@ void HTMLElement::generate_code(std::stringstream &ss, const std::string &parent
     int my_id = counter++;
     std::string var;
 
+    bool has_scoped_css = g_components_with_scoped_css.count(parent_component_name) > 0;
+
     if (in_loop)
     {
         // In loops, use local variable but still deferred creation
         var = "_el_" + std::to_string(my_id);
         ss << "        webcc::handle " << var << " = webcc::handle(webcc::next_deferred_handle());\n";
-        ss << "        webcc::dom::create_element_deferred(" << var << ", \"" << tag << "\");\n";
+        if (has_scoped_css) {
+            ss << "        webcc::dom::create_element_deferred_scoped(" << var << ", \"" << tag << "\", \"" << parent_component_name << "\");\n";
+        } else {
+            ss << "        webcc::dom::create_element_deferred(" << var << ", \"" << tag << "\");\n";
+        }
     }
     else
     {
         // Outside loops, store in el[] array with deferred creation
         var = "el[" + std::to_string(my_id) + "]";
         ss << "        " << var << " = webcc::DOMElement(webcc::next_deferred_handle());\n";
-        ss << "        webcc::dom::create_element_deferred(" << var << ", \"" << tag << "\");\n";
+        if (has_scoped_css) {
+            ss << "        webcc::dom::create_element_deferred_scoped(" << var << ", \"" << tag << "\", \"" << parent_component_name << "\");\n";
+        } else {
+            ss << "        webcc::dom::create_element_deferred(" << var << ", \"" << tag << "\");\n";
+        }
     }
-
-    ss << "        webcc::dom::set_attribute(" << var << ", \"coi-scope\", \"" << parent_component_name << "\");\n";
 
     if (!ref_binding.empty())
     {

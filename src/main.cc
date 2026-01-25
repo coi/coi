@@ -1082,6 +1082,15 @@ int main(int argc, char **argv)
         // Detect which runtime features are actually used
         FeatureFlags features = detect_features(all_components, required_headers);
 
+        // Populate global set of components with scoped CSS (for view.cc to conditionally emit scope attributes)
+        extern std::set<std::string> g_components_with_scoped_css;
+        g_components_with_scoped_css.clear();
+        for (const auto& comp : all_components) {
+            if (!comp.css.empty()) {
+                g_components_with_scoped_css.insert(comp.name);
+            }
+        }
+
         // Generic event dispatcher template (only if needed)
         if (needs_dispatcher(features))
         {
