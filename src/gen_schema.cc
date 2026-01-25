@@ -24,6 +24,8 @@ static const std::set<std::string> EXCLUDED_FUNCTIONS = {
     "input::init_keyboard",             // Called internally when Input.isKeyDown is used
     "input::init_mouse",                // Handled by onMouseDown/onMouseMove/onMouseUp attributes
     "dom::create_element_deferred",     // Internal compiler function
+    "dom::create_element_deferred_scoped", // Internal compiler function (scoped CSS)
+    "dom::create_element_scoped",       // Internal compiler function (scoped CSS)
     "dom::create_comment_deferred",     // Internal compiler function
     "dom::add_input_listener",          // Handled by onInput attribute
     "dom::add_change_listener",         // Handled by onChange attribute
