@@ -30,4 +30,7 @@ type string {
 
     @inline("${this}.trim_end()")
     def trimEnd(): string
+
+    @inline("${this} += ${0}")
+    def append(string suffix): void
 }
