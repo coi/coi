@@ -1,7 +1,7 @@
 {
   "browser": "Chrome 143.0.0.0",
   "bundle_sizes": {
-    "coi": 24076,
+    "coi": 21736,
     "react": 145411,
     "vue": 63043,
     "svelte": 28917

@@ -13,8 +13,8 @@
 <text x="400.0" y="105" text-anchor="middle" fill="#212529" font-size="16" font-weight="bold">Bundle Size</text>
 <text x="400.0" y="123" text-anchor="middle" fill="#6c757d" font-size="12">Counter App - Smaller is better (KB)</text>
 <text x="168" y="168" text-anchor="end" fill="#212529" font-size="13" font-weight="bold">Coi</text>
-<rect x="180" y="150" width="74.50743066205446" height="26" fill="#9477ff" rx="4"/>
-<text x="262.50743066205445" y="168" fill="#212529" font-size="13" font-weight="bold">23.5 KB ★</text>
+<rect x="180" y="150" width="67.26588772513772" height="26" fill="#9477ff" rx="4"/>
+<text x="255.2658877251377" y="168" fill="#212529" font-size="13" font-weight="bold">21.2 KB ★</text>
 <text x="168" y="204" text-anchor="end" fill="#212529" font-size="13" font-weight="bold">Svelte</text>
 <rect x="180" y="186" width="89.48875944735954" height="26" fill="#e97d30" rx="4"/>
 <text x="277.48875944735954" y="204" fill="#212529" font-size="13" font-weight="normal">28.2 KB</text>
@@ -68,9 +68,9 @@
 <text x="480" y="768" text-anchor="end" fill="#6c757d" font-size="11" font-weight="bold">Best Other</text>
 <text x="640" y="768" text-anchor="end" fill="#6c757d" font-size="11" font-weight="bold">Difference</text>
 <text x="100" y="786" fill="#212529" font-size="11">Bundle Size</text>
-<text x="320" y="786" text-anchor="end" fill="#212529" font-size="11" font-weight="bold">23.5 KB</text>
+<text x="320" y="786" text-anchor="end" fill="#212529" font-size="11" font-weight="bold">21.2 KB</text>
 <text x="480" y="786" text-anchor="end" fill="#6c757d" font-size="11">28.2 KB (Svelte)</text>
-<text x="640" y="786" text-anchor="end" fill="#22c55e" font-size="11" font-weight="bold">✓ 4.7 KB smaller</text>
+<text x="640" y="786" text-anchor="end" fill="#22c55e" font-size="11" font-weight="bold">✓ 7.0 KB smaller</text>
 <text x="100" y="804" fill="#212529" font-size="11">Create 1,000 rows</text>
 <text x="320" y="804" text-anchor="end" fill="#212529" font-size="11" font-weight="normal">80.4 ms</text>
 <text x="480" y="804" text-anchor="end" fill="#6c757d" font-size="11">76.7 ms (Vue)</text>
