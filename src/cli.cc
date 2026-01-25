@@ -63,8 +63,8 @@ std::filesystem::path get_executable_dir()
     return fs::path();
 }
 
-// Get the templates directory relative to the executable
-static fs::path get_templates_dir()
+// Get the template directory relative to the executable
+static fs::path get_template_dir()
 {
     fs::path exe_dir = get_executable_dir();
     if (exe_dir.empty())
@@ -72,11 +72,11 @@ static fs::path get_templates_dir()
         return fs::path();
     }
 
-    // The coi binary is at repo root, templates/ is a sibling
-    fs::path templates = exe_dir / "templates";
-    if (fs::exists(templates))
+    // The coi binary is at repo root, template/ is a sibling
+    fs::path tpl_dir = exe_dir / "template";
+    if (fs::exists(tpl_dir))
     {
-        return templates;
+        return tpl_dir;
     }
 
     return fs::path();
@@ -143,10 +143,10 @@ static bool is_valid_project_name(const std::string &name)
 
 int init_project(const std::string &project_name_arg)
 {
-    fs::path templates_dir = get_templates_dir();
-    if (templates_dir.empty() || !fs::exists(templates_dir))
+    fs::path tpl_dir = get_template_dir();
+    if (tpl_dir.empty() || !fs::exists(tpl_dir))
     {
-        ErrorHandler::cli_error("Could not find templates directory.",
+        ErrorHandler::cli_error("Could not find template directory.",
                                 "Make sure you're running the coi binary from the repository.");
         return 1;
     }
@@ -203,10 +203,10 @@ int init_project(const std::string &project_name_arg)
     std::map<std::string, std::string> vars = {
         {"PROJECT_NAME", project_name}};
 
-    // Copy entire templates directory recursively
-    for (const auto &entry : fs::recursive_directory_iterator(templates_dir))
+    // Copy entire template directory recursively
+    for (const auto &entry : fs::recursive_directory_iterator(tpl_dir))
     {
-        fs::path rel_path = fs::relative(entry.path(), templates_dir);
+        fs::path rel_path = fs::relative(entry.path(), tpl_dir);
         fs::path dest_path = project_dir / rel_path;
 
         if (entry.is_directory())
