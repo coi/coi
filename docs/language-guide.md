@@ -119,6 +119,163 @@ string left = text.trimStart();     // Remove leading whitespace
 string right = text.trimEnd();      // Remove trailing whitespace
 ```
 
+## Data Types
+
+Data types are simple value types (like structs in other languages) that group related fields together. Unlike platform types (Canvas, Audio, etc.), data types are **copyable** and can be freely passed around.
+
+### Declaring Data Types
+
+Data types can be declared globally or inside components:
+
+```tsx
+// Global data type
+data User {
+    string name;
+    int age;
+    string email;
+}
+
+// Inside a component
+component App {
+    data Config {
+        string host;
+        int port;
+        bool secure;
+    }
+    
+    mut Config config;
+}
+```
+
+### Field Rules
+
+- **No modifiers**: Data fields cannot use `pub` or `mut` modifiers
+- **Value types only**: Data fields cannot contain no-copy types like `Canvas`, `Audio`, `WebSocket`, etc.
+- **Any primitive or data type**: Can use `int`, `float`, `string`, `bool`, arrays, and other data types
+
+```tsx
+data Point {
+    float x;
+    float y;
+}
+
+data Rectangle {
+    Point topLeft;     // Nested data type - OK
+    Point bottomRight;
+    string label;
+}
+
+data BadData {
+    Canvas canvas;     // ERROR: Canvas is a no-copy type
+    Audio sound;       // ERROR: Audio is a no-copy type
+}
+```
+
+### Initialization
+
+Use aggregate initialization syntax with curly braces. Both positional and named field syntax are supported:
+
+```tsx
+component App {
+    mut User user;
+    
+    init {
+        // Positional initialization (fields in declaration order)
+        user = User{"Alice", 25, "alice@example.com"};
+        
+        // Named initialization (any order, more readable)
+        user = User{name = "Alice", age = 25, email = "alice@example.com"};
+        
+        // Named with trailing comma
+        user = User{
+            name = "Bob",
+            age = 30,
+            email = "bob@example.com",
+        };
+        
+        // Move with named syntax
+        mut string email = "charlie@example.com";
+        user = User{name = "Charlie", age = 35, email := email};
+    }
+}
+```
+
+### Copying and Moving
+
+Data types are value types and support both copying and moving:
+
+```tsx
+mut User user1 = User{"Bob", 30, "bob@example.com"};
+
+// Copy (both variables are valid)
+mut User user2 = user1;
+
+// Move (user3 becomes invalid after move)
+mut User user3 = User{"Charlie", 35, "charlie@example.com"};
+mut User user4 := user3;  // user3 is now invalid
+```
+
+### References
+
+Data types support references like any other type:
+
+```tsx
+def updateUser(mut User& u) : void {
+    u.age = u.age + 1;
+}
+
+mut User user = User{"Dave", 28, "dave@example.com"};
+updateUser(&user);  // Pass by reference
+```
+
+### Arrays of Data Types
+
+You can create arrays of data types:
+
+```tsx
+data Item {
+    string name;
+    int quantity;
+}
+
+mut Item[] inventory = [
+    Item{"Apple", 5},
+    Item{"Banana", 3},
+    Item{"Orange", 7}
+];
+
+// Use in loops
+for item in inventory {
+    print(item.name);
+}
+```
+
+### Reactivity
+
+Data types participate in Coi's reactivity system. When you modify a field of a data type, the entire object is marked as modified:
+
+```tsx
+component UserProfile {
+    mut User user;
+    
+    init {
+        user = User{"Eve", 22, "eve@example.com"};
+    }
+    
+    def updateEmail(string newEmail) : void {
+        user.email = newEmail;  // Marks 'user' as modified
+        // View will automatically re-render
+    }
+    
+    view {
+        <div>
+            <p>Name: {user.name}</p>
+            <p>Email: {user.email}</p>
+        </div>
+    }
+}
+```
+
 ## Enums
 
 Enums define a set of named constants. They can be declared inside components, as shared (accessible from other components), or globally.

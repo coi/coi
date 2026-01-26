@@ -1,0 +1,39 @@
+// Test: Data type with named field initialization
+data Person {
+    string name;
+    int age;
+    string city;
+}
+
+component NamedInitTest {
+    mut Person p1;
+    mut Person p2;
+    mut Person p3;
+    
+    init {
+        // Positional initialization
+        p1 = Person{"Alice", 25, "NYC"};
+        
+        // Named initialization (same order)
+        p2 = Person{name = "Bob", age = 30, city = "LA"};
+        
+        // Named initialization with trailing comma
+        p3 = Person{
+            name = "Charlie",
+            age = 35,
+            city = "Seattle",
+        };
+    }
+
+    view {
+        <div>
+            <p>{p1.name} - {p1.age}</p>
+            <p>{p2.name} - {p2.age}</p>
+            <p>{p3.name} - {p3.age}</p>
+        </div>
+    }
+}
+
+app {
+    root = NamedInitTest;
+}
