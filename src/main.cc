@@ -340,7 +340,7 @@ static FeatureFlags detect_features(const std::vector<Component> &components,
         }
     }
 
-    // Detect keyboard usage (Input.isKeyDown), Json.parse, and after_paint usage
+    // Detect keyboard usage (Input.isKeyDown) and Json.parse usage
     // by scanning for specific patterns in method bodies
     std::function<void(Expression *)> scan_expr = [&](Expression *expr)
     {
