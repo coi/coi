@@ -3,6 +3,7 @@
 #include "ast/ast.h"
 #include "def_parser.h"
 #include "type_checker.h"
+#include "json_codegen.h"
 #include "cli.h"
 #include "error.h"
 #include <iostream>
@@ -238,7 +239,11 @@ static std::set<std::string> get_required_headers(const std::vector<Component> &
         auto it = type_to_header.find(type);
         if (it != type_to_header.end())
         {
-            headers.insert(it->second);
+            // Skip 'json' header - it's embedded inline when features.json is true
+            if (it->second != "json")
+            {
+                headers.insert(it->second);
+            }
         }
     }
 
@@ -262,6 +267,7 @@ struct FeatureFlags
     bool router = false;      // Browser history/popstate (any component)
     bool websocket = false;   // WebSocket connections
     bool fetch = false;       // HTTP fetch requests
+    bool json = false;        // JSON parsing (Json.parse)
 };
 
 // Scan view nodes for event handler attributes
@@ -334,7 +340,7 @@ static FeatureFlags detect_features(const std::vector<Component> &components,
         }
     }
 
-    // Detect keyboard usage (Input.isKeyDown) and after_paint usage
+    // Detect keyboard usage (Input.isKeyDown), Json.parse, and after_paint usage
     // by scanning for specific patterns in method bodies
     std::function<void(Expression *)> scan_expr = [&](Expression *expr)
     {
@@ -346,6 +352,11 @@ static FeatureFlags detect_features(const std::vector<Component> &components,
             if (call->name.find("Input.isKeyDown") != std::string::npos)
             {
                 flags.keyboard = true;
+            }
+            // Check for Json.parse pattern
+            if (call->name == "Json.parse")
+            {
+                flags.json = true;
             }
             for (auto &arg : call->args)
                 scan_expr(arg.value.get());
@@ -1057,13 +1068,34 @@ int main(int argc, char **argv)
         out << "#include \"webcc/core/new.h\"\n";
         out << "#include \"webcc/core/array.h\"\n";
         out << "#include \"webcc/core/vector.h\"\n";
-        out << "#include \"webcc/core/random.h\"\n\n";
+        out << "#include \"webcc/core/random.h\"\n";
 
         // Sort components topologically so dependencies come first
         auto sorted_components = topological_sort_components(all_components);
 
         // Detect which runtime features are actually used
         FeatureFlags features = detect_features(all_components, required_headers);
+
+        // Emit JSON runtime helpers inline if Json.parse is used
+        if (features.json)
+        {
+            emit_json_runtime(out);
+        }
+        out << "\n";
+
+        // Register all data types in the DataTypeRegistry for JSON codegen
+        DataTypeRegistry::instance().clear();
+        for (const auto &data_def : all_global_data)
+        {
+            DataTypeRegistry::instance().register_type(data_def->name, data_def->fields);
+        }
+        for (const auto &comp : all_components)
+        {
+            for (const auto &data_def : comp.data)
+            {
+                DataTypeRegistry::instance().register_type(data_def->name, data_def->fields);
+            }
+        }
 
         // Populate global set of components with scoped CSS (for view.cc to conditionally emit scope attributes)
         extern std::set<std::string> g_components_with_scoped_css;
@@ -1155,6 +1187,23 @@ int main(int argc, char **argv)
         }
         if (!all_global_data.empty())
         {
+            out << "\n";
+        }
+
+        // Output Meta structs for JSON parsing (if Json.parse is used)
+        if (features.json)
+        {
+            for (const auto &data_def : all_global_data)
+            {
+                out << generate_meta_struct(data_def->name);
+            }
+            for (const auto &comp : all_components)
+            {
+                for (const auto &data_def : comp.data)
+                {
+                    out << generate_meta_struct(data_def->name);
+                }
+            }
             out << "\n";
         }
 

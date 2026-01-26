@@ -559,6 +559,143 @@ component FormSubmit {
 }
 ```
 
+## JSON
+
+Type-safe JSON parsing with compile-time schema validation and presence tracking.
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `Json.parse(Type, json, &onSuccess=..., &onError=...)` | Parse JSON into a data type (static) |
+| `Json.stringify(value)` | Convert data type to JSON string (static) |
+
+### Defining Data Types
+
+JSON parsing requires a `data` definition that describes the expected structure:
+
+```tsx
+data Address {
+    string street;
+    string city;
+    int zipcode;
+}
+
+data User {
+    string name;
+    int age;
+    string email;
+    Address address;      // Nested objects
+    string[] tags;        // Arrays
+    Friend[] friends;     // Arrays of objects
+}
+```
+
+### Callback Signatures
+
+| Callback | Signature | Description |
+|----------|-----------|-------------|
+| `onSuccess` | `def handler(Type data, TypeMeta meta) : void` | Called with parsed data and presence info |
+| `onError` | `def handler(string error) : void` | Called when JSON structure is malformed |
+
+**Note:** `onError` is only called for invalid JSON structure (unbalanced braces, unclosed strings, etc.). Missing fields or type mismatches don't trigger errors - instead, those fields simply won't be marked as present in the meta struct.
+
+### Meta Structs (Presence Checking)
+
+The `onSuccess` callback receives a **meta data** that tracks which fields were present in the JSON. This handles optional/nullable fields gracefully:
+
+```tsx
+def handleUser(User u, UserMeta meta) : void {
+    // Check if fields were present in JSON
+    if (meta.has_name()) {
+        System.log("Name: " + u.name);
+    }
+    
+    if (meta.has_age()) {
+        System.log("Age: {u.age}");
+    }
+    
+    // Nested objects have nested meta
+    if (meta.has_address()) {
+        if (meta.address.has_city()) {
+            System.log("City: " + u.address.city);
+        }
+    }
+}
+```
+
+### Example: Fetch + Parse
+
+```tsx
+component UserLoader {
+    mut string status = "Ready";
+    mut User user;
+
+    def handleSuccess(string data) : void {
+        Json.parse(
+            User,
+            data,
+            &onSuccess = handleParsedUser,
+            &onError = handleParseError
+        );
+    }
+
+    def handleParsedUser(User u, UserMeta meta) : void {
+        user = u;
+        status = "Loaded: " + u.name;
+    }
+
+    def handleParseError(string error) : void {
+        status = "Parse error: " + error;
+    }
+
+    def handleFetchError(string error) : void {
+        status = "Fetch error: " + error;
+    }
+
+    def loadUser() : void {
+        status = "Loading...";
+        FetchRequest.get(
+            "https://api.example.com/user/1",
+            &onSuccess = handleSuccess,
+            &onError = handleFetchError
+        );
+    }
+
+    view {
+        <div>
+            <button onclick={loadUser}>Load User</button>
+            <p>{status}</p>
+        </div>
+    }
+}
+```
+
+### Supported Types
+
+| Type | JSON | Notes |
+|------|------|-------|
+| `string` | `"text"` | Handles escape sequences |
+| `int` | `123` | 32-bit signed integer |
+| `float` | `3.14` | 64-bit double |
+| `bool` | `true`/`false` | |
+| `Type` | `{...}` | Nested data types |
+| `string[]` | `[...]` | Array of strings |
+| `int[]` | `[...]` | Array of integers |
+| `Type[]` | `[...]` | Array of nested objects |
+
+### Null Handling
+
+JSON `null` values are handled gracefully - the field is simply not marked as present in the meta struct:
+
+```tsx
+// JSON: {"name": "Alice", "age": null}
+def handle(User u, UserMeta meta) : void {
+    meta.has_name();  // true
+    meta.has_age();   // false (was null)
+}
+```
+
 ## WebSocket
 
 Real-time bidirectional communication with WebSocket servers. The handle is automatically invalidated when the connection closes or errors.
@@ -630,6 +767,161 @@ component Chat {
 }
 ```
 
+## JSON
+
+Type-safe JSON parsing and serialization with automatic presence detection.
+
+### Json.parse()
+
+Parse JSON strings into strongly-typed data structures:
+
+```tsx
+data User {
+    string name;
+    int age;
+    string email;
+}
+
+component App {
+    mut User user;
+    
+    def handleParsed(User data, UserMeta meta) : void {
+        user = data;
+        
+        // Check which fields were present in JSON
+        if (meta.has_name()) {
+            System.log("Name: " + data.name);
+        }
+        if (meta.has_age()) {
+            System.log("Age: {data.age}");
+        }
+    }
+    
+    def handleError(string error) : void {
+        System.log("Parse error: " + error);
+    }
+    
+    init {
+        string json = "\{\"name\": \"Alice\", \"age\": 25\}";
+        Json.parse(
+            User,
+            json,
+            &onSuccess = handleParsed,
+            &onError = handleError
+        );
+    }
+}
+```
+
+**Meta structs** automatically track which fields were present in the JSON:
+
+```tsx
+// For each data type, a Meta struct is generated:
+// struct UserMeta {
+//     bool has_name();
+//     bool has_age();
+//     bool has_email();
+// }
+
+def handleParsed(User data, UserMeta meta) : void {
+    if (meta.has_email()) {
+        // Email was present in JSON
+    } else {
+        // Email was missing (data.email will be default value)
+    }
+}
+```
+
+### Nested Objects
+
+JSON parsing supports nested data types:
+
+```tsx
+data Address {
+    string street;
+    string city;
+    int zipcode;
+}
+
+data User {
+    string name;
+    int age;
+    Address address;
+}
+
+component App {
+    def handleParsed(User data, UserMeta meta) : void {
+        if (meta.has_address()) {
+            System.log(data.address.street);
+            System.log(data.address.city);
+        }
+    }
+    
+    init {
+        string json = "\{\"name\": \"Bob\", \"address\": \{\"street\": \"Main St\", \"city\": \"Berlin\"\}\}";
+        Json.parse(User, json, &onSuccess = handleParsed);
+    }
+}
+```
+
+### Json.stringify()
+
+Convert data types to JSON strings:
+
+```tsx
+data User {
+    string name;
+    int age;
+}
+
+component App {
+    init {
+        User user = User{name = "Alice", age = 25};
+        string json = Json.stringify(user);
+        // json = "{\"name\":\"Alice\",\"age\":25}"
+        System.log(json);
+    }
+}
+```
+
+### With FetchRequest
+
+Combine with HTTP requests for API calls:
+
+```tsx
+data ApiResponse {
+    string status;
+    int code;
+}
+
+component App {
+    def handleFetch(string responseJson) : void {
+        Json.parse(
+            ApiResponse,
+            responseJson,
+            &onSuccess = handleParsed,
+            &onError = handleError
+        );
+    }
+    
+    def handleParsed(ApiResponse data, ApiResponseMeta meta) : void {
+        System.log("Status: " + data.status);
+    }
+    
+    def handleError(string error) : void {
+        System.log("Error: " + error);
+    }
+    
+    init {
+        FetchRequest.get(
+            "https://api.example.com/status",
+            &onSuccess = handleFetch,
+            &onError = handleError
+        );
+    }
+}
+```
+
 ## Available APIs
 
 | Module       | Description                                      |
@@ -645,6 +937,7 @@ component Chat {
 | `WGPU`       | WebGPU support                                   |
 | `FetchRequest` | HTTP GET/POST requests                         |
 | `WebSocket`  | WebSocket connections                            |
+| `Json`       | Type-safe JSON parsing and serialization         |
 
 ## Next Steps
 

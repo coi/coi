@@ -278,6 +278,58 @@ for item in inventory {
 }
 ```
 
+### JSON Parsing
+
+Data types can be automatically parsed from JSON using `Json.parse()`:
+
+```tsx
+data User {
+    string name;
+    int age;
+    string email;
+}
+
+component App {
+    mut User user;
+    
+    def handleParsed(User data, UserMeta meta) : void {
+        user = data;
+        
+        // Meta struct provides presence detection
+        if (meta.has_name()) {
+            System.log("Name found: " + data.name);
+        }
+    }
+    
+    def handleError(string error) : void {
+        System.log("Parse error: " + error);
+    }
+    
+    init {
+        string json = "\{\"name\": \"Alice\", \"age\": 25\}";
+        Json.parse(
+            User,
+            json,
+            &onSuccess = handleParsed,
+            &onError = handleError
+        );
+    }
+}
+```
+
+For each data type, a corresponding **Meta struct** is automatically generated with `has_fieldName()` methods to check field presence:
+
+```tsx
+// UserMeta is generated automatically:
+// struct UserMeta {
+//     bool has_name();
+//     bool has_age();
+//     bool has_email();
+// }
+```
+
+See [API Reference - JSON](api-reference.md#json) for more details and examples.
+
 ### Reactivity
 
 Data types participate in Coi's reactivity system. When you modify a field of a data type, the entire object is marked as modified:

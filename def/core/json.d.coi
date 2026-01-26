@@ -1,0 +1,47 @@
+// Coi JSON Parsing Definitions
+// Provides type-safe JSON parsing with callbacks
+
+// =========================================================
+// Json (static utilities - not instantiable)
+// =========================================================
+// Usage: Json.parse(Type, jsonString, &onSuccess = handler, &onError = errorHandler)
+
+type Json {
+    // Parse JSON string into a data type (compiler intrinsic)
+    // First argument is a data type name (must be defined with `data { ... }`)
+    // 
+    // Example:
+    //   data User { string name; int age; }
+    //   
+    //   def handleUser(User data, UserMeta meta) : void {
+    //       if (meta.has_name()) {
+    //           System.log(data.name);
+    //       }
+    //   }
+    //   
+    //   Json.parse(
+    //       User,
+    //       jsonString,
+    //       &onSuccess = handleUser,
+    //       &onError = handleError
+    //   );
+    //
+    // The onSuccess callback receives the data AND a meta struct with presence bits.
+    // The onError callback receives an error message string.
+    @intrinsic("json_parse")
+    shared def parse(
+        data DataType,
+        string json,
+        def onSuccess(DataType, DataTypeMeta) : void = void,
+        def onError(string) : void = void
+    ): void
+
+    // Stringify a data type instance to JSON (compiler intrinsic)
+    // 
+    // Example:
+    //   data User { string name; int age; }
+    //   User u = User{name = "Alice", age = 25};
+    //   string json = Json.stringify(u);
+    @intrinsic("json_stringify")
+    shared def stringify(data value): string
+}

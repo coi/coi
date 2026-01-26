@@ -1,6 +1,7 @@
 #include "expressions.h"
 #include "formatter.h"
 #include "../def_parser.h"
+#include "../json_codegen.h"
 #include <cctype>
 
 // Reference to per-component context for reference props
@@ -166,6 +167,30 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
         code += "            return _req;\n";
         code += "        }()";
         return code;
+    }
+    
+    // Json.parse with named callback arguments
+    // Usage: Json.parse(User, jsonStr, &onSuccess = handler, &onError = errorHandler)
+    if (intrinsic_name == "json_parse") {
+        if (args.size() < 2) return "";
+        
+        // First arg is data type identifier (e.g., "User")
+        std::string data_type = args[0].value->to_webcc();
+        // Second arg is JSON string expression
+        std::string json_expr = args[1].value->to_webcc();
+        
+        // Find callbacks
+        std::string on_success, on_error;
+        for (size_t i = 2; i < args.size(); i++) {
+            const auto& arg = args[i];
+            if (arg.name == "onSuccess") {
+                on_success = arg.value->to_webcc();
+            } else if (arg.name == "onError") {
+                on_error = arg.value->to_webcc();
+            }
+        }
+        
+        return generate_json_parse(data_type, json_expr, on_success, on_error);
     }
     
     return "";  // Unknown intrinsic
