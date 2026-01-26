@@ -53,6 +53,9 @@ Whether you're building a typical web app or something graphics-intensive, Coi g
 
 ## Benchmarks
 
+> [!CAUTION]
+> **Benchmark Alert:** The current DOM benchmark is misleading due to incomplete reactivity code generation. This creates an unfair comparison with other frameworks. I'm fixing the reactivity generation and will publish proper benchmarks soon.
+
 Coi is designed for high-performance and minimal footprint. In [benchmarks](benchmark/) comparing Coi, React, Vue, and Svelte:
 Coi's fine-grained reactivity and minimal WASM runtime deliver smaller bundles and faster DOM updates with no Virtual DOM overhead.
 
