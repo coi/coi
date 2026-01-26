@@ -2,6 +2,34 @@
 
 Coi is a statically-typed language. This guide covers the core language features.
 
+## Naming Conventions
+
+Coi enforces naming conventions to distinguish between different constructs:
+
+| Construct | Convention | Example | Enforced |
+|-----------|------------|---------|----------|
+| Components | `UpperCase` | `component Counter` | ✓ Yes |
+| Data types | `UpperCase` | `data User` | ✓ Yes |
+| Enums | `UpperCase` | `enum Mode` | ✓ Yes |
+| Methods | `lowerCase` | `def handleClick()` | ✓ Yes |
+| Variables | `lowerCase` | `mut int count` | Recommended |
+
+**Enforced conventions** will cause compile errors:
+
+```tsx
+// ✓ Correct
+data User { string name; }
+enum Status { Active, Inactive }
+def handleClick() : void { }
+
+// ✗ Compile errors
+data user { }      // Error: Data type name must start with uppercase
+enum status { }    // Error: Enum type name must start with uppercase  
+def HandleClick()  // Error: Method name must start with lowercase
+```
+
+**Why this matters:** When you write `Name(...)`, Coi treats it as component/type construction. Writing `name(...)` is a function call. This distinction enables clean JSX-like syntax without ambiguity.
+
 ## Types
 
 ### Primitive Types

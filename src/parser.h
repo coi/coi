@@ -24,6 +24,11 @@ class Parser{
         void advance();
         bool match(TokenType type);
         void expect(TokenType type, const std::string& msg);
+        
+        // Helper methods
+        bool is_type_token();                    // INT, STRING, FLOAT, FLOAT32, BOOL, IDENTIFIER, VOID
+        bool is_identifier_token();              // IDENTIFIER, KEY, DATA (keywords usable as names)
+        std::vector<CallArg> parse_call_args(TokenType end_token);  // Parse (args) or {args}
 
         std::unique_ptr<Expression> parse_expression();
         std::unique_ptr<Expression> parse_expression_no_gt();  // Parse expression without > as comparison

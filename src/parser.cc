@@ -31,6 +31,75 @@ void Parser::expect(TokenType type, const std::string& msg){
     }
 }
 
+// Check if current token is a type keyword (INT, STRING, FLOAT, etc.) or identifier
+bool Parser::is_type_token() {
+    TokenType t = current().type;
+    return t == TokenType::INT || t == TokenType::STRING ||
+           t == TokenType::FLOAT || t == TokenType::FLOAT32 ||
+           t == TokenType::BOOL || t == TokenType::IDENTIFIER ||
+           t == TokenType::VOID;
+}
+
+// Check if current token can be used as an identifier (including keywords that are allowed as names)
+bool Parser::is_identifier_token() {
+    TokenType t = current().type;
+    return t == TokenType::IDENTIFIER || t == TokenType::KEY || t == TokenType::DATA;
+}
+
+// Parse comma-separated arguments until end_token (RPAREN or RBRACE)
+// Supports: positional, named (name = val), reference (&val or &name = val), move (:val or name := val)
+std::vector<CallArg> Parser::parse_call_args(TokenType end_token) {
+    std::vector<CallArg> args;
+    
+    while (current().type != end_token) {
+        CallArg arg;
+
+        // Check for reference prefix &
+        if (current().type == TokenType::AMPERSAND) {
+            arg.is_reference = true;
+            advance();
+        }
+        // Check for move prefix :
+        else if (current().type == TokenType::COLON) {
+            arg.is_move = true;
+            advance();
+        }
+
+        // Check if this is a named argument: name = value or name := value
+        bool is_named = false;
+        if (is_identifier_token()) {
+            if (peek().type == TokenType::ASSIGN || peek().type == TokenType::MOVE_ASSIGN) {
+                is_named = true;
+            }
+        }
+
+        if (is_named) {
+            arg.name = current().value;
+            advance();
+
+            // Check for := (move) or = (copy/reference)
+            if (match(TokenType::MOVE_ASSIGN)) {
+                arg.is_move = true;
+            } else {
+                expect(TokenType::ASSIGN, "Expected '=' or ':=' after argument name");
+            }
+
+            arg.value = parse_expression();
+        } else {
+            arg.value = parse_expression();
+        }
+
+        args.push_back(std::move(arg));
+
+        if (current().type == TokenType::COMMA) {
+            advance();
+            if (current().type == end_token) break; // Allow trailing comma
+        }
+    }
+    
+    return args;
+}
+
 std::unique_ptr<Expression> Parser::parse_expression(){
     return parse_ternary();
 }
@@ -230,7 +299,7 @@ std::unique_ptr<Expression> Parser::parse_primary(){
     }
 
     // Identifer or function call (also allow 'key' and 'data' keywords as identifier)
-    if(current().type == TokenType::IDENTIFIER || current().type == TokenType::KEY || current().type == TokenType::DATA){
+    if(is_identifier_token()){
         std::string name = current().value;
         int identifier_line = current().line;
         advance();
@@ -249,45 +318,7 @@ std::unique_ptr<Expression> Parser::parse_primary(){
             // Data literal initialization: TypeName{val1, val2, ...} or TypeName{name = val, ...}
             if(current().type == TokenType::LBRACE && std::isupper(name[0])){
                 advance();
-                
-                // Parse aggregate initialization arguments (supports named and positional)
-                std::vector<CallArg> parsed_args;
-                while (current().type != TokenType::RBRACE) {
-                    CallArg arg;
-                    
-                    // Check if this is a named argument: name = value or name := value
-                    bool is_named = false;
-                    if (current().type == TokenType::IDENTIFIER || current().type == TokenType::KEY || current().type == TokenType::DATA) {
-                        if (peek().type == TokenType::ASSIGN || peek().type == TokenType::MOVE_ASSIGN) {
-                            is_named = true;
-                        }
-                    }
-                    
-                    if (is_named) {
-                        // Named argument
-                        arg.name = current().value;
-                        advance();
-                        
-                        // Check for := (move) or = (copy)
-                        if (match(TokenType::MOVE_ASSIGN)) {
-                            arg.is_move = true;
-                        } else {
-                            expect(TokenType::ASSIGN, "Expected '=' or ':=' after field name");
-                        }
-                        
-                        arg.value = parse_expression();
-                    } else {
-                        // Positional argument
-                        arg.value = parse_expression();
-                    }
-                    
-                    parsed_args.push_back(std::move(arg));
-                    
-                    if (current().type == TokenType::COMMA) {
-                        advance();
-                        if (current().type == TokenType::RBRACE) break; // Allow trailing comma
-                    }
-                }
+                auto parsed_args = parse_call_args(TokenType::RBRACE);
                 expect(TokenType::RBRACE, "Expected '}'");
                 
                 // Use ComponentConstruction for data types too (same aggregate init semantics)
@@ -298,70 +329,14 @@ std::unique_ptr<Expression> Parser::parse_primary(){
             if(current().type == TokenType::LPAREN){
                 advance();
 
-                // Both function calls and component construction support the same argument syntax:
-                // Named args: Name(&param = value, param := value, param = value)
-                // Positional args: Name(&value, :value, value)
-                // The distinction between function call and component construction is semantic:
-                // - Component construction: simple uppercase identifier like MyComponent(...)
-                // - Function call: lowercase identifier, or any member access like obj.method() or Type.staticMethod()
-
-                // Check if this is a component construction (simple uppercase identifier)
-                // vs a function/method call (member access or lowercase identifier)
+                // Check if this is a component construction (uppercase) vs function call
                 bool is_component = false;
                 if (dynamic_cast<Identifier*>(expr.get())) {
                     // Simple identifier - component if uppercase
                     is_component = std::isupper(name[0]);
                 }
-                // If expr is a MemberAccess, it's always a method call, not component construction
 
-                // Parse arguments - supports both named and positional syntax
-                std::vector<CallArg> parsed_args;
-                while (current().type != TokenType::RPAREN) {
-                    CallArg arg;
-
-                    // Check for reference prefix &
-                    if (current().type == TokenType::AMPERSAND) {
-                        arg.is_reference = true;
-                        advance();
-                    }
-                    // Check for move prefix :
-                    else if (current().type == TokenType::COLON) {
-                        arg.is_move = true;
-                        advance();
-                    }
-
-                    // Check if this is a named argument: [&]name = value OR name := value
-                    bool is_named = false;
-                    if (current().type == TokenType::IDENTIFIER || current().type == TokenType::KEY) {
-                        if (peek().type == TokenType::ASSIGN || peek().type == TokenType::MOVE_ASSIGN) {
-                            is_named = true;
-                        }
-                    }
-
-                    if (is_named) {
-                        // Named argument
-                        arg.name = current().value;
-                        advance();
-
-                        // Check for := (move) or = (copy/reference)
-                        if (match(TokenType::MOVE_ASSIGN)) {
-                            arg.is_move = true;
-                        } else {
-                            expect(TokenType::ASSIGN, "Expected '=' or ':=' after parameter name");
-                        }
-
-                        arg.value = parse_expression();
-                    } else {
-                        // Positional argument
-                        arg.value = parse_expression();
-                    }
-
-                    parsed_args.push_back(std::move(arg));
-
-                    if (current().type == TokenType::COMMA) {
-                        advance();
-                    }
-                }
+                auto parsed_args = parse_call_args(TokenType::RPAREN);
                 expect(TokenType::RPAREN, "Expected ')'");
 
                 if (is_component) {
@@ -600,7 +575,7 @@ std::unique_ptr<Statement> Parser::parse_statement(){
         }
 
         std::string name = current().value;
-        if (current().type == TokenType::IDENTIFIER || current().type == TokenType::KEY || current().type == TokenType::DATA) {
+        if (is_identifier_token()) {
             advance();
         } else {
             expect(TokenType::IDENTIFIER, "Expected variable name");
@@ -877,7 +852,14 @@ std::unique_ptr<Statement> Parser::parse_statement(){
 std::unique_ptr<DataDef> Parser::parse_data(){
     expect(TokenType::DATA, "Expected 'data'");
     std::string name = current().value;
+    int name_line = current().line;
     expect(TokenType::IDENTIFIER, "Expected data name");
+    
+    // Data type names must start with uppercase (convention for type names)
+    if (!name.empty() && !std::isupper(name[0])) {
+        ErrorHandler::compiler_error("Data type name '" + name + "' must start with an uppercase letter", name_line);
+    }
+    
     expect(TokenType::LBRACE, "Expected '{'");
 
     auto def = std::make_unique<DataDef>();
@@ -885,14 +867,13 @@ std::unique_ptr<DataDef> Parser::parse_data(){
 
     while(current().type != TokenType::RBRACE && current().type != TokenType::END_OF_FILE){
         std::string type = current().value;
-        // Handle types
+        // Handle types (excluding VOID - not valid for data fields)
         if(current().type == TokenType::INT || current().type == TokenType::STRING ||
             current().type == TokenType::FLOAT || current().type == TokenType::FLOAT32 ||
-            current().type == TokenType::BOOL ||
-            current().type == TokenType::IDENTIFIER){
+            current().type == TokenType::BOOL || current().type == TokenType::IDENTIFIER){
             advance();
         } else {
-            ErrorHandler::compiler_error("Expected type in data", -1);
+            ErrorHandler::compiler_error("Expected type in data field", current().line);
         }
 
         std::string fieldName = current().value;
@@ -908,7 +889,14 @@ std::unique_ptr<DataDef> Parser::parse_data(){
 std::unique_ptr<EnumDef> Parser::parse_enum(){
     expect(TokenType::ENUM, "Expected 'enum'");
     std::string name = current().value;
+    int name_line = current().line;
     expect(TokenType::IDENTIFIER, "Expected enum name");
+    
+    // Enum type names must start with uppercase (convention for type names)
+    if (!name.empty() && !std::isupper(name[0])) {
+        ErrorHandler::compiler_error("Enum type name '" + name + "' must start with an uppercase letter", name_line);
+    }
+    
     expect(TokenType::LBRACE, "Expected '{'");
 
     auto def = std::make_unique<EnumDef>();
@@ -1496,8 +1484,7 @@ Component Parser::parse_component(){
                 advance();
                 param->is_callback = true;
                 param->name = current().value;
-                // Allow 'key' and 'data' keywords as parameter name
-                if (current().type == TokenType::IDENTIFIER || current().type == TokenType::KEY || current().type == TokenType::DATA) {
+                if (is_identifier_token()) {
                     advance();
                 } else {
                     expect(TokenType::IDENTIFIER, "Expected param name");
@@ -1540,10 +1527,7 @@ Component Parser::parse_component(){
                 expect(TokenType::COLON, "Expected ':'");
 
                 std::string retType = current().value;
-                if(current().type == TokenType::INT || current().type == TokenType::STRING ||
-                    current().type == TokenType::FLOAT || current().type == TokenType::FLOAT32 ||
-                    current().type == TokenType::BOOL ||
-                    current().type == TokenType::IDENTIFIER || current().type == TokenType::VOID){
+                if(is_type_token()){
                     advance();
                 } else {
                     throw std::runtime_error("Expected return type");
@@ -1558,10 +1542,7 @@ Component Parser::parse_component(){
                 param->type = "webcc::function<" + retType + "(" + params_str + ")>";
             } else {
                 param->type = current().value;
-                if(current().type == TokenType::INT || current().type == TokenType::STRING ||
-                    current().type == TokenType::FLOAT || current().type == TokenType::FLOAT32 ||
-                    current().type == TokenType::BOOL ||
-                    current().type == TokenType::IDENTIFIER || current().type == TokenType::VOID){
+                if(is_type_token()){
                     advance();
                 } else {
                     throw std::runtime_error("Expected param type");
@@ -1581,8 +1562,7 @@ Component Parser::parse_component(){
                 }
 
                 param->name = current().value;
-                // Allow 'key' and 'data' keywords as parameter name
-                if (current().type == TokenType::IDENTIFIER || current().type == TokenType::KEY || current().type == TokenType::DATA) {
+                if (is_identifier_token()) {
                     advance();
                 } else {
                     expect(TokenType::IDENTIFIER, "Expected param name");
@@ -1629,11 +1609,10 @@ Component Parser::parse_component(){
             advance();
         }
 
-        // Variable declaration
+        // Variable declaration (note: VOID not valid here, only in return types)
         if(current().type == TokenType::INT || current().type == TokenType::STRING ||
             current().type == TokenType::FLOAT || current().type == TokenType::FLOAT32 ||
-            current().type == TokenType::BOOL ||
-            current().type == TokenType::IDENTIFIER){
+            current().type == TokenType::BOOL || current().type == TokenType::IDENTIFIER){
             auto var_decl = std::make_unique<VarDeclaration>();
             var_decl->type = current().value;
             var_decl->is_public = is_public;
@@ -1668,7 +1647,7 @@ Component Parser::parse_component(){
             }
 
             var_decl->name = current().value;
-            if (current().type == TokenType::IDENTIFIER || current().type == TokenType::KEY || current().type == TokenType::DATA) {
+            if (is_identifier_token()) {
                 advance();
             } else {
                 expect(TokenType::IDENTIFIER, "Expected variable name");
@@ -1722,8 +1701,15 @@ Component Parser::parse_component(){
             advance();
             FunctionDef func;
             func.is_public = is_public;
-            func.name  = current().value;
+            func.name = current().value;
+            int func_line = current().line;
             expect(TokenType::IDENTIFIER, "Expected function name");
+            
+            // Method names must start with lowercase (to distinguish from component/type construction)
+            if (!func.name.empty() && std::isupper(func.name[0])) {
+                ErrorHandler::compiler_error("Method name '" + func.name + "' must start with a lowercase letter", func_line);
+            }
+            
             expect(TokenType::LPAREN, "Expected '('");
 
             // Parse parameters
@@ -1945,54 +1931,7 @@ std::unique_ptr<RouterDef> Parser::parse_router() {
         // Uses same syntax as component construction: &ref, :move, name = value
         if (current().type == TokenType::LPAREN) {
             advance();
-            while (current().type != TokenType::RPAREN && current().type != TokenType::END_OF_FILE) {
-                CallArg arg;
-
-                // Check for reference prefix &
-                if (current().type == TokenType::AMPERSAND) {
-                    arg.is_reference = true;
-                    advance();
-                }
-                // Check for move prefix :
-                else if (current().type == TokenType::COLON) {
-                    arg.is_move = true;
-                    advance();
-                }
-
-                // Check if this is a named argument: [&]name = value OR name := value
-                bool is_named = false;
-                if (current().type == TokenType::IDENTIFIER || current().type == TokenType::KEY) {
-                    if (peek().type == TokenType::ASSIGN || peek().type == TokenType::MOVE_ASSIGN) {
-                        is_named = true;
-                    }
-                }
-
-                if (is_named) {
-                    // Named argument
-                    arg.name = current().value;
-                    advance();
-
-                    // Check for := (move) or = (copy/reference)
-                    if (match(TokenType::MOVE_ASSIGN)) {
-                        arg.is_move = true;
-                    } else {
-                        expect(TokenType::ASSIGN, "Expected '=' or ':=' after parameter name");
-                    }
-
-                    arg.value = parse_expression();
-                } else {
-                    // Positional argument
-                    arg.value = parse_expression();
-                }
-
-                entry.args.push_back(std::move(arg));
-
-                if (current().type == TokenType::COMMA) {
-                    advance();
-                } else {
-                    break;
-                }
-            }
+            entry.args = parse_call_args(TokenType::RPAREN);
             expect(TokenType::RPAREN, "Expected ')' after component arguments");
         }
         
