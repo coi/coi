@@ -1,0 +1,28 @@
+// Test: enum type names with uppercase are valid
+component Test {
+    enum Status {
+        Active,
+        Inactive,
+        Pending
+    }
+
+    mut Status current = Status::Active;
+
+    def toggle() : void {
+        if (current == Status::Active) {
+            current = Status::Inactive;
+        } else {
+            current = Status::Active;
+        }
+    }
+
+    view {
+        <div>
+            <button onclick={toggle}>Toggle</button>
+        </div>
+    }
+}
+
+app {
+    root = Test;
+}

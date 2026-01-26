@@ -1,0 +1,29 @@
+// Test: method names with lowercase are valid
+component Test {
+    mut int count = 0;
+
+    def increment() : void {
+        count++;
+    }
+
+    def decrement() : void {
+        count--;
+    }
+
+    def reset() : void {
+        count = 0;
+    }
+
+    view {
+        <div>
+            <button onclick={increment}>+</button>
+            <span>Count: {count}</span>
+            <button onclick={decrement}>-</button>
+            <button onclick={reset}>Reset</button>
+        </div>
+    }
+}
+
+app {
+    root = Test;
+}

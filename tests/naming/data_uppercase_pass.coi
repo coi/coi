@@ -1,0 +1,21 @@
+// Test: data type names with uppercase are valid
+data User {
+    string name;
+    int age;
+}
+
+component Test {
+    mut User user;
+
+    init {
+        user = User{"Alice", 25};
+    }
+
+    view {
+        <div>{user.name}</div>
+    }
+}
+
+app {
+    root = Test;
+}

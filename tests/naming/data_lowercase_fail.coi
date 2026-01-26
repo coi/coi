@@ -1,0 +1,17 @@
+// Test: data type names must start with uppercase
+data user {  // Should fail - lowercase
+    string name;
+    int age;
+}
+
+component Test {
+    mut user u;
+
+    view {
+        <div>Test</div>
+    }
+}
+
+app {
+    root = Test;
+}

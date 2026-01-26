@@ -1,0 +1,18 @@
+// Test: method names must start with lowercase
+component Test {
+    mut int count = 0;
+
+    def Increment() : void {  // Should fail - uppercase
+        count++;
+    }
+
+    view {
+        <div>
+            <button onclick={Increment}>Count: {count}</button>
+        </div>
+    }
+}
+
+app {
+    root = Test;
+}

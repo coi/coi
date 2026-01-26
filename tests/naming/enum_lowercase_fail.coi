@@ -1,0 +1,17 @@
+// Test: enum type names must start with uppercase
+component Test {
+    enum status {  // Should fail - lowercase
+        Active,
+        Inactive
+    }
+
+    mut status current = status::Active;
+
+    view {
+        <div>Test</div>
+    }
+}
+
+app {
+    root = Test;
+}
