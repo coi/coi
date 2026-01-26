@@ -246,15 +246,41 @@ std::unique_ptr<Expression> Parser::parse_primary(){
         std::unique_ptr<Expression> expr = std::make_unique<Identifier>(name);
 
         while(true) {
-            // Data literal initialization: TypeName{val1, val2, ...}
+            // Data literal initialization: TypeName{val1, val2, ...} or TypeName{name = val, ...}
             if(current().type == TokenType::LBRACE && std::isupper(name[0])){
                 advance();
                 
-                // Parse aggregate initialization arguments
+                // Parse aggregate initialization arguments (supports named and positional)
                 std::vector<CallArg> parsed_args;
                 while (current().type != TokenType::RBRACE) {
                     CallArg arg;
-                    arg.value = parse_expression();
+                    
+                    // Check if this is a named argument: name = value or name := value
+                    bool is_named = false;
+                    if (current().type == TokenType::IDENTIFIER || current().type == TokenType::KEY || current().type == TokenType::DATA) {
+                        if (peek().type == TokenType::ASSIGN || peek().type == TokenType::MOVE_ASSIGN) {
+                            is_named = true;
+                        }
+                    }
+                    
+                    if (is_named) {
+                        // Named argument
+                        arg.name = current().value;
+                        advance();
+                        
+                        // Check for := (move) or = (copy)
+                        if (match(TokenType::MOVE_ASSIGN)) {
+                            arg.is_move = true;
+                        } else {
+                            expect(TokenType::ASSIGN, "Expected '=' or ':=' after field name");
+                        }
+                        
+                        arg.value = parse_expression();
+                    } else {
+                        // Positional argument
+                        arg.value = parse_expression();
+                    }
+                    
                     parsed_args.push_back(std::move(arg));
                     
                     if (current().type == TokenType::COMMA) {
