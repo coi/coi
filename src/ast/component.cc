@@ -511,10 +511,10 @@ std::string Component::to_webcc(CompilerSession &session)
     // Generate component as a struct
     ss << "struct " << name << " {\n";
 
-    // Structs
-    for (auto &s : structs)
+    // Data types
+    for (auto &d : data)
     {
-        ss << s->to_webcc() << "\n";
+        ss << d->to_webcc() << "\n";
     }
 
     // Enums

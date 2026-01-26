@@ -20,7 +20,9 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
 // - Parameter and state variable initialization
 // - Method body statements
 // - Return types
-void validate_types(const std::vector<Component> &components, const std::vector<std::unique_ptr<EnumDef>> &global_enums = {});
+void validate_types(const std::vector<Component> &components, 
+                    const std::vector<std::unique_ptr<EnumDef>> &global_enums = {},
+                    const std::vector<std::unique_ptr<DataDef>> &global_data = {});
 
 // Validate mutability constraints:
 // - Only mutable variables can be modified

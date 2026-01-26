@@ -38,7 +38,7 @@ class Parser{
         std::unique_ptr<Expression> parse_multiplicative();
         std::unique_ptr<Expression> parse_primary();
         std::unique_ptr<Statement> parse_statement();
-        std::unique_ptr<StructDef> parse_struct();
+        std::unique_ptr<DataDef> parse_data();
         std::unique_ptr<EnumDef> parse_enum();
         std::string parse_style_block();
         std::unique_ptr<ASTNode> parse_html_element();
@@ -51,6 +51,7 @@ class Parser{
 
     public:
         std::vector<Component> components;
+        std::vector<std::unique_ptr<DataDef>> global_data;    // Data types declared outside components
         std::vector<std::unique_ptr<EnumDef>> global_enums;  // Enums declared outside components
         std::vector<std::string> imports;
         AppConfig app_config;

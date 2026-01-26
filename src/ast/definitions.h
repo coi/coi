@@ -20,14 +20,14 @@ struct FunctionDef {
     void collect_modifications(std::set<std::string>& mods) const;
 };
 
-struct StructField {
+struct DataField {
     std::string type;
     std::string name;
 };
 
-struct StructDef : ASTNode {
+struct DataDef : ASTNode {
     std::string name;
-    std::vector<StructField> fields;
+    std::vector<DataField> fields;
 
     std::string to_webcc() override;
 };

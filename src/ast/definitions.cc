@@ -25,25 +25,12 @@ void FunctionDef::collect_modifications(std::set<std::string>& mods) const {
     }
 }
 
-std::string StructDef::to_webcc() {
+std::string DataDef::to_webcc() {
     std::stringstream ss;
     ss << "struct " << name << " {\n";
     for(const auto& field : fields){
         ss << "    " << convert_type(field.type) << " " << field.name << ";\n";
     }
-    // Constructor
-    ss << "    " << name << "(";
-    for(size_t i = 0; i < fields.size(); i++){
-        if(i > 0) ss << ", ";
-        ss << convert_type(fields[i].type) << " " << fields[i].name;
-    }
-    ss << ") : ";
-    for(size_t i = 0; i < fields.size(); i++){
-        if(i > 0) ss << ", ";
-        ss << fields[i].name << "(" << fields[i].name << ")";
-    }
-    ss << " {}\n";
-    ss << "    " << name << "() {}\n"; // Default constructor
     ss << "};\n";
     return ss.str();
 }

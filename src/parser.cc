@@ -229,8 +229,8 @@ std::unique_ptr<Expression> Parser::parse_primary(){
         return std::make_unique<BoolLiteral>(false);
     }
 
-    // Identifer or function call (also allow 'key' keyword as identifier)
-    if(current().type == TokenType::IDENTIFIER || current().type == TokenType::KEY){
+    // Identifer or function call (also allow 'key' and 'data' keywords as identifier)
+    if(current().type == TokenType::IDENTIFIER || current().type == TokenType::KEY || current().type == TokenType::DATA){
         std::string name = current().value;
         int identifier_line = current().line;
         advance();
@@ -246,6 +246,29 @@ std::unique_ptr<Expression> Parser::parse_primary(){
         std::unique_ptr<Expression> expr = std::make_unique<Identifier>(name);
 
         while(true) {
+            // Data literal initialization: TypeName{val1, val2, ...}
+            if(current().type == TokenType::LBRACE && std::isupper(name[0])){
+                advance();
+                
+                // Parse aggregate initialization arguments
+                std::vector<CallArg> parsed_args;
+                while (current().type != TokenType::RBRACE) {
+                    CallArg arg;
+                    arg.value = parse_expression();
+                    parsed_args.push_back(std::move(arg));
+                    
+                    if (current().type == TokenType::COMMA) {
+                        advance();
+                        if (current().type == TokenType::RBRACE) break; // Allow trailing comma
+                    }
+                }
+                expect(TokenType::RBRACE, "Expected '}'");
+                
+                // Use ComponentConstruction for data types too (same aggregate init semantics)
+                auto data_expr = std::make_unique<ComponentConstruction>(name);
+                data_expr->args = std::move(parsed_args);
+                return data_expr;
+            }
             if(current().type == TokenType::LPAREN){
                 advance();
 
@@ -551,7 +574,11 @@ std::unique_ptr<Statement> Parser::parse_statement(){
         }
 
         std::string name = current().value;
-        expect(TokenType::IDENTIFIER, "Expected variable name");
+        if (current().type == TokenType::IDENTIFIER || current().type == TokenType::KEY || current().type == TokenType::DATA) {
+            advance();
+        } else {
+            expect(TokenType::IDENTIFIER, "Expected variable name");
+        }
 
         auto var_decl = std::make_unique<VarDeclaration>();
         var_decl->type = type;
@@ -821,13 +848,13 @@ std::unique_ptr<Statement> Parser::parse_statement(){
     // throw std::runtime_error("Unexpected statement");
 }
 
-std::unique_ptr<StructDef> Parser::parse_struct(){
-    expect(TokenType::STRUCT, "Expected 'struct'");
+std::unique_ptr<DataDef> Parser::parse_data(){
+    expect(TokenType::DATA, "Expected 'data'");
     std::string name = current().value;
-    expect(TokenType::IDENTIFIER, "Expected struct name");
+    expect(TokenType::IDENTIFIER, "Expected data name");
     expect(TokenType::LBRACE, "Expected '{'");
 
-    auto def = std::make_unique<StructDef>();
+    auto def = std::make_unique<DataDef>();
     def->name = name;
 
     while(current().type != TokenType::RBRACE && current().type != TokenType::END_OF_FILE){
@@ -839,7 +866,7 @@ std::unique_ptr<StructDef> Parser::parse_struct(){
             current().type == TokenType::IDENTIFIER){
             advance();
         } else {
-            ErrorHandler::compiler_error("Expected type in struct", -1);
+            ErrorHandler::compiler_error("Expected type in data", -1);
         }
 
         std::string fieldName = current().value;
@@ -1443,7 +1470,12 @@ Component Parser::parse_component(){
                 advance();
                 param->is_callback = true;
                 param->name = current().value;
-                expect(TokenType::IDENTIFIER, "Expected param name");
+                // Allow 'key' and 'data' keywords as parameter name
+                if (current().type == TokenType::IDENTIFIER || current().type == TokenType::KEY || current().type == TokenType::DATA) {
+                    advance();
+                } else {
+                    expect(TokenType::IDENTIFIER, "Expected param name");
+                }
 
                 // Check for optional parameter list: (type1, type2, ...)
                 std::vector<std::string> callback_params;
@@ -1523,7 +1555,12 @@ Component Parser::parse_component(){
                 }
 
                 param->name = current().value;
-                expect(TokenType::IDENTIFIER, "Expected param name");
+                // Allow 'key' and 'data' keywords as parameter name
+                if (current().type == TokenType::IDENTIFIER || current().type == TokenType::KEY || current().type == TokenType::DATA) {
+                    advance();
+                } else {
+                    expect(TokenType::IDENTIFIER, "Expected param name");
+                }
             }
 
             // Parse default value
@@ -1605,7 +1642,11 @@ Component Parser::parse_component(){
             }
 
             var_decl->name = current().value;
-            expect(TokenType::IDENTIFIER, "Expected variable name");
+            if (current().type == TokenType::IDENTIFIER || current().type == TokenType::KEY || current().type == TokenType::DATA) {
+                advance();
+            } else {
+                expect(TokenType::IDENTIFIER, "Expected variable name");
+            }
             var_decl->is_mutable = is_mutable;
 
             if(match(TokenType::ASSIGN)){
@@ -1637,9 +1678,9 @@ Component Parser::parse_component(){
         else if (is_mutable && !is_public && current().type != TokenType::DEF) {
             throw std::runtime_error("Expected variable declaration after 'mut'");
         }
-        // Struct definition
-        else if(current().type == TokenType::STRUCT){
-            comp.structs.push_back(parse_struct());
+        // Data definition
+        else if(current().type == TokenType::DATA){
+            comp.data.push_back(parse_data());
         }
         // Enum definition (with optional shared prefix)
         else if(current().type == TokenType::ENUM){
@@ -1684,8 +1725,8 @@ Component Parser::parse_component(){
                 }
 
                 std::string paramName = current().value;
-                // Allow 'key' keyword as parameter name
-                if (current().type == TokenType::IDENTIFIER || current().type == TokenType::KEY) {
+                // Allow 'key' and 'data' keywords as parameter name
+                if (current().type == TokenType::IDENTIFIER || current().type == TokenType::KEY || current().type == TokenType::DATA) {
                     advance();
                 } else {
                     throw std::runtime_error("Expected parameter name at line " + std::to_string(current().line));
@@ -1779,8 +1820,8 @@ Component Parser::parse_component(){
                     }
 
                     std::string paramName = current().value;
-                    // Allow 'key' keyword as parameter name
-                    if (current().type == TokenType::IDENTIFIER || current().type == TokenType::KEY) {
+                    // Allow 'key' and 'data' keywords as parameter name
+                    if (current().type == TokenType::IDENTIFIER || current().type == TokenType::KEY || current().type == TokenType::DATA) {
                         advance();
                     } else {
                         throw std::runtime_error("Expected parameter name at line " + std::to_string(current().line));
@@ -1997,6 +2038,9 @@ void Parser::parse_file(){
         } else if(current().type == TokenType::ENUM){
             // Global enum (outside any component)
             global_enums.push_back(parse_enum());
+        } else if(current().type == TokenType::DATA){
+            // Global data type (outside any component)
+            global_data.push_back(parse_data());
         } else if(current().type == TokenType::IDENTIFIER && current().value == "app"){
             advance();
             parse_app();

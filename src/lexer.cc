@@ -98,7 +98,7 @@ Token Lexer::read_identifier(){
         {"component", TokenType::COMPONENT},
         {"def", TokenType::DEF},
         {"return", TokenType::RETURN},
-        {"struct", TokenType::STRUCT},
+        {"data", TokenType::DATA},
         {"view", TokenType::VIEW},
         {"tick", TokenType::TICK},
         {"init", TokenType::INIT},

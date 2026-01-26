@@ -24,7 +24,7 @@ struct Component : ASTNode {
     std::string name;
     std::string css;
     std::string global_css;
-    std::vector<std::unique_ptr<StructDef>> structs;
+    std::vector<std::unique_ptr<DataDef>> data;
     std::vector<std::unique_ptr<EnumDef>> enums;
     std::vector<std::unique_ptr<VarDeclaration>> state;
     std::vector<std::unique_ptr<ComponentParam>> params;

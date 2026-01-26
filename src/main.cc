@@ -888,6 +888,7 @@ int main(int argc, char **argv)
     }
 
     std::vector<Component> all_components;
+    std::vector<std::unique_ptr<DataDef>> all_global_data;
     std::vector<std::unique_ptr<EnumDef>> all_global_enums;
     AppConfig final_app_config;
     std::set<std::string> processed_files;
@@ -953,6 +954,12 @@ int main(int argc, char **argv)
                 all_global_enums.push_back(std::move(enum_def));
             }
 
+            // Collect global data types
+            for (auto &data_def : parser.global_data)
+            {
+                all_global_data.push_back(std::move(data_def));
+            }
+
             if (!parser.app_config.root_component.empty())
             {
                 final_app_config = parser.app_config;
@@ -984,7 +991,7 @@ int main(int argc, char **argv)
 
         validate_view_hierarchy(all_components);
         validate_mutability(all_components);
-        validate_types(all_components, all_global_enums);
+        validate_types(all_components, all_global_enums, all_global_data);
 
         // Determine output filename
         fs::path input_path(input_file);
@@ -1137,6 +1144,16 @@ int main(int argc, char **argv)
             out << enum_def->to_webcc();
         }
         if (!all_global_enums.empty())
+        {
+            out << "\n";
+        }
+
+        // Output global data types (defined outside components)
+        for (const auto &data_def : all_global_data)
+        {
+            out << data_def->to_webcc();
+        }
+        if (!all_global_data.empty())
         {
             out << "\n";
         }
