@@ -24,6 +24,16 @@ check_clang_version() {
 
 check_clang_version
 
+# Detect platform and set linker flags for Homebrew LLVM on macOS
+# These flags ensure we link against Homebrew's libc++ on macOS
+export LDFLAGS_LIBCXX=""
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    LLVM_PREFIX=$(brew --prefix llvm 2>/dev/null || echo "")
+    if [ -n "$LLVM_PREFIX" ] && [ -d "$LLVM_PREFIX/lib/c++" ]; then
+        export LDFLAGS_LIBCXX="-L$LLVM_PREFIX/lib/c++ -Wl,-rpath,$LLVM_PREFIX/lib/c++"
+    fi
+fi
+
 # Ensure git submodules are up to date (deps/webcc)
 if [ -d ".git" ] && [ -f ".gitmodules" ]; then
     if [ -d "deps/webcc/.git" ] || grep -q "submodule.*webcc" .gitmodules; then

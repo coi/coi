@@ -1,15 +1,13 @@
 builddir = build
 cxx = clang++
 cflags = -std=c++20 -O0 -Isrc
-ldflags = 
-
 rule cxx
   command = $cxx $cflags -MD -MF $out.d -c $in -o $out
   depfile = $out.d
   description = CXX $in
 
 rule link
-  command = $cxx $ldflags -o $out $in
+  command = $cxx $$LDFLAGS_LIBCXX -o $out $in
   description = LINK $out
 
 rule gen_schema_cxx
@@ -18,7 +16,7 @@ rule gen_schema_cxx
   description = CXX_GEN $in
 
 rule gen_schema_link
-  command = clang++ -o $out $in
+  command = clang++ $$LDFLAGS_LIBCXX -o $out $in
   description = LINK_GEN $out
 
 rule generate_def_files
