@@ -38,6 +38,35 @@ jobs:
       - name: Build Example
         run: cd example && ../coi build
 
+      - name: Setup Node (for web tests)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install web test deps
+        run: cd tests/visual && npm ci
+
+      - name: Ensure headless Chrome
+        run: |
+          set -euo pipefail
+          if command -v google-chrome >/dev/null 2>&1; then
+            echo "WEB_BROWSER=$(command -v google-chrome)" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          sudo apt-get update
+          sudo apt-get install -y chromium-browser || sudo apt-get install -y chromium
+          if command -v chromium >/dev/null 2>&1; then
+            echo "WEB_BROWSER=$(command -v chromium)" >> "$GITHUB_ENV"
+          elif command -v chromium-browser >/dev/null 2>&1; then
+            echo "WEB_BROWSER=$(command -v chromium-browser)" >> "$GITHUB_ENV"
+          else
+            echo "error: no chrome/chromium found" >&2
+            exit 1
+          fi
+
+      - name: Run web integration tests
+        run: bash tests/run_web_integration.sh
+
   deploy:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: test
