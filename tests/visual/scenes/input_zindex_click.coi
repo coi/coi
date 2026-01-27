@@ -1,0 +1,70 @@
+component App {
+  mut int a = 0;
+  mut int b = 0;
+
+  def clickA() : void { a += 1; }
+  def clickB() : void { b += 1; }
+
+  style {
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #0f1117;
+      color: #e8e8e8;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    }
+    .root {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+    .status {
+      position: absolute;
+      left: 24px;
+      top: 24px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 2px solid rgba(144, 238, 144, 0.55);
+      background: rgba(30, 60, 30, 0.55);
+      z-index: 30;
+      user-select: none;
+    }
+    .panel {
+      position: absolute;
+      width: 480px;
+      height: 260px;
+      border-radius: 24px;
+      border: 8px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.06);
+      box-sizing: border-box;
+      padding: 16px;
+      user-select: none;
+    }
+    .a {
+      left: 140px;
+      top: 120px;
+      border-color: rgba(255, 216, 128, 0.35);
+      background: rgba(255, 216, 128, 0.10);
+      z-index: 10;
+    }
+    .b {
+      left: 220px;
+      top: 180px;
+      border-color: rgba(255, 160, 128, 0.35);
+      background: rgba(255, 160, 128, 0.10);
+      z-index: 20;
+    }
+    .label { font-size: 18px; opacity: 0.95; }
+  }
+
+  view {
+    <div class="root root">
+      <div class="status status">clicks: A={a} B={b}</div>
+      <div class="panel a" onclick={clickA}><div class="label">A (z=10)</div></div>
+      <div class="panel b" onclick={clickB}><div class="label">B (z=20) should win</div></div>
+    </div>
+  }
+}
+
+app { root = App; }
+
