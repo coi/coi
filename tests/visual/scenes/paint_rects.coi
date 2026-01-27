@@ -1,0 +1,50 @@
+component App {
+  style {
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #0f1117;
+      color: #e8e8e8;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    }
+    .root {
+      width: 100vw;
+      height: 100vh;
+      box-sizing: border-box;
+      padding: 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .row {
+      display: flex;
+      gap: 16px;
+    }
+    .card {
+      border-radius: 14px;
+      border: 3px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.06);
+      height: 120px;
+    }
+    .a { width: 260px; background: rgba(76, 98, 255, 0.55); }
+    .b { width: 260px; background: rgba(224, 132, 224, 0.45); }
+    .c { flex: 1;   background: rgba(140, 214, 255, 0.35); }
+    .wide { height: 160px; background: rgba(138, 173, 255, 0.40); }
+  }
+
+  view {
+    <div class="root root">
+      <div class="row">
+        <div class="card a"></div>
+        <div class="card b"></div>
+        <div class="card c"></div>
+      </div>
+      <div class="card wide"></div>
+    </div>
+  }
+}
+
+app {
+  root = App;
+}
+
