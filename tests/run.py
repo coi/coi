@@ -19,7 +19,7 @@ SCRIPT_DIR = Path(__file__).parent.resolve()
 PROJECT_ROOT = SCRIPT_DIR.parent
 
 def main():
-    parser = argparse.ArgumentParser(description="COI Test Runner")
+    parser = argparse.ArgumentParser(description="Coi Test Runner")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     # Unit Tests
