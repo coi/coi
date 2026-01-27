@@ -8,7 +8,7 @@ src/coi_schema.h
 src/coi_schema.cc
 node_modules/
 *.vsix
+**/.cache/
 **/.coi_cache
-def/.cache/
 **/__pycache__
 

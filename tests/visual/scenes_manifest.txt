@@ -1,7 +1,0 @@
-# name|path|backends
-# backends: web (comma-separated)
-
-paint_rects|tests/visual/scenes/paint_rects.coi|web
-input_zindex_click|tests/visual/scenes/input_zindex_click.coi|web
-input_clip_click|tests/visual/scenes/input_clip_click.coi|web
-

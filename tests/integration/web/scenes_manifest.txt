@@ -1,0 +1,7 @@
+# name|path|backends
+# backends: web (comma-separated)
+
+paint_rects|tests/integration/web/scenes/paint_rects.coi|web
+input_zindex_click|tests/integration/web/scenes/input_zindex_click.coi|web
+input_clip_click|tests/integration/web/scenes/input_clip_click.coi|web
+
