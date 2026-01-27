@@ -5,8 +5,6 @@ Coi Test Runner
 
 import argparse
 from pathlib import Path
-
-# Fix module search path if needed
 import sys
 sys.path.append(str(Path(__file__).parent))
 
