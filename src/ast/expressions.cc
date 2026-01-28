@@ -37,6 +37,71 @@ static std::string expand_inline_template(const std::string& tmpl, const std::st
     return result;
 }
 
+static int find_string_concat_arg(const std::vector<CallArg>& args) {
+    for (size_t i = 0; i < args.size(); i++) {
+        if (is_string_expr(args[i].value.get()) && dynamic_cast<BinaryOp*>(args[i].value.get())) {
+            return (int)i;
+        }
+    }
+    return -1;
+}
+
+static std::string join_with_comma(const std::vector<std::string>& parts, size_t start, size_t end) {
+    std::string out;
+    for (size_t i = start; i < end; i++) {
+        if (i > start) out += ", ";
+        out += parts[i];
+    }
+    return out;
+}
+
+static std::string emit_mapped_call(const std::string& map_ns,
+                                    const std::string& map_func,
+                                    bool pass_receiver,
+                                    const std::string& receiver_expr,
+                                    const std::vector<CallArg>& args,
+                                    const std::string& return_type) {
+    int string_concat_arg_idx = find_string_concat_arg(args);
+
+    std::vector<std::string> arg_exprs;
+    arg_exprs.reserve(args.size() + (pass_receiver ? 1 : 0));
+    if (pass_receiver) arg_exprs.push_back(receiver_expr);
+    for (const auto& a : args) arg_exprs.push_back(a.value->to_webcc());
+
+    // Formatter block for "string + value" chains passed to string_view-ish APIs.
+    if (string_concat_arg_idx >= 0) {
+        size_t pos = pass_receiver ? (size_t)string_concat_arg_idx + 1 : (size_t)string_concat_arg_idx;
+
+        std::vector<Expression*> parts;
+        flatten_string_concat(args[(size_t)string_concat_arg_idx].value.get(), parts);
+
+        std::string call_prefix = "webcc::" + map_ns + "::" + map_func + "(";
+        if (pos > 0) {
+            call_prefix += join_with_comma(arg_exprs, 0, pos);
+            call_prefix += ", ";
+        }
+
+        std::string call_suffix;
+        if (pos + 1 < arg_exprs.size()) {
+            call_suffix += ", ";
+            call_suffix += join_with_comma(arg_exprs, pos + 1, arg_exprs.size());
+        }
+        call_suffix += ")";
+
+        return generate_formatter_block(parts, call_prefix, call_suffix);
+    }
+
+    std::string code = "webcc::" + map_ns + "::" + map_func + "(";
+    code += join_with_comma(arg_exprs, 0, arg_exprs.size());
+    code += ")";
+
+    if (return_type == "int") {
+        code = "(int32_t)(" + code + ")";
+    }
+
+    return code;
+}
+
 // Helper to generate WebSocket dispatcher registration code
 // ws_member is the member variable name (e.g., "ws") for invalidation on close/error
 static std::string generate_ws_dispatcher(const std::string& event_type,
@@ -422,75 +487,8 @@ std::string FunctionCall::to_webcc() {
                 if (sep != std::string::npos) {
                     std::string map_ns = method_def->mapping_value.substr(0, sep);
                     std::string map_func = method_def->mapping_value.substr(sep + 2);
-
                     bool pass_obj = !method_def->is_shared;
-                    std::string obj_arg = pass_obj ? type_or_obj : "";
-
-                    // Check for string concat argument - use formatter block
-                    bool has_string_concat_arg = false;
-                    int string_concat_arg_idx = -1;
-                    for (size_t i = 0; i < args.size(); i++) {
-                        if (is_string_expr(args[i].value.get()) && dynamic_cast<BinaryOp*>(args[i].value.get())) {
-                            has_string_concat_arg = true;
-                            string_concat_arg_idx = (int)i;
-                            break;
-                        }
-                    }
-
-                    if (has_string_concat_arg) {
-                        std::vector<Expression*> parts;
-                        flatten_string_concat(args[string_concat_arg_idx].value.get(), parts);
-
-                        std::string call_prefix = "webcc::" + map_ns + "::" + map_func + "(";
-                        std::string call_suffix;
-
-                        bool first_arg = true;
-                        if (pass_obj) {
-                            call_prefix += obj_arg;
-                            first_arg = false;
-                        }
-
-                        for (size_t i = 0; i < args.size(); i++) {
-                            if (!first_arg) {
-                                if ((int)i == string_concat_arg_idx) {
-                                    call_prefix += ", ";
-                                } else if ((int)i < string_concat_arg_idx) {
-                                    call_prefix += ", " + args[i].value->to_webcc();
-                                } else {
-                                    call_suffix += ", " + args[i].value->to_webcc();
-                                }
-                            } else {
-                                if ((int)i != string_concat_arg_idx) {
-                                    call_prefix += args[i].value->to_webcc();
-                                }
-                            }
-                            first_arg = false;
-                        }
-                        call_suffix += ")";
-
-                        return generate_formatter_block(parts, call_prefix, call_suffix);
-                    }
-
-                    std::string code = "webcc::" + map_ns + "::" + map_func + "(";
-                    bool first_arg = true;
-
-                    if (pass_obj) {
-                        code += obj_arg;
-                        first_arg = false;
-                    }
-
-                    for(size_t i = 0; i < args.size(); i++){
-                        if (!first_arg) code += ", ";
-                        code += args[i].value->to_webcc();
-                        first_arg = false;
-                    }
-                    code += ")";
-
-                    if (method_def->return_type == "int") {
-                        code = "(int32_t)(" + code + ")";
-                    }
-
-                    return code;
+                    return emit_mapped_call(map_ns, map_func, pass_obj, type_or_obj, args, method_def->return_type);
                 }
             }
         }
@@ -595,72 +593,7 @@ std::string FunctionCall::to_webcc() {
     }
 
     if (map_method && !map_ns.empty() && !map_func.empty()) {
-        // Check for string concat argument - use formatter block
-        bool has_string_concat_arg = false;
-        int string_concat_arg_idx = -1;
-        for (size_t i = 0; i < args.size(); i++) {
-            if (is_string_expr(args[i].value.get()) && dynamic_cast<BinaryOp*>(args[i].value.get())) {
-                has_string_concat_arg = true;
-                string_concat_arg_idx = i;
-                break;
-            }
-        }
-
-        if (has_string_concat_arg) {
-            std::vector<Expression*> parts;
-            flatten_string_concat(args[string_concat_arg_idx].value.get(), parts);
-
-            std::string call_prefix = "webcc::" + map_ns + "::" + map_func + "(";
-            std::string call_suffix;
-
-            bool first_arg = true;
-            if (pass_obj) {
-                call_prefix += obj_arg;
-                first_arg = false;
-            }
-
-            for (size_t i = 0; i < args.size(); i++) {
-                if (!first_arg) {
-                    if ((int)i == string_concat_arg_idx) {
-                        call_prefix += ", ";
-                    } else if ((int)i < string_concat_arg_idx) {
-                        call_prefix += ", " + args[i].value->to_webcc();
-                    } else {
-                        call_suffix += ", " + args[i].value->to_webcc();
-                    }
-                } else {
-                    if ((int)i != string_concat_arg_idx) {
-                        call_prefix += args[i].value->to_webcc();
-                    }
-                }
-                first_arg = false;
-            }
-            call_suffix += ")";
-
-            return generate_formatter_block(parts, call_prefix, call_suffix);
-        }
-
-        std::string code = "webcc::" + map_ns + "::" + map_func + "(";
-        bool first_arg = true;
-
-        if (pass_obj) {
-            code += obj_arg;
-            first_arg = false;
-        }
-
-        for(size_t i = 0; i < args.size(); i++){
-            if (!first_arg) code += ", ";
-            code += args[i].value->to_webcc();
-            first_arg = false;
-        }
-        code += ")";
-
-        // Check return type from method definition
-        if (map_method->return_type == "int") {
-            code = "(int32_t)(" + code + ")";
-        }
-
-        return code;
+        return emit_mapped_call(map_ns, map_func, pass_obj, obj_arg, args, map_method->return_type);
     }
 
     std::string result = name + "(";
