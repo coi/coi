@@ -137,6 +137,9 @@ mut Audio[] backup := sounds;  // sounds is now invalid
 
 ### Setup Example
 
+> [!IMPORTANT]
+> **Upcoming Change:** `Canvas.createCanvas()` will be removed in a future release. Use `<canvas &={canvas}>` in your view instead. See [CHANGES.md](../CHANGES.md#canvas-initialization--view-binding) for migration details.
+
 ```tsx
 component CanvasApp {
     mut Canvas canvas;
@@ -432,7 +435,10 @@ component Game {
 
 ## DOMElement
 
-Direct DOM manipulation.
+Direct DOM manipulation for browser APIs and measurements.
+
+> [!IMPORTANT]
+> **Upcoming Change:** Direct DOM manipulation (`.appendChild()`, `.setInnerHtml()`, `.addClass()`) will be discouraged in favor of declarative view syntax in future releases. `DOMElement` references should primarily be used for browser APIs like `requestFullscreen()` or measurements. See [CHANGES.md](../CHANGES.md#direct-dom-manipulation--declarative-view) for details.
 
 ### Methods
 
