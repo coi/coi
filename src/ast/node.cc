@@ -1,5 +1,5 @@
 #include "node.h"
-#include "../def_parser.h"
+#include "../defs/def_parser.h"
 #include <cctype>
 #include <algorithm>
 

@@ -1,7 +1,7 @@
 #include "expressions.h"
 #include "formatter.h"
-#include "../def_parser.h"
-#include "../json_codegen.h"
+#include "../defs/def_parser.h"
+#include "../codegen/json_codegen.h"
 #include <cctype>
 
 // Reference to per-component context for reference props

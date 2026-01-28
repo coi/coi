@@ -1,6 +1,6 @@
 #include "type_checker.h"
-#include "def_parser.h"
-#include "error.h"
+#include "../defs/def_parser.h"
+#include "../cli/error.h"
 #include <iostream>
 #include <algorithm>
 #include <set>

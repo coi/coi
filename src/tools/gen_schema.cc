@@ -13,8 +13,8 @@
 #include <cctype>
 
 // Include webcc's schema definitions
-#include "../deps/webcc/src/cli/schema.h"
-#include "../deps/webcc/src/cli/webcc_schema.h"
+#include "../../deps/webcc/src/cli/schema.h"
+#include "../../deps/webcc/src/cli/webcc_schema.h"
 
 // Functions that are handled by Coi language constructs (not exposed directly)
 // Format: "namespace::function_name" to allow same function names in different namespaces
