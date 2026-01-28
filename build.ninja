@@ -23,22 +23,39 @@ rule generate_def_files
   command = build/gen_schema
   description = GEN_DEF_FILES
 
-# Generator (generates .d.coi definition files)
-build build/obj/gen_schema.o: gen_schema_cxx src/gen_schema.cc
-build build/gen_schema: gen_schema_link build/obj/gen_schema.o
+# Generator tool (generates .d.coi definition files)
+build build/obj/tools/gen_schema.o: gen_schema_cxx src/tools/gen_schema.cc
+build build/gen_schema: gen_schema_link build/obj/tools/gen_schema.o
 
 # Generated .d.coi files (gen_schema reads webcc schema.def and generates def/web/*.d.coi)
 build def/web/index.d.coi: generate_def_files build/gen_schema
 
 # Coi Compiler source objects
 build build/obj/main.o: cxx src/main.cc
-build build/obj/lexer.o: cxx src/lexer.cc
-build build/obj/parser.o: cxx src/parser.cc
-build build/obj/type_checker.o: cxx src/type_checker.cc
-build build/obj/cli.o: cxx src/cli.cc
-build build/obj/def_parser.o: cxx src/def_parser.cc
 
-# AST module (split for parallel compilation)
+# Frontend module (lexing & parsing)
+build build/obj/frontend/lexer.o: cxx src/frontend/lexer.cc
+build build/obj/frontend/parser.o: cxx src/frontend/parser.cc
+
+# Analysis module (semantic analysis & validation)
+build build/obj/analysis/type_checker.o: cxx src/analysis/type_checker.cc
+build build/obj/analysis/include_detector.o: cxx src/analysis/include_detector.cc
+build build/obj/analysis/feature_detector.o: cxx src/analysis/feature_detector.cc
+build build/obj/analysis/dependency_resolver.o: cxx src/analysis/dependency_resolver.cc
+
+# Definition module (def file handling)
+build build/obj/defs/def_parser.o: cxx src/defs/def_parser.cc
+build build/obj/defs/def_loader.o: cxx src/defs/def_loader.cc
+
+# Codegen module (code generation)
+build build/obj/codegen/codegen.o: cxx src/codegen/codegen.cc
+build build/obj/codegen/json_codegen.o: cxx src/codegen/json_codegen.cc
+build build/obj/codegen/css_generator.o: cxx src/codegen/css_generator.cc
+
+# CLI module (command-line interface)
+build build/obj/cli/cli.o: cxx src/cli/cli.cc
+
+# AST module (abstract syntax tree)
 build build/obj/ast/node.o: cxx src/ast/node.cc
 build build/obj/ast/expressions.o: cxx src/ast/expressions.cc
 build build/obj/ast/formatter.o: cxx src/ast/formatter.cc
@@ -47,11 +64,8 @@ build build/obj/ast/definitions.o: cxx src/ast/definitions.cc
 build build/obj/ast/view.o: cxx src/ast/view.cc
 build build/obj/ast/component.o: cxx src/ast/component.cc
 
-# JSON codegen module
-build build/obj/json_codegen.o: cxx src/json_codegen.cc
-
 # Link Coi
-build coi: link build/obj/main.o build/obj/lexer.o build/obj/parser.o build/obj/type_checker.o build/obj/cli.o build/obj/def_parser.o build/obj/json_codegen.o build/obj/ast/node.o build/obj/ast/expressions.o build/obj/ast/formatter.o build/obj/ast/statements.o build/obj/ast/definitions.o build/obj/ast/view.o build/obj/ast/component.o
+build coi: link build/obj/main.o build/obj/frontend/lexer.o build/obj/frontend/parser.o build/obj/analysis/type_checker.o build/obj/cli/cli.o build/obj/defs/def_parser.o build/obj/codegen/json_codegen.o build/obj/analysis/include_detector.o build/obj/analysis/feature_detector.o build/obj/analysis/dependency_resolver.o build/obj/defs/def_loader.o build/obj/codegen/codegen.o build/obj/codegen/css_generator.o build/obj/ast/node.o build/obj/ast/expressions.o build/obj/ast/formatter.o build/obj/ast/statements.o build/obj/ast/definitions.o build/obj/ast/view.o build/obj/ast/component.o
 
 # Generate def cache at build time
 rule gen_def_cache

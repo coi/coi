@@ -1,6 +1,6 @@
 #include "component.h"
 #include "formatter.h"
-#include "../def_parser.h"
+#include "../defs/def_parser.h"
 #include <cctype>
 #include <algorithm>
 #include <sstream>

@@ -1,6 +1,6 @@
 #include "parser.h"
-#include "def_parser.h"
-#include "error.h"
+#include "../defs/def_parser.h"
+#include "../cli/error.h"
 #include <stdexcept>
 #include <iostream>
 #include <limits>

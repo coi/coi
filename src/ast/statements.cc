@@ -1,5 +1,5 @@
 #include "statements.h"
-#include "../def_parser.h"
+#include "../defs/def_parser.h"
 
 // Reference to per-component context for reference props
 extern std::set<std::string> g_ref_props;
