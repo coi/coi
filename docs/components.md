@@ -31,9 +31,11 @@ component Counter {
 
 ### Mutability (`mut`) and Visibility (`pub`)
 
-Coi uses two orthogonal modifiers for variables:
+Coi uses two orthogonal modifiers:
 - **`mut`**: Makes a variable mutable (can be changed from inside the component)
-- **`pub`**: Makes a variable visible (can be read from outside the component)
+- **`pub`**: Makes a variable or method visible (can be accessed from outside the component)
+
+**Variables:**
 
 | Syntax | Inside Component | Outside Component | Description |
 |--------|------------------|-------------------|-------------|
@@ -42,6 +44,13 @@ Coi uses two orthogonal modifiers for variables:
 | `pub int x` | Read Only | Read Only | Public constant |
 | `pub mut int x` | Read/Write | Read Only | Public state (read-only outside) |
 
+**Methods:**
+
+| Syntax | Inside Component | Outside Component | Description |
+|--------|------------------|-------------------|-------------|
+| `def method() : void` | Callable | Hidden | Private method |
+| `pub def method() : void` | Callable | Callable | Public method |
+
 **Important**: You can never write to a component's member from outside. If you need to modify a child's state, use a setter method or reference parameters.
 
 ```tsx
@@ -49,9 +58,24 @@ component Counter(pub mut int count = 0) {
     mut int internal = 0;      // Private, mutable
     pub int version = 1;       // Public, constant
     
-    def helper() : void { }    // Private method
-    pub def reset() : void {   // Public method
+    def helper() : void { }    // Private method (not accessible from outside)
+    pub def reset() : void {   // Public method (accessible from outside)
         count = 0;
+    }
+}
+
+// Usage
+component App {
+    mut Counter counter;
+    
+    view {
+        <div>
+            <span>{counter.count}</span>     // ✅ Can read public state
+            <span>{counter.version}</span>   // ✅ Can read public constant
+            <button onclick={counter.reset}>Reset</button>  // ✅ Can call public method
+            // ❌ counter.internal - Error: private member
+            // ❌ counter.helper() - Error: private method
+        </div>
     }
 }
 ```
