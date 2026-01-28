@@ -431,9 +431,10 @@ int main()
                     << "def onError() : void = void"
                     << "): WebSocket\n\n";
 
-                out << "    // Check if the WebSocket is connected (handle is valid)\n";
+                out << "    // Check whether the WebSocket handle is still valid (not closed/errored).\n";
+                out << "    // Note: this does not guarantee the connection is OPEN; track OPEN via callbacks.\n";
                 out << "    @inline(\"$self.is_valid()\")\n";
-                out << "    def isConnected(): bool\n";
+                out << "    def isConnected(): bool\n\n";
 
                 out << "    // WebSocket callback registration (compiler intrinsics)\n";
                 out << "    @intrinsic(\"ws_on_message\")\n";

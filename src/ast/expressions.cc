@@ -403,6 +403,99 @@ std::string FunctionCall::to_webcc() {
         method = name.substr(dot_pos + 1);
     }
 
+    // If the type checker resolved which type owns this method call, use it to avoid
+    // ambiguous cross-type name collisions (e.g. DOMElement.isConnected vs WebSocket.isConnected)
+    // and accidental builtin (string/array) expansion on non-builtin receivers.
+    if (dot_pos != std::string::npos && !resolved_owner_type.empty() && !type_or_obj.empty()) {
+        if (const auto* method_def = DefSchema::instance().lookup_method(resolved_owner_type, method, args.size())) {
+            if (method_def->mapping_type == MappingType::Intrinsic) {
+                std::string code = generate_intrinsic(method_def->mapping_value, args);
+                if (!code.empty()) return code;
+            }
+
+            if (method_def->mapping_type == MappingType::Inline) {
+                return expand_inline_template(method_def->mapping_value, type_or_obj, args);
+            }
+
+            if (method_def->mapping_type == MappingType::Map && !method_def->mapping_value.empty()) {
+                size_t sep = method_def->mapping_value.find("::");
+                if (sep != std::string::npos) {
+                    std::string map_ns = method_def->mapping_value.substr(0, sep);
+                    std::string map_func = method_def->mapping_value.substr(sep + 2);
+
+                    bool pass_obj = !method_def->is_shared;
+                    std::string obj_arg = pass_obj ? type_or_obj : "";
+
+                    // Check for string concat argument - use formatter block
+                    bool has_string_concat_arg = false;
+                    int string_concat_arg_idx = -1;
+                    for (size_t i = 0; i < args.size(); i++) {
+                        if (is_string_expr(args[i].value.get()) && dynamic_cast<BinaryOp*>(args[i].value.get())) {
+                            has_string_concat_arg = true;
+                            string_concat_arg_idx = (int)i;
+                            break;
+                        }
+                    }
+
+                    if (has_string_concat_arg) {
+                        std::vector<Expression*> parts;
+                        flatten_string_concat(args[string_concat_arg_idx].value.get(), parts);
+
+                        std::string call_prefix = "webcc::" + map_ns + "::" + map_func + "(";
+                        std::string call_suffix;
+
+                        bool first_arg = true;
+                        if (pass_obj) {
+                            call_prefix += obj_arg;
+                            first_arg = false;
+                        }
+
+                        for (size_t i = 0; i < args.size(); i++) {
+                            if (!first_arg) {
+                                if ((int)i == string_concat_arg_idx) {
+                                    call_prefix += ", ";
+                                } else if ((int)i < string_concat_arg_idx) {
+                                    call_prefix += ", " + args[i].value->to_webcc();
+                                } else {
+                                    call_suffix += ", " + args[i].value->to_webcc();
+                                }
+                            } else {
+                                if ((int)i != string_concat_arg_idx) {
+                                    call_prefix += args[i].value->to_webcc();
+                                }
+                            }
+                            first_arg = false;
+                        }
+                        call_suffix += ")";
+
+                        return generate_formatter_block(parts, call_prefix, call_suffix);
+                    }
+
+                    std::string code = "webcc::" + map_ns + "::" + map_func + "(";
+                    bool first_arg = true;
+
+                    if (pass_obj) {
+                        code += obj_arg;
+                        first_arg = false;
+                    }
+
+                    for(size_t i = 0; i < args.size(); i++){
+                        if (!first_arg) code += ", ";
+                        code += args[i].value->to_webcc();
+                        first_arg = false;
+                    }
+                    code += ")";
+
+                    if (method_def->return_type == "int") {
+                        code = "(int32_t)(" + code + ")";
+                    }
+
+                    return code;
+                }
+            }
+        }
+    }
+
     // Try DefSchema lookup first (handles @intrinsic, @inline, @map)
     if (!type_or_obj.empty()) {
         // Check for static type call (e.g., System.random, Input.isKeyDown)
@@ -426,19 +519,19 @@ std::string FunctionCall::to_webcc() {
             }
         }
 
-        // Check for builtin type instance methods (string, array)
-        // For string methods, we need to check against the "string" type
-        // Use arg_count to find the correct overload
-        if (auto* method_def = DefSchema::instance().lookup_method("string", method, args.size())) {
-            if (method_def->mapping_type == MappingType::Inline) {
-                return expand_inline_template(method_def->mapping_value, type_or_obj, args);
+        // Check for builtin type instance methods (string, array).
+        // Note: these are ambiguous by name, so prefer the type checker's resolution above when available.
+        if (resolved_owner_type.empty()) {
+            if (auto* method_def = DefSchema::instance().lookup_method("string", method, args.size())) {
+                if (method_def->mapping_type == MappingType::Inline) {
+                    return expand_inline_template(method_def->mapping_value, type_or_obj, args);
+                }
             }
-        }
 
-        // Check array methods
-        if (auto* method_def = DefSchema::instance().lookup_method("array", method, args.size())) {
-            if (method_def->mapping_type == MappingType::Inline) {
-                return expand_inline_template(method_def->mapping_value, type_or_obj, args);
+            if (auto* method_def = DefSchema::instance().lookup_method("array", method, args.size())) {
+                if (method_def->mapping_type == MappingType::Inline) {
+                    return expand_inline_template(method_def->mapping_value, type_or_obj, args);
+                }
             }
         }
     }

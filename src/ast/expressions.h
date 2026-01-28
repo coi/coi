@@ -69,6 +69,9 @@ struct FunctionCall : Expression {
     std::string name;
     std::vector<CallArg> args;
     int line = 0;
+    // Set by the type checker to disambiguate instance methods (e.g. DOMElement.isConnected vs WebSocket.isConnected)
+    // and prevent accidental builtin (string/array) method expansion on non-builtin receivers.
+    std::string resolved_owner_type;
 
     FunctionCall(const std::string& n) : name(n){}
     std::string args_to_string();

@@ -384,6 +384,14 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
     // Ternary operator type inference (cond ? true_expr : false_expr)
     if (auto ternary = dynamic_cast<TernaryOp *>(expr))
     {
+        // Condition must be boolean-ish
+        std::string cond_type = infer_expression_type(ternary->condition.get(), scope);
+        if (cond_type != "unknown" && cond_type != "bool")
+        {
+            ErrorHandler::type_error("Ternary operator condition must be 'bool' but got '" + cond_type + "'", -1);
+            exit(1);
+        }
+
         // The result type is the type of the true/false branches (they should match)
         std::string true_type = infer_expression_type(ternary->true_expr.get(), scope);
         std::string false_type = infer_expression_type(ternary->false_expr.get(), scope);
@@ -424,6 +432,40 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
         {
             obj_name = full_name.substr(0, dot_pos);
             method_name = full_name.substr(dot_pos + 1);
+
+            // Resolve the owning type for instance/static method calls so codegen can disambiguate
+            // collisions like DOMElement.isConnected vs WebSocket.isConnected.
+            if (!obj_name.empty()) {
+                if (scope.count(obj_name)) {
+                    std::string obj_type = scope.at(obj_name);
+
+                    bool is_dynamic_array = obj_type.ends_with("[]");
+                    bool is_fixed_array = false;
+                    if (!is_dynamic_array) {
+                        size_t bracket_pos = obj_type.rfind('[');
+                        if (bracket_pos != std::string::npos && obj_type.back() == ']') {
+                            std::string size_str = obj_type.substr(bracket_pos + 1, obj_type.length() - bracket_pos - 2);
+                            is_fixed_array = !size_str.empty() && std::all_of(size_str.begin(), size_str.end(), ::isdigit);
+                        }
+                    }
+
+                    const MethodDef* method_def = nullptr;
+                    if (obj_type == "string") {
+                        method_def = DefSchema::instance().lookup_method("string", method_name, func->args.size());
+                        if (method_def) func->resolved_owner_type = "string";
+                    } else if (is_dynamic_array || is_fixed_array) {
+                        method_def = DefSchema::instance().lookup_method("array", method_name, func->args.size());
+                        if (method_def) func->resolved_owner_type = "array";
+                    } else {
+                        method_def = DefSchema::instance().lookup_method(obj_type, method_name, func->args.size());
+                        if (method_def) func->resolved_owner_type = obj_type;
+                    }
+                } else if (DefSchema::instance().lookup_type(obj_name)) {
+                    if (DefSchema::instance().lookup_method(obj_name, method_name, func->args.size())) {
+                        func->resolved_owner_type = obj_name;
+                    }
+                }
+            }
             
             // Only validate simple identifiers (not complex expressions like array access)
             // Complex expressions like balls[i] contain brackets, so skip those
@@ -435,6 +477,7 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                 // Check if it's a handle type or enum - those are validated by schema lookup below
                 bool is_handle = DefSchema::instance().is_handle(obj_name);
                 bool is_enum = is_enum_type(obj_name);
+                bool is_known_type = (DefSchema::instance().lookup_type(obj_name) != nullptr);
                 
                 // Check if obj_name is a valid type with a namespace mapping (e.g., DOMElement -> dom, System -> system)
                 // Also walk the inheritance chain (e.g., Canvas -> DOMElement means check canvas:: then dom::)
@@ -475,7 +518,7 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                 }
                 
                 // If not in scope and not a handle/enum/schema-namespace, it's undefined
-                if (!is_handle && !is_enum && !is_valid_schema_call)
+                if (!is_handle && !is_enum && !is_valid_schema_call && !is_known_type)
                 {
                     std::cerr << "\033[1;31mError:\033[0m Undefined variable '" << obj_name 
                               << "' in method call at line " << func->line << std::endl;
@@ -527,99 +570,97 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
         std::string snake_method = DefSchema::to_snake_case(method_name);
         const auto *entry = DefSchema::instance().lookup_func(snake_method);
 
+        // Fallback for non-@map methods (e.g. @inline/@intrinsic) which are
+        // indexed by type and not part of the global schema func table.
+        if (!entry && !obj_name.empty()) {
+            // Instance call: obj.method(...)
+            if (scope.count(obj_name)) {
+                std::string obj_type = scope.at(obj_name);
+                if (const auto* method_def = DefSchema::instance().lookup_method(obj_type, method_name)) {
+                    if (method_def->is_shared) {
+                        std::cerr << "\033[1;31mError:\033[0m Shared method '" << method_name
+                                  << "' cannot be called on an instance at line " << func->line << std::endl;
+                        exit(1);
+                    }
+                    if (func->args.size() != method_def->params.size()) {
+                        std::cerr << "\033[1;31mError:\033[0m Function '" << full_name << "' expects " << method_def->params.size()
+                                  << " arguments but got " << func->args.size() << " at line " << func->line << std::endl;
+                        exit(1);
+                    }
+                    for (size_t i = 0; i < func->args.size(); ++i) {
+                        std::string arg_type = infer_expression_type(func->args[i].value.get(), scope);
+                        std::string expected_type = method_def->params[i].type;
+                        if (!is_compatible_type(arg_type, expected_type)) {
+                            std::cerr << "\033[1;31mError:\033[0m Argument " << (i + 1) << " of '" << full_name << "' expects '" << expected_type
+                                      << "' but got '" << arg_type << "' at line " << func->line << std::endl;
+                            exit(1);
+                        }
+                    }
+                    return method_def->return_type.empty() ? "void" : normalize_type(method_def->return_type);
+                }
+            }
+            // Static call: Type.method(...)
+            else if (DefSchema::instance().lookup_type(obj_name)) {
+                if (const auto* method_def = DefSchema::instance().lookup_method(obj_name, method_name)) {
+                    if (!method_def->is_shared) {
+                        std::cerr << "\033[1;31mError:\033[0m Instance method '" << method_name
+                                  << "' cannot be called on '" << obj_name << "' at line " << func->line << std::endl;
+                        exit(1);
+                    }
+                    if (func->args.size() != method_def->params.size()) {
+                        std::cerr << "\033[1;31mError:\033[0m Function '" << full_name << "' expects " << method_def->params.size()
+                                  << " arguments but got " << func->args.size() << " at line " << func->line << std::endl;
+                        exit(1);
+                    }
+                    for (size_t i = 0; i < func->args.size(); ++i) {
+                        std::string arg_type = infer_expression_type(func->args[i].value.get(), scope);
+                        std::string expected_type = method_def->params[i].type;
+                        if (!is_compatible_type(arg_type, expected_type)) {
+                            std::cerr << "\033[1;31mError:\033[0m Argument " << (i + 1) << " of '" << full_name << "' expects '" << expected_type
+                                      << "' but got '" << arg_type << "' at line " << func->line << std::endl;
+                            exit(1);
+                        }
+                    }
+                    return method_def->return_type.empty() ? "void" : normalize_type(method_def->return_type);
+                }
+            }
+        }
+
         if (entry)
         {
             size_t expected_args = entry->method->params.size();
             size_t actual_args = func->args.size();
-            size_t param_offset = 0;
+            // Validate static/namespace calls (Type.method(...) where Type is not a variable).
+            // Instance calls already have an implicit receiver in the def signature.
+            if (!obj_name.empty() && !scope.count(obj_name)) {
+                bool is_valid_call = false;
+                bool is_handle_type = DefSchema::instance().is_handle(obj_name);
 
-            bool implicit_obj = false;
-            if (!obj_name.empty())
-            {
-                if (scope.count(obj_name))
-                {
-                    // Only treat as implicit object if function actually expects a handle as first arg
-                    if (!entry->method->params.empty())
-                    {
-                        std::string first_param_type = entry->method->params[0].type;
-                        if (DefSchema::instance().is_handle(first_param_type))
-                        {
-                            std::string obj_type = scope.at(obj_name);
-                            if (is_compatible_type(obj_type, first_param_type))
-                            {
-                                implicit_obj = true;
-                            }
-                        }
-                    }
+                std::string expected_ns = obj_name;
+                std::transform(expected_ns.begin(), expected_ns.end(), expected_ns.begin(), ::tolower);
+
+                if (entry->ns == expected_ns) {
+                    // Namespace-style call: System.log(), Dom.scrollToTop(), ...
+                    is_valid_call = true;
+                } else if (is_handle_type && entry->method->is_shared &&
+                           !entry->method->return_type.empty() &&
+                           is_compatible_type(entry->method->return_type, obj_name)) {
+                    // Shared factory method on a handle type: DOMElement.createElement(), Canvas.createCanvas(), ...
+                    is_valid_call = true;
+                } else {
+                    std::cerr << "\033[1;31mError:\033[0m Method '" << method_name << "' does not belong to '"
+                              << obj_name << "'. It belongs to the '" << entry->ns << "' namespace at line " << func->line << std::endl;
+                    exit(1);
                 }
-                else
-                {
-                    // obj_name is NOT in scope - it's a type name or namespace
-                    // Check if this is a valid static call
-                    
-                    bool is_valid_call = false;
-                    
-                    // Check if obj_name is a known handle type
-                    bool is_handle_type = DefSchema::instance().is_handle(obj_name);
-                    
-                    if (!entry->method->params.empty() && DefSchema::instance().is_handle(entry->method->params[0].type))
-                    {
-                        // Method expects a handle as first param (instance method)
-                        // Only allow if obj_name matches the expected handle type
-                        if (is_handle_type && is_compatible_type(obj_name, entry->method->params[0].type))
-                        {
-                            // Valid: DOMElement.createElement() where first param is DOMElement
-                            is_valid_call = true;
-                        }
-                        else
-                        {
-                            // Invalid: trying to call instance method statically with wrong type
-                            std::cerr << "\033[1;31mError:\033[0m '" << method_name << "' is an instance method on '" 
-                                      << entry->method->params[0].type << "' and cannot be called on '" << obj_name 
-                                      << "'. Use instance." << method_name << "(...) instead at line " << func->line << std::endl;
-                            exit(1);
-                        }
-                    }
-                    else
-                    {
-                        // True static method (no handle as first param)
-                        // Two valid cases:
-                        // 1. Called via namespace: namespace.method() where obj_name matches entry->ns
-                        // 2. Called via handle type: HandleType.method() where return type matches handle type
-                        //    This supports "shared def" pattern (static factory methods)
-                        std::string expected_ns = obj_name;
-                        std::transform(expected_ns.begin(), expected_ns.end(), expected_ns.begin(), ::tolower);
-                        
-                        if (entry->ns == expected_ns)
-                        {
-                            // Case 1: namespace.method()
-                            is_valid_call = true;
-                        }
-                        else if (is_handle_type && !entry->method->return_type.empty() && 
-                                 is_compatible_type(entry->method->return_type, obj_name))
-                        {
-                            // Case 2: HandleType.method() where method returns that handle type
-                            // This is a "shared def" / static factory method pattern
-                            is_valid_call = true;
-                        }
-                        else
-                        {
-                            std::cerr << "\033[1;31mError:\033[0m Method '" << method_name << "' does not belong to '" 
-                                      << obj_name << "'. It belongs to the '" << entry->ns << "' namespace at line " << func->line << std::endl;
-                            exit(1);
-                        }
-                    }
+
+                if (!is_valid_call) {
+                    exit(1);
                 }
             }
 
-            if (implicit_obj)
+            if (actual_args != expected_args)
             {
-                param_offset = 1;
-            }
-
-            if (actual_args != (expected_args - param_offset))
-            {
-                std::cerr << "\033[1;31mError:\033[0m Function '" << full_name << "' expects " << (expected_args - param_offset)
+                std::cerr << "\033[1;31mError:\033[0m Function '" << full_name << "' expects " << expected_args
                           << " arguments but got " << actual_args << " at line " << func->line << std::endl;
                 exit(1);
             }
@@ -627,7 +668,7 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
             for (size_t i = 0; i < actual_args; ++i)
             {
                 std::string arg_type = infer_expression_type(func->args[i].value.get(), scope);
-                std::string expected_type = entry->method->params[i + param_offset].type;
+                std::string expected_type = entry->method->params[i].type;
 
                 // Note: Schema methods (external APIs) don't support reference parameters,
                 // so we don't validate &arg/:arg here. That validation happens for component methods.
