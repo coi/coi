@@ -1,0 +1,41 @@
+// Test: Flexible callback signatures - users can omit params they don't need
+data User {
+    string name;
+    int age;
+}
+
+component FlexibleCallbackTest {
+    mut string status = "Not started";
+    mut User user;
+
+    // onSuccess with only data param (no meta)
+    def handleUserSimple(User u) : void {
+        user = u;
+        status = "Got user: {u.name}";
+    }
+
+    // onError with no params
+    def handleErrorSimple() : void {
+        status = "Error occurred";
+    }
+
+    def parseJson() : void {
+        string json = "{\"name\": \"Bob\", \"age\": 30}";
+        Json.parse(
+            User,
+            json,
+            &onSuccess = handleUserSimple,
+            &onError = handleErrorSimple
+        );
+    }
+
+    view {
+        <div>
+            <p>Status: {status}</p>
+        </div>
+    }
+}
+
+app {
+    root = FlexibleCallbackTest;
+}

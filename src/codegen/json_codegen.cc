@@ -3,7 +3,6 @@
 // =============================================================================
 
 #include "json_codegen.h"
-#include "../ast/node.h"
 #include <sstream>
 
 // ============================================================================
@@ -99,13 +98,10 @@ static std::string get_array_element_type(const std::string& type) {
     return type.substr(0, type.size() - 2);
 }
 
-// Generate callback invocation with flexible parameter count
-// For onSuccess: can accept (data), (data, meta), or no params
-// For onError: can accept (string) or no params
+// Generate callback invocation based on user's method param count
 static std::string generate_callback_call(
     const std::string& callback_name,
     bool is_array,
-    const std::string& elem_type,
     bool is_error = false)
 {
     if (callback_name.empty()) return "";
@@ -116,28 +112,18 @@ static std::string generate_callback_call(
     ss << "this->" << callback_name << "(";
     
     if (is_error) {
-        // onError callback - can take 0 or 1 (string) parameter
-        if (param_count > 0) {
-            // User's callback accepts the error string
+        // onError: 0 params = no arg, 1+ params = pass error string
+        if (param_count >= 1) {
             ss << "webcc::string(\"" << (is_array ? "Expected JSON array" : "Invalid JSON") << "\")";
         }
-        // else: no parameters
     } else {
-        // onSuccess callback - can take 0, 1 (data), or 2 (data, meta) parameters
+        // onSuccess: 0 params = no args, 1 param = data only, 2+ params = data + meta
         if (is_array) {
-            if (param_count >= 1) {
-                ss << "webcc::move(_results)";
-            }
-            if (param_count >= 2) {
-                ss << ", webcc::move(_metas)";
-            }
+            if (param_count >= 1) ss << "webcc::move(_results)";
+            if (param_count >= 2) ss << ", webcc::move(_metas)";
         } else {
-            if (param_count >= 1) {
-                ss << "webcc::move(_result)";
-            }
-            if (param_count >= 2) {
-                ss << ", webcc::move(_meta)";
-            }
+            if (param_count >= 1) ss << "webcc::move(_result)";
+            if (param_count >= 2) ss << ", webcc::move(_meta)";
         }
     }
     
@@ -293,7 +279,7 @@ static std::string generate_json_parse_array(
     ss << "            uint32_t _p = json::skip_ws(_s, 0, _len);\n";
     ss << "            if (_p >= _len || _s[_p] != '[') {\n";
     if (!on_error_callback.empty()) {
-        ss << "                " << generate_callback_call(on_error_callback, true, elem_type, true) << ";\n";
+        ss << "                " << generate_callback_call(on_error_callback, true, true) << ";\n";
     }
     ss << "                return;\n";
     ss << "            }\n";
@@ -311,7 +297,7 @@ static std::string generate_json_parse_array(
     ss << "                }\n";
     ss << "            });\n";
     if (!on_success_callback.empty()) {
-        ss << "            " << generate_callback_call(on_success_callback, true, elem_type, false) << ";\n";
+        ss << "            " << generate_callback_call(on_success_callback, true, false) << ";\n";
     }
     ss << "        }()";
     return ss.str();
@@ -338,7 +324,7 @@ std::string generate_json_parse(
     ss << "            uint32_t _len = " << json_expr << ".length();\n";
     ss << "            if (!json::is_valid(_s, _len)) {\n";
     if (!on_error_callback.empty()) {
-        ss << "                " << generate_callback_call(on_error_callback, false, data_type, true) << ";\n";
+        ss << "                " << generate_callback_call(on_error_callback, false, true) << ";\n";
     }
     ss << "                return;\n";
     ss << "            }\n";
@@ -347,7 +333,7 @@ std::string generate_json_parse(
     ss << "            bool _ok;\n";
     generate_object_fields_parse(ss, data_type, "_result", "_meta", "_s", "_len", "_ok", "            ");
     if (!on_success_callback.empty()) {
-        ss << "            " << generate_callback_call(on_success_callback, false, data_type, false) << ";\n";
+        ss << "            " << generate_callback_call(on_success_callback, false, false) << ";\n";
     }
     ss << "        }()";
     return ss.str();
