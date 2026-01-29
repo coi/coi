@@ -274,8 +274,9 @@ static std::string generate_json_parse_array(
     
     std::stringstream ss;
     ss << "[&]() {\n";
-    ss << "            const char* _s = " << json_expr << ".data();\n";
-    ss << "            uint32_t _len = " << json_expr << ".length();\n";
+    ss << "            webcc::string _json = " << json_expr << ";\n";
+    ss << "            const char* _s = _json.data();\n";
+    ss << "            uint32_t _len = _json.length();\n";
     ss << "            uint32_t _p = json::skip_ws(_s, 0, _len);\n";
     ss << "            if (_p >= _len || _s[_p] != '[') {\n";
     if (!on_error_callback.empty()) {
@@ -320,8 +321,9 @@ std::string generate_json_parse(
     
     std::stringstream ss;
     ss << "[&]() {\n";
-    ss << "            const char* _s = " << json_expr << ".data();\n";
-    ss << "            uint32_t _len = " << json_expr << ".length();\n";
+    ss << "            webcc::string _json = " << json_expr << ";\n";
+    ss << "            const char* _s = _json.data();\n";
+    ss << "            uint32_t _len = _json.length();\n";
     ss << "            if (!json::is_valid(_s, _len)) {\n";
     if (!on_error_callback.empty()) {
         ss << "                " << generate_callback_call(on_error_callback, false, true) << ";\n";
