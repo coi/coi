@@ -369,6 +369,13 @@ std::unique_ptr<Expression> Parser::parse_primary(){
                 expr = std::make_unique<MemberAccess>(std::move(expr), member);
             }
             else if(current().type == TokenType::LBRACKET){
+                // Check for type literal syntax: TypeName[] (empty brackets = array type)
+                if (peek().type == TokenType::RBRACKET) {
+                    // This is a type literal like "User[]" - used in Json.parse(User[], ...)
+                    advance(); // consume [
+                    advance(); // consume ]
+                    return std::make_unique<TypeLiteral>(name + "[]");
+                }
                 // Array index access
                 advance();
                 auto index = parse_expression();
@@ -1728,6 +1735,12 @@ Component Parser::parse_component(){
                     current().type == TokenType::STRING || current().type == TokenType::BOOL ||
                     current().type == TokenType::IDENTIFIER){
                     advance();
+                    // Check for array type: Type[]
+                    if (current().type == TokenType::LBRACKET) {
+                        advance();
+                        expect(TokenType::RBRACKET, "Expected ']' for array type");
+                        paramType += "[]";
+                    }
                 } else {
                         throw std::runtime_error("Expected parameter type");
                 }
@@ -1823,6 +1836,12 @@ Component Parser::parse_component(){
                         current().type == TokenType::STRING || current().type == TokenType::BOOL ||
                         current().type == TokenType::IDENTIFIER){
                         advance();
+                        // Check for array type: Type[]
+                        if (current().type == TokenType::LBRACKET) {
+                            advance();
+                            expect(TokenType::RBRACKET, "Expected ']' for array type");
+                            paramType += "[]";
+                        }
                     } else {
                             throw std::runtime_error("Expected parameter type");
                     }

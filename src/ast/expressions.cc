@@ -175,10 +175,19 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
     if (intrinsic_name == "json_parse") {
         if (args.size() < 2) return "";
         
-        // First arg is data type identifier (e.g., "User")
+        // First arg is data type identifier (e.g., "User" or "User[]")
         // Resolve component-local types (e.g., "TestStruct" -> "App_TestStruct")
         std::string data_type = args[0].value->to_webcc();
-        data_type = ComponentTypeContext::instance().resolve(data_type);
+        
+        // Handle array types: resolve the element type, then add [] back
+        bool is_array = data_type.size() > 2 && data_type.substr(data_type.size() - 2) == "[]";
+        if (is_array) {
+            std::string elem_type = data_type.substr(0, data_type.size() - 2);
+            elem_type = ComponentTypeContext::instance().resolve(elem_type);
+            data_type = elem_type + "[]";
+        } else {
+            data_type = ComponentTypeContext::instance().resolve(data_type);
+        }
         
         // Second arg is JSON string expression
         std::string json_expr = args[1].value->to_webcc();
@@ -225,22 +234,34 @@ std::vector<StringLiteral::Part> StringLiteral::parse() {
                 // No closing brace found - treat as literal
                 current += '{';
             } else {
-                // Found closing brace - extract expression
-                if(!current.empty()) parts.push_back({false, current});
-                current = "";
-                i++;
-                while(i < value.length() && value[i] != '}') {
-                    current += value[i];
-                    i++;
-                }
-                // Only treat as expression if content is non-empty
-                if (!current.empty()) {
-                    parts.push_back({true, current});
+                // Check if content looks like a valid expression (starts with letter/underscore)
+                // This allows JSON-like content with braces to pass through as literals
+                char first_char = (i + 1 < value.length()) ? value[i + 1] : '\0';
+                bool looks_like_expr = (first_char >= 'a' && first_char <= 'z') ||
+                                       (first_char >= 'A' && first_char <= 'Z') ||
+                                       first_char == '_';
+                
+                if (!looks_like_expr) {
+                    // Not an expression - treat braces as literal
+                    current += '{';
                 } else {
-                    // Empty braces {} - treat as literal
-                    parts.push_back({false, "{}"});
+                    // Found closing brace - extract expression
+                    if(!current.empty()) parts.push_back({false, current});
+                    current = "";
+                    i++;
+                    while(i < value.length() && value[i] != '}') {
+                        current += value[i];
+                        i++;
+                    }
+                    // Only treat as expression if content is non-empty
+                    if (!current.empty()) {
+                        parts.push_back({true, current});
+                    } else {
+                        // Empty braces {} - treat as literal
+                        parts.push_back({false, "{}"});
+                    }
+                    current = "";
                 }
-                current = "";
             }
         } else {
             current += value[i];

@@ -46,6 +46,14 @@ struct Identifier : Expression {
     void collect_dependencies(std::set<std::string>& deps) override;
 };
 
+// Type literal expression (for passing types as arguments, e.g., Json.parse(User[], ...))
+struct TypeLiteral : Expression {
+    std::string type_name;  // e.g., "User" or "User[]"
+    TypeLiteral(const std::string& t) : type_name(t) {}
+    std::string to_webcc() override { return type_name; }
+    bool is_static() override { return true; }
+};
+
 struct BinaryOp : Expression {
     std::unique_ptr<Expression> left;
     std::string op;

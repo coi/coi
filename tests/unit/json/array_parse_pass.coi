@@ -1,0 +1,38 @@
+// Test: JSON array parsing with Json.parse(Type[], ...)
+// Tests parsing of root-level JSON arrays into vector of data types
+
+component JsonArrayTest {
+    data Show {
+        string title;
+        int id;
+    }
+    
+    mut string result = "not parsed";
+    mut int count = 0;
+    
+    def onSuccess(Show[] shows, ShowMeta[] metas) : void {
+        count = shows.length();
+        if (count > 0) {
+            result = "Parsed {count} shows: {shows[0].title}";
+        } else {
+            result = "Empty array";
+        }
+    }
+    
+    def onError() : void {
+        result = "Parse error";
+    }
+    
+    mount {
+        string jsonArray = "[{\"title\":\"Breaking Bad\",\"id\":1},{\"title\":\"Game of Thrones\",\"id\":2}]";
+        Json.parse(Show[], jsonArray, &onSuccess = onSuccess, &onError = onError);
+    }
+    
+    view {
+        <div>{result}</div>
+    }
+}
+
+app {
+    root = JsonArrayTest;
+}
