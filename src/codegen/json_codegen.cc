@@ -246,7 +246,7 @@ static std::string generate_json_parse_array(
     ss << "            uint32_t _p = json::skip_ws(_s, 0, _len);\n";
     ss << "            if (_p >= _len || _s[_p] != '[') {\n";
     if (!on_error_callback.empty()) {
-        ss << "                this->" << on_error_callback << "();\n";
+        ss << "                this->" << on_error_callback << "(webcc::string(\"Expected JSON array\"));\n";
     }
     ss << "                return;\n";
     ss << "            }\n";
@@ -291,7 +291,7 @@ std::string generate_json_parse(
     ss << "            uint32_t _len = " << json_expr << ".length();\n";
     ss << "            if (!json::is_valid(_s, _len)) {\n";
     if (!on_error_callback.empty()) {
-        ss << "                this->" << on_error_callback << "();\n";
+        ss << "                this->" << on_error_callback << "(webcc::string(\"Invalid JSON\"));\n";
     }
     ss << "                return;\n";
     ss << "            }\n";
