@@ -82,6 +82,7 @@ Token Lexer::read_string(){
     return Token{TokenType::STRING_LITERAL, str, start_line, start_column};
 }
 
+<<<<<<< dev
 Token Lexer::read_template_string(){
     int start_line = line;
     int start_column = column;
@@ -104,6 +105,8 @@ Token Lexer::read_template_string(){
     return Token{TokenType::TEMPLATE_STRING, str, start_line, start_column};
 }
 
+=======
+>>>>>>> main
 Token Lexer::read_identifier(){
     int start_line = line;
     int start_column = column;
@@ -184,12 +187,15 @@ std::vector<Token> Lexer::tokenize(){
             continue;
         }
 
+<<<<<<< dev
         // Template strings (backticks)
         if(current() == '`'){
             tokens.push_back(read_template_string());
             continue;
         }
 
+=======
+>>>>>>> main
         // Identifiers and keywords
         if(std::isalpha(current()) || current() == '_'){
             tokens.push_back(read_identifier());
