@@ -8,7 +8,7 @@ enum class TokenType {
     // Types
     INT, FLOAT, FLOAT32, STRING, BOOL, VOID,
     // Literals
-    INT_LITERAL, FLOAT_LITERAL, STRING_LITERAL, TRUE, FALSE,
+    INT_LITERAL, FLOAT_LITERAL, STRING_LITERAL, TEMPLATE_STRING, TRUE, FALSE,
     // Identifiers
     IDENTIFIER,
     // Operatos

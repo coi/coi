@@ -1,6 +1,6 @@
 #include "component.h"
 #include "formatter.h"
-#include "../def_parser.h"
+#include "../defs/def_parser.h"
 #include <cctype>
 #include <algorithm>
 #include <sstream>
@@ -415,6 +415,19 @@ std::string Component::to_webcc(CompilerSession &session)
     int loop_counter = 0;
     int if_counter = 0;
 
+    // Set up component-local type context for convert_type() to use
+    std::set<std::string> local_data_names;
+    std::set<std::string> local_enum_names;
+    for (const auto &d : data)
+    {
+        local_data_names.insert(d->name);
+    }
+    for (const auto &e : enums)
+    {
+        local_enum_names.insert(e->name);
+    }
+    ComponentTypeContext::instance().set(name, local_data_names, local_enum_names);
+
     // Populate global context for reference params
     g_ref_props.clear();
     for (auto &param : params)
@@ -509,19 +522,8 @@ std::string Component::to_webcc(CompilerSession &session)
     }
 
     // Generate component as a struct
+    // Note: Data types and enums are now flattened to global scope with ComponentName_ prefix
     ss << "struct " << name << " {\n";
-
-    // Data types
-    for (auto &d : data)
-    {
-        ss << d->to_webcc() << "\n";
-    }
-
-    // Enums
-    for (auto &e : enums)
-    {
-        ss << e->to_webcc() << "\n";
-    }
 
     // Component parameters (data members only - callbacks emitted later for proper aggregate init order)
     for (auto &param : params)
@@ -2084,6 +2086,7 @@ std::string Component::to_webcc(CompilerSession &session)
     ss << "};\n";
 
     g_ref_props.clear();
+    ComponentTypeContext::instance().clear();
 
     return ss.str();
 }

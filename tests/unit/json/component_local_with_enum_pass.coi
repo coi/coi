@@ -1,0 +1,47 @@
+// Test: Component-local enum with JSON data type in same component
+// Both should be flattened with ComponentName_ prefix
+
+component MixedTypes {
+    enum Status {
+        Pending,
+        Success,
+        Error
+    }
+    
+    data Response {
+        string message;
+        int code;
+    }
+    
+    mut Status status = Status::Pending;
+    mut Response response;
+    
+    def handleResponse(Response r, ResponseMeta meta) : void {
+        response = r;
+        if (meta.has_code() && r.code == 200) {
+            status = Status::Success;
+        } else {
+            status = Status::Error;
+        }
+    }
+    
+    def handleError(string error) : void {
+        status = Status::Error;
+    }
+    
+    mount {
+        string jsonData = "{\"message\": \"OK\", \"code\": 200}";
+        Json.parse(Response, jsonData, &onSuccess = handleResponse, &onError = handleError);
+    }
+    
+    view {
+        <div>
+            Status: {status == Status::Pending ? "Pending" : (status == Status::Success ? "Success" : "Error")}
+            {status == Status::Success ? " - " + response.message : ""}
+        </div>
+    }
+}
+
+app {
+    root = MixedTypes;
+}

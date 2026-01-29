@@ -1,6 +1,6 @@
 #include "type_checker.h"
-#include "def_parser.h"
-#include "error.h"
+#include "../defs/def_parser.h"
+#include "../cli/error.h"
 #include <iostream>
 #include <algorithm>
 #include <set>
@@ -319,10 +319,11 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
     // Member access type inference (e.g., obj.field)
     if (auto member = dynamic_cast<MemberAccess *>(expr))
     {
-        // First check if the object identifier exists in scope
+        // First check if the object identifier exists in scope or is an enum type
         if (auto id = dynamic_cast<Identifier *>(member->object.get()))
         {
-            if (scope.find(id->name) == scope.end())
+            // If it's an enum type, this is valid (e.g., Color::Red)
+            if (!is_enum_type(id->name) && scope.find(id->name) == scope.end())
             {
                 ErrorHandler::type_error("Undefined variable '" + id->name + "' in member access", member->line);
                 exit(1);

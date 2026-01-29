@@ -1,0 +1,63 @@
+component About {
+    style {
+        .hero {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 120px 20px 80px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 48px;
+            font-weight: 800;
+            margin: 0 0 12px 0;
+            color: #1a1a1a;
+            letter-spacing: -1px;
+        }
+
+        .tagline {
+            font-size: 18px;
+            color: #666;
+            margin: 0 0 40px 0;
+            max-width: 600px;
+            line-height: 1.6;
+        }
+
+        .discord-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: #5865F2;
+            color: white;
+            padding: 14px 32px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 16px;
+            transition: all 0.2s;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .discord-btn:hover {
+            background: #4752C4;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(88, 101, 242, 0.4);
+        }
+    }
+
+    view {
+        <main class="hero">
+            <h1>Hey there! 👋</h1>
+            <p class="tagline">
+                This is built with Coi - it's pretty fast and fun to work with.
+                If you want to chat or have questions, come hang out on Discord!
+            </p>
+            <a class="discord-btn" href="https://discord.gg/KSpWx78wuR" target="_blank">
+                Join Discord Server
+            </a>
+        </main>
+    }
+}

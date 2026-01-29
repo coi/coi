@@ -147,6 +147,63 @@ string left = text.trimStart();     // Remove leading whitespace
 string right = text.trimEnd();      // Remove trailing whitespace
 ```
 
+### String Interpolation
+
+**Both string types support `{expr}` interpolation:**
+
+```tsx
+string name = "Alice";
+int age = 25;
+
+// Regular strings
+string greeting = "Hello, {name}! You are {age} years old.";
+
+// Template strings (backticks)
+string greeting2 = `Hello, {name}! You are {age} years old.`;
+```
+
+**Escaping interpolation:**
+
+Use `\{` and `\}` to include literal braces:
+
+```tsx
+string code = "Use \{variable\} for interpolation";
+// Result: "Use {variable} for interpolation"
+```
+
+**Regular strings (`"..."`)** - Require escape sequences:
+
+```tsx
+string text = "Line 1\nLine 2";  // Newline with \n
+string quote = "He said \"Hello\"";  // Quotes with \"
+string path = "C:\\Users\\name";  // Backslash with \\
+```
+
+**Template strings (`` `...` ``)** - Multi-line, minimal escaping:
+
+```tsx
+string title = "Breaking Bad";
+int id = 1;
+
+// Multi-line with interpolation - perfect for JSON!
+string jsonData = `
+[
+    {"title": "{title}", "id": {id}},
+    {"title": "Game of Thrones", "id": 2}
+]`;
+
+// No need to escape quotes
+string html = `<div class="card">{title}</div>`;
+
+// Only escape backticks themselves
+string example = `Use \` for backticks`;
+```
+
+**Key differences:**
+- Regular strings: Need `\"`, `\n`, `\\` for quotes, newlines, backslashes
+- Template strings: Preserve whitespace/newlines, only escape `` \` ``
+- Both: Support `{variable}` interpolation and `\{` `\}` escaping
+
 ## Data Types
 
 Data types are simple value types (like structs in other languages) that group related fields together. Unlike platform types (Canvas, Audio, etc.), data types are **copyable** and can be freely passed around.

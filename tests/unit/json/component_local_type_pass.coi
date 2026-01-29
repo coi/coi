@@ -1,0 +1,36 @@
+// Test: JSON parsing with component-local data types
+// Component-local types should work with Json.parse and have correct Meta types
+
+component JsonApp {
+    data User {
+        string name;
+        int age;
+    }
+    
+    mut string result = "not parsed";
+    
+    def onSuccess(User user, UserMeta meta) : void {
+        if (meta.has_name() && meta.has_age()) {
+            result = "User: " + user.name + ", age " + user.age;
+        } else {
+            result = "Partial data";
+        }
+    }
+    
+    def onError(string error) : void {
+        result = "Error: " + error;
+    }
+    
+    mount {
+        string jsonData = "{\"name\": \"Bob\", \"age\": 30}";
+        Json.parse(User, jsonData, &onSuccess = onSuccess, &onError = onError);
+    }
+    
+    view {
+        <div>{result}</div>
+    }
+}
+
+app {
+    root = JsonApp;
+}

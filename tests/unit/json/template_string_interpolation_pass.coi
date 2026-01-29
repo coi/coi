@@ -1,0 +1,48 @@
+// Test: Template string with interpolation
+// Template strings (backticks) support both raw JSON and {expr} interpolation
+
+component TemplateStringTest {
+    data Show {
+        string title;
+        int id;
+    }
+    
+    mut string result = "not parsed";
+    mut int count = 0;
+    
+    def onSuccess(Show[] shows, ShowMeta[] metas) : void {
+        count = shows.length();
+        if (count > 0) {
+            result = "Parsed {count} shows: {shows[0].title}";
+        } else {
+            result = "Empty array";
+        }
+    }
+    
+    def onError() : void {
+        result = "Parse error";
+    }
+    
+    mount {
+        // Template strings support interpolation!
+        string show1 = "Breaking Bad";
+        string show2 = "Game of Thrones";
+        int id1 = 1;
+        int id2 = 2;
+        
+        string jsonArray = `[
+            {"title": "{show1}", "id": {id1}},
+            {"title": "{show2}", "id": {id2}}
+        ]`;
+        
+        Json.parse(Show[], jsonArray, &onSuccess = onSuccess, &onError = onError);
+    }
+    
+    view {
+        <div>{result}</div>
+    }
+}
+
+app {
+    root = TemplateStringTest;
+}

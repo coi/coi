@@ -98,6 +98,131 @@ static std::string get_array_element_type(const std::string& type) {
     return type.substr(0, type.size() - 2);
 }
 
+<<<<<<< HEAD
+// Forward declaration
+static void generate_object_fields_parse(std::stringstream& ss,
+                                          const std::string& data_type,
+                                          const std::string& result_var,
+                                          const std::string& meta_var,
+                                          const std::string& src_var,
+                                          const std::string& len_var,
+                                          const std::string& ok_var,
+                                          const std::string& indent);
+
+// Generate inline parsing code for a single primitive field
+static void generate_primitive_field_parse(std::stringstream& ss,
+                                            const std::string& field_type,
+                                            const std::string& field_name,
+                                            uint32_t field_idx,
+                                            const std::string& result_var,
+                                            const std::string& meta_var,
+                                            const std::string& src_var,
+                                            const std::string& pos_var,
+                                            const std::string& len_var,
+                                            const std::string& ok_var,
+                                            const std::string& indent) {
+    ss << indent << "if (!json::is_null(" << src_var << ", " << pos_var << ", " << len_var << ")) {\n";
+    if (field_type == "string") {
+        ss << indent << "    " << result_var << "." << field_name << " = json::ext_str(" << src_var << ", " << pos_var << ", " << len_var << ");\n";
+        ss << indent << "    " << meta_var << ".set(" << field_idx << ");\n";
+    } else {
+        ss << indent << "    " << result_var << "." << field_name << " = json::ext_" << field_type << "(" << src_var << ", " << pos_var << ", " << len_var << ", " << ok_var << ");\n";
+        ss << indent << "    if (" << ok_var << ") " << meta_var << ".set(" << field_idx << ");\n";
+    }
+    ss << indent << "}\n";
+}
+
+// Generate inline parsing code for an array field
+static void generate_array_field_parse(std::stringstream& ss,
+                                        const std::string& elem_type,
+                                        const std::string& field_name,
+                                        uint32_t field_idx,
+                                        const std::string& result_var,
+                                        const std::string& meta_var,
+                                        const std::string& src_var,
+                                        const std::string& pos_var,
+                                        const std::string& len_var,
+                                        const std::string& indent) {
+    ss << indent << "auto _arr_view = json::isolate(" << src_var << ", " << pos_var << ", " << len_var << ");\n";
+    ss << indent << "if (_arr_view.length() > 0) {\n";
+    ss << indent << "    json::for_each(_arr_view.data(), 0, _arr_view.length(), [&](const char* _aes, uint32_t _aep, uint32_t _aelen) {\n";
+    
+    if (elem_type == "string") {
+        ss << indent << "        " << result_var << "." << field_name << ".push_back(json::ext_str(_aes, _aep, _aelen));\n";
+    } else if (elem_type == "int" || elem_type == "float" || elem_type == "bool") {
+        ss << indent << "        bool _aok;\n";
+        ss << indent << "        " << result_var << "." << field_name << ".push_back(json::ext_" << elem_type << "(_aes, _aep, _aelen, _aok));\n";
+    } else if (!elem_type.empty() && std::isupper(elem_type[0]) && DataTypeRegistry::instance().lookup(elem_type)) {
+        // Nested data type array
+        ss << indent << "        auto _ae_view = json::isolate(_aes, _aep, _aelen);\n";
+        ss << indent << "        if (_ae_view.length() > 0) {\n";
+        ss << indent << "            " << elem_type << " _ae{};\n";
+        ss << indent << "            " << elem_type << "Meta _ae_meta{};\n";
+        ss << indent << "            bool _ae_ok;\n";
+        generate_object_fields_parse(ss, elem_type, "_ae", "_ae_meta", 
+                                     "_ae_view.data()", "_ae_view.length()", "_ae_ok",
+                                     indent + "            ");
+        ss << indent << "            " << result_var << "." << field_name << ".push_back(_ae);\n";
+        ss << indent << "        }\n";
+    }
+    
+    ss << indent << "    });\n";
+    ss << indent << "    " << meta_var << ".set(" << field_idx << ");\n";
+    ss << indent << "}\n";
+}
+
+// Generate inline parsing code for a nested object field
+static void generate_nested_field_parse(std::stringstream& ss,
+                                         const std::string& nested_type,
+                                         const std::string& field_name,
+                                         uint32_t field_idx,
+                                         const std::string& result_var,
+                                         const std::string& meta_var,
+                                         const std::string& src_var,
+                                         const std::string& pos_var,
+                                         const std::string& len_var,
+                                         const std::string& indent) {
+    ss << indent << "auto _nv = json::isolate(" << src_var << ", " << pos_var << ", " << len_var << ");\n";
+    ss << indent << "if (_nv.length() > 0) {\n";
+    ss << indent << "    bool _n_ok;\n";
+    generate_object_fields_parse(ss, nested_type, 
+                                 result_var + "." + field_name,
+                                 meta_var + "." + field_name,
+                                 "_nv.data()", "_nv.length()", "_n_ok",
+                                 indent + "    ");
+    ss << indent << "    " << meta_var << ".set(" << field_idx << ");\n";
+    ss << indent << "}\n";
+}
+
+// Generate inline parsing code for all fields of a data type
+static void generate_object_fields_parse(std::stringstream& ss,
+                                          const std::string& data_type,
+                                          const std::string& result_var,
+                                          const std::string& meta_var,
+                                          const std::string& src_var,
+                                          const std::string& len_var,
+                                          const std::string& ok_var,
+                                          const std::string& indent) {
+    auto* fields = DataTypeRegistry::instance().lookup(data_type);
+    if (!fields) return;
+    
+    for (uint32_t i = 0; i < fields->size(); i++) {
+        const auto& field = (*fields)[i];
+        ss << indent << "if (uint32_t _fp = json::find_key(" << src_var << ", " << len_var << ", \"" 
+           << field.name << "\", " << field.name.length() << ")) {\n";
+        ss << indent << "    _fp = json::skip_ws(" << src_var << ", _fp, " << len_var << ");\n";
+        
+        if (is_array_type(field.type)) {
+            generate_array_field_parse(ss, get_array_element_type(field.type), field.name, i,
+                                       result_var, meta_var, src_var, "_fp", len_var, indent + "    ");
+        } else if (!field.type.empty() && std::isupper(field.type[0]) && 
+                   DataTypeRegistry::instance().lookup(field.type)) {
+            generate_nested_field_parse(ss, field.type, field.name, i,
+                                        result_var, meta_var, src_var, "_fp", len_var, indent + "    ");
+        } else {
+            generate_primitive_field_parse(ss, field.type, field.name, i,
+                                           result_var, meta_var, src_var, "_fp", len_var, ok_var, indent + "    ");
+=======
 // Generate inline parsing code for a nested object
 // Returns the code to parse nested_type from (_ns, 0, _nlen) into result_var and meta_var
 static void generate_nested_parse(std::stringstream& ss, 
@@ -152,24 +277,99 @@ static void generate_nested_parse(std::stringstream& ss,
             ss << indent << "        " << result_var << "." << field.name << " = json::ext_bool(" << src_var << ", _np, " << len_var << ", _nok);\n";
             ss << indent << "        if (_nok) " << meta_var << ".set(" << i << ");\n";
             ss << indent << "    }\n";
+>>>>>>> 688f98f (The big cleanup :) (#23))
         }
         
         ss << indent << "}\n";
     }
 }
 
+<<<<<<< HEAD
+// Generate JSON parse code for root-level arrays (e.g., Json.parse(User[], ...))
+static std::string generate_json_parse_array(
+    const std::string& array_type,
+    const std::string& json_expr,
+    const std::string& on_success_callback,
+    const std::string& on_error_callback)
+{
+    std::string elem_type = get_array_element_type(array_type);
+    if (!DataTypeRegistry::instance().lookup(elem_type)) {
+        return "/* Error: Unknown element type '" + elem_type + "' for Json.parse */";
+    }
+    
+    std::stringstream ss;
+    ss << "[&]() {\n";
+    ss << "            const char* _s = " << json_expr << ".data();\n";
+    ss << "            uint32_t _len = " << json_expr << ".length();\n";
+    ss << "            uint32_t _p = json::skip_ws(_s, 0, _len);\n";
+    ss << "            if (_p >= _len || _s[_p] != '[') {\n";
+    if (!on_error_callback.empty()) {
+        ss << "                this->" << on_error_callback << "();\n";
+    }
+    ss << "                return;\n";
+    ss << "            }\n";
+    ss << "            webcc::vector<" << elem_type << "> _results;\n";
+    ss << "            webcc::vector<" << elem_type << "Meta> _metas;\n";
+    ss << "            json::for_each(_s, _p, _len, [&](const char* _es, uint32_t _ep, uint32_t _elen) {\n";
+    ss << "                auto _ev = json::isolate(_es, _ep, _elen);\n";
+    ss << "                if (_ev.length() > 0) {\n";
+    ss << "                    " << elem_type << " _elem{};\n";
+    ss << "                    " << elem_type << "Meta _elem_meta{};\n";
+    ss << "                    bool _ok;\n";
+    generate_object_fields_parse(ss, elem_type, "_elem", "_elem_meta", "_ev.data()", "_ev.length()", "_ok", "                    ");
+    ss << "                    _results.push_back(webcc::move(_elem));\n";
+    ss << "                    _metas.push_back(webcc::move(_elem_meta));\n";
+    ss << "                }\n";
+    ss << "            });\n";
+    if (!on_success_callback.empty()) {
+        ss << "            this->" << on_success_callback << "(webcc::move(_results), webcc::move(_metas));\n";
+    }
+    ss << "        }()";
+    return ss.str();
+}
+
+=======
+>>>>>>> 688f98f (The big cleanup :) (#23))
 std::string generate_json_parse(
     const std::string& data_type,
     const std::string& json_expr,
     const std::string& on_success_callback,
     const std::string& on_error_callback)
 {
+<<<<<<< HEAD
+    // Check if this is an array type at the root level (e.g., "User[]")
+    if (is_array_type(data_type)) {
+        return generate_json_parse_array(data_type, json_expr, on_success_callback, on_error_callback);
+    }
+    
+    if (!DataTypeRegistry::instance().lookup(data_type)) {
+=======
     auto* fields = DataTypeRegistry::instance().lookup(data_type);
     if (!fields) {
+>>>>>>> 688f98f (The big cleanup :) (#23))
         return "/* Error: Unknown data type '" + data_type + "' for Json.parse */";
     }
     
     std::stringstream ss;
+<<<<<<< HEAD
+    ss << "[&]() {\n";
+    ss << "            const char* _s = " << json_expr << ".data();\n";
+    ss << "            uint32_t _len = " << json_expr << ".length();\n";
+    ss << "            if (!json::is_valid(_s, _len)) {\n";
+    if (!on_error_callback.empty()) {
+        ss << "                this->" << on_error_callback << "();\n";
+    }
+    ss << "                return;\n";
+    ss << "            }\n";
+    ss << "            " << data_type << " _result{};\n";
+    ss << "            " << data_type << "Meta _meta{};\n";
+    ss << "            bool _ok;\n";
+    generate_object_fields_parse(ss, data_type, "_result", "_meta", "_s", "_len", "_ok", "            ");
+    if (!on_success_callback.empty()) {
+        ss << "            this->" << on_success_callback << "(webcc::move(_result), webcc::move(_meta));\n";
+    }
+    ss << "        }()";
+=======
     
     // Generate inline lambda that does the parsing
     ss << "[&]() {\n";
@@ -321,6 +521,7 @@ std::string generate_json_parse(
     
     ss << "        }()";
     
+>>>>>>> 688f98f (The big cleanup :) (#23))
     return ss.str();
 }
 

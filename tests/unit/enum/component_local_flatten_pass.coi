@@ -1,0 +1,47 @@
+// Test: Component-local enums are flattened to global scope with ComponentName_ prefix
+// This ensures component-local enums don't conflict and are properly scoped
+
+component App {
+    enum Color {
+        Red,
+        Green,
+        Blue
+    }
+    
+    mut Color selected = Color::Red;
+    
+    def changeColor() : void {
+        if (selected == Color::Red) {
+            selected = Color::Green;
+        } else if (selected == Color::Green) {
+            selected = Color::Blue;
+        } else {
+            selected = Color::Red;
+        }
+    }
+    
+    view {
+        <div onclick={changeColor}>
+            Color: {selected == Color::Red ? "Red" : (selected == Color::Green ? "Green" : "Blue")}
+        </div>
+    }
+}
+
+component Other {
+    // Different component can have same-named enum
+    enum Color {
+        Cyan,
+        Magenta,
+        Yellow
+    }
+    
+    mut Color selected = Color::Cyan;
+    
+    view {
+        <div>Color: {selected == Color::Cyan ? "Cyan" : "Other"}</div>
+    }
+}
+
+app {
+    root = App;
+}

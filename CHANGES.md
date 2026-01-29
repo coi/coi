@@ -35,6 +35,25 @@ The `DOMElement` type is **not** being removed, but its purpose is being redefin
 
 > **Guideline:** Use the `view` to define **what** the element is. Use `DOMElement` references only to trigger **browser behaviors** that the view cannot describe.
 
+**Example of Valid `DOMElement` Usage:**
+
+```tsx
+component VideoPlayer {
+    mut DOMElement videoEl;
+
+    fn enterFullscreen() {
+        videoEl.requestFullscreen();  // ✅ Browser API
+    }
+
+    view {
+        <div>
+            <video &={videoEl} src="video.mp4"></video>
+            <button @click={enterFullscreen}>Fullscreen</button>
+        </div>
+    }
+}
+```
+
 ### Migration Example
 
 **❌ Old (Imperative):**
@@ -91,6 +110,8 @@ The `Canvas.createCanvas()` factory method **will be removed** in a future relea
 
 This aligns canvas initialization with the declarative view model. The canvas element becomes part of your component's view definition rather than being imperatively created in lifecycle methods.
 
+> **Lifecycle Note:** Component lifecycle runs in this order: `init {}` → `view {}` → `mount {}`. The `&={canvas}` binding populates the reference during view rendering, so it's safe to use in `mount {}`.
+
 ### Migration Example
 
 **❌ Old (Factory Method):**
@@ -101,7 +122,7 @@ component CanvasApp {
     mut CanvasContext2D ctx;
     
     mount {
-        canvas = Canvas.createCanvas("myCanvas", 800.0, 600.0);
+        canvas = Canvas.createCanvas("myCanvas", 800, 600);
         ctx = canvas.getContext2d();
     }
     
@@ -145,7 +166,7 @@ The import system **will be changed** to only include components, enums, and dat
 
 **Why this change?**
 
-This provides better encapsulation and makes module boundaries explicit. By default, everything is private to its module unless you explicitly export it.
+This provides better encapsulation and makes module boundaries explicit. By default, everything is private to its module unless you explicitly export it. **This change enables better library support** by allowing library authors to control their public API surface and hide internal implementation details from consumers.
 
 ### Migration Example
 
@@ -180,6 +201,80 @@ pub component Button {  // Explicitly exported
 
 ---
 
+## ⚠️ Module Scoping & Namespaces
+
+### One Module Declaration Per File
+
+Each file starts with a **single module declaration** on the first line. This defines the module scope for all components and types in that file.
+
+```tsx
+// Button.coi
+module TurboUI;  // ← First line, defines module scope
+pub component Button { ... }
+
+// Dashboard.coi
+module TurboUI;  // Same module
+pub component Dashboard { ... }
+
+// App.coi
+module Main;  // Different module (Main is the default for app root)
+pub component App { ... }
+```
+
+**Why this design?**
+
+This provides a clear mental model inspired by C++ namespaces:
+- **Same module:** Components share the same namespace (direct access)
+- **Different module:** Explicit prefix required (prevents naming conflicts)
+
+**This enables better library support** by allowing library authors to organize their code into logical modules while making it clear which components come from which library when used in application code.
+
+### Access Rules
+
+**You must always import the `.coi` file before using its components**, regardless of whether they're in the same module or not.
+
+**Within the same module:** Components can be used directly by name (no prefix required).
+
+```tsx
+// Button.coi
+module TurboUI;
+pub component Button {
+    view { <button>Click</button> }
+}
+
+// Dashboard.coi
+module TurboUI;
+import "Button.coi";  // Import the file
+
+pub component Dashboard {
+    view {
+        <Button />  // ✅ Direct access (same module, no prefix needed)
+    }
+}
+```
+
+**Across modules:** Use the namespace prefix (`ModuleName::Component`).
+
+```tsx
+// Button.coi
+module TurboUI;
+pub component Button {
+    view { <button>Click</button> }
+}
+
+// App.coi
+module Main;
+import "Button.coi";  // Import the file
+
+pub component App {
+    view {
+        <TurboUI::Button />  // ✅ Module prefix required (different module)
+    }
+}
+```
+
+---
+
 ## Summary of Planned Changes
 
 | Feature | Current | Future | Reason |
@@ -188,6 +283,7 @@ pub component Button {  // Explicitly exported
 | DOM Styling | `element.addClass()` | `<div class={...}>` | Reactive bindings |
 | Canvas Init | `Canvas.createCanvas()` | `<canvas &={canvas}>` | Consistent view model |
 | Imports | All components importable | Only `pub` components | Explicit module boundaries |
+| Module Access | Implicit/unclear scope | Same module: no prefix, Different module: `Module::Component` | Clear scoping rules |
 
 ---
 
