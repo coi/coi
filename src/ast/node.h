@@ -51,11 +51,18 @@ struct Expression : ASTNode {
 // Base for statements (actions)
 struct Statement : ASTNode {};
 
+// Method signature for callback parameter validation during code generation
+struct MethodSignature {
+    std::vector<std::string> param_types;  // e.g., {"Item[]", "ItemMeta[]"} for onSuccess
+    std::string return_type;                // e.g., "void"
+};
+
 // Context for component-local type resolution
 struct ComponentTypeContext {
     std::string component_name;                // Current component being compiled
     std::set<std::string> local_data_types;    // Data types defined in this component
     std::set<std::string> local_enum_types;    // Enum types defined in this component
+    std::map<std::string, MethodSignature> method_signatures;  // Method name -> signature
     
     static ComponentTypeContext& instance() {
         static ComponentTypeContext ctx;
@@ -68,12 +75,31 @@ struct ComponentTypeContext {
         component_name = comp_name;
         local_data_types = data_types;
         local_enum_types = enum_types;
+        method_signatures.clear();
     }
     
     void clear() {
         component_name.clear();
         local_data_types.clear();
         local_enum_types.clear();
+        method_signatures.clear();
+    }
+    
+    // Register a method's signature for callback validation
+    void register_method(const std::string& name, const std::vector<std::string>& param_types, const std::string& return_type = "void") {
+        method_signatures[name] = {param_types, return_type};
+    }
+    
+    // Get a method's parameter count (-1 if unknown)
+    int get_method_param_count(const std::string& name) const {
+        auto it = method_signatures.find(name);
+        return it != method_signatures.end() ? static_cast<int>(it->second.param_types.size()) : -1;
+    }
+    
+    // Get a method's full signature (nullptr if unknown)
+    const MethodSignature* get_method_signature(const std::string& name) const {
+        auto it = method_signatures.find(name);
+        return it != method_signatures.end() ? &it->second : nullptr;
     }
     
     // Check if a type is component-local and return prefixed name if so

@@ -44,8 +44,15 @@ static std::string generate_ws_dispatcher(const std::string& event_type,
                                           const std::string& ws_obj,
                                           const std::string& callback,
                                           const std::string& ws_member = "") {
+    int param_count = ComponentTypeContext::instance().get_method_param_count(callback);
+    
     if (event_type == "onMessage") {
-        return "g_ws_message_dispatcher.set(" + ws_obj + ", [this](const webcc::string& msg) { this->" + callback + "(msg); })";
+        // onMessage can accept 0 or 1 (string) parameter
+        if (param_count > 0) {
+            return "g_ws_message_dispatcher.set(" + ws_obj + ", [this](const webcc::string& msg) { this->" + callback + "(msg); })";
+        } else {
+            return "g_ws_message_dispatcher.set(" + ws_obj + ", [this](const webcc::string& msg) { this->" + callback + "(); })";
+        }
     } else if (event_type == "onOpen") {
         return "g_ws_open_dispatcher.set(" + ws_obj + ", [this]() { this->" + callback + "(); })";
     } else if (event_type == "onClose") {
@@ -147,10 +154,21 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
                 event_name = (i == 1) ? "onSuccess" : "onError";
             }
             
+            int param_count = ComponentTypeContext::instance().get_method_param_count(callback);
             if (event_name == "onSuccess") {
-                code += "            g_fetch_success_dispatcher.set(_req, [this](const webcc::string& data) { this->" + callback + "(data); });\n";
+                // onSuccess can accept 0 or 1 (string) parameter
+                if (param_count > 0) {
+                    code += "            g_fetch_success_dispatcher.set(_req, [this](const webcc::string& data) { this->" + callback + "(data); });\n";
+                } else {
+                    code += "            g_fetch_success_dispatcher.set(_req, [this](const webcc::string& data) { this->" + callback + "(); });\n";
+                }
             } else if (event_name == "onError") {
-                code += "            g_fetch_error_dispatcher.set(_req, [this](const webcc::string& error) { this->" + callback + "(error); });\n";
+                // onError can accept 0 or 1 (string) parameter
+                if (param_count > 0) {
+                    code += "            g_fetch_error_dispatcher.set(_req, [this](const webcc::string& error) { this->" + callback + "(error); });\n";
+                } else {
+                    code += "            g_fetch_error_dispatcher.set(_req, [this](const webcc::string& error) { this->" + callback + "(); });\n";
+                }
             }
         }
         
@@ -183,10 +201,21 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
                 event_name = (i == 2) ? "onSuccess" : "onError";
             }
             
+            int param_count = ComponentTypeContext::instance().get_method_param_count(callback);
             if (event_name == "onSuccess") {
-                code += "            g_fetch_success_dispatcher.set(_req, [this](const webcc::string& data) { this->" + callback + "(data); });\n";
+                // onSuccess can accept 0 or 1 (string) parameter
+                if (param_count > 0) {
+                    code += "            g_fetch_success_dispatcher.set(_req, [this](const webcc::string& data) { this->" + callback + "(data); });\n";
+                } else {
+                    code += "            g_fetch_success_dispatcher.set(_req, [this](const webcc::string& data) { this->" + callback + "(); });\n";
+                }
             } else if (event_name == "onError") {
-                code += "            g_fetch_error_dispatcher.set(_req, [this](const webcc::string& error) { this->" + callback + "(error); });\n";
+                // onError can accept 0 or 1 (string) parameter
+                if (param_count > 0) {
+                    code += "            g_fetch_error_dispatcher.set(_req, [this](const webcc::string& error) { this->" + callback + "(error); });\n";
+                } else {
+                    code += "            g_fetch_error_dispatcher.set(_req, [this](const webcc::string& error) { this->" + callback + "(); });\n";
+                }
             }
         }
         

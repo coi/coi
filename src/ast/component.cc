@@ -428,6 +428,17 @@ std::string Component::to_webcc(CompilerSession &session)
     }
     ComponentTypeContext::instance().set(name, local_data_names, local_enum_names);
 
+    // Register method signatures for callback parameter validation during intrinsic codegen
+    for (const auto &m : methods)
+    {
+        std::vector<std::string> param_types;
+        for (const auto &p : m.params)
+        {
+            param_types.push_back(p.type);
+        }
+        ComponentTypeContext::instance().register_method(m.name, param_types, m.return_type.empty() ? "void" : m.return_type);
+    }
+
     // Populate global context for reference params
     g_ref_props.clear();
     for (auto &param : params)
