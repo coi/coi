@@ -43,7 +43,7 @@ bool Parser::is_type_token() {
 // Check if current token can be used as an identifier (including keywords that are allowed as names)
 bool Parser::is_identifier_token() {
     TokenType t = current().type;
-    return t == TokenType::IDENTIFIER || t == TokenType::KEY || t == TokenType::DATA;
+    return t == TokenType::IDENTIFIER || t == TokenType::KEY || t == TokenType::DATA || t == TokenType::SHARED || t == TokenType::PUB || t == TokenType::MUT;
 }
 
 // Parse comma-separated arguments until end_token (RPAREN or RBRACE)
@@ -782,7 +782,7 @@ std::unique_ptr<Statement> Parser::parse_statement(){
     }
 
     // Assignment
-    if(current().type == TokenType::IDENTIFIER &&
+    if(is_identifier_token() &&
         (peek().type == TokenType::ASSIGN ||
         peek().type == TokenType::MOVE_ASSIGN ||
         peek().type == TokenType::PLUS_ASSIGN ||
@@ -1591,8 +1591,10 @@ Component Parser::parse_component(){
         bool is_mutable = false;
         bool is_shared = false;
 
-        // Check for shared keyword (for enums)
-        if (current().type == TokenType::SHARED) {
+        // Check for shared keyword (only if followed by declaration keyword - not when used as variable name)
+        // If followed by = or . then it's a variable name, otherwise it's the shared modifier
+        if (current().type == TokenType::SHARED && 
+            peek().type != TokenType::ASSIGN && peek().type != TokenType::DOT) {
             is_shared = true;
             advance();
         }

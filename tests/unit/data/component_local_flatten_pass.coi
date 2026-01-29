@@ -1,0 +1,45 @@
+// Test: Component-local data types are flattened to global scope with ComponentName_ prefix
+// This ensures component-local types don't conflict and are properly scoped
+
+component App {
+    data TestStruct {
+        int a;
+        string b;
+    }
+    
+    mut TestStruct value;
+    
+    init {
+        value = TestStruct{1, "hello"};
+    }
+    
+    def process() : void {
+        value.a += 1;
+    }
+    
+    view {
+        <div>Value: {value.a}, {value.b}</div>
+    }
+}
+
+component Other {
+    // Different component can have same-named data type
+    data TestStruct {
+        float x;
+        float y;
+    }
+    
+    mut TestStruct pos;
+    
+    init {
+        pos = TestStruct{0.0, 0.0};
+    }
+    
+    view {
+        <div>Position: ({pos.x}, {pos.y})</div>
+    }
+}
+
+app {
+    root = App;
+}

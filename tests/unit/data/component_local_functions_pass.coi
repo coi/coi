@@ -1,0 +1,43 @@
+// Test: Component-local data types used in function parameters and return types
+// Tests that type resolution works correctly for component-local types
+
+component TypeTest {
+    data Point {
+        float x;
+        float y;
+    }
+    
+    data Rectangle {
+        Point topLeft;
+        Point bottomRight;
+    }
+    
+    mut Point center;
+    
+    def calculateCenter(Rectangle rect) : Point {
+        float centerX = (rect.topLeft.x + rect.bottomRight.x) / 2.0;
+        float centerY = (rect.topLeft.y + rect.bottomRight.y) / 2.0;
+        Point result = Point{centerX, centerY};
+        return result;
+    }
+    
+    def createRect() : Rectangle {
+        Point tl = Point{0.0, 0.0};
+        Point br = Point{100.0, 100.0};
+        Rectangle r = Rectangle{tl, br};
+        return r;
+    }
+    
+    init {
+        Rectangle rect = createRect();
+        center = calculateCenter(rect);
+    }
+    
+    view {
+        <div>Center: ({center.x}, {center.y})</div>
+    }
+}
+
+app {
+    root = TypeTest;
+}

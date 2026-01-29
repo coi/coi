@@ -1,5 +1,6 @@
 #include "expressions.h"
 #include "formatter.h"
+#include "node.h" 
 #include "../defs/def_parser.h"
 #include "../codegen/json_codegen.h"
 #include <cctype>
@@ -175,7 +176,10 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
         if (args.size() < 2) return "";
         
         // First arg is data type identifier (e.g., "User")
+        // Resolve component-local types (e.g., "TestStruct" -> "App_TestStruct")
         std::string data_type = args[0].value->to_webcc();
+        data_type = ComponentTypeContext::instance().resolve(data_type);
+        
         // Second arg is JSON string expression
         std::string json_expr = args[1].value->to_webcc();
         

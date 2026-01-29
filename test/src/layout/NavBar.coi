@@ -1,0 +1,70 @@
+component NavBar {
+    def navigateTo(string path) : void {
+        System.navigate(path);
+    }
+
+    style {
+        .nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 32px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid #eee;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+        }
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 20px;
+            font-weight: 700;
+            color: #1a1a1a;
+            cursor: pointer;
+        }
+        .logo:hover {
+            color: #9477ff;
+        }
+        .links {
+            display: flex;
+            gap: 24px;
+            align-items: center;
+        }
+        a, .nav-link {
+            color: #666;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 14px;
+            transition: color 0.2s;
+            cursor: pointer;
+        }
+        a:hover, .nav-link:hover {
+            color: #9477ff;
+        }
+        .divider {
+            width: 1px;
+            height: 16px;
+            background: #ddd;
+        }
+    }
+
+    view {
+        <nav class="nav">
+            <span class="logo" onclick={navigateTo("/")}>
+                <span>test</span>
+            </span>
+            <div class="links">
+                <span class="nav-link" onclick={navigateTo("/")}>Home</span>
+                <span class="nav-link" onclick={navigateTo("/about")}>About</span>
+                <span class="divider"></span>
+                <a href="https://github.com/io-eric/coi" target="_blank">GitHub</a>
+                <a href="https://discord.gg/KSpWx78wuR" target="_blank">Discord</a>
+            </div>
+        </nav>
+    }
+}

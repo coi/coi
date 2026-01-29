@@ -1,0 +1,51 @@
+import "layout/NavBar.coi";
+import "layout/Footer.coi";
+import "pages/Home.coi";
+import "pages/About.coi";
+
+component App {
+    router {
+        "/" => Home,
+        "/about" => About
+    }
+
+    style {
+        .page {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+    }
+
+    style global {
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #ffffff;
+            background-image: radial-gradient(circle at 50% 0%, rgba(148, 119, 255, 0.08) 0%, rgba(255, 255, 255, 0) 60%);
+            color: #1a1a1a;
+            min-height: 100vh;
+        }
+        ::selection {
+            background: #9477ff;
+            color: #ffffff;
+        }
+    }
+
+    view {
+        <div class="page">
+            <NavBar />
+            <route />
+            <Footer />
+        </div>
+    }
+}
+
+app {
+    root = App;
+    title = "test";
+}
