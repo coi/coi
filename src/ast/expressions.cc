@@ -1,5 +1,6 @@
 #include "expressions.h"
 #include "formatter.h"
+#include "node.h" 
 #include "../defs/def_parser.h"
 #include "../codegen/json_codegen.h"
 #include <cctype>
@@ -87,8 +88,9 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
         return "g_app_get_route()";
     }
     
-    // WebSocket.connect with named callback arguments
-    // Usage: WebSocket.connect("url", &onMessage = handler, &onOpen = handler, ...)
+    // WebSocket.connect with callback arguments
+    // Usage: WebSocket.connect("url", msgHandler, openHandler, closeHandler, errorHandler)
+    //    or: WebSocket.connect("url", &onMessage = handler, &onOpen = handler, ...)
     if (intrinsic_name == "ws_connect") {
         if (args.empty()) return "";
         
@@ -97,13 +99,21 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
         std::string code = "[&]() {\n";
         code += "            auto _ws = webcc::websocket::connect(" + url + ");\n";
         
-        // Process named callback arguments
+        // Process callback arguments - support both positional and named
+        // Positional order: onMessage, onOpen, onClose, onError
+        const char* positional_names[] = {"onMessage", "onOpen", "onClose", "onError"};
         for (size_t i = 1; i < args.size(); i++) {
             const auto& arg = args[i];
-            if (arg.name.empty()) continue;
-            
             std::string callback = arg.value->to_webcc();
-            std::string dispatcher_code = generate_ws_dispatcher(arg.name, "_ws", callback, ws_member);
+            std::string event_name;
+            
+            if (!arg.name.empty()) {
+                event_name = arg.name;
+            } else if (i - 1 < 4) {
+                event_name = positional_names[i - 1];
+            }
+            
+            std::string dispatcher_code = generate_ws_dispatcher(event_name, "_ws", callback, ws_member);
             if (!dispatcher_code.empty()) {
                 code += "            " + dispatcher_code + ";\n";
             }
@@ -114,8 +124,9 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
         return code;
     }
     
-    // FetchRequest.get with named callback arguments
-    // Usage: FetchRequest.get("url", &onSuccess = handler, &onError = handler)
+    // FetchRequest.get with callback arguments
+    // Usage: FetchRequest.get("url", successHandler, errorHandler)
+    //    or: FetchRequest.get("url", &onSuccess = handler, &onError = handler)
     if (intrinsic_name == "fetch_get") {
         if (args.empty()) return "";
         
@@ -123,15 +134,22 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
         std::string code = "[&]() {\n";
         code += "            auto _req = webcc::fetch::get(" + url + ");\n";
         
-        // Process named callback arguments
+        // Process callback arguments - support both positional and named
         for (size_t i = 1; i < args.size(); i++) {
             const auto& arg = args[i];
-            if (arg.name.empty()) continue;
-            
             std::string callback = arg.value->to_webcc();
-            if (arg.name == "onSuccess") {
+            std::string event_name;
+            
+            if (!arg.name.empty()) {
+                event_name = arg.name;
+            } else {
+                // Positional: arg[1] = onSuccess, arg[2] = onError
+                event_name = (i == 1) ? "onSuccess" : "onError";
+            }
+            
+            if (event_name == "onSuccess") {
                 code += "            g_fetch_success_dispatcher.set(_req, [this](const webcc::string& data) { this->" + callback + "(data); });\n";
-            } else if (arg.name == "onError") {
+            } else if (event_name == "onError") {
                 code += "            g_fetch_error_dispatcher.set(_req, [this](const webcc::string& error) { this->" + callback + "(error); });\n";
             }
         }
@@ -141,8 +159,9 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
         return code;
     }
     
-    // FetchRequest.post with named callback arguments
-    // Usage: FetchRequest.post("url", "body", &onSuccess = handler, &onError = handler)
+    // FetchRequest.post with callback arguments
+    // Usage: FetchRequest.post("url", "body", successHandler, errorHandler)
+    //    or: FetchRequest.post("url", "body", &onSuccess = handler, &onError = handler)
     if (intrinsic_name == "fetch_post") {
         if (args.size() < 2) return "";
         
@@ -151,15 +170,22 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
         std::string code = "[&]() {\n";
         code += "            auto _req = webcc::fetch::post(" + url + ", " + body + ");\n";
         
-        // Process named callback arguments
+        // Process callback arguments - support both positional and named
         for (size_t i = 2; i < args.size(); i++) {
             const auto& arg = args[i];
-            if (arg.name.empty()) continue;
-            
             std::string callback = arg.value->to_webcc();
-            if (arg.name == "onSuccess") {
+            std::string event_name;
+            
+            if (!arg.name.empty()) {
+                event_name = arg.name;
+            } else {
+                // Positional: arg[2] = onSuccess, arg[3] = onError
+                event_name = (i == 2) ? "onSuccess" : "onError";
+            }
+            
+            if (event_name == "onSuccess") {
                 code += "            g_fetch_success_dispatcher.set(_req, [this](const webcc::string& data) { this->" + callback + "(data); });\n";
-            } else if (arg.name == "onError") {
+            } else if (event_name == "onError") {
                 code += "            g_fetch_error_dispatcher.set(_req, [this](const webcc::string& error) { this->" + callback + "(error); });\n";
             }
         }
@@ -169,24 +195,47 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
         return code;
     }
     
-    // Json.parse with named callback arguments
-    // Usage: Json.parse(User, jsonStr, &onSuccess = handler, &onError = errorHandler)
+    // Json.parse - supports both positional and named callback arguments
+    // Usage: Json.parse(User, jsonStr, successHandler, errorHandler)
+    //    or: Json.parse(User, jsonStr, &onSuccess = handler, &onError = errorHandler)
     if (intrinsic_name == "json_parse") {
         if (args.size() < 2) return "";
         
-        // First arg is data type identifier (e.g., "User")
+        // First arg is data type identifier (e.g., "User" or "User[]")
+        // Resolve component-local types (e.g., "TestStruct" -> "App_TestStruct")
         std::string data_type = args[0].value->to_webcc();
+        
+        // Handle array types: resolve the element type, then add [] back
+        bool is_array = data_type.size() > 2 && data_type.substr(data_type.size() - 2) == "[]";
+        if (is_array) {
+            std::string elem_type = data_type.substr(0, data_type.size() - 2);
+            elem_type = ComponentTypeContext::instance().resolve(elem_type);
+            data_type = elem_type + "[]";
+        } else {
+            data_type = ComponentTypeContext::instance().resolve(data_type);
+        }
+        
         // Second arg is JSON string expression
         std::string json_expr = args[1].value->to_webcc();
         
-        // Find callbacks
+        // Find callbacks - support both positional and named arguments
         std::string on_success, on_error;
         for (size_t i = 2; i < args.size(); i++) {
             const auto& arg = args[i];
-            if (arg.name == "onSuccess") {
-                on_success = arg.value->to_webcc();
-            } else if (arg.name == "onError") {
-                on_error = arg.value->to_webcc();
+            if (!arg.name.empty()) {
+                // Named argument
+                if (arg.name == "onSuccess") {
+                    on_success = arg.value->to_webcc();
+                } else if (arg.name == "onError") {
+                    on_error = arg.value->to_webcc();
+                }
+            } else {
+                // Positional argument: arg[2] = onSuccess, arg[3] = onError
+                if (i == 2) {
+                    on_success = arg.value->to_webcc();
+                } else if (i == 3) {
+                    on_error = arg.value->to_webcc();
+                }
             }
         }
         
@@ -221,22 +270,34 @@ std::vector<StringLiteral::Part> StringLiteral::parse() {
                 // No closing brace found - treat as literal
                 current += '{';
             } else {
-                // Found closing brace - extract expression
-                if(!current.empty()) parts.push_back({false, current});
-                current = "";
-                i++;
-                while(i < value.length() && value[i] != '}') {
-                    current += value[i];
-                    i++;
-                }
-                // Only treat as expression if content is non-empty
-                if (!current.empty()) {
-                    parts.push_back({true, current});
+                // Check if content looks like a valid expression (starts with letter/underscore)
+                // This allows JSON-like content with braces to pass through as literals
+                char first_char = (i + 1 < value.length()) ? value[i + 1] : '\0';
+                bool looks_like_expr = (first_char >= 'a' && first_char <= 'z') ||
+                                       (first_char >= 'A' && first_char <= 'Z') ||
+                                       first_char == '_';
+                
+                if (!looks_like_expr) {
+                    // Not an expression - treat braces as literal
+                    current += '{';
                 } else {
-                    // Empty braces {} - treat as literal
-                    parts.push_back({false, "{}"});
+                    // Found closing brace - extract expression
+                    if(!current.empty()) parts.push_back({false, current});
+                    current = "";
+                    i++;
+                    while(i < value.length() && value[i] != '}') {
+                        current += value[i];
+                        i++;
+                    }
+                    // Only treat as expression if content is non-empty
+                    if (!current.empty()) {
+                        parts.push_back({true, current});
+                    } else {
+                        // Empty braces {} - treat as literal
+                        parts.push_back({false, "{}"});
+                    }
+                    current = "";
                 }
-                current = "";
             }
         } else {
             current += value[i];

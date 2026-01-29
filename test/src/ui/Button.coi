@@ -1,0 +1,60 @@
+component Button(
+    string label = "Button",
+    string type = "primary",
+    string href = "",
+    def onclick : void
+) {
+    def handleClick() : void {
+        if (!href.isEmpty()) {
+            // Check if it's an internal link (starts with /)
+            if (href.subStr(0, 1) == "/") {
+                System.navigate(href);
+            } else {
+                System.openUrl(href);
+            }
+        }
+        onclick();
+    }
+
+    style {
+        button {
+            border: none;
+            border-radius: 8px;
+            padding: 14px 28px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+            text-decoration: none;
+            display: inline-block;
+        }
+        button:active {
+            transform: translateY(1px);
+        }
+        .primary {
+            background: #9477ff;
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(148, 119, 255, 0.3);
+        }
+        .primary:hover {
+            background: #8266ff;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(148, 119, 255, 0.4);
+        }
+        .secondary {
+            background: transparent;
+            color: #666;
+            border: 1px solid #e0e0e0;
+        }
+        .secondary:hover {
+            color: #1a1a1a;
+            border-color: #999;
+            background: #fafafa;
+            transform: translateY(-2px);
+        }
+    }
+
+    view {
+        <button class={type} onclick={handleClick}>{label}</button>
+    }
+}

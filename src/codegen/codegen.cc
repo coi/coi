@@ -37,6 +37,7 @@ void generate_cpp_code(
     out << "\n";
 
     // Register all data types in the DataTypeRegistry for JSON codegen
+    // Component-local types are prefixed with ComponentName_
     DataTypeRegistry::instance().clear();
     for (const auto &data_def : all_global_data)
     {
@@ -46,7 +47,8 @@ void generate_cpp_code(
     {
         for (const auto &data_def : comp.data)
         {
-            DataTypeRegistry::instance().register_type(data_def->name, data_def->fields);
+            // Prefix component-local data types
+            DataTypeRegistry::instance().register_type(comp.name + "_" + data_def->name, data_def->fields);
         }
     }
 
@@ -135,6 +137,25 @@ void generate_cpp_code(
         out << "\n";
     }
 
+    // Output component-local enums (flattened with ComponentName_ prefix)
+    for (const auto &comp : all_components)
+    {
+        for (const auto &enum_def : comp.enums)
+        {
+            out << "enum struct " << comp.name << "_" << enum_def->name << " : ";
+            size_t total_values = enum_def->values.size() + 1;
+            if (total_values <= 256) out << "uint8_t";
+            else if (total_values <= 65536) out << "uint16_t";
+            else out << "uint32_t";
+            out << " {\n";
+            for (const auto &val : enum_def->values)
+            {
+                out << "    " << val << ",\n";
+            }
+            out << "    _COUNT\n};\n";
+        }
+    }
+
     // Output global data types (defined outside components)
     for (const auto &data_def : all_global_data)
     {
@@ -144,6 +165,21 @@ void generate_cpp_code(
     {
         out << "\n";
     }
+
+    // Output component-local data types (flattened with ComponentName_ prefix)
+    for (const auto &comp : all_components)
+    {
+        for (const auto &data_def : comp.data)
+        {
+            out << "struct " << comp.name << "_" << data_def->name << " {\n";
+            for (const auto &field : data_def->fields)
+            {
+                out << "    " << convert_type(field.type) << " " << field.name << ";\n";
+            }
+            out << "};\n";
+        }
+    }
+    out << "\n";
 
     // Output Meta structs for JSON parsing (if Json.parse is used)
     if (features.json)
@@ -156,7 +192,8 @@ void generate_cpp_code(
         {
             for (const auto &data_def : comp.data)
             {
-                out << generate_meta_struct(data_def->name);
+                // Use prefixed name for component-local types
+                out << generate_meta_struct(comp.name + "_" + data_def->name);
             }
         }
         out << "\n";

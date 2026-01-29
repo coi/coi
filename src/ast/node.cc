@@ -6,6 +6,20 @@
 std::string convert_type(const std::string& type) {
     if (type == "string") return "webcc::string";
     
+    // Check if this is a component-local type and prefix it
+    std::string resolved_local = ComponentTypeContext::instance().resolve(type);
+    if (resolved_local != type) {
+        return resolved_local;
+    }
+    
+    // Check if this is a Meta type for a component-local data type (e.g., TestStructMeta)
+    if (type.size() > 4 && type.substr(type.size() - 4) == "Meta") {
+        std::string base_type = type.substr(0, type.size() - 4);
+        if (ComponentTypeContext::instance().is_local(base_type)) {
+            return ComponentTypeContext::instance().resolve(base_type) + "Meta";
+        }
+    }
+    
     // Resolve type aliases from schema (e.g., int -> int32, float -> float64)
     std::string resolved = DefSchema::instance().resolve_alias(type);
     

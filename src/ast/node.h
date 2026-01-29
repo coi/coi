@@ -51,5 +51,44 @@ struct Expression : ASTNode {
 // Base for statements (actions)
 struct Statement : ASTNode {};
 
+// Context for component-local type resolution
+struct ComponentTypeContext {
+    std::string component_name;                // Current component being compiled
+    std::set<std::string> local_data_types;    // Data types defined in this component
+    std::set<std::string> local_enum_types;    // Enum types defined in this component
+    
+    static ComponentTypeContext& instance() {
+        static ComponentTypeContext ctx;
+        return ctx;
+    }
+    
+    void set(const std::string& comp_name, 
+             const std::set<std::string>& data_types,
+             const std::set<std::string>& enum_types) {
+        component_name = comp_name;
+        local_data_types = data_types;
+        local_enum_types = enum_types;
+    }
+    
+    void clear() {
+        component_name.clear();
+        local_data_types.clear();
+        local_enum_types.clear();
+    }
+    
+    // Check if a type is component-local and return prefixed name if so
+    std::string resolve(const std::string& type) const {
+        if (component_name.empty()) return type;
+        if (local_data_types.count(type) || local_enum_types.count(type)) {
+            return component_name + "_" + type;
+        }
+        return type;
+    }
+    
+    bool is_local(const std::string& type) const {
+        return local_data_types.count(type) || local_enum_types.count(type);
+    }
+};
+
 // Type conversion utility
 std::string convert_type(const std::string& type);

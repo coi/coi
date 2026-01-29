@@ -573,7 +573,8 @@ Type-safe JSON parsing with compile-time schema validation and presence tracking
 
 | Method | Description |
 |--------|-------------|
-| `Json.parse(Type, json, &onSuccess=..., &onError=...)` | Parse JSON into a data type (static) |
+| `Json.parse(Type, json, &onSuccess=..., &onError=...)` | Parse JSON object into a data type (static) |
+| `Json.parse(Type[], json, &onSuccess=..., &onError=...)` | Parse JSON array into a vector of data types (static) |
 | `Json.stringify(value)` | Convert data type to JSON string (static) |
 
 ### Defining Data Types
@@ -599,10 +600,19 @@ data User {
 
 ### Callback Signatures
 
+**For single object parsing (`Json.parse(Type, ...)`):**
+
 | Callback | Signature | Description |
 |----------|-----------|-------------|
 | `onSuccess` | `def handler(Type data, TypeMeta meta) : void` | Called with parsed data and presence info |
-| `onError` | `def handler(string error) : void` | Called when JSON structure is malformed |
+| `onError` | `def handler() : void` | Called when JSON structure is malformed |
+
+**For array parsing (`Json.parse(Type[], ...)`):**
+
+| Callback | Signature | Description |
+|----------|-----------|-------------|
+| `onSuccess` | `def handler(Type[] data, TypeMeta[] metas) : void` | Called with array of parsed data and meta structs |
+| `onError` | `def handler() : void` | Called when JSON structure is malformed |
 
 **Note:** `onError` is only called for invalid JSON structure (unbalanced braces, unclosed strings, etc.). Missing fields or type mismatches don't trigger errors - instead, those fields simply won't be marked as present in the meta struct.
 
@@ -672,6 +682,59 @@ component UserLoader {
         <div>
             <button onclick={loadUser}>Load User</button>
             <p>{status}</p>
+        </div>
+    }
+}
+```
+
+### Example: Array Parsing
+
+Parsing JSON arrays returns a vector of data types with corresponding meta structs:
+
+```tsx
+component ShowList {
+    data Show {
+        string title;
+        int id;
+    }
+    
+    mut Show[] shows = [];
+    mut string status = "Ready";
+    
+    def handleShows(Show[] parsedShows, ShowMeta[] metas) : void {
+        shows = parsedShows;
+        status = "Loaded {parsedShows.length()} shows";
+        
+        // Each element has its own meta
+        for (int i = 0; i < metas.length(); i++) {
+            if (metas[i].has_title()) {
+                // shows[i].title was present
+            }
+        }
+    }
+    
+    def handleError() : void {
+        status = "Parse error";
+    }
+    
+    mount {
+        // Use template strings for clean JSON with interpolation
+        string favShow = "Better Call Saul";
+        string jsonData = `
+        [
+            {"title": "Breaking Bad", "id": 1},
+            {"title": "{favShow}", "id": 2}
+        ]`;
+        
+        Json.parse(Show[], jsonData, &onSuccess = handleShows, &onError = handleError);
+    }
+    
+    view {
+        <div>
+            <p>{status}</p>
+            <for show in shows>
+                <div>{show.title} (ID: {show.id})</div>
+            </for>
         </div>
     }
 }

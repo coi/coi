@@ -82,6 +82,28 @@ Token Lexer::read_string(){
     return Token{TokenType::STRING_LITERAL, str, start_line, start_column};
 }
 
+Token Lexer::read_template_string(){
+    int start_line = line;
+    int start_column = column;
+    std::string str;
+    advance(); // skip opening backtick
+
+    while(current() != '`' && current() != '\0'){
+        // Template strings support raw content - no escape sequences except for backtick
+        if(current() == '\\' && peek() == '`'){
+            advance(); // skip backslash
+            str += '`'; // add literal backtick
+            advance();
+        }else{
+            str += current();
+            advance();
+        }
+    }
+
+    advance(); // skip closing backtick
+    return Token{TokenType::TEMPLATE_STRING, str, start_line, start_column};
+}
+
 Token Lexer::read_identifier(){
     int start_line = line;
     int start_column = column;
@@ -159,6 +181,12 @@ std::vector<Token> Lexer::tokenize(){
         // Strings
         if(current() == '"'){
             tokens.push_back(read_string());
+            continue;
+        }
+
+        // Template strings (backticks)
+        if(current() == '`'){
+            tokens.push_back(read_template_string());
             continue;
         }
 

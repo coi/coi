@@ -19,8 +19,8 @@ class Lexer {
         Token make_token(TokenType type, const std::string& value = "");
         Token read_number();
         Token read_string();
+        Token read_template_string();
         Token read_identifier();
-
     public:
         Lexer(const std::string& src);
         std::vector<Token> tokenize();

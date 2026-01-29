@@ -43,7 +43,7 @@ bool Parser::is_type_token() {
 // Check if current token can be used as an identifier (including keywords that are allowed as names)
 bool Parser::is_identifier_token() {
     TokenType t = current().type;
-    return t == TokenType::IDENTIFIER || t == TokenType::KEY || t == TokenType::DATA;
+    return t == TokenType::IDENTIFIER || t == TokenType::KEY || t == TokenType::DATA || t == TokenType::SHARED || t == TokenType::PUB || t == TokenType::MUT;
 }
 
 // Parse comma-separated arguments until end_token (RPAREN or RBRACE)
@@ -285,7 +285,14 @@ std::unique_ptr<Expression> Parser::parse_primary(){
     if(current().type == TokenType::STRING_LITERAL){
         std::string value = current().value;
         advance();
-        return std::make_unique<StringLiteral>(value);
+        return std::make_unique<StringLiteral>(value, false);
+    }
+
+    // Template string (backticks)
+    if(current().type == TokenType::TEMPLATE_STRING){
+        std::string value = current().value;
+        advance();
+        return std::make_unique<StringLiteral>(value, true);
     }
 
     // Boolean literal
@@ -369,6 +376,13 @@ std::unique_ptr<Expression> Parser::parse_primary(){
                 expr = std::make_unique<MemberAccess>(std::move(expr), member);
             }
             else if(current().type == TokenType::LBRACKET){
+                // Check for type literal syntax: TypeName[] (empty brackets = array type)
+                if (peek().type == TokenType::RBRACKET) {
+                    // This is a type literal like "User[]" - used in Json.parse(User[], ...)
+                    advance(); // consume [
+                    advance(); // consume ]
+                    return std::make_unique<TypeLiteral>(name + "[]");
+                }
                 // Array index access
                 advance();
                 auto index = parse_expression();
@@ -782,7 +796,7 @@ std::unique_ptr<Statement> Parser::parse_statement(){
     }
 
     // Assignment
-    if(current().type == TokenType::IDENTIFIER &&
+    if(is_identifier_token() &&
         (peek().type == TokenType::ASSIGN ||
         peek().type == TokenType::MOVE_ASSIGN ||
         peek().type == TokenType::PLUS_ASSIGN ||
@@ -1591,8 +1605,10 @@ Component Parser::parse_component(){
         bool is_mutable = false;
         bool is_shared = false;
 
-        // Check for shared keyword (for enums)
-        if (current().type == TokenType::SHARED) {
+        // Check for shared keyword (only if followed by declaration keyword - not when used as variable name)
+        // If followed by = or . then it's a variable name, otherwise it's the shared modifier
+        if (current().type == TokenType::SHARED && 
+            peek().type != TokenType::ASSIGN && peek().type != TokenType::DOT) {
             is_shared = true;
             advance();
         }
@@ -1726,6 +1742,12 @@ Component Parser::parse_component(){
                     current().type == TokenType::STRING || current().type == TokenType::BOOL ||
                     current().type == TokenType::IDENTIFIER){
                     advance();
+                    // Check for array type: Type[]
+                    if (current().type == TokenType::LBRACKET) {
+                        advance();
+                        expect(TokenType::RBRACKET, "Expected ']' for array type");
+                        paramType += "[]";
+                    }
                 } else {
                         throw std::runtime_error("Expected parameter type");
                 }
@@ -1821,6 +1843,12 @@ Component Parser::parse_component(){
                         current().type == TokenType::STRING || current().type == TokenType::BOOL ||
                         current().type == TokenType::IDENTIFIER){
                         advance();
+                        // Check for array type: Type[]
+                        if (current().type == TokenType::LBRACKET) {
+                            advance();
+                            expect(TokenType::RBRACKET, "Expected ']' for array type");
+                            paramType += "[]";
+                        }
                     } else {
                             throw std::runtime_error("Expected parameter type");
                     }

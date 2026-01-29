@@ -1,0 +1,55 @@
+// Test: Multiple components with same-named data types don't conflict
+// Each component's types should be prefixed with the component name
+
+data GlobalData {
+    string global;
+}
+
+component First {
+    data LocalData {
+        int value;
+    }
+    
+    mut LocalData local;
+    mut GlobalData shared;
+    
+    init {
+        local = LocalData{42};
+        shared = GlobalData{"first"};
+    }
+    
+    view {
+        <div>First: {local.value}, {shared.global}</div>
+    }
+}
+
+component Second {
+    data LocalData {
+        string text;
+    }
+    
+    mut LocalData local;
+    mut GlobalData shared;
+    
+    init {
+        local = LocalData{"hello"};
+        shared = GlobalData{"second"};
+    }
+    
+    view {
+        <div>Second: {local.text}, {shared.global}</div>
+    }
+}
+
+component Container {
+    view {
+        <div>
+            <First/>
+            <Second/>
+        </div>
+    }
+}
+
+app {
+    root = Container;
+}
