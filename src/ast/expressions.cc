@@ -1,9 +1,6 @@
 #include "expressions.h"
 #include "formatter.h"
-<<<<<<< HEAD
 #include "node.h" 
-=======
->>>>>>> 688f98f (The big cleanup :) (#23))
 #include "../defs/def_parser.h"
 #include "../codegen/json_codegen.h"
 #include <cctype>

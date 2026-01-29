@@ -37,10 +37,7 @@ void generate_cpp_code(
     out << "\n";
 
     // Register all data types in the DataTypeRegistry for JSON codegen
-<<<<<<< HEAD
     // Component-local types are prefixed with ComponentName_
-=======
->>>>>>> 688f98f (The big cleanup :) (#23))
     DataTypeRegistry::instance().clear();
     for (const auto &data_def : all_global_data)
     {
@@ -50,12 +47,8 @@ void generate_cpp_code(
     {
         for (const auto &data_def : comp.data)
         {
-<<<<<<< HEAD
             // Prefix component-local data types
             DataTypeRegistry::instance().register_type(comp.name + "_" + data_def->name, data_def->fields);
-=======
-            DataTypeRegistry::instance().register_type(data_def->name, data_def->fields);
->>>>>>> 688f98f (The big cleanup :) (#23))
         }
     }
 
@@ -144,7 +137,6 @@ void generate_cpp_code(
         out << "\n";
     }
 
-<<<<<<< HEAD
     // Output component-local enums (flattened with ComponentName_ prefix)
     for (const auto &comp : all_components)
     {
@@ -164,8 +156,6 @@ void generate_cpp_code(
         }
     }
 
-=======
->>>>>>> 688f98f (The big cleanup :) (#23))
     // Output global data types (defined outside components)
     for (const auto &data_def : all_global_data)
     {
@@ -176,7 +166,6 @@ void generate_cpp_code(
         out << "\n";
     }
 
-<<<<<<< HEAD
     // Output component-local data types (flattened with ComponentName_ prefix)
     for (const auto &comp : all_components)
     {
@@ -192,8 +181,6 @@ void generate_cpp_code(
     }
     out << "\n";
 
-=======
->>>>>>> 688f98f (The big cleanup :) (#23))
     // Output Meta structs for JSON parsing (if Json.parse is used)
     if (features.json)
     {
@@ -205,12 +192,8 @@ void generate_cpp_code(
         {
             for (const auto &data_def : comp.data)
             {
-<<<<<<< HEAD
                 // Use prefixed name for component-local types
                 out << generate_meta_struct(comp.name + "_" + data_def->name);
-=======
-                out << generate_meta_struct(data_def->name);
->>>>>>> 688f98f (The big cleanup :) (#23))
             }
         }
         out << "\n";
