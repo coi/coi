@@ -44,16 +44,21 @@ static std::string generate_ws_dispatcher(const std::string& event_type,
                                           const std::string& ws_obj,
                                           const std::string& callback,
                                           const std::string& ws_member = "") {
+    int param_count = ComponentTypeContext::instance().get_method_param_count(callback);
+    
     if (event_type == "onMessage") {
-        return "g_ws_message_dispatcher.set(" + ws_obj + ", [this](const webcc::string& msg) { this->" + callback + "(msg); })";
+        // onMessage can accept 0 or 1 (string) param
+        if (param_count >= 1) {
+            return "g_ws_message_dispatcher.set(" + ws_obj + ", [this](const webcc::string& msg) { this->" + callback + "(msg); })";
+        } else {
+            return "g_ws_message_dispatcher.set(" + ws_obj + ", [this](const webcc::string&) { this->" + callback + "(); })";
+        }
     } else if (event_type == "onOpen") {
         return "g_ws_open_dispatcher.set(" + ws_obj + ", [this]() { this->" + callback + "(); })";
     } else if (event_type == "onClose") {
-        // Invalidate the handle after calling the user's callback
         std::string invalidate = ws_member.empty() ? "" : " this->" + ws_member + " = webcc::WebSocket(-1);";
         return "g_ws_close_dispatcher.set(" + ws_obj + ", [this]() { this->" + callback + "();" + invalidate + " })";
     } else if (event_type == "onError") {
-        // Invalidate the handle after calling the user's callback
         std::string invalidate = ws_member.empty() ? "" : " this->" + ws_member + " = webcc::WebSocket(-1);";
         return "g_ws_error_dispatcher.set(" + ws_obj + ", [this]() { this->" + callback + "();" + invalidate + " })";
     }
@@ -125,8 +130,6 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
     }
     
     // FetchRequest.get with callback arguments
-    // Usage: FetchRequest.get("url", successHandler, errorHandler)
-    //    or: FetchRequest.get("url", &onSuccess = handler, &onError = handler)
     if (intrinsic_name == "fetch_get") {
         if (args.empty()) return "";
         
@@ -134,23 +137,24 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
         std::string code = "[&]() {\n";
         code += "            auto _req = webcc::fetch::get(" + url + ");\n";
         
-        // Process callback arguments - support both positional and named
         for (size_t i = 1; i < args.size(); i++) {
             const auto& arg = args[i];
             std::string callback = arg.value->to_webcc();
-            std::string event_name;
-            
-            if (!arg.name.empty()) {
-                event_name = arg.name;
-            } else {
-                // Positional: arg[1] = onSuccess, arg[2] = onError
-                event_name = (i == 1) ? "onSuccess" : "onError";
-            }
+            std::string event_name = !arg.name.empty() ? arg.name : (i == 1 ? "onSuccess" : "onError");
+            int param_count = ComponentTypeContext::instance().get_method_param_count(callback);
             
             if (event_name == "onSuccess") {
-                code += "            g_fetch_success_dispatcher.set(_req, [this](const webcc::string& data) { this->" + callback + "(data); });\n";
+                if (param_count >= 1) {
+                    code += "            g_fetch_success_dispatcher.set(_req, [this](const webcc::string& data) { this->" + callback + "(data); });\n";
+                } else {
+                    code += "            g_fetch_success_dispatcher.set(_req, [this](const webcc::string&) { this->" + callback + "(); });\n";
+                }
             } else if (event_name == "onError") {
-                code += "            g_fetch_error_dispatcher.set(_req, [this](const webcc::string& error) { this->" + callback + "(error); });\n";
+                if (param_count >= 1) {
+                    code += "            g_fetch_error_dispatcher.set(_req, [this](const webcc::string& error) { this->" + callback + "(error); });\n";
+                } else {
+                    code += "            g_fetch_error_dispatcher.set(_req, [this](const webcc::string&) { this->" + callback + "(); });\n";
+                }
             }
         }
         
@@ -160,8 +164,6 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
     }
     
     // FetchRequest.post with callback arguments
-    // Usage: FetchRequest.post("url", "body", successHandler, errorHandler)
-    //    or: FetchRequest.post("url", "body", &onSuccess = handler, &onError = handler)
     if (intrinsic_name == "fetch_post") {
         if (args.size() < 2) return "";
         
@@ -170,23 +172,24 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
         std::string code = "[&]() {\n";
         code += "            auto _req = webcc::fetch::post(" + url + ", " + body + ");\n";
         
-        // Process callback arguments - support both positional and named
         for (size_t i = 2; i < args.size(); i++) {
             const auto& arg = args[i];
             std::string callback = arg.value->to_webcc();
-            std::string event_name;
-            
-            if (!arg.name.empty()) {
-                event_name = arg.name;
-            } else {
-                // Positional: arg[2] = onSuccess, arg[3] = onError
-                event_name = (i == 2) ? "onSuccess" : "onError";
-            }
+            std::string event_name = !arg.name.empty() ? arg.name : (i == 2 ? "onSuccess" : "onError");
+            int param_count = ComponentTypeContext::instance().get_method_param_count(callback);
             
             if (event_name == "onSuccess") {
-                code += "            g_fetch_success_dispatcher.set(_req, [this](const webcc::string& data) { this->" + callback + "(data); });\n";
+                if (param_count >= 1) {
+                    code += "            g_fetch_success_dispatcher.set(_req, [this](const webcc::string& data) { this->" + callback + "(data); });\n";
+                } else {
+                    code += "            g_fetch_success_dispatcher.set(_req, [this](const webcc::string&) { this->" + callback + "(); });\n";
+                }
             } else if (event_name == "onError") {
-                code += "            g_fetch_error_dispatcher.set(_req, [this](const webcc::string& error) { this->" + callback + "(error); });\n";
+                if (param_count >= 1) {
+                    code += "            g_fetch_error_dispatcher.set(_req, [this](const webcc::string& error) { this->" + callback + "(error); });\n";
+                } else {
+                    code += "            g_fetch_error_dispatcher.set(_req, [this](const webcc::string&) { this->" + callback + "(); });\n";
+                }
             }
         }
         
@@ -196,8 +199,6 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
     }
     
     // Json.parse - supports both positional and named callback arguments
-    // Usage: Json.parse(User, jsonStr, successHandler, errorHandler)
-    //    or: Json.parse(User, jsonStr, &onSuccess = handler, &onError = errorHandler)
     if (intrinsic_name == "json_parse") {
         if (args.size() < 2) return "";
         

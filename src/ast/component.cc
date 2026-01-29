@@ -427,6 +427,12 @@ std::string Component::to_webcc(CompilerSession &session)
         local_enum_names.insert(e->name);
     }
     ComponentTypeContext::instance().set(name, local_data_names, local_enum_names);
+    
+    // Register method param counts for intrinsic callback codegen
+    for (const auto &m : methods)
+    {
+        ComponentTypeContext::instance().register_method(m.name, m.params.size());
+    }
 
     // Populate global context for reference params
     g_ref_props.clear();

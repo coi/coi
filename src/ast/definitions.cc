@@ -1,13 +1,16 @@
 #include "definitions.h"
+#include "node.h"
 
 std::string FunctionDef::to_webcc(const std::string& injected_code) {
     std::string result = convert_type(return_type) + " " + name + "(";
+    
     for(size_t i = 0; i < params.size(); i++){
         if(i > 0) result += ", ";
         result += (params[i].is_mutable ? "" : "const ") + convert_type(params[i].type);
         if(params[i].is_reference) result += "&";
         result += " " + params[i].name;
     }
+    
     result += ") {\n";
     for(auto& stmt : body){
         result += "    " + stmt->to_webcc() + "\n";

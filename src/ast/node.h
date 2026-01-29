@@ -51,11 +51,12 @@ struct Expression : ASTNode {
 // Base for statements (actions)
 struct Statement : ASTNode {};
 
-// Context for component-local type resolution
+// Context for component-local type resolution and method signature tracking
 struct ComponentTypeContext {
     std::string component_name;                // Current component being compiled
     std::set<std::string> local_data_types;    // Data types defined in this component
     std::set<std::string> local_enum_types;    // Enum types defined in this component
+    std::map<std::string, int> method_param_counts;  // Method name -> param count
     
     static ComponentTypeContext& instance() {
         static ComponentTypeContext ctx;
@@ -68,12 +69,25 @@ struct ComponentTypeContext {
         component_name = comp_name;
         local_data_types = data_types;
         local_enum_types = enum_types;
+        method_param_counts.clear();
     }
     
     void clear() {
         component_name.clear();
         local_data_types.clear();
         local_enum_types.clear();
+        method_param_counts.clear();
+    }
+    
+    // Register a method's param count
+    void register_method(const std::string& name, int param_count) {
+        method_param_counts[name] = param_count;
+    }
+    
+    // Get a method's param count (-1 if unknown)
+    int get_method_param_count(const std::string& name) const {
+        auto it = method_param_counts.find(name);
+        return it != method_param_counts.end() ? it->second : -1;
     }
     
     // Check if a type is component-local and return prefixed name if so
