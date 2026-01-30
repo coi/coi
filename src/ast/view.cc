@@ -1,5 +1,6 @@
 #include "view.h"
 #include "formatter.h"
+#include "../codegen/codegen_utils.h"
 
 // Global set of components with scoped CSS (populated in main.cc before code generation)
 std::set<std::string> g_components_with_scoped_css;
@@ -642,7 +643,7 @@ void ViewIfStatement::generate_code(std::stringstream &ss, const std::string &pa
     {
         int loop_id_before = loop_counter ? *loop_counter : 0;
 
-        ss << "        if (" << condition->to_webcc() << ") {\n";
+        ss << "        if (" << strip_outer_parens(condition->to_webcc()) << ") {\n";
         for (auto &child : then_children)
         {
             generate_view_child(child.get(), ss, parent, counter, event_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter, loop_var_name);
@@ -790,7 +791,7 @@ void ViewIfStatement::generate_code(std::stringstream &ss, const std::string &pa
     // Use deferred creation for comment anchors
     ss << "        _if_" << my_if_id << "_anchor = webcc::DOMElement(webcc::next_deferred_handle());\n";
     ss << "        webcc::dom::create_comment_deferred(_if_" << my_if_id << "_anchor, \"coi-⚓\");\n";
-    ss << "        if (" << region.condition_code << ") {\n";
+    ss << "        if (" << strip_outer_parens(region.condition_code) << ") {\n";
     ss << "        _if_" << my_if_id << "_state = true;\n";
     // Use original append_child for initial render (before anchor is in DOM)
     ss << then_ss.str();

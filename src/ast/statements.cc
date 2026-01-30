@@ -1,5 +1,6 @@
 #include "statements.h"
 #include "../defs/def_parser.h"
+#include "../codegen/codegen_utils.h"
 
 // Reference to per-component context for reference props
 extern std::set<std::string> g_ref_props;
@@ -447,7 +448,8 @@ void BlockStatement::collect_dependencies(std::set<std::string> &deps)
 
 std::string IfStatement::to_webcc()
 {
-    std::string code = "if(" + condition->to_webcc() + ") ";
+    std::string cond = strip_outer_parens(condition->to_webcc());
+    std::string code = "if(" + cond + ") ";
     code += then_branch->to_webcc();
     if (else_branch)
     {
