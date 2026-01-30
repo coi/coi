@@ -26,11 +26,11 @@ For developers who want the productivity of component-based frameworks with the 
 Coi is designed for building reactive, interactive web applications:
 
 - **Web Apps**: Dashboards, admin panels, SPAs with real-time updates
-- **Data Visualization**: Interactive charts, graphs, analytics tools with thousands of elements
-- **Content-Heavy Sites**: Blogs, documentation sites, landing pages with dynamic components
-- **Canvas Apps**: Drawing tools, image editors, animations, or even games
+- **Canvas Apps**: Drawing tools, image editors, animations, or games
+- **Computation-Heavy Apps**: Simulations, data processing, physics engines—where WASM shines
+- **Content Sites**: Blogs, documentation sites, landing pages with dynamic components
 
-Whether you're building a typical web app or something graphics-intensive, Coi gives you composable components, fine-grained reactivity, type safety, and WASM performance.
+Coi gives you composable components, fine-grained reactivity, type safety, and tiny bundle sizes.
 
 ## Features
 
@@ -56,11 +56,13 @@ Whether you're building a typical web app or something graphics-intensive, Coi g
 
 ## Benchmarks
 
-> [!CAUTION]
-> **Benchmark Alert:** The current DOM benchmark is misleading due to incomplete reactivity code generation. This creates an unfair comparison with other frameworks. I'm fixing the reactivity generation and will publish proper benchmarks soon.
 
-Coi is designed for high-performance and minimal footprint. In [benchmarks](benchmark/) comparing Coi, React, Vue, and Svelte:
-Coi's fine-grained reactivity and minimal WASM runtime deliver smaller bundles and faster DOM updates with no Virtual DOM overhead.
+### DOM Performance (Rows App)
+
+> [!NOTE]
+> **Work in Progress:** Coi currently trails in DOM performance benchmarks. Improvements to DOM node allocation and rendering are in progress.
+
+In [benchmarks](benchmark/) comparing Coi, React, Vue, and Svelte, Coi delivers the smallest bundle size. DOM performance is still being optimized—see the chart below for current results.
 
 <p align="center">
   <img src="benchmark/benchmark_results.svg" alt="Benchmark Results" width="600">
