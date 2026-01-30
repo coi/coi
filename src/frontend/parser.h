@@ -12,6 +12,7 @@ class Parser{
         std::vector<Token> tokens;
         size_t pos = 0;
         bool allow_gt_comparison = true;  // When false, > is not treated as comparison op
+        bool allow_brace_init = true;     // When false, Name{ is not treated as data literal
         
         // Maps member variable names to their component types (for detecting <memberName/> in views)
         std::map<std::string, std::string> component_member_types;

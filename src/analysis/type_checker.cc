@@ -286,7 +286,16 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
     if (auto arr = dynamic_cast<ArrayRepeatLiteral *>(expr))
     {
         std::string elem_type = infer_expression_type(arr->value.get(), scope);
-        return elem_type + "[" + std::to_string(arr->count) + "]";
+        // Get count as string - either int literal value or identifier name
+        std::string count_str;
+        if (auto int_lit = dynamic_cast<IntLiteral *>(arr->count.get())) {
+            count_str = std::to_string(int_lit->value);
+        } else if (auto id = dynamic_cast<Identifier *>(arr->count.get())) {
+            count_str = id->name;
+        } else {
+            count_str = "?"; // Unknown - will be caught by type checker
+        }
+        return elem_type + "[" + count_str + "]";
     }
 
     // Index access type inference

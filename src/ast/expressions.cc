@@ -769,18 +769,14 @@ bool ArrayLiteral::is_static() {
 }
 
 std::string ArrayRepeatLiteral::to_webcc() {
-    std::string val = value->to_webcc();
-    std::string code = "{";
-    for (int i = 0; i < count; ++i) {
-        if (i > 0) code += ", ";
-        code += val;
-    }
-    code += "}";
-    return code;
+    // Generate initialization - webcc::array constructor will fill with the value
+    // The actual array type and initialization is handled by VarDeclaration::to_webcc
+    return value->to_webcc();
 }
 
 void ArrayRepeatLiteral::collect_dependencies(std::set<std::string>& deps) {
     value->collect_dependencies(deps);
+    count->collect_dependencies(deps);
 }
 
 bool ArrayRepeatLiteral::is_static() {

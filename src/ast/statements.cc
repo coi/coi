@@ -30,9 +30,10 @@ std::string VarDeclaration::to_webcc()
         {
             elem_type = elem_type.substr(0, elem_type.length() - 2);
         }
-        std::string result = (is_mutable ? "" : "const ");
-        result += "webcc::array<" + convert_type(elem_type) + ", " + std::to_string(repeat->count) + ">";
-        result += " " + name + " = " + repeat->to_webcc() + ";";
+        // Use count expression directly - works for literals and const identifiers
+        std::string arr_type = "webcc::array<" + convert_type(elem_type) + ", " + repeat->count->to_webcc() + ">";
+        std::string result = (is_mutable ? "" : "const ") + arr_type + " " + name + "; ";
+        result += name + ".fill(" + repeat->value->to_webcc() + ");";
         return result;
     }
 

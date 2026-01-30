@@ -156,10 +156,10 @@ struct ArrayLiteral : Expression {
     bool is_static() override;
 };
 
-// Fixed-size array repeat initializer: [value; count] e.g., [0; 100]
+// Fixed-size array repeat initializer: [value; count] e.g., [0; 100] or [0; NUM_ITEMS]
 struct ArrayRepeatLiteral : Expression {
     std::unique_ptr<Expression> value;  // The value to repeat
-    int count;  // Number of times to repeat
+    std::unique_ptr<Expression> count;  // Count expression (must be compile-time constant integer)
 
     ArrayRepeatLiteral() = default;
     std::string to_webcc() override;
