@@ -451,7 +451,8 @@ std::string BinaryOp::to_webcc() {
         flatten_string_concat(this, parts);
         return generate_formatter_expr(parts);
     }
-    return left->to_webcc() + " " + op + " " + right->to_webcc();
+    // Wrap in parentheses to preserve operator precedence
+    return "(" + left->to_webcc() + " " + op + " " + right->to_webcc() + ")";
 }
 
 void BinaryOp::collect_dependencies(std::set<std::string>& deps) {
