@@ -31,6 +31,12 @@ type string {
     @inline("${this}.trim_end()")
     def trimEnd(): string
 
+    @inline("${this}.to_int()")
+    def toInt(): int
+
+    @inline("${this}.to_float()")
+    def toFloat(): float
+
     @inline("${this} += ${0}")
     def append(string suffix): void
 }
