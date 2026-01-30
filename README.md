@@ -27,7 +27,7 @@ Coi is designed for building reactive, interactive web applications:
 
 - **Web Apps**: Dashboards, admin panels, SPAs with real-time updates
 - **Canvas Apps**: Drawing tools, image editors, animations, or games
-- **Computation-Heavy Apps**: Simulations, data processing, physics engines—where WASM shines
+- **Computation-Heavy Apps**: Simulations, data processing, physics engines, where WASM shines
 - **Content Sites**: Blogs, documentation sites, landing pages with dynamic components
 
 Coi gives you composable components, fine-grained reactivity, type safety, and tiny bundle sizes.
