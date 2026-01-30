@@ -475,8 +475,12 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                     current_type = parent_type;
                 }
                 
-                // If not in scope and not a handle/enum/schema-namespace, it's undefined
-                if (!is_handle && !is_enum && !is_valid_schema_call)
+                // Check if obj_name is a static utility type (e.g., Math, Json)
+                auto* static_method = DefSchema::instance().lookup_method(obj_name, method_name);
+                bool has_static_method = static_method && static_method->is_shared;
+                
+                // If not in scope and not a handle/enum/schema-namespace/static-method-type, it's undefined
+                if (!is_handle && !is_enum && !is_valid_schema_call && !has_static_method)
                 {
                     std::cerr << "\033[1;31mError:\033[0m Undefined variable '" << obj_name 
                               << "' in method call at line " << func->line << std::endl;

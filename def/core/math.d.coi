@@ -1,0 +1,59 @@
+// Coi Math Library
+// Provides mathematical functions and constants
+
+type Math {
+    // Constants
+    @inline("webcc::PI")
+    shared def PI() : float
+
+    @inline("webcc::HALF_PI")
+    shared def HALF_PI() : float
+
+    @inline("webcc::TAU")
+    shared def TAU() : float
+
+    @inline("webcc::DEG2RAD")
+    shared def DEG2RAD() : float
+
+    @inline("webcc::RAD2DEG")
+    shared def RAD2DEG() : float
+
+    // Basic Math Functions
+    @inline("webcc::abs(${0})")
+    shared def abs(float x) : float
+
+    @inline("webcc::sqrt(${0})")
+    shared def sqrt(float x) : float
+
+    // Trigonometric Functions
+    @inline("webcc::sin(${0})")
+    shared def sin(float x) : float
+
+    @inline("webcc::cos(${0})")
+    shared def cos(float x) : float
+
+    @inline("webcc::tan(${0})")
+    shared def tan(float x) : float
+
+    // Utility Functions
+    @inline("(${0} < ${1} ? ${0} : ${1})")
+    shared def min(float a, float b) : float
+
+    @inline("(${0} > ${1} ? ${0} : ${1})")
+    shared def max(float a, float b) : float
+
+    @inline("((${0} < ${2}) ? ${2} : ((${0} > ${1}) ? ${1} : ${0}))")
+    shared def clamp(float value, float min, float max) : float
+
+    @inline("(${0} * (1.0f - ${2}) + ${1} * ${2})")
+    shared def lerp(float a, float b, float t) : float
+
+    @inline("((float)(int)${0})")
+    shared def floor(float x) : float
+
+    @inline("((float)((int)${0} + 1))")
+    shared def ceil(float x) : float
+
+    @inline("((float)(int)(${0} + 0.5f))")
+    shared def round(float x) : float
+}
