@@ -16,8 +16,16 @@ static std::map<std::string, std::string> build_type_to_header()
         if (ns.empty())
             continue;
 
-        // Map the type itself to its namespace
-        result[type_name] = ns;
+        // Map namespace to header (special cases for inline types)
+        std::string header = ns;
+        if (ns == "webcc")
+        {
+            // @inline methods using webcc:: namespace map to core/math header
+            header = "core/math";
+        }
+
+        // Map the type itself to its header
+        result[type_name] = header;
 
         // Also map return types and parameter types from methods
         for (const auto &method : type_def.methods)

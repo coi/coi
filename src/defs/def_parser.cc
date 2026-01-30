@@ -954,7 +954,7 @@ std::string DefSchema::get_namespace_for_type(const std::string &type_name) cons
     if (type_it == types_.end())
         return "";
 
-    // Extract namespace from first @map or @intrinsic annotation
+    // Extract namespace from first @map, @intrinsic, or @inline annotation
     for (const auto &method : type_it->second.methods)
     {
         if (method.mapping_value.empty())
@@ -965,6 +965,11 @@ std::string DefSchema::get_namespace_for_type(const std::string &type_name) cons
             sep = method.mapping_value.find("::"); // "ns::func_name"
         else if (method.mapping_type == MappingType::Intrinsic)
             sep = method.mapping_value.find('_');  // "ns_func"
+        else if (method.mapping_type == MappingType::Inline)
+        {
+            // For @inline("webcc::func(${0})"), extract namespace before ::
+            sep = method.mapping_value.find("::");
+        }
 
         if (sep != std::string::npos)
             return method.mapping_value.substr(0, sep);
