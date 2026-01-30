@@ -169,6 +169,19 @@ void generate_cpp_code(
     // Output component-local data types (flattened with ComponentName_ prefix)
     for (const auto &comp : all_components)
     {
+        // Set up ComponentTypeContext so convert_type can resolve nested local types
+        std::set<std::string> local_data_names;
+        std::set<std::string> local_enum_names;
+        for (const auto &d : comp.data)
+        {
+            local_data_names.insert(d->name);
+        }
+        for (const auto &e : comp.enums)
+        {
+            local_enum_names.insert(e->name);
+        }
+        ComponentTypeContext::instance().set(comp.name, local_data_names, local_enum_names);
+
         for (const auto &data_def : comp.data)
         {
             out << "struct " << comp.name << "_" << data_def->name << " {\n";
@@ -178,6 +191,8 @@ void generate_cpp_code(
             }
             out << "};\n";
         }
+
+        ComponentTypeContext::instance().clear();
     }
     out << "\n";
 

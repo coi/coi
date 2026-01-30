@@ -814,7 +814,9 @@ std::string EnumAccess::to_webcc() {
 }
 
 std::string ComponentConstruction::to_webcc() {
-    std::string result = component_name + "(";
+    // Resolve component-local data types (e.g., Body -> App_Body)
+    std::string resolved_name = ComponentTypeContext::instance().resolve(component_name);
+    std::string result = resolved_name + "(";
     for (size_t i = 0; i < args.size(); i++) {
         if (i > 0) result += ", ";
         result += args[i].value->to_webcc();
