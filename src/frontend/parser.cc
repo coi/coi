@@ -254,7 +254,8 @@ std::unique_ptr<Expression> Parser::parse_primary(){
     if(current().type == TokenType::INT_LITERAL){
         int value;
         try {
-            long long ll_value = std::stoll(current().value);
+            // Use base 0 to auto-detect decimal (10) or hexadecimal (0x)
+            long long ll_value = std::stoll(current().value, nullptr, 0);
             if (ll_value > std::numeric_limits<int>::max() || ll_value < std::numeric_limits<int>::min()) {
                 throw std::out_of_range("overflow");
             }

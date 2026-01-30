@@ -48,6 +48,11 @@ uint16 port = 8080;        // 16-bit unsigned
 uint32 id = 4000000000;    // 32-bit unsigned
 uint64 huge = 10000000000; // 64-bit unsigned
 
+// Hexadecimal literals (0x prefix)
+int GL_ARRAY_BUFFER = 0x8892;      // WebGL constant
+uint32 color = 0xFF00FF;           // RGB color value
+int mask = 0x4000;                 // Bit mask
+
 // Floating point
 float32 precise = 3.14;    // 32-bit float (single precision)
 float64 speed = 3.14159;   // 64-bit float (double precision)

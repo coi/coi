@@ -42,6 +42,21 @@ Token Lexer::read_number(){
     std::string num;
     bool is_float = false;
 
+    // Check for hexadecimal (0x prefix)
+    if(current() == '0' && (peek() == 'x' || peek() == 'X')){
+        num += current(); advance(); // '0'
+        num += current(); advance(); // 'x' or 'X'
+        
+        // Read hexadecimal digits
+        while(std::isxdigit(current())){
+            num += current();
+            advance();
+        }
+        
+        return Token{TokenType::INT_LITERAL, num, start_line, start_column};
+    }
+
+    // Regular decimal number
     while(std::isdigit(current()) || current() == '.'){
         if(current() == '.'){
             if(is_float) break;

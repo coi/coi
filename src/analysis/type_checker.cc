@@ -239,6 +239,10 @@ bool is_compatible_type(const std::string &source, const std::string &target)
         return true;  // Allow narrowing from float64 to float32
     if (source == "float32" && target == "float64")
         return true;  // Allow widening from float32 to float64
+    // int32 can be assigned to unsigned types (for hex literals like 0x8B31)
+    // C++ handles the conversion correctly
+    if (source == "int32" && (target == "uint32" || target == "uint16" || target == "uint64"))
+        return true;
     // int32 can be used as handle (for raw handle values)
     if (source == "int32" && DefSchema::instance().is_handle(target))
         return true;
