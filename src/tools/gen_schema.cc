@@ -30,7 +30,6 @@ static const std::set<std::string> EXCLUDED_FUNCTIONS = {
     "dom::add_input_listener",             // Handled by onInput attribute
     "dom::add_change_listener",            // Handled by onChange attribute
     "dom::add_keydown_listener",           // Handled by onKeydown attribute
-    "system::random",                      // System.random() - built-in wasm random
     "websocket::connect",                  // WebSocket.connect with callbacks handled via intrinsic
     "fetch::get",                          // FetchRequest.get with callbacks handled via intrinsic
     "fetch::post",                         // FetchRequest.post with callbacks handled via intrinsic
@@ -529,11 +528,6 @@ int main()
                 out << "    shared def navigate(string route): void\n";
                 out << "    @intrinsic(\"get_route\")\n";
                 out << "    shared def getRoute(): string\n";
-                out << "\n    // Random number generation (compiler intrinsics)\n";
-                out << "    @intrinsic(\"random\")\n";
-                out << "    shared def random(): float\n";
-                out << "    @intrinsic(\"random_seeded\")\n";
-                out << "    shared def random(int seed): float\n";
                 out << "\n    // Force flush of all pending DOM operations (compiler intrinsic)\n";
                 out << "    @intrinsic(\"flush\")\n";
                 out << "    shared def flush(): void\n";

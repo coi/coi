@@ -35,6 +35,13 @@ type Math {
     @inline("webcc::tan(${0})")
     shared def tan(float x) : float
 
+    // Random number generation (compiler intrinsics)
+    @intrinsic("random")
+    
+    shared def random(): float
+    @intrinsic("random_seeded")
+    shared def random(int seed): float
+
     // Utility Functions
     @inline("(${0} < ${1} ? ${0} : ${1})")
     shared def min(float a, float b) : float
