@@ -154,26 +154,26 @@ string right = text.trimEnd();      // Remove trailing whitespace
 
 ### String Interpolation
 
-**Both string types support `{expr}` interpolation:**
+**Both string types support `${expr}` interpolation:**
 
 ```tsx
 string name = "Alice";
 int age = 25;
 
 // Regular strings
-string greeting = "Hello, {name}! You are {age} years old.";
+string greeting = "Hello, ${name}! You are ${age} years old.";
 
 // Template strings (backticks)
-string greeting2 = `Hello, {name}! You are {age} years old.`;
+string greeting2 = `Hello, ${name}! You are ${age} years old.`;
 ```
 
 **Escaping interpolation:**
 
-Use `\{` and `\}` to include literal braces:
+Use `\$` to include a literal `$` character:
 
 ```tsx
-string code = "Use \{variable\} for interpolation";
-// Result: "Use {variable} for interpolation"
+string code = "Use \${variable} for interpolation";
+// Result: "Use ${variable} for interpolation"
 ```
 
 **Regular strings (`"..."`)** - Require escape sequences:
@@ -193,12 +193,13 @@ int id = 1;
 // Multi-line with interpolation - perfect for JSON!
 string jsonData = `
 [
-    {"title": "{title}", "id": {id}},
+    {"title": "${title}", "id": ${id}},
     {"title": "Game of Thrones", "id": 2}
 ]`;
 
-// No need to escape quotes
-string html = `<div class="card">{title}</div>`;
+// Literal braces don't need escaping (only ${} is interpolation)
+string json = `{"name": "Alice", "age": 25}`;
+string html = `<div class="title">${title}</div>`;
 
 // Only escape backticks themselves
 string example = `Use \` for backticks`;
@@ -207,7 +208,7 @@ string example = `Use \` for backticks`;
 **Key differences:**
 - Regular strings: Need `\"`, `\n`, `\\` for quotes, newlines, backslashes
 - Template strings: Preserve whitespace/newlines, only escape `` \` ``
-- Both: Support `{variable}` interpolation and `\{` `\}` escaping
+- Both: Support `${variable}` interpolation and `\$` escaping
 
 ## Math Library
 

@@ -214,7 +214,7 @@ view {
 
 <div class = "progress-container">
     <div class = "progress-bar">
-        <div class = "progress-fill" style = "width: {progress}%;"></div>
+        <div class = "progress-fill" style = "width: ${progress}%;"></div>
 </div>
 <div class = "time-info">
     <span > {currentTime}s < /span>
@@ -237,7 +237,7 @@ view {
     <span class = "volume-icon" > 🔊 < /span>
 <button class = "volume-btn" onclick = {volumeDown} > − < /button>
 <div class = "volume-bar">
-    <div class = "volume-fill" style = "width: {volume}%;"></div>
+    <div class = "volume-fill" style = "width: ${volume}%;"></div>
 </div>
 <button class = "volume-btn" onclick = {volumeUp} > + < /button>
 <span class = "volume-text" > {volume}% < /span>

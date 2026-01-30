@@ -278,44 +278,35 @@ std::vector<StringLiteral::Part> StringLiteral::parse() {
     std::vector<Part> parts;
     std::string current;
     for(size_t i=0; i<value.length(); ++i) {
-        if(value[i] == '\\' && i + 1 < value.length() && (value[i+1] == '{' || value[i+1] == '}')) {
-            current += value[i+1];
+        // Handle escaped $ (\$ becomes literal $)
+        if(value[i] == '\\' && i + 1 < value.length() && value[i+1] == '$') {
+            current += '$';
             i++;
-        } else if(value[i] == '{') {
-            // Look ahead to find closing brace
-            size_t close_pos = value.find('}', i + 1);
+        } else if(value[i] == '$' && i + 1 < value.length() && value[i+1] == '{') {
+            // Found ${ - look for closing }
+            size_t close_pos = value.find('}', i + 2);
             if (close_pos == std::string::npos) {
                 // No closing brace found - treat as literal
+                current += '$';
                 current += '{';
+                i++; // skip the {
             } else {
-                // Check if content looks like a valid expression (starts with letter/underscore)
-                // This allows JSON-like content with braces to pass through as literals
-                char first_char = (i + 1 < value.length()) ? value[i + 1] : '\0';
-                bool looks_like_expr = (first_char >= 'a' && first_char <= 'z') ||
-                                       (first_char >= 'A' && first_char <= 'Z') ||
-                                       first_char == '_';
-                
-                if (!looks_like_expr) {
-                    // Not an expression - treat braces as literal
-                    current += '{';
-                } else {
-                    // Found closing brace - extract expression
-                    if(!current.empty()) parts.push_back({false, current});
-                    current = "";
+                // Extract expression between ${ and }
+                if(!current.empty()) parts.push_back({false, current});
+                current = "";
+                i += 2; // skip ${
+                while(i < value.length() && value[i] != '}') {
+                    current += value[i];
                     i++;
-                    while(i < value.length() && value[i] != '}') {
-                        current += value[i];
-                        i++;
-                    }
-                    // Only treat as expression if content is non-empty
-                    if (!current.empty()) {
-                        parts.push_back({true, current});
-                    } else {
-                        // Empty braces {} - treat as literal
-                        parts.push_back({false, "{}"});
-                    }
-                    current = "";
                 }
+                // Only treat as expression if content is non-empty
+                if (!current.empty()) {
+                    parts.push_back({true, current});
+                } else {
+                    // Empty ${} - treat as literal
+                    parts.push_back({false, "${}"});
+                }
+                current = "";
             }
         } else {
             current += value[i];

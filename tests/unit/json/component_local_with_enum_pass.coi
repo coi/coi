@@ -30,7 +30,7 @@ component MixedTypes {
     }
     
     mount {
-        string jsonData = "{\"message\": \"OK\", \"code\": 200}";
+        string jsonData = `{"message": "OK", "code": 200}`;
         Json.parse(Response, jsonData, &onSuccess = handleResponse, &onError = handleError);
     }
     

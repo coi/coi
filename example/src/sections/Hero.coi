@@ -148,7 +148,7 @@ component Hero {
             </div>
             <p class="built-with">✨ This site is built with Coi</p>
 
-            <div class="popup-overlay" style="display: {popupDisplay};">
+            <div class="popup-overlay" style="display: ${popupDisplay};">
                  <div class="popup">
                     <h3>Work in Progress 🚧</h3>
                     <p>This section is not finished yet... but you can look into the demos below or in the git repository to get a good start with this language :D</p>

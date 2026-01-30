@@ -12,7 +12,7 @@ component JsonTest {
     def handleUser(User u, UserMeta meta) : void {
         user = u;
         if (meta.has_name() && meta.has_age()) {
-            status = "Success: {u.name}, {u.age}";
+            status = "Success: ${u.name}, ${u.age}";
         } else {
             status = "Partial data received";
         }
@@ -23,7 +23,7 @@ component JsonTest {
     }
 
     def parseJson() : void {
-        string json = "{\"name\": \"Alice\", \"age\": 25, \"email\": \"alice@example.com\"}";
+        string json = `{"name": "Alice", "age": 25, "email": "alice@example.com"}`;
         Json.parse(
             User,
             json,

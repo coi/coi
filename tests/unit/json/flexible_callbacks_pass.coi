@@ -11,7 +11,7 @@ component FlexibleCallbackTest {
     // onSuccess with only data param (no meta)
     def handleUserSimple(User u) : void {
         user = u;
-        status = "Got user: {u.name}";
+        status = "Got user: ${u.name}";
     }
 
     // onError with no params
@@ -20,7 +20,7 @@ component FlexibleCallbackTest {
     }
 
     def parseJson() : void {
-        string json = "{\"name\": \"Bob\", \"age\": 30}";
+        string json = `{"name": "Bob", "age": 30}`;
         Json.parse(
             User,
             json,

@@ -22,7 +22,7 @@ component JsonApp {
     }
     
     mount {
-        string jsonData = "{\"name\": \"Bob\", \"age\": 30}";
+        string jsonData = `{"name": "Bob", "age": 30}`;
         Json.parse(User, jsonData, &onSuccess = onSuccess, &onError = onError);
     }
     

@@ -20,7 +20,7 @@ component TestFetchPost {
         result = "Posting...";
         FetchRequest.post(
             "https://httpbin.org/post",
-            "{\"message\": \"hello\"}",
+            `{"message": "hello"}`,
             &onSuccess = handleSuccess,
             &onError = handleError
         );

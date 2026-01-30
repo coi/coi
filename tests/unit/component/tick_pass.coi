@@ -10,7 +10,7 @@ component TickTest {
     }
 
     view {
-        <div style="left: {x}px;">Moving</div>
+        <div style="left: ${x}px;">Moving</div>
     }
 }
 

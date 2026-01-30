@@ -47,7 +47,7 @@ component AnimatedBox {
         <div class="wrapper">
             <div class="label">Animation</div>
             <div class="container">
-                <div class="box" style="left: {x}%;"></div>
+                <div class="box" style="left: ${x}%;"></div>
             </div>
         </div>
     }

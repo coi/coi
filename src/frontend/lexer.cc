@@ -83,8 +83,7 @@ Token Lexer::read_string(){
                 case 't' : str += '\t'; break;
                 case '\\' : str += '\\'; break;
                 case '"' : str += '"'; break;
-                case '{' : str += "\\{"; break;
-                case '}' : str += "\\}"; break;
+                case '$' : str += "\\$"; break;  // Escape $ for ${} interpolation
                 default: str += current();
             }
         }else{

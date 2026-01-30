@@ -13,7 +13,7 @@ component JsonArrayTest {
     def onSuccess(Show[] shows, ShowMeta[] metas) : void {
         count = shows.length();
         if (count > 0) {
-            result = "Parsed {count} shows: {shows[0].title}";
+            result = "Parsed ${count} shows: ${shows[0].title}";
         } else {
             result = "Empty array";
         }
