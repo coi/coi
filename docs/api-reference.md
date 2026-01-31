@@ -313,7 +313,7 @@ component MusicPlayer {
             <button onclick={toggle}>
                 {playing ? "Pause" : "Play"}
             </button>
-            <div style="width: {progress}%"></div>
+            <div style="width: ${progress}%"></div>
         </div>
     }
 }
