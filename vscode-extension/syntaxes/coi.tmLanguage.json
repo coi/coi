@@ -12,7 +12,7 @@
       "include": "#component-definition"
     },
     {
-      "include": "#data-definition"
+      "include": "#pod-definition"
     },
     {
       "include": "#function-definition"
@@ -70,7 +70,7 @@
       "patterns": [
         {
           "name": "keyword.control.coi",
-          "match": "\\b(component|data|def|view|return|if|else|for|while|computed|tick|init|mount|app|import|struct|style|type|global|in|root|extends|enum|key|router|route)\\b"
+          "match": "\\b(component|pod|def|view|return|if|else|for|while|computed|tick|init|mount|app|import|struct|style|type|in|root|extends|enum|key|router|route)\\b"
         },
         {
           "name": "storage.modifier.coi",
@@ -175,8 +175,8 @@
         "2": { "name": "entity.name.type.class.coi" }
       }
     },
-    "data-definition": {
-      "match": "\\b(data)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+    "pod-definition": {
+      "match": "\\b(pod)\\s+([A-Za-z_][A-Za-z0-9_]*)",
       "captures": {
         "1": { "name": "keyword.control.coi" },
         "2": { "name": "entity.name.type.class.coi" }
