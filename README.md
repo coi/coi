@@ -60,13 +60,27 @@ Coi gives you composable components, fine-grained reactivity, type safety, and t
 ### DOM Performance (Rows App)
 
 > [!NOTE]
-> **Work in Progress:** Coi currently trails in DOM performance benchmarks. Improvements to DOM node allocation and rendering are in progress.
+> **Work in Progress:** Coi currently trails in DOM performance benchmarks. However, this gap is largely architectural overhead that I'm actively addressing - read below for details.
 
 In [benchmarks](benchmark/) comparing Coi, React, Vue, and Svelte, Coi delivers the smallest bundle size. DOM performance is still being optimized, see the chart below for current results.
 
 <p align="center">
   <img src="benchmark/benchmark_results.svg" alt="Benchmark Results" width="600">
 </p>
+
+**Why the Current Gap Exists:**
+
+Coi's architecture uses an asynchronous event and command buffering system to maintain a tiny runtime and stable WASM-JS interop. While this design ensures minimal bundle sizes and batched operations, it introduces a systematic frame delay:
+
+- **Buffer Latency**: Events are queued and processed in cycles, adding delay between user actions and DOM updates
+- **Polling Overhead**: On 165Hz displays (6.06ms per frame), the once-per-frame polling introduces an average ~6ms overhead regardless of how fast the WASM logic executes
+- **Node Allocation**: DOM node allocation and rendering optimizations are still in progress
+
+**Accounting for Overhead**: If we subtract the ~6ms systematic buffer overhead from Coi's results, the adjusted performance becomes highly competitive:
+- Create 1,000 rows: ~26ms (comparable to React/Svelte at 25-26ms)
+- Update 1,000 rows: ~9ms (matching or beating Svelte at 11ms)
+
+I'm actively working on moving towards a synchronous event-based model to eliminate this buffering delay while preserving the benefits of batched operations and minimal runtime size.
 
 See the [benchmark/](benchmark/) directory for details and instructions on how to run it yourself.
 
