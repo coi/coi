@@ -23,12 +23,14 @@ rule generate_def_files
   command = build/gen_schema
   description = GEN_DEF_FILES
 
-# Generator tool (generates .d.coi definition files)
+# Generator tool (generates .d.coi definition files from schema.wcc.bin)
 build build/obj/tools/gen_schema.o: gen_schema_cxx src/tools/gen_schema.cc
-build build/gen_schema: gen_schema_link build/obj/tools/gen_schema.o
+build build/obj/tools/webcc_schema.o: gen_schema_cxx deps/webcc/src/cli/schema.cc
+build build/obj/tools/webcc_utils.o: gen_schema_cxx deps/webcc/src/cli/utils.cc
+build build/gen_schema: gen_schema_link build/obj/tools/gen_schema.o build/obj/tools/webcc_schema.o build/obj/tools/webcc_utils.o
 
-# Generated .d.coi files (gen_schema reads webcc schema.def and generates def/web/*.d.coi)
-build def/web/index.d.coi: generate_def_files build/gen_schema
+# Generated .d.coi files (gen_schema reads webcc schema.wcc.bin and generates defs/web/*.d.coi)
+build defs/web/index.d.coi: generate_def_files build/gen_schema | deps/webcc/schema.wcc.bin
 
 # Coi Compiler source objects
 build build/obj/main.o: cxx src/main.cc
@@ -72,6 +74,6 @@ rule gen_def_cache
   command = ./coi --gen-def-cache
   description = GEN_DEF_CACHE
 
-build def/.cache/definitions.coi.bin: gen_def_cache coi | def/web/index.d.coi
+build defs/.cache/definitions.coi.bin: gen_def_cache coi | defs/web/index.d.coi
 
-default coi def/.cache/definitions.coi.bin
+default coi defs/.cache/definitions.coi.bin

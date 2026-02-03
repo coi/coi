@@ -36,7 +36,7 @@ The Coi compiler transforms `.coi` files into WebAssembly applications through s
 ### `defs/` - Definition File System
 - **def_parser.{cc,h}** - Parses `.d.coi` definition files
 - **def_loader.{cc,h}** - Loads and caches definition schemas
-- Schema files in `def/` define Web APIs (DOM, Canvas, Audio, etc.)
+- Schema files in `defs/` define Web APIs (DOM, Canvas, Audio, etc.)
 
 ### `codegen/` - Code Generation
 - **codegen.{cc,h}** - Main C++ code generator
@@ -96,9 +96,9 @@ The generated C++ is passed to WebCC which:
 
 ### Definition Files (`.d.coi`)
 - Define Web APIs available to Coi programs
-- Located in `def/web/`
+- Located in `defs/web/`
 - Generated from WebCC's schema by `tools/gen_schema`
-- Cached in `def/.cache/definitions.coi.bin` for fast loading
+- Cached in `defs/.cache/definitions.coi.bin` for fast loading
 
 ### Component Lifecycle
 1. `init {}` - Initialize state and variables

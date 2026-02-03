@@ -19,7 +19,7 @@ To build the compiler and the toolchain:
 This will:
 1. Initialize the WebCC submodule (if needed)
 2. Build the WebCC toolchain
-3. Generate type definition files (def/web/*.d.coi) from WebCC schema
+3. Generate type definition files (defs/web/*.d.coi) from WebCC schema
 4. Build the Coi compiler
 
 ### Build Options
@@ -27,7 +27,7 @@ This will:
 The build script supports these options:
 
 ```bash
-./build.sh --rebuild-schema   # Force regenerate def/web/*.d.coi from WebCC schema
+./build.sh --rebuild-schema   # Force regenerate defs/web/*.d.coi from WebCC schema
 ./build.sh --rebuild-webcc    # Force rebuild the WebCC toolchain
 ./build.sh --help             # Show all available options
 ```
@@ -36,14 +36,14 @@ The build script supports these options:
 
 Coi uses `.d.coi` definition files for type information:
 
-- **`def/core/`** — Built-in types (int, string, bool, array, etc.) - source-controlled
-- **`def/web/`** — Web platform APIs auto-generated from WebCC schema - gitignored
+- **`defs/core/`** — Built-in types (int, string, bool, array, etc.) - source-controlled
+- **`defs/web/`** — Web platform APIs auto-generated from WebCC schema - gitignored
 
 The build system automatically detects when `deps/webcc/schema.def` changes:
 
 1. Running `./build.sh` checks if WebCC's schema.def was modified
 2. If changed, WebCC rebuilds automatically
-3. Coi regenerates `def/web/*.d.coi` to match the new schema
+3. Coi regenerates `defs/web/*.d.coi` to match the new schema
 
 This means you can simply run `./build.sh` after editing `schema.def` and everything cascades correctly.
 

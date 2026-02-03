@@ -56,7 +56,8 @@ int main(int argc, char **argv)
     }
 
     // Return the absolute path to the bundled def/ directory next to the executable
-    if (first_arg == "--def-path")
+    // TODO: Deprecate --def-path once VS Code extension v1.0.12 is released.
+    if (first_arg == "--def-path" || first_arg == "--defs-path")
     {
         fs::path exe_dir = get_executable_dir();
         if (exe_dir.empty())
@@ -64,7 +65,7 @@ int main(int argc, char **argv)
             ErrorHandler::cli_error("could not determine executable directory");
             return 1;
         }
-        fs::path def_dir = exe_dir / "def";
+        fs::path def_dir = exe_dir / "defs";
         std::cout << def_dir.string() << std::endl;
         return 0;
     }

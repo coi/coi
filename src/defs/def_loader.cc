@@ -9,14 +9,14 @@ namespace fs = std::filesystem;
 
 void load_def_schema()
 {
-    // Initialize DefSchema from def files (for @intrinsic, @inline, @map)
-    // Always use the def directory next to the executable
+    // Initialize DefSchema from defs files (for @intrinsic, @inline, @map)
+    // Always use the defs directory next to the executable
     fs::path exe_dir = get_executable_dir();
     std::string def_dir;
 
-    if (!exe_dir.empty() && fs::exists(exe_dir / "def"))
+    if (!exe_dir.empty() && fs::exists(exe_dir / "defs"))
     {
-        def_dir = (exe_dir / "def").string();
+        def_dir = (exe_dir / "defs").string();
     }
     else
     {
@@ -30,9 +30,9 @@ void load_def_schema()
         }
         else
         {
-            hint = "Expected location: " + (exe_dir / "def").string();
+            hint = "Expected location: " + (exe_dir / "defs").string();
         }
-        ErrorHandler::cli_error("Could not find 'def' directory next to executable", hint);
+        ErrorHandler::cli_error("Could not find 'defs' directory next to executable", hint);
         exit(1);
     }
 

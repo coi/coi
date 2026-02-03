@@ -1,5 +1,5 @@
 // Generates .coi definition files for the coi compiler
-// Reads webcc's schema definitions and produces def/*.d.coi files
+// Reads webcc's schema.wcc.bin binary cache and produces defs/*.d.coi files
 // These are the source of truth for type information, method mappings, etc.
 
 #include <iostream>
@@ -12,9 +12,8 @@
 #include <filesystem>
 #include <cctype>
 
-// Include webcc's schema definitions
+// Include webcc's schema definitions (for types and load_defs_binary)
 #include "../../deps/webcc/src/cli/schema.h"
-#include "../../deps/webcc/src/cli/webcc_schema.h"
 
 // Functions that are handled by Coi language constructs (not exposed directly)
 // Format: "namespace::function_name" to allow same function names in different namespaces
@@ -100,30 +99,41 @@ int main()
     // Force rebuild by touching this file
     std::cout << "[Coi] Regenerating schema..." << std::endl;
 
+    // Load schema from binary cache (deps/webcc/schema.wcc.bin)
+    std::string schema_path = "deps/webcc/schema.wcc.bin";
+    webcc::SchemaDefs defs;
+    if (!webcc::load_defs_binary(defs, schema_path))
+    {
+        std::cerr << "[Coi] Error: Cannot load " << schema_path << std::endl;
+        std::cerr << "       Run './build.sh' in deps/webcc first to generate the schema cache." << std::endl;
+        return 1;
+    }
+    std::cout << "[Coi] Loaded " << defs.commands.size() << " commands, " << defs.events.size() << " events from " << schema_path << std::endl;
+
     // Collect all handle types from commands and map them to namespaces
-    for (const auto *c = webcc::SCHEMA_COMMANDS; !c->ns.empty(); ++c)
+    for (const auto &c : defs.commands)
     {
         // Check return handle type
-        if (!c->return_handle_type.empty())
+        if (!c.return_handle_type.empty())
         {
-            handles.insert(c->return_handle_type);
+            handles.insert(c.return_handle_type);
             // Map handle type to namespace (first occurrence wins)
-            if (type_to_ns.find(c->return_handle_type) == type_to_ns.end())
+            if (type_to_ns.find(c.return_handle_type) == type_to_ns.end())
             {
-                type_to_ns[c->return_handle_type] = c->ns;
+                type_to_ns[c.return_handle_type] = c.ns;
             }
         }
         // Check param handle types - if first param is a handle, map it to this namespace
-        for (size_t i = 0; i < c->params.size(); ++i)
+        for (size_t i = 0; i < c.params.size(); ++i)
         {
-            const auto &p = c->params[i];
+            const auto &p = c.params[i];
             if (!p.handle_type.empty())
             {
                 handles.insert(p.handle_type);
                 // First param handle type defines the receiver type for instance methods
                 if (i == 0 && type_to_ns.find(p.handle_type) == type_to_ns.end())
                 {
-                    type_to_ns[p.handle_type] = c->ns;
+                    type_to_ns[p.handle_type] = c.ns;
                 }
             }
         }
@@ -134,19 +144,19 @@ int main()
     // Don't add for namespaces like "dom" which have DOMElement, "canvas" which has Canvas, etc.
     std::set<std::string> namespaces_with_funcs;
     std::set<std::string> namespaces_with_handles; // Namespaces that have handle types
-    for (const auto *c = webcc::SCHEMA_COMMANDS; !c->ns.empty(); ++c)
+    for (const auto &c : defs.commands)
     {
-        namespaces_with_funcs.insert(c->ns);
+        namespaces_with_funcs.insert(c.ns);
         // If this command has handle types, mark the namespace as having handles
-        if (!c->return_handle_type.empty())
+        if (!c.return_handle_type.empty())
         {
-            namespaces_with_handles.insert(c->ns);
+            namespaces_with_handles.insert(c.ns);
         }
-        for (const auto &p : c->params)
+        for (const auto &p : c.params)
         {
             if (!p.handle_type.empty())
             {
-                namespaces_with_handles.insert(c->ns);
+                namespaces_with_handles.insert(c.ns);
             }
         }
     }
@@ -179,9 +189,9 @@ int main()
     }
 
     // Collect from events too
-    for (const auto *e = webcc::SCHEMA_EVENTS; !e->ns.empty(); ++e)
+    for (const auto &e : defs.events)
     {
-        for (const auto &p : e->params)
+        for (const auto &p : e.params)
         {
             if (!p.handle_type.empty())
             {
@@ -191,46 +201,46 @@ int main()
     }
 
     // Collect from inheritance
-    for (const auto *kv = webcc::HANDLE_INHERITANCE; kv->first != nullptr; ++kv)
+    for (const auto &[derived, base] : defs.handle_inheritance)
     {
-        handles.insert(kv->first);
-        handles.insert(kv->second);
+        handles.insert(derived);
+        handles.insert(base);
     }
 
     // =========================================================
-    // Generate .coi definition files in /def/web folder
+    // Generate .coi definition files in /defs/web folder
     // =========================================================
     namespace fs = std::filesystem;
 
-    // Create def/web directory
-    fs::create_directories("def/web");
+    // Create defs/web directory
+    fs::create_directories("defs/web");
 
     // Group commands by namespace
     std::map<std::string, std::vector<const webcc::SchemaCommand *>> commands_by_ns;
     std::map<std::string, std::set<std::string>> handles_by_ns; // Track which handles belong to which namespace
 
-    for (const auto *c = webcc::SCHEMA_COMMANDS; !c->ns.empty(); ++c)
+    for (const auto &c : defs.commands)
     {
         // Track handle types for this namespace BEFORE exclusion check
         // This ensures namespaces with intrinsic-only types still get generated
-        if (!c->return_handle_type.empty())
+        if (!c.return_handle_type.empty())
         {
-            handles_by_ns[c->ns].insert(c->return_handle_type);
+            handles_by_ns[c.ns].insert(c.return_handle_type);
             // Ensure namespace exists in commands_by_ns even if all commands are excluded
-            if (commands_by_ns.find(c->ns) == commands_by_ns.end())
+            if (commands_by_ns.find(c.ns) == commands_by_ns.end())
             {
-                commands_by_ns[c->ns] = {};
+                commands_by_ns[c.ns] = {};
             }
         }
 
         // Skip excluded functions (check namespace::function_name)
-        if (EXCLUDED_FUNCTIONS.count(c->ns + "::" + c->func_name))
+        if (EXCLUDED_FUNCTIONS.count(c.ns + "::" + c.func_name))
         {
             continue;
         }
         // Skip functions with func_ptr params (not supported in Coi)
         bool has_func_ptr = false;
-        for (const auto &p : c->params)
+        for (const auto &p : c.params)
         {
             if (p.type == "func_ptr")
             {
@@ -241,7 +251,7 @@ int main()
         if (has_func_ptr)
             continue;
 
-        commands_by_ns[c->ns].push_back(c);
+        commands_by_ns[c.ns].push_back(&c);
     }
 
     // Group commands by their "receiver" handle type (first param if it's a handle)
@@ -255,7 +265,7 @@ int main()
     // Generate a .coi file for each namespace
     for (const auto &[ns, commands] : commands_by_ns)
     {
-        std::string filename = "def/web/" + ns + ".d.coi";
+        std::string filename = "defs/web/" + ns + ".d.coi";
         std::ofstream out(filename);
         if (!out)
         {
@@ -328,13 +338,10 @@ int main()
         {
             // Check for inheritance
             std::string extends = "";
-            for (const auto *kv = webcc::HANDLE_INHERITANCE; kv->first != nullptr; ++kv)
+            auto inherit_it = defs.handle_inheritance.find(handle_type);
+            if (inherit_it != defs.handle_inheritance.end())
             {
-                if (kv->first == handle_type)
-                {
-                    extends = kv->second;
-                    break;
-                }
+                extends = inherit_it->second;
             }
 
             out << "// =========================================================\n";
@@ -544,13 +551,13 @@ int main()
     }
 
     // =========================================================
-    // Generate main index file (def/web/index.d.coi)
+    // Generate main index file (defs/web/index.d.coi)
     // =========================================================
     {
-        std::ofstream out("def/web/index.d.coi");
+        std::ofstream out("defs/web/index.d.coi");
         if (!out)
         {
-            std::cerr << "[Coi] Error: Cannot create def/web/index.d.coi" << std::endl;
+            std::cerr << "[Coi] Error: Cannot create defs/web/index.d.coi" << std::endl;
             return 1;
         }
 
@@ -576,13 +583,10 @@ int main()
         for (const auto &handle : handles)
         {
             std::string extends = "";
-            for (const auto *kv = webcc::HANDLE_INHERITANCE; kv->first != nullptr; ++kv)
+            auto inherit_it = defs.handle_inheritance.find(handle);
+            if (inherit_it != defs.handle_inheritance.end())
             {
-                if (kv->first == handle)
-                {
-                    extends = kv->second;
-                    break;
-                }
+                extends = inherit_it->second;
             }
 
             if (!extends.empty())
@@ -616,7 +620,7 @@ int main()
         out << "//\n";
 
         out.close();
-        std::cout << "[Coi] Generated def/web/index.d.coi" << std::endl;
+        std::cout << "[Coi] Generated defs/web/index.d.coi" << std::endl;
     }
 
     return 0;

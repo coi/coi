@@ -577,7 +577,7 @@ const formatter = new CoiFormatter();
 function activate(context) {
     console.log('Coi Language extension activated');
 
-    // Load definitions from bundled def/ folder or custom path
+    // Load definitions from bundled defs/ folder or custom path
     loadDefinitions(context);
 
     // Register completion provider
@@ -672,15 +672,15 @@ function loadDefinitions(context) {
     let defPath = config.get('definitionsPath');
 
     if (!defPath) {
-        // Dynamically discover def path using 'coi --def-path'
+        // Dynamically discover def path using 'coi --defs-path'
         try {
-            const output = execSync('coi --def-path', { encoding: 'utf8' });
+            const output = execSync('coi --defs-path', { encoding: 'utf8' });
             defPath = output.trim();
             if (!fs.existsSync(defPath)) {
-                throw new Error('Returned def path does not exist: ' + defPath);
+                throw new Error('Returned defs path does not exist: ' + defPath);
             }
         } catch (err) {
-            vscode.window.showErrorMessage('Failed to locate Coi definitions directory using \'coi --def-path\'. Please set \'coi.definitionsPath\' in your settings.');
+            vscode.window.showErrorMessage('Failed to locate Coi definitions directory using \'coi --defs-path\'. Please set \'coi.definitionsPath\' in your settings.');
             return;
         }
     }
