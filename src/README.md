@@ -98,7 +98,7 @@ The generated C++ is passed to WebCC which:
 - Define Web APIs available to Coi programs
 - Located in `def/web/`
 - Generated from WebCC's schema by `tools/gen_schema`
-- Cached in `def/.cache/def_cache.bin` for fast loading
+- Cached in `def/.cache/definitions.coi.bin` for fast loading
 
 ### Component Lifecycle
 1. `init {}` - Initialize state and variables

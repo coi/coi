@@ -72,6 +72,6 @@ rule gen_def_cache
   command = ./coi --gen-def-cache
   description = GEN_DEF_CACHE
 
-build def/.cache/def_cache.bin: gen_def_cache coi | def/web/index.d.coi
+build def/.cache/definitions.coi.bin: gen_def_cache coi | def/web/index.d.coi
 
-default coi def/.cache/def_cache.bin
+default coi def/.cache/definitions.coi.bin

@@ -37,7 +37,7 @@ void load_def_schema()
     }
 
     // Load from binary cache (generated at build time by gen_schema)
-    std::string cache_path = def_dir + "/.cache/def_cache.bin";
+    std::string cache_path = def_dir + "/.cache/definitions.coi.bin";
     auto &def_schema = DefSchema::instance();
 
     if (def_schema.is_cache_valid(cache_path, def_dir))
