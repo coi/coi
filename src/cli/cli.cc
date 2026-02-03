@@ -1,5 +1,6 @@
 #include "cli.h"
 #include "error.h"
+#include "version.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -369,6 +370,19 @@ if __name__ == '__main__':
 
     std::string cmd = "cd " + dist_dir.string() + " && python3 -c \"" + python_script + "\" 2>&1 | grep -v 'Serving HTTP'";
     return system(cmd.c_str());
+}
+
+void print_version()
+{
+    std::cout << std::endl;
+    std::cout << BRAND << "              .  o  ..          " << RESET << std::endl;
+    std::cout << BRAND << "          o  .    '   .  o      " << RESET << std::endl;
+    std::cout << BRAND << "       o     ><(((º>    '       " << RESET << DIM << "just keep compiling." << RESET << std::endl;
+    std::cout << BRAND << "          .    o   '  .         " << RESET << std::endl;
+    std::cout << BRAND << "              '  .    o         " << RESET << std::endl;
+    std::cout << std::endl;
+    std::cout << "  " << BRAND << BOLD << "Coi Compiler" << RESET << " " << DIM << "(build: " << __DATE__ << "-" << GIT_COMMIT_HASH << ")" << RESET << std::endl;
+    std::cout << std::endl;
 }
 
 void print_help(const char *program_name)

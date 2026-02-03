@@ -36,5 +36,8 @@ int dev_project(bool keep_cc = false, bool cc_only = false);
 // Print help message
 void print_help(const char* program_name);
 
+// Print version information
+void print_version();
+
 // Get the directory where the coi executable is located
 std::filesystem::path get_executable_dir();
