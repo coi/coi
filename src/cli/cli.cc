@@ -396,6 +396,7 @@ void print_help(const char *program_name)
     std::cout << "    " << CYAN << program_name << " init" << RESET << " [name]              Create a new project" << std::endl;
     std::cout << "    " << CYAN << program_name << " build" << RESET << "                    Build the project" << std::endl;
     std::cout << "    " << CYAN << program_name << " dev" << RESET << "                      Build and start dev server" << std::endl;
+    std::cout << "    " << CYAN << program_name << " version" << RESET << "                  Show version" << std::endl;
     std::cout << "    " << CYAN << program_name << RESET << " <file.coi> [options]    Compile a .coi file" << std::endl;
     std::cout << std::endl;
     std::cout << "  " << BOLD << "Options:" << RESET << std::endl;

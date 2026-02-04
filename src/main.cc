@@ -38,7 +38,7 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    if (first_arg == "--version" || first_arg == "-v")
+    if (first_arg == "version" || first_arg == "--version" || first_arg == "-v")
     {
         print_version();
         return 0;
