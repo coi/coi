@@ -5,6 +5,7 @@ cflags = -std=c++20 -O0 -Isrc
 rule gen_version
   command = sh -c 'echo "#pragma once" > $out && echo "#define GIT_COMMIT_HASH \"$$(git rev-parse --short HEAD 2>/dev/null || echo unknown)\"" >> $out'
   description = GEN_VERSION
+  restat = 1
 
 rule cxx
   command = $cxx $cflags -MD -MF $out.d -c $in -o $out
@@ -64,7 +65,7 @@ build build/obj/codegen/json_codegen.o: cxx src/codegen/json_codegen.cc
 build build/obj/codegen/css_generator.o: cxx src/codegen/css_generator.cc
 
 # Generate version header
-build src/cli/version.h: gen_version
+build src/cli/version.h: gen_version | .git/HEAD
 
 # CLI module (command-line interface)
 build build/obj/cli/cli.o: cxx src/cli/cli.cc | src/cli/version.h
