@@ -1,0 +1,163 @@
+// schema_whitelist.def
+// Purpose: Explicitly allow these WebCC functions to be exposed to Coi
+// This is the "single source of truth" for the public Coi API.
+//
+// Format:
+//   [namespace]
+//   function_name              - Regular webcc function (auto-generates @map)
+//   // comment                 - Preserved comment (emitted before next @intrinsic/@inline)
+//   @intrinsic("x") def ...    - Raw intrinsic definition (emitted as-is)
+//   @inline("x") def ...       - Raw inline definition (emitted as-is)
+
+[dom]
+request_fullscreen
+request_pointer_lock
+scroll_to_top
+
+[canvas]
+get_context_2d
+get_context_webgl
+get_context_webgpu
+set_size
+log_canvas_info
+set_fill_style
+set_fill_style_str
+fill_rect
+clear_rect
+stroke_rect
+set_stroke_style
+set_stroke_style_str
+set_line_width
+begin_path
+close_path
+move_to
+line_to
+stroke
+fill
+arc
+fill_text
+fill_text_f
+fill_text_i
+set_font
+set_text_align
+draw_image
+translate
+rotate
+scale
+save
+restore
+set_global_alpha
+set_line_cap
+set_line_join
+set_shadow
+bezier_curve_to
+quadratic_curve_to
+rect
+clip
+stroke_text
+set_text_baseline
+draw_image_scaled
+draw_image_region
+measure_text
+ellipse
+arc_to
+set_line_dash
+get_line_dash
+reset_transform
+set_transform
+
+[audio]
+create_audio
+play
+pause
+set_volume
+set_loop
+get_current_time
+get_duration
+
+[image]
+load
+
+[input]
+exit_pointer_lock
+// Keyboard state queries (compiler intrinsics)
+@intrinsic("key_down") shared def isKeyDown(int keyCode): bool
+@intrinsic("key_up") shared def isKeyUp(int keyCode): bool
+
+[storage]
+set_item
+remove_item
+clear
+
+[fetch]
+// FetchRequest.get with optional callback parameters (compiler intrinsic)
+@intrinsic("fetch_get") shared def get(string url, def onSuccess(string): void = void, def onError(string): void = void): FetchRequest
+// FetchRequest.post with optional callback parameters (compiler intrinsic)
+@intrinsic("fetch_post") shared def post(string url, string body, def onSuccess(string): void = void, def onError(string): void = void): FetchRequest
+
+[system]
+log
+warn
+error
+set_title
+reload
+open_url
+get_time
+get_date_now
+get_pathname
+get_search
+get_query_param
+// Router navigation (compiler intrinsics)
+@intrinsic("navigate") shared def navigate(string route): void
+@intrinsic("get_route") shared def getRoute(): string
+// Force flush of all pending DOM operations
+@intrinsic("flush") shared def flush(): void
+
+[webgl]
+viewport
+clear_color
+clear
+create_shader
+create_program
+attach_shader
+link_program
+bind_attrib_location
+use_program
+create_buffer
+bind_buffer
+buffer_data
+enable_vertex_attrib_array
+enable
+get_uniform_location
+uniform_1f
+vertex_attrib_pointer
+draw_arrays
+
+[websocket]
+send
+close
+// Check if the WebSocket is connected (handle is valid)
+@inline("$self.is_valid()") def isConnected(): bool
+// WebSocket.connect with optional callback parameters (compiler intrinsic)
+@intrinsic("ws_connect") shared def connect(string url, def onMessage(string): void = void, def onOpen(): void = void, def onClose(): void = void, def onError(): void = void): WebSocket
+// WebSocket callback registration (compiler intrinsics)
+@intrinsic("ws_on_message") def onMessage(def callback(string): void): void
+@intrinsic("ws_on_open") def onOpen(def callback: void): void
+@intrinsic("ws_on_close") def onClose(def callback: void): void
+@intrinsic("ws_on_error") def onError(def callback: void): void
+
+[wgpu]
+request_adapter
+request_device
+configure
+get_current_texture_view
+get_queue
+create_shader_module
+create_command_encoder
+create_render_pipeline_simple
+begin_render_pass
+finish_encoder
+queue_submit
+end_pass
+set_pipeline
+draw

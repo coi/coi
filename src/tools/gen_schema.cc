@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <set>
 #include <map>
 #include <string>
@@ -15,41 +16,113 @@
 // Include webcc's schema definitions (for types and load_defs_binary)
 #include "../../deps/webcc/src/cli/schema.h"
 
-// Functions that are handled by Coi language constructs (not exposed directly)
-// Format: "namespace::function_name" to allow same function names in different namespaces
-static const std::set<std::string> EXCLUDED_FUNCTIONS = {
-    "system::set_main_loop",               // Handled by tick {}
-    "input::init_keyboard",                // Called internally when Input.isKeyDown is used
-    "input::init_mouse",                   // Handled by onMouseDown/onMouseMove/onMouseUp attributes
-    "dom::add_click_listener",             // Handled by onClick attribute
-    "dom::create_element_deferred",        // Internal compiler function
-    "dom::create_comment",                 // Internal compiler function
-    "dom::create_element_deferred_scoped", // Internal compiler function (scoped CSS)
-    "dom::create_element_scoped",          // Internal compiler function (scoped CSS)
-    "dom::create_comment_deferred",        // Internal compiler function
-    "dom::add_input_listener",             // Handled by onInput attribute
-    "dom::add_change_listener",            // Handled by onChange attribute
-    "dom::add_keydown_listener",           // Handled by onKeydown attribute
-    "dom::insert_before",                  // Internal compiler function
-    "dom::move_before",                    // Internal compiler function
-    "dom::remove_element",                 // Internal compiler function
-    "dom::get_attribute",                 // Internal compiler function
-    "dom::set_property",                 // Internal compiler function
-    "dom::get_body",                 // Internal compiler function
-    "dom::get_element_by_id",                 // Internal compiler function
-    "websocket::connect",                  // WebSocket.connect with callbacks handled via intrinsic
-    "fetch::get",                          // FetchRequest.get with callbacks handled via intrinsic
-    "fetch::post",                         // FetchRequest.post with callbacks handled via intrinsic
-    // Direct DOM manipulation - use declarative view instead
-    "dom::create_element", // Use view {} block for structure
-    "dom::append_child",   // Use view {} block for structure
-    "dom::set_inner_html", // Use <raw>{html}</raw> in view
-    "dom::set_inner_text", // Use {text} interpolation in view
-    "dom::add_class",      // Use class={expr} attribute binding
-    "dom::remove_class",   // Use class={expr} attribute binding
-    // Canvas initialization - use declarative view binding
-    "canvas::create_canvas", // Use <canvas &={canvas}> in view, then canvas.setSize()
-};
+// Whitelist of functions and intrinsics exposed to Coi users
+// Loaded from src/tools/schema_whitelist.def at runtime
+//
+// Format:
+//   function_name              - Regular webcc function (auto-generates @map)
+//   // comment                 - Comment (preserved if followed by @intrinsic/@inline)
+//   @intrinsic("x") def ...    - Raw definition line (emitted as-is)
+//   @inline("x") def ...       - Raw definition line (emitted as-is)
+
+static std::set<std::string> WHITELISTED_FUNCTIONS;
+
+// Intrinsic definitions by namespace - stores raw lines to emit (with preceding comments)
+static std::map<std::string, std::vector<std::string>> INTRINSIC_DEFS;
+
+// Load whitelist from src/tools/schema_whitelist.def
+bool load_whitelist(const std::string &path)
+{
+    std::ifstream file(path);
+    if (!file)
+    {
+        return false;
+    }
+
+    std::string current_ns;
+    std::string line;
+    std::vector<std::string> pending_comments; // Comments waiting for an @intrinsic/@inline
+
+    while (std::getline(file, line))
+    {
+        // Trim whitespace
+        size_t start = line.find_first_not_of(" \t");
+        if (start == std::string::npos)
+        {
+            pending_comments.clear(); // Empty line clears pending comments
+            continue;
+        }
+        size_t end = line.find_last_not_of(" \t\r\n");
+        line = line.substr(start, end - start + 1);
+
+        // Skip empty lines
+        if (line.empty())
+        {
+            pending_comments.clear();
+            continue;
+        }
+
+        // Check for namespace header [namespace]
+        if (line[0] == '[' && line.back() == ']')
+        {
+            current_ns = line.substr(1, line.size() - 2);
+            pending_comments.clear();
+            continue;
+        }
+
+        // Comments starting with // - accumulate for potential @intrinsic/@inline
+        if (line.rfind("//", 0) == 0)
+        {
+            pending_comments.push_back(line);
+            continue;
+        }
+
+        // Skip # comments (not preserved)
+        if (line[0] == '#')
+        {
+            continue;
+        }
+
+        if (!current_ns.empty())
+        {
+            // Check if it's an intrinsic/inline definition (@intrinsic or @inline)
+            if (line[0] == '@')
+            {
+                // Add pending comments first
+                for (const auto &comment : pending_comments)
+                {
+                    INTRINSIC_DEFS[current_ns].push_back(comment);
+                }
+                pending_comments.clear();
+                // Add the intrinsic definition itself
+                INTRINSIC_DEFS[current_ns].push_back(line);
+            }
+            else
+            {
+                // Regular function name
+                WHITELISTED_FUNCTIONS.insert(current_ns + "::" + line);
+                pending_comments.clear();
+            }
+        }
+    }
+
+    return true;
+}
+
+// Count total intrinsic definitions
+size_t count_intrinsics()
+{
+    size_t count = 0;
+    for (const auto &[ns, defs] : INTRINSIC_DEFS)
+    {
+        for (const auto &def : defs)
+        {
+            if (def[0] == '@')
+                count++;
+        }
+    }
+    return count;
+}
 
 // Convert snake_case to camelCase for Coi function names
 std::string to_camel_case(const std::string &snake)
@@ -115,6 +188,17 @@ int main()
 
     // Force rebuild by touching this file
     std::cout << "[Coi] Regenerating schema..." << std::endl;
+
+    // Load whitelist from src/tools/schema_whitelist.def
+    std::string whitelist_path = "src/tools/schema_whitelist.def";
+    if (!load_whitelist(whitelist_path))
+    {
+        std::cerr << "[Coi] Error: Cannot load " << whitelist_path << std::endl;
+        std::cerr << "       This file defines which webcc functions are exposed to Coi." << std::endl;
+        return 1;
+    }
+    std::cout << "[Coi] Loaded " << WHITELISTED_FUNCTIONS.size() << " functions, " 
+              << count_intrinsics() << " intrinsics from " << whitelist_path << std::endl;
 
     // Load schema from binary cache (deps/webcc/schema.wcc.bin)
     std::string schema_path = "deps/webcc/schema.wcc.bin";
@@ -250,8 +334,9 @@ int main()
             }
         }
 
-        // Skip excluded functions (check namespace::function_name)
-        if (EXCLUDED_FUNCTIONS.count(c.ns + "::" + c.func_name))
+        // Skip functions NOT in the whitelist
+        std::string qualified_name = c.ns + "::" + c.func_name;
+        if (!WHITELISTED_FUNCTIONS.count(qualified_name))
         {
             continue;
         }
@@ -442,53 +527,31 @@ int main()
                 }
             }
 
-            // Inject WebSocket intrinsics (connect + callback registration)
-            if (handle_type == "WebSocket")
+            // Emit intrinsic definitions from whitelist for this handle type
+            // Handle types like WebSocket, FetchRequest have intrinsics defined in the whitelist
+            // We need to check which namespace this handle belongs to
+            std::string handle_ns;
+            auto ns_it = type_to_ns.find(handle_type);
+            if (ns_it != type_to_ns.end())
             {
-                out << "    // WebSocket.connect with optional callback parameters (compiler intrinsic)\n";
-                out << "    @intrinsic(\"ws_connect\")\n";
-                out << "    shared def connect(string url, "
-                    << "def onMessage(string) : void = void, "
-                    << "def onOpen() : void = void, "
-                    << "def onClose() : void = void, "
-                    << "def onError() : void = void"
-                    << "): WebSocket\n\n";
-
-                out << "    // Check if the WebSocket is connected (handle is valid)\n";
-                out << "    @inline(\"$self.is_valid()\")\n";
-                out << "    def isConnected(): bool\n";
-
-                out << "    // WebSocket callback registration (compiler intrinsics)\n";
-                out << "    @intrinsic(\"ws_on_message\")\n";
-                out << "    def onMessage(def callback(string) : void): void\n\n";
-                out << "    @intrinsic(\"ws_on_open\")\n";
-                out << "    def onOpen(def callback : void): void\n\n";
-                out << "    @intrinsic(\"ws_on_close\")\n";
-                out << "    def onClose(def callback : void): void\n\n";
-                out << "    @intrinsic(\"ws_on_error\")\n";
-                out << "    def onError(def callback : void): void\n";
+                handle_ns = ns_it->second;
             }
-
-            // Inject FetchRequest intrinsics (get/post with callbacks)
-            if (handle_type == "FetchRequest")
+            if (!handle_ns.empty() && INTRINSIC_DEFS.count(handle_ns))
             {
-                out << "    // FetchRequest.get with optional callback parameters (compiler intrinsic)\n";
-                out << "    @intrinsic(\"fetch_get\")\n";
-                out << "    shared def get(string url, "
-                    << "def onSuccess(string) : void = void, "
-                    << "def onError(string) : void = void"
-                    << "): FetchRequest\n\n";
-
-                out << "    // FetchRequest.post with optional callback parameters (compiler intrinsic)\n";
-                out << "    @intrinsic(\"fetch_post\")\n";
-                out << "    shared def post(string url, string body, "
-                    << "def onSuccess(string) : void = void, "
-                    << "def onError(string) : void = void"
-                    << "): FetchRequest\n";
+                for (const auto &def : INTRINSIC_DEFS[handle_ns])
+                {
+                    out << "    " << def << "\n";
+                    // Add blank line after @intrinsic/@inline definitions (not after comments)
+                    if (def[0] == '@')
+                    {
+                        out << "\n";
+                    }
+                }
             }
 
             out << "}\n\n";
         }
+
 
         // Generate namespace utilities as a type with shared methods (e.g., Storage.clear, System.log)
         // These are types with only shared (static) methods - not instantiable
@@ -535,26 +598,18 @@ int main()
                 out << "): " << return_type << "\n\n";
             }
 
-            // Inject intrinsics directly into generated files for documentation
-            if (ns == "input")
+            // Emit intrinsic definitions from whitelist for this namespace
+            if (INTRINSIC_DEFS.count(ns))
             {
-                out << "\n    // Keyboard state queries (compiler intrinsics)\n";
-                out << "    @intrinsic(\"key_down\")\n";
-                out << "    shared def isKeyDown(int keyCode): bool\n";
-                out << "    @intrinsic(\"key_up\")\n";
-                out << "    shared def isKeyUp(int keyCode): bool\n";
-            }
-
-            if (ns == "system")
-            {
-                out << "\n    // Router navigation (compiler intrinsics - calls app router)\n";
-                out << "    @intrinsic(\"navigate\")\n";
-                out << "    shared def navigate(string route): void\n";
-                out << "    @intrinsic(\"get_route\")\n";
-                out << "    shared def getRoute(): string\n";
-                out << "\n    // Force flush of all pending DOM operations (compiler intrinsic)\n";
-                out << "    @intrinsic(\"flush\")\n";
-                out << "    shared def flush(): void\n";
+                for (const auto &def : INTRINSIC_DEFS[ns])
+                {
+                    out << "    " << def << "\n";
+                    // Add blank line after @intrinsic/@inline definitions (not after comments)
+                    if (def[0] == '@')
+                    {
+                        out << "\n";
+                    }
+                }
             }
 
             if (!all_handle_types.count(ns_type))
@@ -562,6 +617,7 @@ int main()
                 out << "}\n\n";
             }
         }
+
 
         out.close();
         std::cout << "[Coi] Generated " << filename << " with " << commands.size() << " functions" << std::endl;
