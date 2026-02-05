@@ -1,6 +1,7 @@
 #include "lexer.h"
 #include <cctype>
 #include <unordered_map>
+#include "../cli/error.h"
 
 Lexer::Lexer(const std::string& src) : source(src){}
 
@@ -90,6 +91,10 @@ Token Lexer::read_string(){
             str += current();
         }
         advance();
+    }
+
+    if (current() == '\0') {
+        ErrorHandler::compiler_error("Unterminated string literal at line " + std::to_string(start_line) + ", column " + std::to_string(start_column), start_line);
     }
 
     advance(); // skip closing quote

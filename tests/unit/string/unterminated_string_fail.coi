@@ -1,0 +1,13 @@
+// Test: Unterminated string literal should fail compilation
+component UnterminatedStringFail {
+    // Missing closing quote triggers lexer error
+    string name = "oops
+
+    view {
+        <div>{name}</div>
+    }
+}
+
+app {
+    root = UnterminatedStringFail;
+}

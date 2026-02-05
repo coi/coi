@@ -4,6 +4,59 @@
 #include <stdexcept>
 #include <cctype>
 
+// Parse a prop/attribute value: string, number (with optional unary -), or {expression}
+std::unique_ptr<Expression> Parser::parse_prop_or_attr_value()
+{
+    int err_line = current().line;
+
+    if (current().type == TokenType::STRING_LITERAL)
+    {
+        auto val = std::make_unique<StringLiteral>(current().value);
+        advance();
+        return val;
+    }
+
+    if (current().type == TokenType::INT_LITERAL)
+    {
+        auto val = std::make_unique<IntLiteral>(std::stoi(current().value));
+        advance();
+        return val;
+    }
+
+    if (current().type == TokenType::FLOAT_LITERAL)
+    {
+        auto val = std::make_unique<FloatLiteral>(std::stod(current().value));
+        advance();
+        return val;
+    }
+
+    if (match(TokenType::MINUS))
+    {
+        if (current().type == TokenType::INT_LITERAL)
+        {
+            auto val = std::make_unique<IntLiteral>(-std::stoi(current().value));
+            advance();
+            return val;
+        }
+        else if (current().type == TokenType::FLOAT_LITERAL)
+        {
+            auto val = std::make_unique<FloatLiteral>(-std::stod(current().value));
+            advance();
+            return val;
+        }
+        ErrorHandler::compiler_error("Expected number after '-' in prop or attribute value", err_line);
+    }
+
+    if (match(TokenType::LBRACE))
+    {
+        auto expr = parse_expression();
+        expect(TokenType::RBRACE, "Expected '}'");
+        return expr;
+    }
+
+    ErrorHandler::compiler_error("Expected prop or attribute value", err_line);
+}
+
 std::string Parser::parse_style_block()
 {
     expect(TokenType::LBRACE, "Expected '{'");
@@ -60,6 +113,42 @@ std::unique_ptr<ASTNode> Parser::parse_html_element()
     expect(TokenType::LT, "Expected '<'");
     int start_line = current().line;
 
+    auto parse_component_props = [&](ComponentInstantiation &comp) {
+        while (current().type == TokenType::IDENTIFIER || current().type == TokenType::AMPERSAND || current().type == TokenType::COLON)
+        {
+            bool is_ref_prop = false;
+            bool is_move_prop = false;
+            if (match(TokenType::AMPERSAND))
+            {
+                is_ref_prop = true;
+            }
+            else if (match(TokenType::COLON))
+            {
+                is_move_prop = true;
+            }
+
+            std::string prop_name = current().value;
+            expect(TokenType::IDENTIFIER, "Expected prop name");
+
+            std::unique_ptr<Expression> prop_value;
+            if (match(TokenType::ASSIGN))
+            {
+                prop_value = parse_prop_or_attr_value();
+            }
+            else
+            {
+                prop_value = std::make_unique<BoolLiteral>(true);
+            }
+
+            ComponentProp cprop;
+            cprop.name = prop_name;
+            cprop.value = std::move(prop_value);
+            cprop.is_reference = is_ref_prop;
+            cprop.is_move = is_move_prop;
+            comp.props.push_back(std::move(cprop));
+        }
+    };
+
     // Check for component variable syntax: <{varName} props... />
     // Used to project component variables into the view
     if (current().type == TokenType::LBRACE)
@@ -106,77 +195,7 @@ std::unique_ptr<ASTNode> Parser::parse_html_element()
         comp->component_name = component_type;
 
         // Parse props (same as regular component props): &prop={value} = reference, :prop={value} = move
-        while (current().type == TokenType::IDENTIFIER || current().type == TokenType::AMPERSAND || current().type == TokenType::COLON)
-        {
-            bool is_ref_prop = false;
-            bool is_move_prop = false;
-            if (match(TokenType::AMPERSAND))
-            {
-                is_ref_prop = true;
-            }
-            else if (match(TokenType::COLON))
-            {
-                is_move_prop = true;
-            }
-            std::string prop_name = current().value;
-            advance();
-
-            std::unique_ptr<Expression> prop_value;
-            if (match(TokenType::ASSIGN))
-            {
-                if (current().type == TokenType::STRING_LITERAL)
-                {
-                    prop_value = std::make_unique<StringLiteral>(current().value);
-                    advance();
-                }
-                else if (current().type == TokenType::INT_LITERAL)
-                {
-                    prop_value = std::make_unique<IntLiteral>(std::stoi(current().value));
-                    advance();
-                }
-                else if (current().type == TokenType::FLOAT_LITERAL)
-                {
-                    prop_value = std::make_unique<FloatLiteral>(std::stod(current().value));
-                    advance();
-                }
-                else if (match(TokenType::MINUS))
-                {
-                    if (current().type == TokenType::INT_LITERAL)
-                    {
-                        prop_value = std::make_unique<IntLiteral>(-std::stoi(current().value));
-                        advance();
-                    }
-                    else if (current().type == TokenType::FLOAT_LITERAL)
-                    {
-                        prop_value = std::make_unique<FloatLiteral>(-std::stod(current().value));
-                        advance();
-                    }
-                    else
-                    {
-                        throw std::runtime_error("Expected number after '-' in prop value");
-                    }
-                }
-                else if (match(TokenType::LBRACE))
-                {
-                    prop_value = parse_expression();
-                    expect(TokenType::RBRACE, "Expected '}'");
-                }
-                else
-                {
-                    throw std::runtime_error("Expected prop value");
-                }
-            }
-            else
-            {
-                prop_value = std::make_unique<StringLiteral>("true");
-            }
-            ComponentProp cprop;
-            cprop.name = prop_name;
-            cprop.value = std::move(prop_value);
-            cprop.is_reference = is_ref_prop;
-            cprop.is_move = is_move_prop;
-            comp->props.push_back(std::move(cprop));
-        }
+        parse_component_props(*comp);
 
         // Must be self-closing: <{var}/>
         expect(TokenType::SLASH, "Expected '/>' - component variable projection must be self-closing: <{" + member_name + "}/>");
@@ -223,78 +242,7 @@ std::unique_ptr<ASTNode> Parser::parse_html_element()
         comp->component_name = tag;
 
         // Props: &prop={value} = reference, :prop={value} = move, prop={value} = copy
-        while (current().type == TokenType::IDENTIFIER || current().type == TokenType::AMPERSAND || current().type == TokenType::COLON)
-        {
-            bool is_ref_prop = false;
-            bool is_move_prop = false;
-            if (match(TokenType::AMPERSAND))
-            {
-                is_ref_prop = true;
-            }
-            else if (match(TokenType::COLON))
-            {
-                is_move_prop = true;
-            }
-            std::string prop_name = current().value;
-            advance();
-
-            std::unique_ptr<Expression> prop_value;
-            if (match(TokenType::ASSIGN))
-            {
-                if (current().type == TokenType::STRING_LITERAL)
-                {
-                    prop_value = std::make_unique<StringLiteral>(current().value);
-                    advance();
-                }
-                else if (current().type == TokenType::INT_LITERAL)
-                {
-                    prop_value = std::make_unique<IntLiteral>(std::stoi(current().value));
-                    advance();
-                }
-                else if (current().type == TokenType::FLOAT_LITERAL)
-                {
-                    prop_value = std::make_unique<FloatLiteral>(std::stod(current().value));
-                    advance();
-                }
-                else if (match(TokenType::MINUS))
-                {
-                    if (current().type == TokenType::INT_LITERAL)
-                    {
-                        prop_value = std::make_unique<IntLiteral>(-std::stoi(current().value));
-                        advance();
-                    }
-                    else if (current().type == TokenType::FLOAT_LITERAL)
-                    {
-                        prop_value = std::make_unique<FloatLiteral>(-std::stod(current().value));
-                        advance();
-                    }
-                    else
-                    {
-                        throw std::runtime_error("Expected number after '-' in prop value");
-                    }
-                }
-                else if (match(TokenType::LBRACE))
-                {
-                    prop_value = parse_expression();
-                    expect(TokenType::RBRACE, "Expected '}'");
-                }
-                else
-                {
-                    throw std::runtime_error("Expected prop value");
-                }
-            }
-            else
-            {
-                // Boolean prop?
-                prop_value = std::make_unique<StringLiteral>("true");
-            }
-            ComponentProp cprop;
-            cprop.name = prop_name;
-            cprop.value = std::move(prop_value);
-            cprop.is_reference = is_ref_prop;
-            cprop.is_move = is_move_prop;
-            comp->props.push_back(std::move(cprop));
-        }
+        parse_component_props(*comp);
 
         // Self-closing
         if (match(TokenType::SLASH))
@@ -344,25 +292,12 @@ std::unique_ptr<ASTNode> Parser::parse_html_element()
         std::unique_ptr<Expression> attrValue;
         if (match(TokenType::ASSIGN))
         {
-            if (current().type == TokenType::STRING_LITERAL)
-            {
-                attrValue = std::make_unique<StringLiteral>(current().value);
-                advance();
-            }
-            else if (match(TokenType::LBRACE))
-            {
-                attrValue = parse_expression();
-                expect(TokenType::RBRACE, "Expected '}'");
-            }
-            else
-            {
-                throw std::runtime_error("Expected attribute value");
-            }
+            attrValue = parse_prop_or_attr_value();
         }
         else
         {
             // Boolean attribute? Treat as "true"
-            attrValue = std::make_unique<StringLiteral>("true");
+            attrValue = std::make_unique<BoolLiteral>(true);
         }
         el->attributes.push_back({attrName, std::move(attrValue)});
     }
