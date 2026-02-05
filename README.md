@@ -11,7 +11,7 @@
 A modern, component-based language for building reactive web apps.  
 **Type-safe. Fast. WASM-powered.**
 
-For developers who want the productivity of component-based frameworks with the performance of native code. Fine-grained reactivity, strict typing, and zero GC pauses.
+For developers who want the productivity of component-based frameworks with the performance of native code. Fine-grained reactivity, strict typing, and a GC-free runtime for deterministic performance.
 
 </div>
 
