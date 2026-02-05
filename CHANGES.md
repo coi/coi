@@ -1,7 +1,7 @@
-# Migration Guide: Upcoming Breaking Changes
+# Migration Guide: Breaking Changes
 
 > [!CAUTION]
-> This document outlines **planned breaking changes** as Coi transitions to a more declarative, reactive model. These changes are **not yet implemented** but will be coming in future releases. Review this guide to prepare for upcoming migrations.
+> This document outlines **breaking changes** as Coi transitions to a more declarative, reactive model. These changes are **now implemented**. Review this guide to update your existing code.
 
 ---
 
@@ -9,7 +9,7 @@
 
 ### The Shift from Imperative to Declarative
 
-Direct DOM manipulation via `DOMElement` methods (such as `.appendChild()`, `.setInnerHtml()`, or `.addClass()`) **will be phased out** as a primary workflow in upcoming releases.
+Direct DOM manipulation via `DOMElement` methods (such as `.appendChild()`, `.setInnerHtml()`, or `.addClass()`) **have been removed** from the public API.
 
 **Why this change?**
 
@@ -27,9 +27,10 @@ The `DOMElement` type is **not** being removed, but its purpose is being redefin
 
 | Use Case | Status | Recommended Alternative |
 | :--- | :--- | :--- |
-| **Structure** (`appendChild`, `createElement`) | ❌ **Discouraged** | Define structure inside the `view {}` block using logic/loops. |
-| **Styling** (`addClass`, `removeClass`) | ❌ **Discouraged** | Use reactive attribute bindings: `<div class={active ? 'on' : 'off'}>`. |
-| **Content** (`setInnerHtml`, `setInnerText`) | ❌ **Discouraged** | Use variable interpolation: `<div>{myText}</div>`. |
+| **Structure** (`appendChild`, `createElement`) | ❌ **Removed** | Define structure inside the `view {}` block using logic/loops. |
+| **Styling** (`addClass`, `removeClass`) | ❌ **Removed** | Use reactive attribute bindings: `<div class={active ? 'on' : 'off'}>`. |
+| **Content** (`setInnerText`) | ❌ **Removed** | Use variable interpolation: `<div>{myText}</div>`. |
+| **HTML Content** (`setInnerHtml`) | ❌ **Removed** | Use `<raw>{htmlString}</raw>` in view. |
 | **Browser APIs** (`requestFullscreen`, `focus`) | ✅ **Supported** | Use the `&={el}` binding to capture a reference and call these methods. |
 | **Measurements** (`getBoundingClientRect`) | ✅ **Supported** | Use a reference to read physical properties of an element. |
 
@@ -102,9 +103,9 @@ component App {
 
 ## ⚠️ Canvas Initialization → View Binding
 
-### `Canvas.createCanvas()` Will Be Removed
+### `Canvas.createCanvas()` Has Been Removed
 
-The `Canvas.createCanvas()` factory method **will be removed** in a future release. Canvas elements should be created declaratively in the `view` block and bound using the `&={canvas}` reference syntax.
+The `Canvas.createCanvas()` factory method **has been removed**. Canvas elements must be created declaratively in the `view` block and bound using the `&={canvas}` reference syntax.
 
 **Why this change?**
 
@@ -160,9 +161,9 @@ component CanvasApp {
 
 ## ⚠️ Import System → Public-Only Exports
 
-### Only `pub` Members Will Be Importable
+### Only `pub` Members Are Importable
 
-The import system **will be changed** to only include components, enums, and data types that are explicitly marked with the `pub` keyword.
+The import system **now requires** the `pub` keyword for components, enums, and data types to be importable from other files.
 
 **Why this change?**
 
@@ -275,9 +276,9 @@ pub component App {
 
 ---
 
-## Summary of Planned Changes
+## Summary of Changes
 
-| Feature | Current | Future | Reason |
+| Feature | Before | After | Reason |
 | :--- | :--- | :--- | :--- |
 | DOM Structure | `DOMElement.createElement()` | `view { <div>...</div> }` | Declarative UI |
 | DOM Styling | `element.addClass()` | `<div class={...}>` | Reactive bindings |

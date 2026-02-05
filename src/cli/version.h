@@ -1,2 +1,2 @@
 #pragma once
-#define GIT_COMMIT_HASH "35ef8eb"
+#define GIT_COMMIT_HASH "aa57375"

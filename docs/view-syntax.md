@@ -32,6 +32,56 @@ component Greeting {
 }
 ```
 
+## Raw HTML
+
+For rendering HTML strings (e.g., from a CMS or markdown parser), use the `<raw>` element:
+
+```tsx
+component Article {
+    string htmlContent = "<p>This is <strong>bold</strong> text.</p>";
+    
+    view {
+        <div class="article">
+            <raw>{htmlContent}</raw>
+        </div>
+    }
+}
+```
+
+**Security Warning:** The `<raw>` element renders HTML without sanitization. Only use it with trusted content. Never pass user input directly to `<raw>` without sanitizing it first.
+
+```tsx
+// ✗ Dangerous - XSS vulnerability
+<raw>{userInput}</raw>
+
+// ✓ Safe - sanitized or trusted content only
+<raw>{sanitizedMarkdown}</raw>
+<raw>{trustedCmsContent}</raw>
+```
+
+**Dynamic Updates:** Like other view elements, `<raw>` content updates reactively when dependencies change:
+
+```tsx
+component Preview {
+    mut string markdown = "# Hello";
+    mut string rendered = "<h1>Hello</h1>";
+    
+    def updatePreview(string value) : void {
+        markdown = value;
+        rendered = markdownToHtml(value);  // Your markdown parser
+    }
+    
+    view {
+        <div>
+            <textarea oninput={updatePreview}>{markdown}</textarea>
+            <div class="preview">
+                <raw>{rendered}</raw>
+            </div>
+        </div>
+    }
+}
+```
+
 ## Event Handlers
 
 Bind methods to events with `on<event>`:

@@ -729,6 +729,9 @@ std::string Component::to_webcc(CompilerSession &session)
             } else {
                 dom_call = "webcc::dom::set_attribute(" + el_var + ", \"" + binding.name + "\", ";
             }
+        } else if (binding.type == "html") {
+            // Raw HTML injection via <raw> element
+            dom_call = "webcc::dom::set_inner_html(" + el_var + ", ";
         } else {
             dom_call = "webcc::dom::set_inner_text(" + el_var + ", ";
         }

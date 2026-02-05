@@ -32,6 +32,13 @@ static const std::set<std::string> EXCLUDED_FUNCTIONS = {
     "websocket::connect",                  // WebSocket.connect with callbacks handled via intrinsic
     "fetch::get",                          // FetchRequest.get with callbacks handled via intrinsic
     "fetch::post",                         // FetchRequest.post with callbacks handled via intrinsic
+    // Direct DOM manipulation - use declarative view instead
+    "dom::create_element",                 // Use view {} block for structure
+    "dom::append_child",                   // Use view {} block for structure
+    "dom::set_inner_html",                 // Use <raw>{html}</raw> in view
+    "dom::set_inner_text",                 // Use {text} interpolation in view
+    "dom::add_class",                      // Use class={expr} attribute binding
+    "dom::remove_class",                   // Use class={expr} attribute binding
 };
 
 // Convert snake_case to camelCase for Coi function names
