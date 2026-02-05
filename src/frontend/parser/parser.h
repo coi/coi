@@ -1,6 +1,6 @@
 #pragma once
 
-#include "token.h"
+#include "../token.h"
 #include "ast/ast.h"
 #include <vector>
 #include <memory>

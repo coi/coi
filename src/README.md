@@ -14,7 +14,7 @@ The Coi compiler transforms `.coi` files into WebAssembly applications through s
 
 ### `frontend/` - Lexical Analysis & Parsing
 - **lexer.{cc,h}** - Tokenizes source code into tokens
-- **parser.{cc,h}** - Parses tokens into an Abstract Syntax Tree (AST)
+- **parser/** - Parser split into logical units (`core.cc`, `expr.cc`, `stmt.cc`, `view.cc`, `component.cc`, `parser.h`)
 - **token.h** - Token type definitions
 
 ### `ast/` - Abstract Syntax Tree

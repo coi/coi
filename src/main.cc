@@ -1,5 +1,5 @@
 #include "frontend/lexer.h"
-#include "frontend/parser.h"
+#include "frontend/parser/parser.h"
 #include "ast/ast.h"
 #include "defs/def_parser.h"
 #include "analysis/type_checker.h"
