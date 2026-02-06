@@ -137,8 +137,7 @@ mut Audio[] backup := sounds;  // sounds is now invalid
 
 ### Setup Example
 
-> [!IMPORTANT]
-> **Upcoming Change:** `Canvas.createCanvas()` will be removed in a future release. Use `<canvas &={canvas}>` in your view instead. See [CHANGES.md](../CHANGES.md#canvas-initialization--view-binding) for migration details.
+> **Note:** `Canvas.createCanvas()` has been removed. Use `<canvas &={canvas}>` in your view and call `canvas.setSize()` in the `mount {}` block. See [CHANGES.md](../CHANGES.md#canvas-initialization--view-binding) for migration details.
 
 ```tsx
 component CanvasApp {
@@ -435,45 +434,35 @@ component Game {
 
 ## DOMElement
 
-Direct DOM manipulation for browser APIs and measurements.
+Reference handle for browser APIs and measurements.
 
-> [!IMPORTANT]
-> **Upcoming Change:** Direct DOM manipulation (`.appendChild()`, `.setInnerHtml()`, `.addClass()`) will be discouraged in favor of declarative view syntax in future releases. `DOMElement` references should primarily be used for browser APIs like `requestFullscreen()` or measurements. See [CHANGES.md](../CHANGES.md#direct-dom-manipulation--declarative-view) for details.
+`DOMElement` is used as a **reference handle** to interact with browser APIs that cannot be expressed declaratively in the view. Use the `&={element}` binding to capture a reference to an element.
+
+> **Note:** Direct DOM manipulation methods (`.appendChild()`, `.setInnerHtml()`, `.addClass()`, etc.) have been removed. Define your UI structure declaratively in the `view {}` block instead. For rendering HTML strings, use the `<raw>` element (see [View Syntax](view-syntax.md#raw-html)). See [CHANGES.md](../CHANGES.md#direct-dom-manipulation--declarative-view) for migration details.
 
 ### Methods
 
 | Method | Description |
 |--------|-------------|
-| `DOMElement.getBody()` | Get document body (static) |
-| `DOMElement.getElementById(string id)` | Get element by ID (static) |
-| `DOMElement.createElement(string tag)` | Create new element (static) |
-| `setAttribute(string name, string value)` | Set attribute |
-| `getAttribute(string name)` | Get attribute value |
-| `appendChild(DOMElement child)` | Append child element |
-| `insertBefore(DOMElement child, DOMElement ref)` | Insert before reference |
-| `removeElement()` | Remove this element |
-| `setInnerHtml(string html)` | Set inner HTML |
-| `setInnerText(string text)` | Set inner text |
-| `addClass(string cls)` | Add CSS class |
-| `removeClass(string cls)` | Remove CSS class |
 | `requestFullscreen()` | Enter fullscreen mode |
 | `requestPointerLock()` | Request pointer lock |
+| `scrollToTop()` | Scroll element to top |
 
 ### Example
 
 ```tsx
-component App {
-    mut DOMElement container;
+component VideoPlayer {
+    mut DOMElement videoEl;
 
-    mount {
-        DOMElement div = DOMElement.createElement("div");
-        div.setInnerHtml("<p>Dynamic content</p>");
-        div.addClass("dynamic");
-        container.appendChild(div);
+    def enterFullscreen() {
+        videoEl.requestFullscreen();  // Browser API
     }
 
     view {
-        <div &={container}></div>
+        <div>
+            <video &={videoEl} src="video.mp4"></video>
+            <button onclick={enterFullscreen}>Fullscreen</button>
+        </div>
     }
 }
 ```
