@@ -6,6 +6,9 @@
       "include": "#comments"
     },
     {
+      "include": "#module-definition"
+    },
+    {
       "include": "#app-definition"
     },
     {
@@ -70,7 +73,7 @@
       "patterns": [
         {
           "name": "keyword.control.coi",
-          "match": "\\b(component|pod|def|view|return|if|else|for|while|computed|tick|init|mount|app|import|struct|style|type|in|root|extends|enum|key|router|route)\\b"
+          "match": "\\b(component|pod|def|view|return|if|else|for|while|computed|tick|init|mount|app|import|module|struct|style|type|in|root|extends|enum|key|router|route)\\b"
         },
         {
           "name": "storage.modifier.coi",
@@ -167,6 +170,14 @@
           "match": "\\\\."
         }
       ]
+    },
+    "module-definition": {
+      "comment": "Module declaration: module Name;",
+      "match": "\\b(module)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;",
+      "captures": {
+        "1": { "name": "keyword.control.coi" },
+        "2": { "name": "entity.name.namespace.coi" }
+      }
     },
     "component-definition": {
       "match": "\\b(component)\\s+([A-Za-z_][A-Za-z0-9_]*)",
@@ -388,6 +399,14 @@
           ]
         },
         {
+          "comment": "Raw tag: <raw> ... </raw>",
+          "match": "(<)(raw)\\b",
+          "captures": {
+            "1": { "name": "punctuation.definition.tag.coi" },
+            "2": { "name": "keyword.control.coi" }
+          }
+        },
+        {
           "comment": "Opening control flow tags: <if, <else",
           "match": "(<)(if|else)\\b",
           "captures": {
@@ -397,7 +416,7 @@
         },
         {
           "comment": "Closing control flow tags: </if>, </else>, </for>",
-          "match": "(</)(if|else|for)(>)",
+          "match": "(</)(if|else|for|raw)(>)",
           "captures": {
             "1": { "name": "punctuation.definition.tag.coi" },
             "2": { "name": "keyword.control.coi" },
