@@ -30,7 +30,7 @@ void FunctionDef::collect_modifications(std::set<std::string>& mods) const {
 
 std::string DataDef::to_webcc() {
     std::stringstream ss;
-    ss << "struct " << name << " {\n";
+    ss << "struct " << qualified_name(module_name, name) << " {\n";
     for(const auto& field : fields){
         ss << "    " << convert_type(field.type) << " " << field.name << ";\n";
     }
@@ -43,7 +43,7 @@ std::string EnumDef::to_webcc() {
     size_t total_values = values.size() + 1; // Including _COUNT
 
     // Explicitly select the smallest possible type for ALL sizes
-    ss << "enum struct " << name << " : ";
+    ss << "enum struct " << qualified_name(module_name, name) << " : ";
     
     if (total_values <= 256) {
         ss << "uint8_t";

@@ -137,8 +137,37 @@ std::vector<CallArg> Parser::parse_call_args(TokenType end_token)
 
 void Parser::parse_file()
 {
+    // Parse module declaration (must be first non-whitespace statement if present)
+    if (current().type == TokenType::MODULE)
+    {
+        advance();
+        if (current().type != TokenType::IDENTIFIER)
+        {
+            ErrorHandler::compiler_error("Expected module name after 'module'", current().line);
+        }
+        module_name = current().value;
+        advance();
+        expect(TokenType::SEMICOLON, "Expected ';' after module declaration");
+    }
+
     while (current().type != TokenType::END_OF_FILE)
     {
+        // Check for pub keyword before component/enum/pod
+        bool is_public = false;
+        if (current().type == TokenType::PUB)
+        {
+            is_public = true;
+            advance();
+            
+            // pub must be followed by component, enum, or pod
+            if (current().type != TokenType::COMPONENT && 
+                current().type != TokenType::ENUM && 
+                current().type != TokenType::POD)
+            {
+                ErrorHandler::compiler_error("'pub' can only be used with component, enum, or pod declarations", current().line);
+            }
+        }
+
         if (current().type == TokenType::IMPORT)
         {
             advance();
@@ -148,17 +177,26 @@ void Parser::parse_file()
         }
         else if (current().type == TokenType::COMPONENT)
         {
-            components.push_back(parse_component());
+            Component comp = parse_component();
+            comp.is_public = is_public;
+            comp.module_name = module_name;
+            components.push_back(std::move(comp));
         }
         else if (current().type == TokenType::ENUM)
         {
             // Global enum (outside any component)
-            global_enums.push_back(parse_enum());
+            auto enum_def = parse_enum();
+            enum_def->is_public = is_public;
+            enum_def->module_name = module_name;
+            global_enums.push_back(std::move(enum_def));
         }
         else if (current().type == TokenType::POD)
         {
             // Global pod type (outside any component)
-            global_data.push_back(parse_data());
+            auto data_def = parse_data();
+            data_def->is_public = is_public;
+            data_def->module_name = module_name;
+            global_data.push_back(std::move(data_def));
         }
         else if (current().type == TokenType::IDENTIFIER && current().value == "app")
         {

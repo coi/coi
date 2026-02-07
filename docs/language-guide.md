@@ -30,6 +30,47 @@ def HandleClick()  // Error: Method name must start with lowercase
 
 **Why this matters:** When you write `Name(...)`, Coi treats it as component/type construction. Writing `name(...)` is a function call. This distinction enables clean JSX-like syntax without ambiguity.
 
+## Modules and Imports
+
+Coi uses a comprehensive module system to organize code and control visibility.
+
+### Module Declaration
+
+Each file defines which module it belongs to using the `module` keyword at the top of the file.
+
+```tsx
+// Button.coi
+module TurboUI;  // Defines scope "TurboUI"
+
+pub component Button { ... }
+```
+
+If no `module` declaration is present, the file belongs to the **default module**.
+
+### Visibility (`pub`)
+
+By default, all components, types, and functions are **module-internal**. They are only visible to other files within the same module. To make them available to other modules, you must use the `pub` keyword.
+
+| Keyword | Visibility | Description |
+|---------|------------|-------------|
+| (none) | Module-Internal | Visible to any file with the same `module Name;` |
+| `pub` | Public | Visible to any file that imports it |
+
+### Importing
+
+Use the `import` statement to make components from other files available.
+
+```tsx
+import "ui/Button.coi";
+import "utils/Math.coi";
+```
+
+**Key Rules:**
+1. **Explicit Imports:** You must import every file you use directly. Transitive imports (imports of imports) are not available.
+2. **Accessing Components:**
+   - **Same Module:** Access components directly by name (e.g., `<Button />`).
+   - **Different Module:** Access via module prefix (e.g., `<TurboUI::Button />`).
+
 ## Types
 
 ### Primitive Types

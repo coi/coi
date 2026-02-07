@@ -15,8 +15,8 @@ For developers who want the productivity of component-based frameworks with the 
 
 </div>
 
-> [!CAUTION]
-> **Upcoming Breaking Changes:** Significant changes to DOM manipulation, Canvas initialization, and imports are planned. See [CHANGES.md](CHANGES.md) for details on what's coming.
+> [!IMPORTANT]
+> **Recent Breaking Changes:** Significant changes to DOM manipulation and imports have been implemented. See [CHANGES.md](CHANGES.md) for the migration guide.
 
 > [!NOTE]
 > Coi is actively evolving. Some syntax may change in future releases.

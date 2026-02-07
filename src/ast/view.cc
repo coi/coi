@@ -217,19 +217,20 @@ void ComponentInstantiation::generate_code(std::stringstream &ss, const std::str
         return;
     }
 
-    int id = component_counters[component_name]++;
+    std::string qname = qualified_name(module_prefix, component_name);
+    int id = component_counters[qname]++;
 
     if (in_loop)
     {
-        std::string vector_name = "_loop_" + component_name + "s";
+        std::string vector_name = "_loop_" + qname + "s";
         instance_name = vector_name + "[" + vector_name + ".size() - 1]";
-        ss << "        " << vector_name << ".push_back(" << component_name << "());\n";
+        ss << "        " << vector_name << ".push_back(" << qname << "());\n";
         ss << "        auto& _inst = " << instance_name << ";\n";
         instance_name = "_inst";
     }
     else
     {
-        instance_name = component_name + "_" + std::to_string(id);
+        instance_name = qname + "_" + std::to_string(id);
     }
 
     // Set props
@@ -353,6 +354,10 @@ static void generate_view_child(ASTNode *child, std::stringstream &ss, const std
     {
         viewForEach->generate_code(ss, parent, counter, event_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter, loop_var_name);
     }
+    else if (auto rawEl = dynamic_cast<ViewRawElement *>(child))
+    {
+        rawEl->generate_code(ss, parent, counter, event_handlers, bindings, component_counters, method_names, parent_component_name, in_loop, loop_regions, loop_counter, if_regions, if_counter, loop_var_name);
+    }
     else if (auto routePlaceholder = dynamic_cast<RoutePlaceholder *>(child))
     {
         // Route placeholder - create anchor comment for inserting routed components
@@ -468,7 +473,7 @@ void HTMLElement::generate_code(std::stringstream &ss, const std::string &parent
     {
         if (dynamic_cast<HTMLElement *>(child.get()) || dynamic_cast<ComponentInstantiation *>(child.get()) ||
             dynamic_cast<ViewIfStatement *>(child.get()) || dynamic_cast<ViewForRangeStatement *>(child.get()) ||
-            dynamic_cast<ViewForEachStatement *>(child.get()))
+            dynamic_cast<ViewForEachStatement *>(child.get()) || dynamic_cast<ViewRawElement *>(child.get()))
             has_elements = true;
     }
 
@@ -820,6 +825,145 @@ void ViewIfStatement::collect_dependencies(std::set<std::string> &deps)
         child->collect_dependencies(deps);
     for (auto &child : else_children)
         child->collect_dependencies(deps);
+}
+
+// ViewRawElement - <raw>{htmlString}</raw>
+void ViewRawElement::generate_code(std::stringstream &ss, const std::string &parent, int &counter,
+                                   std::vector<EventHandler> &event_handlers,
+                                   std::vector<Binding> &bindings,
+                                   std::map<std::string, int> &component_counters,
+                                   const std::set<std::string> &method_names,
+                                   const std::string &parent_component_name,
+                                   bool in_loop,
+                                   std::vector<LoopRegion> *loop_regions,
+                                   int *loop_counter,
+                                   std::vector<IfRegion> *if_regions,
+                                   int *if_counter,
+                                   const std::string &loop_var_name)
+{
+    int my_id = counter++;
+    std::string var;
+
+    bool has_scoped_css = g_components_with_scoped_css.count(parent_component_name) > 0;
+
+    if (in_loop)
+    {
+        var = "_el_" + std::to_string(my_id);
+        ss << "        webcc::handle " << var << " = webcc::handle(webcc::next_deferred_handle());\n";
+        if (has_scoped_css) {
+            ss << "        webcc::dom::create_element_deferred_scoped(" << var << ", \"span\", \"" << parent_component_name << "\");\n";
+        } else {
+            ss << "        webcc::dom::create_element_deferred(" << var << ", \"span\");\n";
+        }
+    }
+    else
+    {
+        var = "el[" + std::to_string(my_id) + "]";
+        ss << "        " << var << " = webcc::DOMElement(webcc::next_deferred_handle());\n";
+        if (has_scoped_css) {
+            ss << "        webcc::dom::create_element_deferred_scoped(" << var << ", \"span\", \"" << parent_component_name << "\");\n";
+        } else {
+            ss << "        webcc::dom::create_element_deferred(" << var << ", \"span\");\n";
+        }
+    }
+
+    // Append to parent
+    if (!parent.empty())
+    {
+        ss << "        webcc::dom::append_child(" << parent << ", " << var << ");\n";
+    }
+
+    // Build the HTML content from children and set via innerHTML
+    std::string code;
+    bool all_static = true;
+    bool generated_inline = false;
+
+    for (auto &child : children)
+    {
+        std::string c = child->to_webcc();
+        if (!(c.size() >= 2 && c.front() == '"' && c.back() == '"'))
+        {
+            all_static = false;
+            break;
+        }
+    }
+
+    if (children.size() == 1 && all_static)
+    {
+        code = children[0]->to_webcc();
+    }
+    else if (children.size() == 1 && !all_static)
+    {
+        generated_inline = true;
+        std::vector<std::string> parts = {children[0]->to_webcc()};
+        ss << "        " << generate_formatter_block(parts, "webcc::dom::set_inner_html(" + var + ", ") << "\n";
+    }
+    else if (children.size() > 1)
+    {
+        if (all_static)
+        {
+            std::string args;
+            bool first = true;
+            for (auto &child : children)
+            {
+                if (!first)
+                    args += ", ";
+                args += child->to_webcc();
+                first = false;
+            }
+            code = "webcc::string::concat(" + args + ")";
+        }
+        else
+        {
+            generated_inline = true;
+            std::vector<std::string> parts;
+            for (auto &child : children)
+            {
+                parts.push_back(child->to_webcc());
+            }
+            ss << "        " << generate_formatter_block(parts, "webcc::dom::set_inner_html(" + var + ", ") << "\n";
+        }
+    }
+
+    if (!code.empty())
+    {
+        ss << "        webcc::dom::set_inner_html(" << var << ", " << code << ");\n";
+    }
+
+    // Create reactive binding for dynamic content
+    if (!all_static && !in_loop)
+    {
+        Binding b;
+        b.element_id = my_id;
+        b.type = "html";  // Use "html" type so update code uses set_inner_html
+        if (children.size() == 1)
+        {
+            b.expr = dynamic_cast<Expression *>(children[0].get());
+        }
+        std::string args;
+        bool first = true;
+        for (auto &child : children)
+        {
+            if (!first)
+                args += ", ";
+            args += child->to_webcc();
+            first = false;
+        }
+        b.value_code = (children.size() == 1) ? children[0]->to_webcc() : "webcc::string::concat(" + args + ")";
+        for (auto &child : children) {
+            child->collect_dependencies(b.dependencies);
+            child->collect_member_dependencies(b.member_dependencies);
+        }
+        bindings.push_back(b);
+    }
+}
+
+void ViewRawElement::collect_dependencies(std::set<std::string> &deps)
+{
+    for (auto &child : children)
+    {
+        child->collect_dependencies(deps);
+    }
 }
 
 // ViewForRangeStatement

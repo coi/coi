@@ -48,7 +48,7 @@ void generate_cpp_code(
         for (const auto &data_def : comp.data)
         {
             // Prefix component-local data types
-            DataTypeRegistry::instance().register_type(comp.name + "_" + data_def->name, data_def->fields);
+            DataTypeRegistry::instance().register_type(qualified_name(comp.module_name, comp.name) + "_" + data_def->name, data_def->fields);
         }
     }
 
@@ -59,7 +59,7 @@ void generate_cpp_code(
     {
         if (!comp.css.empty())
         {
-            g_components_with_scoped_css.insert(comp.name);
+            g_components_with_scoped_css.insert(qualified_name(comp.module_name, comp.name));
         }
     }
 
@@ -124,7 +124,7 @@ void generate_cpp_code(
                 info.pub_mut_members.insert(param->name);
             }
         }
-        session.component_info[comp->name] = info;
+        session.component_info[qualified_name(comp->module_name, comp->name)] = info;
     }
 
     // Output global enums (defined outside components)
@@ -142,7 +142,7 @@ void generate_cpp_code(
     {
         for (const auto &enum_def : comp.enums)
         {
-            out << "enum struct " << comp.name << "_" << enum_def->name << " : ";
+            out << "enum struct " << qualified_name(comp.module_name, comp.name) << "_" << enum_def->name << " : ";
             size_t total_values = enum_def->values.size() + 1;
             if (total_values <= 256) out << "uint8_t";
             else if (total_values <= 65536) out << "uint16_t";
@@ -180,11 +180,11 @@ void generate_cpp_code(
         {
             local_enum_names.insert(e->name);
         }
-        ComponentTypeContext::instance().set(comp.name, local_data_names, local_enum_names);
+        ComponentTypeContext::instance().set(qualified_name(comp.module_name, comp.name), local_data_names, local_enum_names);
 
         for (const auto &data_def : comp.data)
         {
-            out << "struct " << comp.name << "_" << data_def->name << " {\n";
+            out << "struct " << qualified_name(comp.module_name, comp.name) << "_" << data_def->name << " {\n";
             for (const auto &field : data_def->fields)
             {
                 out << "    " << convert_type(field.type) << " " << field.name << ";\n";
@@ -201,14 +201,14 @@ void generate_cpp_code(
     {
         for (const auto &data_def : all_global_data)
         {
-            out << generate_meta_struct(data_def->name);
+            out << generate_meta_struct(qualified_name(data_def->module_name, data_def->name));
         }
         for (const auto &comp : all_components)
         {
             for (const auto &data_def : comp.data)
             {
                 // Use prefixed name for component-local types
-                out << generate_meta_struct(comp.name + "_" + data_def->name);
+                out << generate_meta_struct(qualified_name(comp.module_name, comp.name) + "_" + data_def->name);
             }
         }
         out << "\n";
@@ -217,7 +217,7 @@ void generate_cpp_code(
     // Forward declarations
     for (auto *comp : sorted_components)
     {
-        out << "struct " << comp->name << ";\n";
+        out << "struct " << qualified_name(comp->module_name, comp->name) << ";\n";
     }
     out << "\n";
 
@@ -236,8 +236,24 @@ void generate_cpp_code(
         exit(1);
     }
 
+    // Find root component and get its qualified name
+    std::string root_qualified;
+    for (const auto &comp : all_components)
+    {
+        if (comp.name == final_app_config.root_component)
+        {
+            root_qualified = qualified_name(comp.module_name, comp.name);
+            break;
+        }
+    }
+    if (root_qualified.empty())
+    {
+        std::cerr << "Error: Root component '" << final_app_config.root_component << "' not found." << std::endl;
+        exit(1);
+    }
+
     out << "\n"
-        << final_app_config.root_component << "* app = nullptr;\n";
+        << root_qualified << "* app = nullptr;\n";
 
     if (features.router)
     {
@@ -274,7 +290,7 @@ void generate_cpp_code(
     out << "    dispatch_events(events, count);\n";
     
     // Only call tick if the root component has a tick method
-    if (session.components_with_tick.count(final_app_config.root_component))
+    if (session.components_with_tick.count(root_qualified))
     {
         out << "    if (app) app->tick(dt);\n";
     }
@@ -285,9 +301,9 @@ void generate_cpp_code(
     out << "    // We allocate the app on the heap because the stack is destroyed when main() returns.\n";
     out << "    // The app needs to persist for the event loop (update_wrapper).\n";
     out << "    // We use webcc::malloc to ensure memory is tracked by the framework.\n";
-    out << "    void* app_mem = webcc::malloc(sizeof(" << final_app_config.root_component << "));\n";
-    out << "    app = new (app_mem) " << final_app_config.root_component << "();\n";
-    emit_feature_init(out, features, final_app_config.root_component);
+    out << "    void* app_mem = webcc::malloc(sizeof(" << root_qualified << "));\n";
+    out << "    app = new (app_mem) " << root_qualified << "();\n";
+    emit_feature_init(out, features, root_qualified);
     out << "    app->view();\n";
     out << "    webcc::system::set_main_loop(update_wrapper);\n";
     out << "    webcc::flush();\n";

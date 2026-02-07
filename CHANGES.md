@@ -1,15 +1,15 @@
-# Migration Guide: Upcoming Breaking Changes
+# Migration Guide: Breaking Changes
 
 > [!CAUTION]
-> This document outlines **planned breaking changes** as Coi transitions to a more declarative, reactive model. These changes are **not yet implemented** but will be coming in future releases. Review this guide to prepare for upcoming migrations.
+> This document outlines **breaking changes** in Coi's transition to a more declarative, reactive model. These changes are **fully implemented**. Review this guide to update your existing code.
 
 ---
 
 ## ⚠️ Direct DOM Manipulation → Declarative View
 
-### The Shift from Imperative to Declarative
+### DOM Manipulation Methods Removed
 
-Direct DOM manipulation via `DOMElement` methods (such as `.appendChild()`, `.setInnerHtml()`, or `.addClass()`) **will be phased out** as a primary workflow in upcoming releases.
+Direct DOM manipulation via `DOMElement` methods (such as `.appendChild()`, `.setInnerHtml()`, or `.addClass()`) **have been removed** from the public API.
 
 **Why this change?**
 
@@ -23,13 +23,14 @@ In a modern reactive framework, the **View is a function of State**. When you ma
 
 ### The New Role of `DOMElement`
 
-The `DOMElement` type is **not** being removed, but its purpose is being redefined. It is transitioning from a **Constructor/Manipulator** to a **Reference Handle**.
+The `DOMElement` type has transitioned from a **Constructor/Manipulator** to a **Reference Handle**.
 
-| Use Case | Status | Recommended Alternative |
+| Use Case | Status | Alternative |
 | :--- | :--- | :--- |
-| **Structure** (`appendChild`, `createElement`) | ❌ **Discouraged** | Define structure inside the `view {}` block using logic/loops. |
-| **Styling** (`addClass`, `removeClass`) | ❌ **Discouraged** | Use reactive attribute bindings: `<div class={active ? 'on' : 'off'}>`. |
-| **Content** (`setInnerHtml`, `setInnerText`) | ❌ **Discouraged** | Use variable interpolation: `<div>{myText}</div>`. |
+| **Structure** (`appendChild`, `createElement`) | ❌ **Removed** | Define structure inside the `view {}` block using logic/loops. |
+| **Styling** (`addClass`, `removeClass`) | ❌ **Removed** | Use reactive attribute bindings: `<div class={active ? 'on' : 'off'}>`. |
+| **Content** (`setInnerText`) | ❌ **Removed** | Use variable interpolation: `<div>{myText}</div>`. |
+| **HTML Content** (`setInnerHtml`) | ❌ **Removed** | Use `<raw>{htmlString}</raw>` in view. |
 | **Browser APIs** (`requestFullscreen`, `focus`) | ✅ **Supported** | Use the `&={el}` binding to capture a reference and call these methods. |
 | **Measurements** (`getBoundingClientRect`) | ✅ **Supported** | Use a reference to read physical properties of an element. |
 
@@ -41,14 +42,14 @@ The `DOMElement` type is **not** being removed, but its purpose is being redefin
 component VideoPlayer {
     mut DOMElement videoEl;
 
-    fn enterFullscreen() {
+    def enterFullscreen() : void {
         videoEl.requestFullscreen();  // ✅ Browser API
     }
 
     view {
         <div>
             <video &={videoEl} src="video.mp4"></video>
-            <button @click={enterFullscreen}>Fullscreen</button>
+            <button onclick={enterFullscreen}>Fullscreen</button>
         </div>
     }
 }
@@ -97,76 +98,25 @@ component App {
     }
 }
 ```
-
----
-
-## ⚠️ Canvas Initialization → View Binding
-
-### `Canvas.createCanvas()` Will Be Removed
-
-The `Canvas.createCanvas()` factory method **will be removed** in a future release. Canvas elements should be created declaratively in the `view` block and bound using the `&={canvas}` reference syntax.
-
-**Why this change?**
-
-This aligns canvas initialization with the declarative view model. The canvas element becomes part of your component's view definition rather than being imperatively created in lifecycle methods.
-
-> **Lifecycle Note:** Component lifecycle runs in this order: `init {}` → `view {}` → `mount {}`. The `&={canvas}` binding populates the reference during view rendering, so it's safe to use in `mount {}`.
-
-### Migration Example
-
-**❌ Old (Factory Method):**
-
-```tsx
-component CanvasApp {
-    mut Canvas canvas;
-    mut CanvasContext2D ctx;
-    
-    mount {
-        canvas = Canvas.createCanvas("myCanvas", 800, 600);
-        ctx = canvas.getContext2d();
-    }
-    
-    view {
-        <canvas &={canvas}></canvas>
-    }
-}
-```
-
-**✅ New (View Binding):**
-
-```tsx
-component CanvasApp {
-    mut Canvas canvas;
-    mut CanvasContext2D ctx;
-    
-    mount {
-        canvas.setSize(800, 600);
-        ctx = canvas.getContext2d();
-    }
-    
-    view {
-        <canvas &={canvas}></canvas>
-    }
-}
-```
-
-**Key Changes:**
-1. Remove `Canvas.createCanvas()` call
-2. Use `<canvas &={canvas}></canvas>` in your view
-3. Call `canvas.setSize()` in `mount {}` to configure dimensions
-4. The canvas reference is automatically populated when the view renders
-
 ---
 
 ## ⚠️ Import System → Public-Only Exports
 
-### Only `pub` Members Will Be Importable
+### Only `pub` Members Are Importable
 
-The import system **will be changed** to only include components, enums, and data types that are explicitly marked with the `pub` keyword.
+The `pub` keyword is required to expose components, enums, and data types **outside of their module**.
 
-**Why this change?**
+*   **Same Module:** Everything defined within a module is automatically visible to other files sharing the same `module Name;` declaration. You do **not** need `pub` for internal sharing.
+*   **Cross-Module:** You must add `pub` if you intend for that member to be imported and used by a **different module**.
 
-This provides better encapsulation and makes module boundaries explicit. By default, everything is private to its module unless you explicitly export it. **This change enables better library support** by allowing library authors to control their public API surface and hide internal implementation details from consumers.
+Additionally, **transitive imports are not allowed**; you must directly import any file whose components you use.
+
+**What `pub` does:**
+
+- **Cross-Boundary Access:** Allows components, data types, and enums to be used by files outside of their own module.
+- **Internal Visibility:** Without `pub`, a member is "module-internal", visible to its siblings in the same module, but hidden from the rest of the application.
+- **API Control:** Allows library authors to hide internal helper components and logic, exposing only the intended interface to the end-user.
+- **Namespace Safety:** Public members from different modules are accessed via the `Module::Member` syntax, preventing naming conflicts in large projects.
 
 ### Migration Example
 
@@ -187,8 +137,8 @@ pub component Button {  // Explicitly exported
     view { <button>Click</button> }
 }
 
-// Now importable from other files:
-// import "./Button.coi";
+// Now importable from other modules:
+// import "Button.coi";
 ```
 
 **What Requires `pub`:**
@@ -205,7 +155,7 @@ pub component Button {  // Explicitly exported
 
 ### One Module Declaration Per File
 
-Each file starts with a **single module declaration** on the first line. This defines the module scope for all components and types in that file.
+Each file can have a **single module declaration** on the first line. This defines the module scope for all components and types in that file. If omitted, the file belongs to the default (unnamed) module.
 
 ```tsx
 // Button.coi
@@ -216,24 +166,23 @@ pub component Button { ... }
 module TurboUI;  // Same module
 pub component Dashboard { ... }
 
-// App.coi
-module Main;  // Different module (Main is the default for app root)
-pub component App { ... }
+// App.coi (no module declaration = default module)
+component App { ... }
 ```
 
 **Why this design?**
 
 This provides a clear mental model inspired by C++ namespaces:
-- **Same module:** Components share the same namespace (direct access)
+- **Same named module:** Components share the same namespace (direct access after import)
 - **Different module:** Explicit prefix required (prevents naming conflicts)
 
 **This enables better library support** by allowing library authors to organize their code into logical modules while making it clear which components come from which library when used in application code.
 
 ### Access Rules
 
-**You must always import the `.coi` file before using its components**, regardless of whether they're in the same module or not.
+**You must always import the `.coi` file before using its components**, regardless of whether they're in the same module or not. Transitive imports are not allowed.
 
-**Within the same module:** Components can be used directly by name (no prefix required).
+**Within the same named module:** Components can be used directly by name (no prefix required).
 
 ```tsx
 // Button.coi
@@ -262,30 +211,15 @@ pub component Button {
     view { <button>Click</button> }
 }
 
-// App.coi
-module Main;
+// App.coi (default module)
 import "Button.coi";  // Import the file
 
-pub component App {
+component App {
     view {
         <TurboUI::Button />  // ✅ Module prefix required (different module)
     }
 }
 ```
-
----
-
-## Summary of Planned Changes
-
-| Feature | Current | Future | Reason |
-| :--- | :--- | :--- | :--- |
-| DOM Structure | `DOMElement.createElement()` | `view { <div>...</div> }` | Declarative UI |
-| DOM Styling | `element.addClass()` | `<div class={...}>` | Reactive bindings |
-| Canvas Init | `Canvas.createCanvas()` | `<canvas &={canvas}>` | Consistent view model |
-| Imports | All components importable | Only `pub` components | Explicit module boundaries |
-| Module Access | Implicit/unclear scope | Same module: no prefix, Different module: `Module::Component` | Clear scoping rules |
-
----
 
 ## Need Help?
 

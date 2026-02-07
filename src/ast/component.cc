@@ -285,7 +285,7 @@ void Component::collect_child_components(ASTNode *node, std::map<std::string, in
         // Don't count member references - they're already declared as member variables
         if (!comp->is_member_reference)
         {
-            counts[comp->component_name]++;
+            counts[qualified_name(comp->module_prefix, comp->component_name)]++;
         }
     }
     if (auto el = dynamic_cast<HTMLElement *>(node))
@@ -316,7 +316,7 @@ static void collect_loop_components(ASTNode *node, std::set<std::string> &loop_c
         // Don't collect member references - they're already declared as member variables
         if (in_loop && !comp->is_member_reference)
         {
-            loop_components.insert(comp->component_name);
+            loop_components.insert(qualified_name(comp->module_prefix, comp->component_name));
         }
     }
     if (auto el = dynamic_cast<HTMLElement *>(node))
@@ -426,7 +426,7 @@ std::string Component::to_webcc(CompilerSession &session)
     {
         local_enum_names.insert(e->name);
     }
-    ComponentTypeContext::instance().set(name, local_data_names, local_enum_names);
+    ComponentTypeContext::instance().set(qualified_name(module_name, name), local_data_names, local_enum_names);
     
     // Register method param counts for intrinsic callback codegen
     for (const auto &m : methods)
@@ -476,28 +476,29 @@ std::string Component::to_webcc(CompilerSession &session)
         }
     }
 
+    std::string qname = qualified_name(module_name, name);
     std::stringstream ss_render;
     for (auto &root : render_roots)
     {
         if (auto el = dynamic_cast<HTMLElement *>(root.get()))
         {
-            el->generate_code(ss_render, "parent", element_count, event_handlers, bindings, component_counters, method_names, name, false, &loop_regions, &loop_counter, &if_regions, &if_counter);
+            el->generate_code(ss_render, "parent", element_count, event_handlers, bindings, component_counters, method_names, qname, false, &loop_regions, &loop_counter, &if_regions, &if_counter);
         }
         else if (auto comp = dynamic_cast<ComponentInstantiation *>(root.get()))
         {
-            comp->generate_code(ss_render, "parent", element_count, event_handlers, bindings, component_counters, method_names, name, false, &loop_regions, &loop_counter, &if_regions, &if_counter);
+            comp->generate_code(ss_render, "parent", element_count, event_handlers, bindings, component_counters, method_names, qname, false, &loop_regions, &loop_counter, &if_regions, &if_counter);
         }
         else if (auto viewIf = dynamic_cast<ViewIfStatement *>(root.get()))
         {
-            viewIf->generate_code(ss_render, "parent", element_count, event_handlers, bindings, component_counters, method_names, name, false, &loop_regions, &loop_counter, &if_regions, &if_counter);
+            viewIf->generate_code(ss_render, "parent", element_count, event_handlers, bindings, component_counters, method_names, qname, false, &loop_regions, &loop_counter, &if_regions, &if_counter);
         }
         else if (auto viewFor = dynamic_cast<ViewForRangeStatement *>(root.get()))
         {
-            viewFor->generate_code(ss_render, "parent", element_count, event_handlers, bindings, component_counters, method_names, name, false, &loop_regions, &loop_counter, &if_regions, &if_counter);
+            viewFor->generate_code(ss_render, "parent", element_count, event_handlers, bindings, component_counters, method_names, qname, false, &loop_regions, &loop_counter, &if_regions, &if_counter);
         }
         else if (auto viewForEach = dynamic_cast<ViewForEachStatement *>(root.get()))
         {
-            viewForEach->generate_code(ss_render, "parent", element_count, event_handlers, bindings, component_counters, method_names, name, false, &loop_regions, &loop_counter, &if_regions, &if_counter);
+            viewForEach->generate_code(ss_render, "parent", element_count, event_handlers, bindings, component_counters, method_names, qname, false, &loop_regions, &loop_counter, &if_regions, &if_counter);
         }
         else if (auto routePlaceholder = dynamic_cast<RoutePlaceholder *>(root.get()))
         {
@@ -529,7 +530,7 @@ std::string Component::to_webcc(CompilerSession &session)
 
     // Generate component as a struct
     // Note: Data types and enums are now flattened to global scope with ComponentName_ prefix
-    ss << "struct " << name << " {\n";
+    ss << "struct " << qualified_name(module_name, name) << " {\n";
 
     // Component parameters (data members only - callbacks emitted later for proper aggregate init order)
     for (auto &param : params)
@@ -665,7 +666,7 @@ std::string Component::to_webcc(CompilerSession &session)
         for (size_t i = 0; i < router->routes.size(); ++i)
         {
             const auto& route = router->routes[i];
-            ss << "    " << route.component_name << "* _route_" << i << " = nullptr;\n";
+            ss << "    " << qualified_name(route.module_name, route.component_name) << "* _route_" << i << " = nullptr;\n";
         }
     }
 
@@ -729,6 +730,9 @@ std::string Component::to_webcc(CompilerSession &session)
             } else {
                 dom_call = "webcc::dom::set_attribute(" + el_var + ", \"" + binding.name + "\", ";
             }
+        } else if (binding.type == "html") {
+            // Raw HTML injection via <raw> element
+            dom_call = "webcc::dom::set_inner_html(" + el_var + ", ";
         } else {
             dom_call = "webcc::dom::set_inner_text(" + el_var + ", ";
         }
@@ -1642,7 +1646,7 @@ std::string Component::to_webcc(CompilerSession &session)
         {
             const auto& route = router->routes[i];
             ss << "        " << (first ? "if" : "else if") << " (_current_route == \"" << route.path << "\") {\n";
-            ss << "            _route_" << i << " = new " << route.component_name << "{";
+            ss << "            _route_" << i << " = new " << qualified_name(route.module_name, route.component_name) << "{";
             // Pass arguments - same handling as component construction
             // Reference args (&) that are identifiers are callbacks and need lambda wrapping
             for (size_t j = 0; j < route.args.size(); ++j)

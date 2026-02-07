@@ -57,6 +57,7 @@ class Parser{
         void parse_app();
 
     public:
+        std::string module_name;  // Current file's module (defaults to empty)
         std::vector<Component> components;
         std::vector<std::unique_ptr<DataDef>> global_data;    // Data types declared outside components
         std::vector<std::unique_ptr<EnumDef>> global_enums;  // Enums declared outside components

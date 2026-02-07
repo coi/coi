@@ -3,6 +3,7 @@
 #include "ast/ast.h"
 #include <string>
 #include <map>
+#include <set>
 #include <vector>
 
 // Type normalization: converts user-facing types to internal representation
@@ -32,4 +33,13 @@ void validate_mutability(const std::vector<Component> &components);
 // - Component instantiation props match declarations
 // - Reference params are passed correctly
 // - Callback argument types match
-void validate_view_hierarchy(const std::vector<Component> &components);
+// - Import visibility (no transitive imports)
+void validate_view_hierarchy(const std::vector<Component> &components,
+                             const std::map<std::string, std::set<std::string>> &file_imports = {});
+
+// Validate import visibility for types:
+// - Data types and enums must be directly imported or in same file/module
+void validate_type_imports(const std::vector<Component> &components,
+                           const std::vector<std::unique_ptr<EnumDef>> &global_enums,
+                           const std::vector<std::unique_ptr<DataDef>> &global_data,
+                           const std::map<std::string, std::set<std::string>> &file_imports);

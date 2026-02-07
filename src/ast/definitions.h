@@ -27,6 +27,9 @@ struct DataField {
 
 struct DataDef : ASTNode {
     std::string name;
+    std::string module_name;  // Module this type belongs to
+    std::string source_file;  // Absolute path to the file this type is defined in
+    bool is_public = false;   // Requires pub keyword to be importable
     std::vector<DataField> fields;
 
     std::string to_webcc() override;
@@ -35,6 +38,9 @@ struct DataDef : ASTNode {
 // Enum definition: enum Mode { Idle, Running, Paused }
 struct EnumDef : ASTNode {
     std::string name;
+    std::string module_name;  // Module this enum belongs to
+    std::string source_file;  // Absolute path to the file this enum is defined in
+    bool is_public = false;   // Requires pub keyword to be importable
     std::vector<std::string> values;
     bool is_shared = false;
     std::string owner_component;

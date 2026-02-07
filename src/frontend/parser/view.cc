@@ -206,7 +206,72 @@ std::unique_ptr<ASTNode> Parser::parse_html_element()
 
     std::string tag = current().value;
     expect(TokenType::IDENTIFIER, "Expected tag name");
+    // Special tag: <raw> - raw HTML injection
+    if (tag == "raw")
+    {
+        auto rawEl = std::make_unique<ViewRawElement>();
+        rawEl->line = start_line;
 
+        expect(TokenType::GT, "Expected '>' after <raw");
+
+        // Parse children (expressions/text) until </raw>
+        while (true)
+        {
+            if (current().type == TokenType::LT && peek().type == TokenType::SLASH)
+            {
+                break;
+            }
+            if (current().type == TokenType::END_OF_FILE)
+            {
+                throw std::runtime_error("Unexpected end of file, expected </raw> at line " + std::to_string(start_line));
+            }
+            if (current().type == TokenType::LBRACE)
+            {
+                advance();
+                rawEl->children.push_back(parse_expression());
+                expect(TokenType::RBRACE, "Expected '}'");
+            }
+            else
+            {
+                // Text content
+                std::string text;
+                bool first = true;
+                Token prev_token = current();
+                while (current().type != TokenType::LT && current().type != TokenType::LBRACE &&
+                       current().type != TokenType::END_OF_FILE)
+                {
+                    if (!first)
+                    {
+                        int prev_len = prev_token.value.length();
+                        if (prev_token.type == TokenType::STRING_LITERAL)
+                            prev_len += 2;
+                        if (prev_token.line != current().line || prev_token.column + prev_len != current().column)
+                            text += " ";
+                    }
+                    text += current().value;
+                    prev_token = current();
+                    advance();
+                    first = false;
+                }
+                if (!text.empty())
+                {
+                    rawEl->children.push_back(std::make_unique<TextNode>(text));
+                }
+            }
+        }
+
+        // </raw>
+        expect(TokenType::LT, "Expected '<'");
+        expect(TokenType::SLASH, "Expected '/'");
+        if (current().value != "raw")
+        {
+            throw std::runtime_error("Mismatched closing tag: expected raw, got " + current().value);
+        }
+        expect(TokenType::IDENTIFIER, "Expected 'raw'");
+        expect(TokenType::GT, "Expected '>'");
+
+        return rawEl;
+    }
     // Special tag: <route /> - placeholder for router
     if (tag == "route")
     {
@@ -222,6 +287,21 @@ std::unique_ptr<ASTNode> Parser::parse_html_element()
         expect(TokenType::GT, "Expected '>'");
 
         return route_placeholder;
+    }
+
+    // Check for Module::Component syntax (cross-module access)
+    std::string module_prefix;
+    if (current().type == TokenType::DOUBLE_COLON)
+    {
+        // tag is actually the module name
+        module_prefix = tag;
+        advance(); // consume ::
+        if (current().type != TokenType::IDENTIFIER)
+        {
+            ErrorHandler::compiler_error("Expected component name after '" + module_prefix + "::'", current().line);
+        }
+        tag = current().value;
+        advance();
     }
 
     // Components must start with uppercase
@@ -240,6 +320,7 @@ std::unique_ptr<ASTNode> Parser::parse_html_element()
         auto comp = std::make_unique<ComponentInstantiation>();
         comp->line = start_line;
         comp->component_name = tag;
+        comp->module_prefix = module_prefix;  // Store module prefix if specified
 
         // Props: &prop={value} = reference, :prop={value} = move, prop={value} = copy
         parse_component_props(*comp);

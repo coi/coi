@@ -106,3 +106,9 @@ struct ComponentTypeContext {
 
 // Type conversion utility
 std::string convert_type(const std::string& type);
+
+// Generate qualified name with module prefix (e.g., "TurboUI_Button" for module "TurboUI", name "Button")
+inline std::string qualified_name(const std::string& module_name, const std::string& name) {
+    if (module_name.empty()) return name;
+    return module_name + "_" + name;
+}

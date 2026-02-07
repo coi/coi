@@ -36,7 +36,7 @@ build build/obj/tools/webcc_utils.o: gen_schema_cxx deps/webcc/src/cli/utils.cc
 build build/gen_schema: gen_schema_link build/obj/tools/gen_schema.o build/obj/tools/webcc_schema.o build/obj/tools/webcc_utils.o
 
 # Generated .d.coi files (gen_schema reads webcc schema.wcc.bin and generates defs/web/*.d.coi)
-build defs/web/index.d.coi: generate_def_files build/gen_schema | deps/webcc/schema.wcc.bin
+build defs/web/index.d.coi: generate_def_files build/gen_schema | deps/webcc/schema.wcc.bin src/tools/schema_whitelist.def
 
 # Coi Compiler source objects
 build build/obj/main.o: cxx src/main.cc

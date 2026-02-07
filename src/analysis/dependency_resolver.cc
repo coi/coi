@@ -1,17 +1,22 @@
 #include "dependency_resolver.h"
 #include "ast/ast.h"
+#include "ast/node.h"
 #include "../cli/error.h"
 #include <map>
 #include <queue>
 
-// Collect child component names from a node
+// Collect child component names from a node (returns qualified names)
 void collect_component_deps(ASTNode *node, std::set<std::string> &deps)
 {
     if (!node)
         return;
     if (auto *comp_inst = dynamic_cast<ComponentInstantiation *>(node))
     {
-        deps.insert(comp_inst->component_name);
+        // Use qualified name (module_prefix + component_name)
+        std::string qname = comp_inst->module_prefix.empty() 
+            ? comp_inst->component_name 
+            : comp_inst->module_prefix + "_" + comp_inst->component_name;
+        deps.insert(qname);
     }
     else if (auto *el = dynamic_cast<HTMLElement *>(node))
     {
@@ -67,13 +72,15 @@ std::vector<Component *> topological_sort_components(std::vector<Component> &com
 
     for (auto &comp : components)
     {
-        comp_map[comp.name] = &comp;
-        in_degree[comp.name] = 0;
+        std::string qname = qualified_name(comp.module_name, comp.name);
+        comp_map[qname] = &comp;
+        in_degree[qname] = 0;
     }
 
     // Build dependency graph
     for (auto &comp : components)
     {
+        std::string comp_qname = qualified_name(comp.module_name, comp.name);
         std::set<std::string> deps;
         // Collect dependencies from view
         for (const auto &root : comp.render_roots)
@@ -85,13 +92,21 @@ std::vector<Component *> topological_sort_components(std::vector<Component> &com
         {
             for (const auto &route : comp.router->routes)
             {
-                deps.insert(route.component_name);
+                deps.insert(qualified_name(route.module_name, route.component_name));
             }
         }
         // Collect dependencies from parameter types (e.g., Vector pos)
         for (const auto &param : comp.params)
         {
             std::string base_type = extract_base_type_name(param->type);
+            // Handle Module::Type syntax
+            size_t dcolon = base_type.find("::");
+            if (dcolon != std::string::npos)
+            {
+                std::string module = base_type.substr(0, dcolon);
+                std::string name = base_type.substr(dcolon + 2);
+                base_type = module + "_" + name;
+            }
             if (comp_map.count(base_type))
             {
                 deps.insert(base_type);
@@ -101,12 +116,20 @@ std::vector<Component *> topological_sort_components(std::vector<Component> &com
         for (const auto &var : comp.state)
         {
             std::string base_type = extract_base_type_name(var->type);
+            // Handle Module::Type syntax
+            size_t dcolon = base_type.find("::");
+            if (dcolon != std::string::npos)
+            {
+                std::string module = base_type.substr(0, dcolon);
+                std::string name = base_type.substr(dcolon + 2);
+                base_type = module + "_" + name;
+            }
             if (comp_map.count(base_type))
             {
                 deps.insert(base_type);
             }
         }
-        dependencies[comp.name] = deps;
+        dependencies[comp_qname] = deps;
     }
 
     // Calculate in-degrees

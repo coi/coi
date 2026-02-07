@@ -5,16 +5,10 @@ component CodeView(
     string code,
     string width = "420px"
 ) {
-    mut DOMElement codeEl;
     mut string highlighted = "";
 
-    // State tracking for tokenizer
-    mut int state = 0;  // 0=normal, 1=comment, 2=string, 3=number, 4=word
-    mut string buffer = "";
-
-    mount {
+    init {
         highlighted = tokenize(code);
-        codeEl.setInnerHtml(highlighted);
     }
 
     def isKeyword(string word) : bool {
@@ -122,7 +116,6 @@ component CodeView(
         mut string cmt = "";
         mut int mode = 0;  // 0=normal, 1=comment, 2=string, 3=number, 4=word, 5=tag
         mut string tag = "";
-        mut bool prevSlash = false;
         int len = src.length();
 
         for i in 0:len {
@@ -369,6 +362,6 @@ component CodeView(
     }
 
     view {
-        <pre class="code-window" style="max-width: ${width}; width: 100%; box-sizing: border-box;"><code &={codeEl}></code></pre>
+        <pre class="code-window" style="max-width: ${width}; width: 100%; box-sizing: border-box;"><code><raw>{highlighted}</raw></code></pre>
     }
 }

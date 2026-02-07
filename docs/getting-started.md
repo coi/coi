@@ -227,15 +227,31 @@ my-app/
 
 ## Imports
 
-Coi supports importing other `.coi` files:
+Coi uses a strict, explicit import system.
 
 ```tsx
 import "components/Button.coi";
 import "layout/Header.coi";
-import "../shared/Utils.coi";
 ```
 
-Imports are relative to the current file's location. All components defined in imported files become available in the current file.
+### Import Rules
+
+1. **Relative Paths**: Imports are relative to the current file.
+2. **Explicit Only**: There are no "transitive imports". If `A` imports `B`, and `B` imports `C`, `A` cannot use `C` unless it imports `C` directly.
+3. **Visibility**: You can only use components that are marked with `pub` if they are in a different module.
+
+### Modules
+
+You can organize files into named modules using the `module` keyword at the top of the file:
+
+```tsx
+// src/ui/Button.coi
+module TurboUI;
+pub component Button { ... }
+```
+
+- **Same Module:** Can access `Button` directly after import.
+- **Different Module:** Must use fully qualified name `<TurboUI::Button />`.
 
 ## Getting Help
 

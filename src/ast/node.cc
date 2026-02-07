@@ -39,11 +39,24 @@ std::string convert_type(const std::string& type) {
     if (resolved == "float32") return "float";
     if (resolved == "float64") return "double";
     
-    // Handle Component.EnumName type syntax - convert to Component::EnumName
+    // Handle Module::ComponentName type syntax - convert to Module_ComponentName
+    // This handles cross-module component types used in variable declarations
+    // Skip webcc:: types - those should stay as-is
+    size_t dcolon_pos = type.find("::");
+    if (dcolon_pos != std::string::npos) {
+        std::string prefix = type.substr(0, dcolon_pos);
+        // Only convert if it's not a webcc type (webcc uses C++ namespace syntax)
+        if (prefix != "webcc") {
+            std::string name = type.substr(dcolon_pos + 2);
+            return prefix + "_" + name;
+        }
+    }
+    
+    // Handle Component.EnumName type syntax - convert to Component_EnumName
     if (type.find('.') != std::string::npos) {
         std::string result = type;
         size_t pos = result.find('.');
-        result.replace(pos, 1, "::");
+        result.replace(pos, 1, "_");
         return result;
     }
     // Handle dynamic arrays: T[]

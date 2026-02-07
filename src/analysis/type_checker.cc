@@ -1510,12 +1510,18 @@ void validate_mutability(const std::vector<Component> &components)
     }
 }
 
-void validate_view_hierarchy(const std::vector<Component> &components)
+void validate_view_hierarchy(const std::vector<Component> &components,
+                             const std::map<std::string, std::set<std::string>> &file_imports)
 {
+    // Map from qualified name (Module_Name or just Name) to component
     std::map<std::string, const Component *> component_map;
+    // Also map from just name to all matching components (for ambiguity detection)
+    std::multimap<std::string, const Component *> component_by_name;
     for (const auto &comp : components)
     {
-        component_map[comp.name] = &comp;
+        std::string qname = comp.module_name.empty() ? comp.name : comp.module_name + "_" + comp.name;
+        component_map[qname] = &comp;
+        component_by_name.insert({comp.name, &comp});
     }
 
     // Build scope for a component (params + state + methods)
@@ -1547,24 +1553,125 @@ void validate_view_hierarchy(const std::vector<Component> &components)
         return scope;
     };
 
-    std::function<void(ASTNode *, const std::string &, std::map<std::string, std::string> &)> validate_node =
-        [&](ASTNode *node, const std::string &parent_comp_name, std::map<std::string, std::string> &scope)
+    std::function<void(ASTNode *, const Component *, std::map<std::string, std::string> &)> validate_node =
+        [&](ASTNode *node, const Component *parent_comp, std::map<std::string, std::string> &scope)
     {
         if (!node)
             return;
 
         if (auto *comp_inst = dynamic_cast<ComponentInstantiation *>(node))
         {
-            auto it = component_map.find(comp_inst->component_name);
+            // Build the lookup key based on module prefix
+            std::string lookup_key;
+            if (!comp_inst->module_prefix.empty())
+            {
+                // Module prefix specified: look up by qualified name
+                lookup_key = comp_inst->module_prefix + "_" + comp_inst->component_name;
+            }
+            else
+            {
+                // No module prefix: first try same module as parent, then default module
+                std::string same_module_key = parent_comp->module_name.empty() 
+                    ? comp_inst->component_name 
+                    : parent_comp->module_name + "_" + comp_inst->component_name;
+                if (component_map.count(same_module_key))
+                {
+                    lookup_key = same_module_key;
+                }
+                else
+                {
+                    // Try default module (no prefix)
+                    lookup_key = comp_inst->component_name;
+                }
+            }
+
+            auto it = component_map.find(lookup_key);
             if (it != component_map.end())
             {
-                if (it->second->render_roots.empty())
+                const Component *target_comp = it->second;
+
+                // Check import visibility (no transitive imports)
+                // Component is accessible if:
+                // 1. It's in the same file as the parent component, OR
+                // 2. It's directly imported by the parent component's file, OR  
+                // 3. It's in the same NAMED module as the parent component (both have non-empty module_name)
+                bool same_file = (parent_comp->source_file == target_comp->source_file);
+                // Only consider "same module" if both have a non-empty module name
+                // The default module (empty module_name) still requires explicit imports
+                bool same_named_module = (!parent_comp->module_name.empty() && 
+                                          parent_comp->module_name == target_comp->module_name);
+                bool directly_imported = false;
+                
+                if (!file_imports.empty() && !same_file && !same_named_module)
+                {
+                    auto imports_it = file_imports.find(parent_comp->source_file);
+                    if (imports_it != file_imports.end())
+                    {
+                        directly_imported = imports_it->second.count(target_comp->source_file) > 0;
+                    }
+                    
+                    if (!directly_imported)
+                    {
+                        throw std::runtime_error(
+                            "Component '" + comp_inst->component_name + "' is not directly imported at line " + 
+                            std::to_string(comp_inst->line));
+                    }
+                }
+
+                // Check module visibility and prefix requirements
+                bool same_module = (parent_comp->module_name == target_comp->module_name);
+                bool has_module_prefix = !comp_inst->module_prefix.empty();
+
+                if (!same_module)
+                {
+                    // Different modules: require pub keyword
+                    if (!target_comp->is_public)
+                    {
+                        std::string target_module = target_comp->module_name.empty() ? "(default)" : target_comp->module_name;
+                        throw std::runtime_error(
+                            "Component '" + comp_inst->component_name + "' in module '" + target_module + 
+                            "' is not public. Add 'pub' keyword to make it importable: pub component " + comp_inst->component_name + 
+                            " at line " + std::to_string(comp_inst->line));
+                    }
+
+                    // Different modules: require Module:: prefix
+                    if (!has_module_prefix)
+                    {
+                        std::string target_module = target_comp->module_name.empty() ? "(default)" : target_comp->module_name;
+                        throw std::runtime_error(
+                            "Component '" + comp_inst->component_name + "' is from module '" + target_module + 
+                            "'. Use '" + (target_comp->module_name.empty() ? "" : target_comp->module_name + "::") + 
+                            comp_inst->component_name + "' at line " + std::to_string(comp_inst->line));
+                    }
+
+                    // Validate module prefix matches target's module
+                    if (comp_inst->module_prefix != target_comp->module_name)
+                    {
+                        throw std::runtime_error(
+                            "Component '" + comp_inst->component_name + "' is in module '" + 
+                            (target_comp->module_name.empty() ? "(default)" : target_comp->module_name) + 
+                            "', not '" + comp_inst->module_prefix + "' at line " + std::to_string(comp_inst->line));
+                    }
+                }
+                else if (has_module_prefix)
+                {
+                    // Same module but used Module:: prefix - allowed but could warn
+                    // For now, just validate the prefix is correct
+                    if (comp_inst->module_prefix != target_comp->module_name)
+                    {
+                        throw std::runtime_error(
+                            "Component '" + comp_inst->component_name + "' is in module '" + 
+                            (target_comp->module_name.empty() ? "(default)" : target_comp->module_name) + 
+                            "', not '" + comp_inst->module_prefix + "' at line " + std::to_string(comp_inst->line));
+                    }
+                }
+
+                if (target_comp->render_roots.empty())
                 {
                     throw std::runtime_error("Component '" + comp_inst->component_name + "' is used in a view but has no view definition (logic-only component) at line " + std::to_string(comp_inst->line));
                 }
 
                 // Validate reference params
-                const Component *target_comp = it->second;
                 std::set<std::string> passed_param_names;
 
                 for (auto &passed_prop : comp_inst->props)
@@ -1735,18 +1842,18 @@ void validate_view_hierarchy(const std::vector<Component> &components)
             
             for (const auto &child : el->children)
             {
-                validate_node(child.get(), parent_comp_name, scope);
+                validate_node(child.get(), parent_comp, scope);
             }
         }
         else if (auto *viewIf = dynamic_cast<ViewIfStatement *>(node))
         {
             for (const auto &child : viewIf->then_children)
             {
-                validate_node(child.get(), parent_comp_name, scope);
+                validate_node(child.get(), parent_comp, scope);
             }
             for (const auto &child : viewIf->else_children)
             {
-                validate_node(child.get(), parent_comp_name, scope);
+                validate_node(child.get(), parent_comp, scope);
             }
         }
         else if (auto *viewFor = dynamic_cast<ViewForRangeStatement *>(node))
@@ -1756,7 +1863,7 @@ void validate_view_hierarchy(const std::vector<Component> &components)
             loop_scope[viewFor->var_name] = "int32"; // Range loops always use int32
             for (const auto &child : viewFor->children)
             {
-                validate_node(child.get(), parent_comp_name, loop_scope);
+                validate_node(child.get(), parent_comp, loop_scope);
             }
         }
         else if (auto *viewForEach = dynamic_cast<ViewForEachStatement *>(node))
@@ -1774,7 +1881,7 @@ void validate_view_hierarchy(const std::vector<Component> &components)
             }
             for (const auto &child : viewForEach->children)
             {
-                validate_node(child.get(), parent_comp_name, loop_scope);
+                validate_node(child.get(), parent_comp, loop_scope);
             }
         }
     };
@@ -1784,7 +1891,7 @@ void validate_view_hierarchy(const std::vector<Component> &components)
         std::map<std::string, std::string> scope = build_scope(&comp);
         for (const auto &root : comp.render_roots)
         {
-            validate_node(root.get(), comp.name, scope);
+            validate_node(root.get(), &comp, scope);
         }
     }
 
@@ -1854,18 +1961,49 @@ void validate_view_hierarchy(const std::vector<Component> &components)
         // Validate that route components exist and their arguments match parameters
         if (has_router_block)
         {
-            for (const auto &route : comp.router->routes)
+            for (auto &route : comp.router->routes)
             {
-                auto it = component_map.find(route.component_name);
+                // Routes use simple names - look up in same module first, then default
+                std::string lookup_key;
+                std::string same_module_key = comp.module_name.empty() 
+                    ? route.component_name 
+                    : comp.module_name + "_" + route.component_name;
+                if (component_map.count(same_module_key))
+                {
+                    lookup_key = same_module_key;
+                }
+                else
+                {
+                    lookup_key = route.component_name;
+                }
+
+                auto it = component_map.find(lookup_key);
                 if (it == component_map.end())
                 {
                     throw std::runtime_error("Route '" + route.path + "' references unknown component '" + route.component_name + "' at line " + std::to_string(route.line));
                 }
 
+                const Component *target_comp = it->second;
+                
+                // Fill in the module name for code generation
+                route.module_name = target_comp->module_name;
+
+                // Check module visibility for routed components
+                if (comp.module_name != target_comp->module_name)
+                {
+                    if (!target_comp->is_public)
+                    {
+                        throw std::runtime_error(
+                            "Route '" + route.path + "' references component '" + route.component_name + 
+                            "' which is not public. Add 'pub' keyword to make it importable: pub component " + 
+                            route.component_name + " at line " + std::to_string(route.line));
+                    }
+                }
+
                 // Use shared validation for route arguments
                 std::string error = validate_component_args(
                     route.args,
-                    it->second->params,
+                    target_comp->params,
                     route.component_name,
                     "Route '" + route.path + "'",
                     route.line
@@ -1873,6 +2011,115 @@ void validate_view_hierarchy(const std::vector<Component> &components)
                 if (!error.empty())
                 {
                     throw std::runtime_error(error);
+                }
+            }
+        }
+    }
+}
+
+void validate_type_imports(const std::vector<Component> &components,
+                           const std::vector<std::unique_ptr<EnumDef>> &global_enums,
+                           const std::vector<std::unique_ptr<DataDef>> &global_data,
+                           const std::map<std::string, std::set<std::string>> &file_imports)
+{
+    if (file_imports.empty()) return;  // No import tracking, skip validation
+    
+    // Build maps from type name to source file
+    std::map<std::string, std::string> data_source_files;  // type name -> source file
+    std::map<std::string, std::string> enum_source_files;  // enum name -> source file
+    
+    for (const auto &d : global_data)
+    {
+        data_source_files[d->name] = d->source_file;
+    }
+    for (const auto &e : global_enums)
+    {
+        enum_source_files[e->name] = e->source_file;
+    }
+    
+    // Helper to check if a type is accessible from a given source file
+    auto is_type_accessible = [&](const std::string& type_name, const std::string& user_file,
+                                  const std::string& type_source_file) -> bool {
+        // Same file - always accessible
+        if (user_file == type_source_file) return true;
+        
+        // Directly imported
+        auto it = file_imports.find(user_file);
+        if (it != file_imports.end() && it->second.count(type_source_file) > 0) return true;
+        
+        return false;
+    };
+    
+    // Helper to extract base type name from type string (removes [], Module::, etc.)
+    auto extract_base_type = [](const std::string& type) -> std::string {
+        std::string base = type;
+        
+        // Remove array suffix
+        if (base.ends_with("[]"))
+            base = base.substr(0, base.length() - 2);
+        else if (auto pos = base.rfind('['); pos != std::string::npos && base.back() == ']')
+            base = base.substr(0, pos);
+        
+        // Handle Module::Type syntax
+        if (auto pos = base.find("::"); pos != std::string::npos)
+            base = base.substr(pos + 2);
+            
+        return base;
+    };
+    
+    // Check types used in each component
+    for (const auto &comp : components)
+    {
+        // Check parameter types
+        for (const auto &param : comp.params)
+        {
+            std::string base_type = extract_base_type(param->type);
+            
+            // Check if it's a global data type
+            if (auto it = data_source_files.find(base_type); it != data_source_files.end())
+            {
+                if (!is_type_accessible(base_type, comp.source_file, it->second))
+                {
+                    throw std::runtime_error(
+                        "Type '" + base_type + "' is not directly imported in component '" + comp.name + 
+                        "' (parameter '" + param->name + "') at line " + std::to_string(param->line));
+                }
+            }
+            
+            // Check if it's a global enum
+            if (auto it = enum_source_files.find(base_type); it != enum_source_files.end())
+            {
+                if (!is_type_accessible(base_type, comp.source_file, it->second))
+                {
+                    throw std::runtime_error(
+                        "Enum '" + base_type + "' is not directly imported in component '" + comp.name + 
+                        "' (parameter '" + param->name + "') at line " + std::to_string(param->line));
+                }
+            }
+        }
+        
+        // Check state variable types
+        for (const auto &state : comp.state)
+        {
+            std::string base_type = extract_base_type(state->type);
+            
+            if (auto it = data_source_files.find(base_type); it != data_source_files.end())
+            {
+                if (!is_type_accessible(base_type, comp.source_file, it->second))
+                {
+                    throw std::runtime_error(
+                        "Type '" + base_type + "' is not directly imported in component '" + comp.name + 
+                        "' (state variable '" + state->name + "') at line " + std::to_string(state->line));
+                }
+            }
+            
+            if (auto it = enum_source_files.find(base_type); it != enum_source_files.end())
+            {
+                if (!is_type_accessible(base_type, comp.source_file, it->second))
+                {
+                    throw std::runtime_error(
+                        "Enum '" + base_type + "' is not directly imported in component '" + comp.name + 
+                        "' (state variable '" + state->name + "') at line " + std::to_string(state->line));
                 }
             }
         }

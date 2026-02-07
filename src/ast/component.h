@@ -9,6 +9,7 @@
 struct RouteEntry {
     std::string path;                              // e.g., "/", "/dashboard", "/pricing"
     std::string component_name;                    // e.g., "Landing", "Dashboard"
+    std::string module_name;                       // Module of the target component (filled by type checker)
     std::vector<CallArg> args;                     // Optional component arguments (same as component construction)
     int line = 0;
 };
@@ -22,6 +23,9 @@ struct RouterDef {
 
 struct Component : ASTNode {
     std::string name;
+    std::string module_name;  // Module this component belongs to
+    std::string source_file;  // Absolute path to the file this component is defined in
+    bool is_public = false;   // Requires pub keyword to be importable
     std::string css;
     std::string global_css;
     std::vector<std::unique_ptr<DataDef>> data;

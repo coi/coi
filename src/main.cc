@@ -144,6 +144,8 @@ int main(int argc, char **argv)
     AppConfig final_app_config;
     std::set<std::string> processed_files;
     std::queue<std::string> file_queue;
+    // Track direct imports for each file (file -> set of directly imported files)
+    std::map<std::string, std::set<std::string>> file_imports;
 
     try
     {
@@ -184,30 +186,33 @@ int main(int argc, char **argv)
             Parser parser(tokens);
             parser.parse_file();
 
-            // Add components with duplicate name check
+            // Add components with duplicate name check (allow same name in different modules)
             for (auto &comp : parser.components)
             {
                 bool duplicate = false;
                 for (const auto &existing : all_components)
                 {
-                    if (existing.name == comp.name)
+                    if (existing.name == comp.name && existing.module_name == comp.module_name)
                     {
                         std::cerr << colors::RED << "Error:" << colors::RESET << " Component '" << comp.name << "' is defined multiple times (found in " << current_file_path << " at line " << comp.line << ")" << std::endl;
                         return 1;
                     }
                 }
+                comp.source_file = current_file_path;  // Track which file this component is from
                 all_components.push_back(std::move(comp));
             }
 
             // Collect global enums
             for (auto &enum_def : parser.global_enums)
             {
+                enum_def->source_file = current_file_path;
                 all_global_enums.push_back(std::move(enum_def));
             }
 
             // Collect global data types
             for (auto &data_def : parser.global_data)
             {
+                data_def->source_file = current_file_path;
                 all_global_data.push_back(std::move(data_def));
             }
 
@@ -219,12 +224,15 @@ int main(int argc, char **argv)
             fs::path current_path(current_file_path);
             fs::path parent_path = current_path.parent_path();
 
+            // Track direct imports for this file
+            std::set<std::string> direct_imports;
             for (const auto &import_path_str : parser.imports)
             {
                 fs::path import_path = parent_path / import_path_str;
                 try
                 {
                     std::string abs_path = fs::canonical(import_path).string();
+                    direct_imports.insert(abs_path);
                     if (processed_files.find(abs_path) == processed_files.end())
                     {
                         file_queue.push(abs_path);
@@ -236,11 +244,13 @@ int main(int argc, char **argv)
                     return 1;
                 }
             }
+            file_imports[current_file_path] = std::move(direct_imports);
         }
 
         std::cerr << "All files processed. Total components: " << all_components.size() << std::endl;
 
-        validate_view_hierarchy(all_components);
+        validate_view_hierarchy(all_components, file_imports);
+        validate_type_imports(all_components, all_global_enums, all_global_data, file_imports);
         validate_mutability(all_components);
         validate_types(all_components, all_global_enums, all_global_data);
 
