@@ -104,12 +104,17 @@ component App {
 
 ### Only `pub` Members Are Importable
 
-The import system **requires** the `pub` keyword for components, enums, and data types to be importable from other modules. Additionally, **transitive imports are not allowed**, you must directly import any file whose components you use.
+The `pub` keyword is required to expose components, enums, and data types **outside of their module**.
+
+*   **Same Module:** Everything defined within a module is automatically visible to other files sharing the same `module Name;` declaration. You do **not** need `pub` for internal sharing.
+*   **Cross-Module:** You must add `pub` if you intend for that member to be imported and used by a **different module**.
+
+Additionally, **transitive imports are not allowed**; you must directly import any file whose components you use.
 
 **What `pub` does:**
 
-- **Explicit Exporting:** Marks components, data types, and enums as "public," allowing them to be imported and used by files outside of their own module.
-- **Module Boundaries:** Without `pub`, a member is "module-internal", visible to any file sharing the same module name, but hidden from the rest of the application.
+- **Cross-Boundary Access:** Allows components, data types, and enums to be used by files outside of their own module.
+- **Internal Visibility:** Without `pub`, a member is "module-internal", visible to its siblings in the same module, but hidden from the rest of the application.
 - **API Control:** Allows library authors to hide internal helper components and logic, exposing only the intended interface to the end-user.
 - **Namespace Safety:** Public members from different modules are accessed via the `Module::Member` syntax, preventing naming conflicts in large projects.
 
