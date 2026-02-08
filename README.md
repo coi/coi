@@ -182,6 +182,7 @@ Open `http://localhost:8000` in your browser.
 | `coi init [name]` | Create a new project |
 | `coi build` | Build the project |
 | `coi dev` | Build and start dev server |
+| `coi version` | Show the Coi compiler version |
 | `coi <file.coi> --out <dir>` | Compile a single file |
 
 ### Project Structure
