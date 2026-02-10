@@ -32,7 +32,7 @@ Coi gives you composable components, fine-grained reactivity, type safety, and t
 ## Why Coi?
 
 > [!IMPORTANT]
-> Coi isn't another JavaScript framework, it's a new language for the web, built from scratch to feel like a component framework but compile to high-performance WebAssembly. You get static types, strict checking, and native-speed execution without the overhead of a heavy JavaScript runtime. Coi replaces complex JS reconciliation with a lightweight WASM engine, using JavaScript only as a thin bridge for DOM and Platform APIs.
+> Coi isn't another JavaScript framework, it's a new language for the web, built from scratch to feel like a component framework but compile to high-performance WebAssembly. You get static types, strict checking, and native-speed execution without the overhead of a heavy JavaScript runtime.
 
 - **Bundle Size Matters**: In our counter app example, Coi is 40% smaller than Svelte, 72% smaller than Vue, and 88% smaller than React (see [benchmarks](benchmark/)). Faster downloads, faster startup, better mobile experience.
 - **Animations & Real-Time Apps**: No garbage collection pauses means consistent 60fps animations and responsive interactions. Perfect for dashboards, games, and live data apps.
