@@ -37,7 +37,7 @@ Coi gives you composable components, fine-grained reactivity, type safety, and t
 - **Bundle Size Matters**: In our counter app example, Coi is 40% smaller than Svelte, 72% smaller than Vue, and 88% smaller than React (see [benchmarks](benchmark/)). Faster downloads, faster startup, better mobile experience.
 - **Animations & Real-Time Apps**: No garbage collection pauses means consistent 60fps animations and responsive interactions. Perfect for dashboards, games, and live data apps.
 - **Type Safety from Day One**: Catch bugs at compile-time, not runtime. Props, state, and platform APIs are fully typed.
-- **No Virtual DOM**: Coi uses a fine-grained reactive system. Instead of "diffing" a virtual tree, the compiler generates surgical DOM updates that execute at native speed.
+- **No Virtual DOM**: Coi uses a fine-grained reactive system. Instead of "diffing" a virtual tree in JS, the compiler generates direct, surgical DOM updates triggered by WASM logic. This eliminates VDOM overhead and minimizes the work the browser has to do.
 - **WASM Performance**: Computation-heavy features run at native speed. Great for simulations, physics, data processing, and canvas-based apps.
 - **One Codebase, Multiple Platforms** *(Roadmap)*: Web today, native platforms and server-side Coi tomorrow. Full-stack with a single language.
 
