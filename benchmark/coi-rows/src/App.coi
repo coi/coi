@@ -39,9 +39,9 @@ component App {
         if (rows.size() < 999) {
             return;
         }
-        Row temp = rows[1];
-        rows[1] = rows[998];
-        rows[998] = temp;
+        Row temp := rows[1];
+        rows[1] := rows[998];
+        rows[998] := temp;
     }
 
     def selectRow(int id) : void {

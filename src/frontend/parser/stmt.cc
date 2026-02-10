@@ -229,6 +229,7 @@ std::unique_ptr<Statement> Parser::parse_statement()
         // Check if followed by assignment operator (including compound assignments)
         TokenType after_bracket = current().type;
         bool is_index_assign = (after_bracket == TokenType::ASSIGN ||
+                                after_bracket == TokenType::MOVE_ASSIGN ||
                                 after_bracket == TokenType::PLUS_ASSIGN ||
                                 after_bracket == TokenType::MINUS_ASSIGN ||
                                 after_bracket == TokenType::STAR_ASSIGN ||
@@ -273,6 +274,10 @@ std::unique_ptr<Statement> Parser::parse_statement()
             idx_assign->array = std::make_unique<Identifier>(name);
             idx_assign->index = std::move(index_expr);
             idx_assign->value = parse_expression();
+
+            // Set move flag if move assignment
+            if (opType == TokenType::MOVE_ASSIGN)
+                idx_assign->is_move = true;
 
             // Set compound operator if not plain assignment
             if (opType == TokenType::PLUS_ASSIGN)

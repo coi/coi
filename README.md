@@ -3,7 +3,7 @@
 
 # Coi
 
-[![CI](https://github.com/io-eric/coi/actions/workflows/verifiy-and-publish.yml/badge.svg)](https://github.com/io-eric/coi/actions/workflows/verifiy-and-publish.yml)
+[![CI](https://github.com/io-eric/coi/actions/workflows/verify-and-publish.yml/badge.svg)](https://github.com/io-eric/coi/actions/workflows/verify-and-publish.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Us-7289da?logo=discord&logoColor=white)](https://discord.gg/KSpWx78wuR)
@@ -11,15 +11,12 @@
 A modern, component-based language for building reactive web apps.  
 **Type-safe. Fast. WASM-powered.**
 
-For developers who want the productivity of component-based frameworks with the performance of native code. Fine-grained reactivity, strict typing, and a GC-free runtime for deterministic performance.
+Components with native performance. Fine-grained reactivity, zero internal GC pauses, tiny bundles.
 
 </div>
 
-> [!IMPORTANT]
-> **Recent Breaking Changes:** Significant changes to DOM manipulation and imports have been implemented. See [CHANGES.md](CHANGES.md) for the migration guide.
-
 > [!NOTE]
-> Coi is actively evolving. Some syntax may change in future releases.
+> Coi is actively evolving. Recent syntax changes are documented in [CHANGES.md](CHANGES.md).
 
 ## What You Can Build
 
@@ -32,13 +29,15 @@ Coi is designed for building reactive, interactive web applications:
 
 Coi gives you composable components, fine-grained reactivity, type safety, and tiny bundle sizes.
 
-## Features
+## Why Coi?
 
-### Performance
-- **Fine-Grained Reactivity**: State changes map directly to DOM elements at compile-time. No Virtual DOM overhead.
-- **No Garbage Collector**: Deterministic memory management with zero internal GC pauses. Predictable performance for animations and real-time apps.
-- **Batched Operations**: Browser API calls (DOM, Canvas, Storage, etc.) are batched to minimize WASM-JS interop overhead, reducing boundary-crossing costs (see [WebCC](https://github.com/io-eric/webcc) for implementation details).
-- **Minimal Runtime**: Tiny WASM binaries with high-performance updates for DOM, Canvas, and more.
+- **Bundle Size Matters**: At 17KB, Coi apps are 40% smaller than Svelte, 72% smaller than Vue, and 88% smaller than React. Faster downloads, faster startup, better mobile experience.
+- **Animations & Real-Time Apps**: No garbage collection pauses means consistent 60fps animations and responsive interactions. Perfect for dashboards, games, and live data apps.
+- **Type Safety from Day One**: Catch bugs at compile-time, not runtime. Props, state, and platform APIs are fully typed.
+- **WASM Performance**: Computation-heavy features run at native speed. Great for simulations, physics, data processing, and canvas-based apps.
+- **One Codebase, Multiple Platforms**: Web today, native platforms and server-side Coi tomorrow. Full-stack with a single language.
+
+## Features
 
 ### Type System & Safety
 - **Strict Typing**: Compile-time error checking with strongly typed parameters and state.
@@ -49,40 +48,10 @@ Coi gives you composable components, fine-grained reactivity, type safety, and t
 ### Developer Experience
 - **Component-Based**: Composable, reusable components with props, state, and lifecycle blocks.
 - **Integrated DOM & Styling**: Write HTML elements and scoped CSS directly in components.
-- **View Control Flow**: Declarative `<if>`, `<else>`, and `<for>` tags for conditional rendering and iteration.
+- **View Control Flow**: Declarative `<if>`, `<else>`, `<for>` tags for conditional rendering and iteration.
 - **Component Lifecycle**: Built-in `init {}`, `mount {}`, and `tick {}` blocks for setup and animations.
-- **Type-Safe Platform APIs**: Browser APIs (Canvas, Storage, Audio, etc.) defined in `.d.coi` files, auto-generated from [WebCC](https://github.com/io-eric/webcc) schema.
+- **Type-Safe Platform APIs**: Full type safety for Canvas, Storage, Audio, Fetch, and other browser APIs.
 - **Editor Extensions**: Syntax highlighting and completions available for [VS Code, Sublime Text, and Zed](docs/tooling.md).
-
-## Benchmarks
-
-
-### DOM Performance (Rows App)
-
-> [!NOTE]
-> **Work in Progress:** Coi currently trails in DOM performance benchmarks. However, this gap is largely architectural overhead that I'm actively addressing - read below for details.
-
-In [benchmarks](benchmark/) comparing Coi, React, Vue, and Svelte, Coi delivers the smallest bundle size. DOM performance is still being optimized, see the chart below for current results.
-
-<p align="center">
-  <img src="benchmark/benchmark_results.svg" alt="Benchmark Results" width="600">
-</p>
-
-**Why the Current Gap Exists:**
-
-Coi's architecture uses an asynchronous event and command buffering system to maintain a tiny runtime and stable WASM-JS interop. While this design ensures minimal bundle sizes and batched operations, it introduces a systematic frame delay:
-
-- **Buffer Latency**: Events are queued and processed in cycles, adding delay between user actions and DOM updates
-- **Polling Overhead**: On 165Hz displays (6.06ms per frame), the once-per-frame polling introduces an average ~6ms overhead regardless of how fast the WASM logic executes
-- **Node Allocation**: DOM node allocation and rendering optimizations are still in progress
-
-**Accounting for Overhead**: If we subtract the ~6ms systematic buffer overhead from Coi's results, the adjusted performance becomes highly competitive:
-- Create 1,000 rows: ~26ms (comparable to React/Svelte at 25-26ms)
-- Update 1,000 rows: ~9ms (matching or beating Svelte at 11ms)
-
-I'm actively working on moving towards a synchronous event-based model to eliminate this buffering delay while preserving the benefits of batched operations and minimal runtime size.
-
-See the [benchmark/](benchmark/) directory for details and instructions on how to run it yourself.
 
 ## Example
 
@@ -149,6 +118,15 @@ app {
 }
 ```
 
+## Benchmarks
+
+In [benchmarks](benchmark/) comparing Coi, React, Vue, and Svelte, Coi delivers the smallest bundle size and competitive DOM performance. See the results below:
+
+<p align="center">
+  <img src="benchmark/benchmark_results.svg" alt="Benchmark Results" width="600">
+</p>
+
+
 ## Quick Start
 
 ### Install
@@ -213,13 +191,13 @@ my-app/
 
 ## Documentation
 
-- [Getting Started](docs/getting-started.md) — Installation, first project, imports
-- [Language Guide](docs/language-guide.md) — Types, enums, control flow, operators
-- [Components](docs/components.md) — State, lifecycle, props, references
-- [View Syntax](docs/view-syntax.md) — JSX-like templates, `<if>`, `<for>`, events
-- [Styling](docs/styling.md) — Scoped and global CSS
-- [Platform APIs](docs/api-reference.md) — Canvas, Storage, Audio, Fetch, and more
-- [Editor Support](docs/tooling.md) — VS Code, Sublime Text, and Zed extensions
+- [Getting Started](docs/getting-started.md): Installation, first project, imports
+- [Language Guide](docs/language-guide.md): Types, enums, control flow, operators
+- [Components](docs/components.md): State, lifecycle, props, references
+- [View Syntax](docs/view-syntax.md): JSX-like templates, `<if>`, `<for>`, events
+- [Styling](docs/styling.md): Scoped and global CSS
+- [Platform APIs](docs/api-reference.md): Canvas, Storage, Audio, Fetch, and more
+- [Editor Support](docs/tooling.md): VS Code, Sublime Text, and Zed extensions
 
 ## Community
 

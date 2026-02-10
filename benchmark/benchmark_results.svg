@@ -13,8 +13,8 @@
 <text x="400.0" y="105" text-anchor="middle" fill="#212529" font-size="16" font-weight="bold">Bundle Size</text>
 <text x="400.0" y="123" text-anchor="middle" fill="#6c757d" font-size="12">Counter App - Smaller is better (KB)</text>
 <text x="168" y="168" text-anchor="end" fill="#212529" font-size="13" font-weight="bold">Coi</text>
-<rect x="180" y="150" width="68.01479943057953" height="26" fill="#9477ff" rx="4"/>
-<text x="256.0147994305795" y="168" fill="#212529" font-size="13" font-weight="bold">21.5 KB ★</text>
+<rect x="180" y="150" width="54.17540626224976" height="26" fill="#9477ff" rx="4"/>
+<text x="242.17540626224977" y="168" fill="#212529" font-size="13" font-weight="bold">17.1 KB ★</text>
 <text x="168" y="204" text-anchor="end" fill="#212529" font-size="13" font-weight="bold">Svelte</text>
 <rect x="180" y="186" width="89.48875944735954" height="26" fill="#e97d30" rx="4"/>
 <text x="277.48875944735954" y="204" fill="#212529" font-size="13" font-weight="normal">28.2 KB</text>
@@ -27,64 +27,64 @@
 <text x="400.0" y="324" text-anchor="middle" fill="#212529" font-size="16" font-weight="bold">DOM Performance</text>
 <text x="400.0" y="342" text-anchor="middle" fill="#6c757d" font-size="12">Rows App - Lower is better (ms)</text>
 <text x="168" y="393" text-anchor="end" fill="#212529" font-size="12" font-weight="bold">Create 1,000 rows</text>
-<rect x="180" y="369" width="276.8103448318695" height="18" fill="#42b883" rx="3"/>
-<text x="464.8103448318695" y="382" fill="#212529" font-size="11" font-weight="bold">23.7ms ★</text>
-<rect x="180" y="391" width="294.35960592013276" height="18" fill="#e97d30" rx="3"/>
-<text x="482.35960592013276" y="404" fill="#212529" font-size="11" font-weight="normal">25.2ms</text>
-<rect x="180" y="413" width="301.3793103493363" height="18" fill="#00d8ff" rx="3"/>
-<text x="489.3793103493363" y="426" fill="#212529" font-size="11" font-weight="normal">25.8ms</text>
+<rect x="180" y="369" width="343.78378378519807" height="18" fill="#00d8ff" rx="3"/>
+<text x="531.783783785198" y="382" fill="#212529" font-size="11" font-weight="bold">25.4ms ★</text>
+<rect x="180" y="391" width="347.02702702643626" height="18" fill="#e97d30" rx="3"/>
+<text x="535.0270270264363" y="404" fill="#212529" font-size="11" font-weight="normal">25.7ms</text>
+<rect x="180" y="413" width="347.29729730073456" height="18" fill="#42b883" rx="3"/>
+<text x="535.2972973007345" y="426" fill="#212529" font-size="11" font-weight="normal">25.7ms</text>
 <rect x="180" y="435" width="380.0" height="18" fill="#9477ff" rx="3"/>
-<text x="568.0" y="448" fill="#212529" font-size="11" font-weight="normal">32.5ms</text>
+<text x="568.0" y="448" fill="#212529" font-size="11" font-weight="normal">28.1ms</text>
 <text x="168" y="484" text-anchor="end" fill="#212529" font-size="12" font-weight="bold">Update 1,000 rows</text>
-<rect x="180" y="460" width="129.86453201653762" height="18" fill="#e97d30" rx="3"/>
-<text x="317.8645320165376" y="473" fill="#212529" font-size="11" font-weight="bold">11.1ms ★</text>
-<rect x="180" y="482" width="135.9482758580863" height="18" fill="#00d8ff" rx="3"/>
-<text x="323.9482758580863" y="495" fill="#212529" font-size="11" font-weight="normal">11.6ms</text>
-<rect x="180" y="504" width="165.43103448253322" height="18" fill="#42b883" rx="3"/>
-<text x="353.4310344825332" y="517" fill="#212529" font-size="11" font-weight="normal">14.1ms</text>
-<rect x="180" y="526" width="181.10837438241154" height="18" fill="#9477ff" rx="3"/>
-<text x="369.1083743824115" y="539" fill="#212529" font-size="11" font-weight="normal">15.5ms</text>
+<rect x="180" y="460" width="149.7297297286162" height="18" fill="#e97d30" rx="3"/>
+<text x="337.72972972861623" y="473" fill="#212529" font-size="11" font-weight="bold">11.1ms ★</text>
+<rect x="180" y="482" width="165.67567567309413" height="18" fill="#00d8ff" rx="3"/>
+<text x="353.67567567309413" y="495" fill="#212529" font-size="11" font-weight="normal">12.3ms</text>
+<rect x="180" y="504" width="181.35135135334212" height="18" fill="#9477ff" rx="3"/>
+<text x="369.3513513533421" y="517" fill="#212529" font-size="11" font-weight="normal">13.4ms</text>
+<rect x="180" y="526" width="191.35135135135494" height="18" fill="#42b883" rx="3"/>
+<text x="379.35135135135494" y="539" fill="#212529" font-size="11" font-weight="normal">14.2ms</text>
 <text x="168" y="575" text-anchor="end" fill="#212529" font-size="12" font-weight="bold">Swap rows</text>
-<rect x="180" y="551" width="51.00985222331858" height="18" fill="#e97d30" rx="3"/>
-<text x="239.00985222331857" y="564" fill="#212529" font-size="11" font-weight="bold">4.4ms ★</text>
-<rect x="180" y="573" width="55.923645325940264" height="18" fill="#42b883" rx="3"/>
-<text x="243.92364532594027" y="586" fill="#212529" font-size="11" font-weight="normal">4.8ms</text>
-<rect x="180" y="595" width="89.15024630536506" height="18" fill="#9477ff" rx="3"/>
-<text x="277.15024630536504" y="608" fill="#212529" font-size="11" font-weight="normal">7.6ms</text>
-<rect x="180" y="617" width="300.91133005550887" height="18" fill="#00d8ff" rx="3"/>
-<text x="488.91133005550887" y="630" fill="#212529" font-size="11" font-weight="normal">25.7ms</text>
+<rect x="180" y="551" width="50.27027027191372" height="18" fill="#e97d30" rx="3"/>
+<text x="238.27027027191372" y="564" fill="#212529" font-size="11" font-weight="bold">3.7ms ★</text>
+<rect x="180" y="573" width="70.5405405422377" height="18" fill="#42b883" rx="3"/>
+<text x="258.5405405422377" y="586" fill="#212529" font-size="11" font-weight="normal">5.2ms</text>
+<rect x="180" y="595" width="103.78378378254851" height="18" fill="#9477ff" rx="3"/>
+<text x="291.78378378254854" y="608" fill="#212529" font-size="11" font-weight="normal">7.7ms</text>
+<rect x="180" y="617" width="358.64864865261944" height="18" fill="#00d8ff" rx="3"/>
+<text x="546.6486486526194" y="630" fill="#212529" font-size="11" font-weight="normal">26.5ms</text>
 <text x="168" y="666" text-anchor="end" fill="#212529" font-size="12" font-weight="bold">Clear rows</text>
-<rect x="180" y="642" width="30.418719207743365" height="18" fill="#00d8ff" rx="3"/>
-<text x="218.41871920774338" y="655" fill="#212529" font-size="11" font-weight="bold">2.6ms ★</text>
-<rect x="180" y="664" width="32.75862068995575" height="18" fill="#42b883" rx="3"/>
-<text x="220.75862068995576" y="677" fill="#212529" font-size="11" font-weight="normal">2.8ms</text>
-<rect x="180" y="686" width="37.67241379257743" height="18" fill="#e97d30" rx="3"/>
-<text x="225.67241379257743" y="699" fill="#212529" font-size="11" font-weight="normal">3.2ms</text>
-<rect x="180" y="708" width="89.61822659919248" height="18" fill="#9477ff" rx="3"/>
-<text x="277.6182265991925" y="721" fill="#212529" font-size="11" font-weight="normal">7.7ms</text>
+<rect x="180" y="642" width="22.972972970516754" height="18" fill="#42b883" rx="3"/>
+<text x="210.97297297051676" y="655" fill="#212529" font-size="11" font-weight="bold">1.7ms ★</text>
+<rect x="180" y="664" width="29.729729729808504" height="18" fill="#e97d30" rx="3"/>
+<text x="217.7297297298085" y="677" fill="#212529" font-size="11" font-weight="normal">2.2ms</text>
+<rect x="180" y="686" width="34.05405405565454" height="18" fill="#00d8ff" rx="3"/>
+<text x="222.05405405565455" y="699" fill="#212529" font-size="11" font-weight="normal">2.5ms</text>
+<rect x="180" y="708" width="112.70270270350474" height="18" fill="#9477ff" rx="3"/>
+<text x="300.70270270350477" y="721" fill="#212529" font-size="11" font-weight="normal">8.3ms</text>
 <text x="400.0" y="743" text-anchor="middle" fill="#212529" font-size="14" font-weight="bold">Coi vs Best Other</text>
 <text x="100" y="768" fill="#6c757d" font-size="11" font-weight="bold">Metric</text>
 <text x="320" y="768" text-anchor="end" fill="#9477ff" font-size="11" font-weight="bold">Coi</text>
 <text x="480" y="768" text-anchor="end" fill="#6c757d" font-size="11" font-weight="bold">Best Other</text>
 <text x="640" y="768" text-anchor="end" fill="#6c757d" font-size="11" font-weight="bold">Difference</text>
 <text x="100" y="786" fill="#212529" font-size="11">Bundle Size</text>
-<text x="320" y="786" text-anchor="end" fill="#212529" font-size="11" font-weight="bold">21.5 KB</text>
+<text x="320" y="786" text-anchor="end" fill="#212529" font-size="11" font-weight="bold">17.1 KB</text>
 <text x="480" y="786" text-anchor="end" fill="#6c757d" font-size="11">28.2 KB (Svelte)</text>
-<text x="640" y="786" text-anchor="end" fill="#22c55e" font-size="11" font-weight="bold">✓ 6.8 KB smaller</text>
+<text x="640" y="786" text-anchor="end" fill="#22c55e" font-size="11" font-weight="bold">✓ 11.1 KB smaller</text>
 <text x="100" y="804" fill="#212529" font-size="11">Create 1,000 rows</text>
-<text x="320" y="804" text-anchor="end" fill="#212529" font-size="11" font-weight="normal">32.5 ms</text>
-<text x="480" y="804" text-anchor="end" fill="#6c757d" font-size="11">23.7 ms (Vue)</text>
-<text x="640" y="804" text-anchor="end" fill="#f59e0b" font-size="11" font-weight="bold">+8.8 ms</text>
+<text x="320" y="804" text-anchor="end" fill="#212529" font-size="11" font-weight="normal">28.1 ms</text>
+<text x="480" y="804" text-anchor="end" fill="#6c757d" font-size="11">25.4 ms (React)</text>
+<text x="640" y="804" text-anchor="end" fill="#f59e0b" font-size="11" font-weight="bold">+2.7 ms</text>
 <text x="100" y="822" fill="#212529" font-size="11">Update 1,000 rows</text>
-<text x="320" y="822" text-anchor="end" fill="#212529" font-size="11" font-weight="normal">15.5 ms</text>
+<text x="320" y="822" text-anchor="end" fill="#212529" font-size="11" font-weight="normal">13.4 ms</text>
 <text x="480" y="822" text-anchor="end" fill="#6c757d" font-size="11">11.1 ms (Svelte)</text>
-<text x="640" y="822" text-anchor="end" fill="#f59e0b" font-size="11" font-weight="bold">+4.4 ms</text>
+<text x="640" y="822" text-anchor="end" fill="#f59e0b" font-size="11" font-weight="bold">+2.3 ms</text>
 <text x="100" y="840" fill="#212529" font-size="11">Swap rows</text>
-<text x="320" y="840" text-anchor="end" fill="#212529" font-size="11" font-weight="normal">7.6 ms</text>
-<text x="480" y="840" text-anchor="end" fill="#6c757d" font-size="11">4.4 ms (Svelte)</text>
-<text x="640" y="840" text-anchor="end" fill="#f59e0b" font-size="11" font-weight="bold">+3.3 ms</text>
+<text x="320" y="840" text-anchor="end" fill="#212529" font-size="11" font-weight="normal">7.7 ms</text>
+<text x="480" y="840" text-anchor="end" fill="#6c757d" font-size="11">3.7 ms (Svelte)</text>
+<text x="640" y="840" text-anchor="end" fill="#f59e0b" font-size="11" font-weight="bold">+4.0 ms</text>
 <text x="100" y="858" fill="#212529" font-size="11">Clear rows</text>
-<text x="320" y="858" text-anchor="end" fill="#212529" font-size="11" font-weight="normal">7.7 ms</text>
-<text x="480" y="858" text-anchor="end" fill="#6c757d" font-size="11">2.6 ms (React)</text>
-<text x="640" y="858" text-anchor="end" fill="#f59e0b" font-size="11" font-weight="bold">+5.1 ms</text>
+<text x="320" y="858" text-anchor="end" fill="#212529" font-size="11" font-weight="normal">8.3 ms</text>
+<text x="480" y="858" text-anchor="end" fill="#6c757d" font-size="11">1.7 ms (Vue)</text>
+<text x="640" y="858" text-anchor="end" fill="#f59e0b" font-size="11" font-weight="bold">+6.6 ms</text>
 </svg>
