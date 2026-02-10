@@ -31,7 +31,7 @@ Coi gives you composable components, fine-grained reactivity, type safety, and t
 
 ## Why Coi?
 
-- **Bundle Size Matters**: At 17KB, Coi apps are 40% smaller than Svelte, 72% smaller than Vue, and 88% smaller than React. Faster downloads, faster startup, better mobile experience.
+- **Bundle Size Matters**: In our counter app example, Coi is 40% smaller than Svelte, 72% smaller than Vue, and 88% smaller than React (see [benchmarks](benchmark/)). Faster downloads, faster startup, better mobile experience.
 - **Animations & Real-Time Apps**: No garbage collection pauses means consistent 60fps animations and responsive interactions. Perfect for dashboards, games, and live data apps.
 - **Type Safety from Day One**: Catch bugs at compile-time, not runtime. Props, state, and platform APIs are fully typed.
 - **WASM Performance**: Computation-heavy features run at native speed. Great for simulations, physics, data processing, and canvas-based apps.
