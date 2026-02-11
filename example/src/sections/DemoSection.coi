@@ -197,7 +197,7 @@ component TodoList \{
             align-items: center;
             gap: 60px;
             border-top: 1px solid #eee;
-            background: #fafafa;
+            background: #ffffff;
         }
         h2 {
             font-size: 32px;
