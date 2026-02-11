@@ -2,6 +2,10 @@ import "../components/FeatureCard.coi";
 
 component Features {
     style {
+        .features-section {
+            background-color: #fafafa;
+            width: 100%;
+        }
         .features {
             padding: 100px 20px;
             max-width: 1100px;
@@ -34,12 +38,13 @@ component Features {
     }
 
     view {
-        <div class="features">
-            <div class="header">
-                <h2>Why Coi?</h2>
-                <p class="subtitle">A modern approach to building web applications with WebAssembly</p>
-            </div>
-            <div class="grid">
+        <div class="features-section">
+            <div class="features">
+                <div class="header">
+                    <h2>Why Coi?</h2>
+                    <p class="subtitle">A modern approach to building web applications with WebAssembly</p>
+                </div>
+                <div class="grid">
                 <FeatureCard icon="⚡" title="WebAssembly Powered" description="Compiles to WASM via WebCC. Native speed with no heavy runtime overhead." />
                 <FeatureCard icon="🎯" title="Incremental Updates" description="Fine-grained DOM updates that only touch what changed. No Virtual DOM." />
                 <FeatureCard icon="🔒" title="Type-Safe Components" description="Catch errors at compile time. Props, state, and functions are strictly typed." />
@@ -50,6 +55,7 @@ component Features {
                 <FeatureCard icon="🎬" title="Animation Support" description="Built-in tick lifecycle method for smooth animations and updates." />
                 <FeatureCard icon="🛠️" title="VS Code Extension" description="Full language support with syntax highlighting, completions, and hover docs." />
             </div>
+        </div>
         </div>
     }
 }

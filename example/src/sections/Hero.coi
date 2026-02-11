@@ -1,106 +1,117 @@
 import "../components/Button.coi";
 
 component Hero {
-    mut string popupDisplay = "none";
-
-    def openPopup() : void {
-        popupDisplay = "flex";
-    }
-
-    def closePopup() : void {
-        popupDisplay = "none";
-    }
-
     style {
         .hero {
+            position: relative;
+            overflow: hidden;
+            padding: 160px 24px 100px;
             text-align: center;
-            padding: 180px 20px 120px;
-            max-width: 900px;
-            margin: 0 auto;
+            background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
+            background-size: 24px 24px;
+            /* Keep layout properties to ensure centering */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .hero::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 100%;
+            background: linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0) 80%, #fafafa 100%);
+            pointer-events: none;
         }
         .logo {
             width: 180px;
             height: auto;
             margin: 0 auto 40px auto;
-            filter: drop-shadow(0 20px 40px rgba(148, 119, 255, 0.2));
+            filter: drop-shadow(0 20px 40px rgba(148, 119, 255, 0.25));
+            animation: float 6s ease-in-out infinite;
+        }
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-15px); }
+            100% { transform: translateY(0px); }
         }
         h1 {
-            font-size: 72px;
+            font-size: 80px;
             font-weight: 800;
-            margin: 0 0 24px 0;
-            letter-spacing: -2px;
-            line-height: 1.1;
-            background: linear-gradient(135deg, #1a1a1a 30%, #9477ff 100%);
+            margin: 0 0 16px 0;
+            letter-spacing: -2.5px;
+            line-height: 1;
+            background: linear-gradient(135deg, #9477ff 30%, #7c5cff 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            color: #1a1a1a;
+            color: #9477ff;
         }
         .tagline {
-            font-size: 24px;
-            color: #666;
-            margin: 0 auto 32px auto;
-            line-height: 1.5;
-            max-width: 600px;
+            font-size: 20px;
+            color: #555;
+            margin: 0 auto 40px auto;
+            line-height: 1.6;
+            max-width: 620px;
         }
         .buttons {
             display: flex;
             gap: 16px;
             justify-content: center;
+            margin-bottom: 48px;
         }
         .subtitle {
-            font-size: 20px;
-            font-weight: 500;
-            color: #4a4a4a;
-            margin: -5px 0 24px 0;
-            letter-spacing: -0.2px;
+            font-size: 24px;
+            font-weight: 600;
+            color: #4f4f4f;
+            margin: -5px 0 20px 0;
+            letter-spacing: -0.5px;
         }
         .built-with {
-            margin-top: 48px;
-            font-size: 13px;
-            color: #9477ff;
-            opacity: 0.8;
-            font-weight: 500;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-        }
-        .popup-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            z-index: 1000;
-            display: flex;
+            display: inline-flex;
             align-items: center;
-            justify-content: center;
-            backdrop-filter: blur(4px);
-        }
-        .popup {
-            background: white;
-            padding: 40px;
+            padding: 8px 16px;
+            margin-bottom: 32px;
+            background: rgba(148, 119, 255, 0.1);
             border-radius: 20px;
-            max-width: 420px;
-            text-align: center;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
-            animation: popupIn 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+            font-size: 14px;
+            color: #7c5cff;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            transition: all 0.2s ease;
+            cursor: default;
         }
-        @keyframes popupIn {
-            from { opacity: 0; transform: scale(0.95); }
-            to { opacity: 1; transform: scale(1); }
+        .built-with:hover {
+            background: rgba(148, 119, 255, 0.15);
+            transform: translateY(-1px);
         }
-        .popup h3 {
-             font-size: 24px;
-             margin: 0 0 16px 0;
-             color: #1a1a1a;
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
         }
-        .popup p {
-            color: #666;
-            margin: 0 0 32px 0;
-            line-height: 1.6;
-            font-size: 16px;
+
+        .built-with { animation: fadeIn 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; opacity: 0; animation-delay: 0.1s; }
+        .logo-wrapper {
+            margin: 0 auto 40px auto;
+            animation: fadeIn 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; 
+            opacity: 0; 
+            animation-delay: 0.2s;
         }
+        .logo {
+            width: 180px;
+            height: auto;
+            margin: 0;
+            display: block; 
+            filter: drop-shadow(0 20px 40px rgba(148, 119, 255, 0.25));
+            animation: float 6s ease-in-out infinite;
+        }
+        h1 { animation: fadeIn 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; opacity: 0; animation-delay: 0.3s; }
+        .subtitle { animation: fadeIn 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; opacity: 0; animation-delay: 0.4s; }
+        .tagline { animation: fadeIn 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; opacity: 0; animation-delay: 0.5s; }
+        .buttons { animation: fadeIn 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; opacity: 0; animation-delay: 0.6s; }
+
 
         @media (max-width: 768px) {
             .hero {
@@ -128,32 +139,23 @@ component Hero {
                 padding: 16px 20px;
                 font-size: 18px;
             }
-            .popup {
-                width: 90%;
-                max-width: 420px;
-                padding: 24px;
-            }
         }
     }
 
     view {
         <div class="hero">
-            <img class="logo" src="assets/images/logo.png" alt="Coi logo" />
+            <div class="built-with">✨ This site is built with Coi</div>
+
+            <div class="logo-wrapper">
+                <img class="logo" src="assets/images/logo.png" alt="Coi logo" />
+            </div>
+
             <h1>Coi</h1>
             <p class="subtitle">WebAssembly for the Modern Web</p>
             <p class="tagline">A component-based language for high-performance web apps.<br/>Fast. Minimal. Type-safe.</p>
             <div class="buttons">
-                <Button label="Get Started" type="primary" &onclick={openPopup} />
+                <Button label="Get Started" type="primary" href="https://github.com/io-eric/coi/blob/main/docs/getting-started.md" />
                 <Button label="GitHub" type="secondary" href="https://github.com/io-eric/coi"/>
-            </div>
-            <p class="built-with">✨ This site is built with Coi</p>
-
-            <div class="popup-overlay" style="display: ${popupDisplay};">
-                 <div class="popup">
-                    <h3>Work in Progress 🚧</h3>
-                    <p>This section is not finished yet... but you can look into the demos below or in the git repository to get a good start with this language :D</p>
-                    <Button label="Got it!" type="primary" &onclick={closePopup} />
-                 </div>
             </div>
         </div>
     }
