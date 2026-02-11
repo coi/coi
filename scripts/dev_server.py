@@ -172,9 +172,10 @@ def watch_files(project_dir, coi_bin, keep_cc, cc_only):
                     print(f'{GREEN}✓{RESET} Rebuilt')
                     notify_reload()
                 else:
-                    print(f'{RED}✗{RESET} Failed')
-                    for line in r.stderr.splitlines():
-                        if line.strip() and 'Processing' not in line:
+                    print(f'{RED}✗{RESET} Build failed:')
+                    output = r.stdout + r.stderr
+                    for line in output.splitlines():
+                        if line.strip():
                             print(f'  {line}')
             except Exception as e:
                 print(f'{RED}✗{RESET} {e}')
