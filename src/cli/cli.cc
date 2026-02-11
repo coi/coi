@@ -343,9 +343,9 @@ int dev_project(bool keep_cc, bool cc_only, bool hot_reloading)
     fs::path dev_script = exe_dir / "scripts" / "dev_server.py";
 
     std::cout << "  " << GREEN << "➜" << RESET << "  Local:   " << CYAN << BOLD << "http://localhost:8000" << RESET << std::endl;
-    if (hot_reloading)
+    if (!hot_reloading)
     {
-        std::cout << "  " << YELLOW << "↻" << RESET << " Hot reload: " << GREEN << "enabled" << RESET << std::endl;
+        std::cout << "  " << DIM << "↻ Hot reload: disabled" << RESET << std::endl;
     }
     std::cout << "  " << DIM << "Press Ctrl+C to stop" << RESET << std::endl;
     std::cout << std::endl;
@@ -362,7 +362,7 @@ int dev_project(bool keep_cc, bool cc_only, bool hot_reloading)
                      " " + coi_bin.string() +
                      " " + dist_dir.string();
     
-    if (hot_reloading) cmd += " --hot";
+    if (!hot_reloading) cmd += " --no-watch";
     if (keep_cc) cmd += " --keep-cc";
     if (cc_only) cmd += " --cc-only";
 
@@ -402,7 +402,7 @@ void print_help(const char *program_name)
     std::cout << "    " << DIM << "--out, -o <dir>" << RESET << "   Output directory" << std::endl;
     std::cout << "    " << DIM << "--cc-only" << RESET << "         Generate C++ only, skip WASM" << std::endl;
     std::cout << "    " << DIM << "--keep-cc" << RESET << "         Keep generated C++ files" << std::endl;
-    std::cout << "    " << DIM << "-h, --hot" << RESET << "         Enable hot reloading (dev only)" << std::endl;
+    std::cout << "    " << DIM << "--no-watch" << RESET << "        Disable hot reloading (dev only)" << std::endl;
     std::cout << std::endl;
     std::cout << "  " << BOLD << "Examples:" << RESET << std::endl;
     std::cout << "    " << DIM << "$" << RESET << " coi init my-app" << std::endl;

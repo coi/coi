@@ -110,13 +110,30 @@ Assets from the `assets/` folder are automatically copied to `dist/assets/`.
 
 ### `coi dev`
 
-Build and start a local development server:
+Build and start a local development server with hot reloading:
 
 ```bash
 coi dev
 ```
 
-This builds the project and starts a server at `http://localhost:8000`. Press `Ctrl+C` to stop.
+This builds the project and starts a server at `http://localhost:8000`. The server automatically watches for changes to:
+- `.coi` files in `src/`
+- Files in `assets/` (images, fonts, etc.)
+- `.css` files in `styles/`
+
+When you save any watched file, the project rebuilds automatically and your browser refreshes with the latest changes.
+
+#### Disable Hot Reloading
+
+If you need to disable hot reloading (for debugging build issues or testing manual workflows):
+
+```bash
+coi dev --no-watch
+```
+
+This builds the project once and starts the dev server without file watching. To see changes, stop the server and run `coi dev --no-watch` again.
+
+Press `Ctrl+C` to stop the dev server.
 
 ### Direct Compilation
 

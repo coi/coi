@@ -95,14 +95,13 @@ int main(int argc, char **argv)
 
     if (first_arg == "dev")
     {
-        // TODO: If hot reloading is stable and fast, make it the default for `coi dev` and remove the separate -h flag.
-        bool hot_reloading = false;
+        bool hot_reloading = true;  // Hot reload is now the default
         for (int i = 2; i < argc; ++i)
         {
             std::string arg = argv[i];
-            if (arg == "-h" || arg == "--hot")
+            if (arg == "--no-watch")
             {
-                hot_reloading = true;
+                hot_reloading = false;
             }
         }
         return dev_project(keep_cc, cc_only, hot_reloading);

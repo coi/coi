@@ -111,27 +111,51 @@ def notify_reload():
     reload_event.set()
 
 
-def get_mtimes(src_dir):
+def get_mtimes(project_dir):
+    """Get modification times for all watched files."""
     mtimes = {}
+    project_path = Path(project_dir)
+    
+    # Watch .coi files in src/
+    src_dir = project_path / 'src'
     if src_dir.exists():
         for f in src_dir.rglob('*.coi'):
             try:
                 mtimes[str(f)] = f.stat().st_mtime
             except OSError:
                 pass
+    
+    # Watch assets/
+    assets_dir = project_path / 'assets'
+    if assets_dir.exists():
+        for f in assets_dir.rglob('*'):
+            if f.is_file():
+                try:
+                    mtimes[str(f)] = f.stat().st_mtime
+                except OSError:
+                    pass
+    
+    # Watch CSS files in styles/
+    styles_dir = project_path / 'styles'
+    if styles_dir.exists():
+        for f in styles_dir.rglob('*.css'):
+            try:
+                mtimes[str(f)] = f.stat().st_mtime
+            except OSError:
+                pass
+    
     return mtimes
 
 
 def watch_files(project_dir, coi_bin, dist_dir, keep_cc, cc_only):
-    src_dir = Path(project_dir) / 'src'
-    entry = src_dir / 'App.coi'
+    entry = Path(project_dir) / 'src' / 'App.coi'
     
     print(f'{DIM}  Watching for changes...{RESET}')
-    last = get_mtimes(src_dir)
+    last = get_mtimes(project_dir)
     
     while True:
         time.sleep(0.3)
-        curr = get_mtimes(src_dir)
+        curr = get_mtimes(project_dir)
         
         changed = [Path(p).name for p, t in curr.items() if p not in last or last[p] != t]
         changed += [f'{Path(p).name} (deleted)' for p in last if p not in curr]
@@ -156,8 +180,6 @@ def watch_files(project_dir, coi_bin, dist_dir, keep_cc, cc_only):
             except Exception as e:
                 print(f'{RED}✗{RESET} {e}')
             
-            last = get_mtimes(src_dir)
-        else:
             last = curr
 
 
@@ -165,14 +187,14 @@ def main():
     global hot_reload_enabled
     
     if len(sys.argv) < 4:
-        print('Usage: dev_server.py <project_dir> <coi_bin> <dist_dir> [--hot] [--keep-cc] [--cc-only]')
+        print('Usage: dev_server.py <project_dir> <coi_bin> <dist_dir> [--no-watch] [--keep-cc] [--cc-only]')
         sys.exit(1)
     
     project_dir = sys.argv[1]
     coi_bin = sys.argv[2]
     dist_dir = sys.argv[3]
     
-    hot_reload_enabled = '--hot' in sys.argv
+    hot_reload_enabled = '--no-watch' not in sys.argv
     keep_cc = '--keep-cc' in sys.argv
     cc_only = '--cc-only' in sys.argv
     
