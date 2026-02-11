@@ -10,9 +10,11 @@ Coi requires [WebCC](https://github.com/io-eric/webcc) to be installed. The buil
 
 ### Building from Source
 
-To build the compiler and the toolchain:
+To build the compiler and the toolchain, clone the repository and run the build script:
 
 ```bash
+git clone https://github.com/io-eric/coi.git
+cd coi
 ./build.sh
 ```
 
