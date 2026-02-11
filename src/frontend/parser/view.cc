@@ -393,6 +393,8 @@ std::unique_ptr<ASTNode> Parser::parse_html_element()
     expect(TokenType::GT, "Expected '>'");
 
     // Children
+    // Track the last token position to detect leading whitespace for text nodes
+    Token last_non_text_token = tokens[pos - 1];  // The '>' we just consumed
     while (true)
     {
         if (current().type == TokenType::LT)
@@ -416,6 +418,7 @@ std::unique_ptr<ASTNode> Parser::parse_html_element()
                 // Regular child element
                 el->children.push_back(parse_html_element());
             }
+            last_non_text_token = tokens[pos - 1];  // Update after parsing element
         }
         else if (current().type == TokenType::LBRACE)
         {
@@ -423,6 +426,7 @@ std::unique_ptr<ASTNode> Parser::parse_html_element()
             advance();
             el->children.push_back(parse_expression());
             expect(TokenType::RBRACE, "Expected '}'");
+            last_non_text_token = tokens[pos - 1];  // The '}' we just consumed
         }
         else
         {
@@ -430,6 +434,15 @@ std::unique_ptr<ASTNode> Parser::parse_html_element()
             std::string text;
             bool first = true;
             Token prev_token = current();
+            
+            // Check for leading whitespace (gap between last non-text token and first text token)
+            int last_len = last_non_text_token.value.length();
+            if (last_non_text_token.type == TokenType::STRING_LITERAL)
+                last_len += 2;
+            if (last_non_text_token.line != current().line || last_non_text_token.column + last_len != current().column)
+            {
+                text += " ";
+            }
             // Text continues until we hit '<' or '{'
             while (current().type != TokenType::LT && current().type != TokenType::LBRACE &&
                    current().type != TokenType::END_OF_FILE)
@@ -456,6 +469,19 @@ std::unique_ptr<ASTNode> Parser::parse_html_element()
             }
             if (!text.empty())
             {
+                // Check if there was whitespace between the last text token and the next token (<, {, or EOF)
+                // If so, preserve the trailing space
+                if (current().type != TokenType::END_OF_FILE)
+                {
+                    int prev_len = prev_token.value.length();
+                    if (prev_token.type == TokenType::STRING_LITERAL)
+                        prev_len += 2;
+
+                    if (prev_token.line != current().line || prev_token.column + prev_len != current().column)
+                    {
+                        text += " ";
+                    }
+                }
                 el->children.push_back(std::make_unique<TextNode>(text));
             }
 
