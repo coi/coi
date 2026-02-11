@@ -67,7 +67,7 @@ class DevHandler(http.server.SimpleHTTPRequestHandler):
             with open(path, 'rb') as f:
                 content = f.read()
             
-            script = b'''<script>(function(){var k='__coi_scroll';var s=sessionStorage.getItem(k);if(s){sessionStorage.removeItem(k);var y=parseInt(s);window.addEventListener('load',function(){requestAnimationFrame(function(){window.scrollTo(0,y)})})}var e=new EventSource('/__hot_reload');e.onmessage=function(m){if(m.data==='reload'){sessionStorage.setItem(k,window.scrollY||document.documentElement.scrollTop);location.reload()}};e.onerror=function(){console.log('[Coi] Reconnecting...')}})();</script></body>'''
+            script = b'''<script>(function(){var k='__coi_scroll';if('scrollRestoration' in history)history.scrollRestoration='manual';var s=sessionStorage.getItem(k);if(s){sessionStorage.removeItem(k);var y=parseInt(s);var n=0;function r(){if(n++>30)return;window.scrollTo(0,y);if(Math.abs(window.scrollY-y)>1)setTimeout(r,60)}window.addEventListener('load',function(){requestAnimationFrame(r)});document.addEventListener('DOMContentLoaded',function(){requestAnimationFrame(r)})}var e=new EventSource('/__hot_reload');e.onmessage=function(m){if(m.data==='reload'){sessionStorage.setItem(k,window.scrollY||document.documentElement.scrollTop);location.reload()}};e.onerror=function(){console.log('[Coi] Reconnecting...')}})();</script></body>'''
             content = content.replace(b'</body>', script)
             
             self.send_response(200)
