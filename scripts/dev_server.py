@@ -67,7 +67,7 @@ class DevHandler(http.server.SimpleHTTPRequestHandler):
             with open(path, 'rb') as f:
                 content = f.read()
             
-            script = b'''<script>(function(){var e=new EventSource('/__hot_reload');e.onmessage=function(m){if(m.data==='reload')location.reload()};e.onerror=function(){console.log('[Coi] Reconnecting...')}})();</script></body>'''
+            script = b'''<script>(function(){var k='__coi_scroll';var s=sessionStorage.getItem(k);if(s){sessionStorage.removeItem(k);var y=parseInt(s);window.addEventListener('load',function(){requestAnimationFrame(function(){window.scrollTo(0,y)})})}var e=new EventSource('/__hot_reload');e.onmessage=function(m){if(m.data==='reload'){sessionStorage.setItem(k,window.scrollY||document.documentElement.scrollTop);location.reload()}};e.onerror=function(){console.log('[Coi] Reconnecting...')}})();</script></body>'''
             content = content.replace(b'</body>', script)
             
             self.send_response(200)
