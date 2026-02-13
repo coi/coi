@@ -344,9 +344,14 @@ std::unique_ptr<ASTNode> Parser::parse_html_element()
     while (current().type != TokenType::SLASH && current().type != TokenType::GT && current().type != TokenType::END_OF_FILE)
     {
         // Check for element ref binding: &={varName}
-        if (match(TokenType::AMPERSAND))
+        // Handle both as two tokens (& =) or single token (&=)
+        if (match(TokenType::AMPERSAND_ASSIGN) || match(TokenType::AMPERSAND))
         {
-            expect(TokenType::ASSIGN, "Expected '=' after '&' for element binding");
+            // If we matched AMPERSAND (not AMPERSAND_ASSIGN), expect the '=' next
+            if (tokens[pos - 1].type == TokenType::AMPERSAND)
+            {
+                expect(TokenType::ASSIGN, "Expected '=' after '&' for element binding");
+            }
             expect(TokenType::LBRACE, "Expected '{' after '&='");
             if (current().type != TokenType::IDENTIFIER)
             {

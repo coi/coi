@@ -234,7 +234,12 @@ std::unique_ptr<Statement> Parser::parse_statement()
                                 after_bracket == TokenType::MINUS_ASSIGN ||
                                 after_bracket == TokenType::STAR_ASSIGN ||
                                 after_bracket == TokenType::SLASH_ASSIGN ||
-                                after_bracket == TokenType::PERCENT_ASSIGN);
+                                after_bracket == TokenType::PERCENT_ASSIGN ||
+                                after_bracket == TokenType::AMPERSAND_ASSIGN ||
+                                after_bracket == TokenType::PIPE_ASSIGN ||
+                                after_bracket == TokenType::CARET_ASSIGN ||
+                                after_bracket == TokenType::LSHIFT_ASSIGN ||
+                                after_bracket == TokenType::RSHIFT_ASSIGN);
 
         // Check if followed by .member = value (member assignment on array element)
         bool is_index_member_assign = false;
@@ -254,7 +259,12 @@ std::unique_ptr<Statement> Parser::parse_statement()
                                       assign_op == TokenType::MINUS_ASSIGN ||
                                       assign_op == TokenType::STAR_ASSIGN ||
                                       assign_op == TokenType::SLASH_ASSIGN ||
-                                      assign_op == TokenType::PERCENT_ASSIGN);
+                                      assign_op == TokenType::PERCENT_ASSIGN ||
+                                      assign_op == TokenType::AMPERSAND_ASSIGN ||
+                                      assign_op == TokenType::PIPE_ASSIGN ||
+                                      assign_op == TokenType::CARET_ASSIGN ||
+                                      assign_op == TokenType::LSHIFT_ASSIGN ||
+                                      assign_op == TokenType::RSHIFT_ASSIGN);
         }
 
         // Restore position
@@ -290,6 +300,16 @@ std::unique_ptr<Statement> Parser::parse_statement()
                 idx_assign->compound_op = "/";
             else if (opType == TokenType::PERCENT_ASSIGN)
                 idx_assign->compound_op = "%";
+            else if (opType == TokenType::AMPERSAND_ASSIGN)
+                idx_assign->compound_op = "&";
+            else if (opType == TokenType::PIPE_ASSIGN)
+                idx_assign->compound_op = "|";
+            else if (opType == TokenType::CARET_ASSIGN)
+                idx_assign->compound_op = "^";
+            else if (opType == TokenType::LSHIFT_ASSIGN)
+                idx_assign->compound_op = "<<";
+            else if (opType == TokenType::RSHIFT_ASSIGN)
+                idx_assign->compound_op = ">>";
 
             expect(TokenType::SEMICOLON, "Expected ';'");
             return idx_assign;
@@ -340,6 +360,16 @@ std::unique_ptr<Statement> Parser::parse_statement()
                 member_assign->compound_op = "/";
             else if (opType == TokenType::PERCENT_ASSIGN)
                 member_assign->compound_op = "%";
+            else if (opType == TokenType::AMPERSAND_ASSIGN)
+                member_assign->compound_op = "&";
+            else if (opType == TokenType::PIPE_ASSIGN)
+                member_assign->compound_op = "|";
+            else if (opType == TokenType::CARET_ASSIGN)
+                member_assign->compound_op = "^";
+            else if (opType == TokenType::LSHIFT_ASSIGN)
+                member_assign->compound_op = "<<";
+            else if (opType == TokenType::RSHIFT_ASSIGN)
+                member_assign->compound_op = ">>";
 
             expect(TokenType::SEMICOLON, "Expected ';'");
             return member_assign;
@@ -369,7 +399,12 @@ std::unique_ptr<Statement> Parser::parse_statement()
                                  assign_op == TokenType::MINUS_ASSIGN ||
                                  assign_op == TokenType::STAR_ASSIGN ||
                                  assign_op == TokenType::SLASH_ASSIGN ||
-                                 assign_op == TokenType::PERCENT_ASSIGN);
+                                 assign_op == TokenType::PERCENT_ASSIGN ||
+                                 assign_op == TokenType::AMPERSAND_ASSIGN ||
+                                 assign_op == TokenType::PIPE_ASSIGN ||
+                                 assign_op == TokenType::CARET_ASSIGN ||
+                                 assign_op == TokenType::LSHIFT_ASSIGN ||
+                                 assign_op == TokenType::RSHIFT_ASSIGN);
 
         // Restore position
         pos = saved_pos;
@@ -413,6 +448,16 @@ std::unique_ptr<Statement> Parser::parse_statement()
                 member_assign->compound_op = "/";
             else if (opType == TokenType::PERCENT_ASSIGN)
                 member_assign->compound_op = "%";
+            else if (opType == TokenType::AMPERSAND_ASSIGN)
+                member_assign->compound_op = "&";
+            else if (opType == TokenType::PIPE_ASSIGN)
+                member_assign->compound_op = "|";
+            else if (opType == TokenType::CARET_ASSIGN)
+                member_assign->compound_op = "^";
+            else if (opType == TokenType::LSHIFT_ASSIGN)
+                member_assign->compound_op = "<<";
+            else if (opType == TokenType::RSHIFT_ASSIGN)
+                member_assign->compound_op = ">>";
 
             expect(TokenType::SEMICOLON, "Expected ';'");
             return member_assign;
@@ -427,7 +472,12 @@ std::unique_ptr<Statement> Parser::parse_statement()
          peek().type == TokenType::MINUS_ASSIGN ||
          peek().type == TokenType::STAR_ASSIGN ||
          peek().type == TokenType::SLASH_ASSIGN ||
-         peek().type == TokenType::PERCENT_ASSIGN))
+         peek().type == TokenType::PERCENT_ASSIGN ||
+         peek().type == TokenType::AMPERSAND_ASSIGN ||
+         peek().type == TokenType::PIPE_ASSIGN ||
+         peek().type == TokenType::CARET_ASSIGN ||
+         peek().type == TokenType::LSHIFT_ASSIGN ||
+         peek().type == TokenType::RSHIFT_ASSIGN))
     {
 
         std::string name = current().value;
@@ -475,6 +525,36 @@ std::unique_ptr<Statement> Parser::parse_statement()
         {
             auto left = std::make_unique<Identifier>(name);
             auto binOp = std::make_unique<BinaryOp>(std::move(left), "%", std::move(val));
+            assign->value = std::move(binOp);
+        }
+        else if (opType == TokenType::AMPERSAND_ASSIGN)
+        {
+            auto left = std::make_unique<Identifier>(name);
+            auto binOp = std::make_unique<BinaryOp>(std::move(left), "&", std::move(val));
+            assign->value = std::move(binOp);
+        }
+        else if (opType == TokenType::PIPE_ASSIGN)
+        {
+            auto left = std::make_unique<Identifier>(name);
+            auto binOp = std::make_unique<BinaryOp>(std::move(left), "|", std::move(val));
+            assign->value = std::move(binOp);
+        }
+        else if (opType == TokenType::CARET_ASSIGN)
+        {
+            auto left = std::make_unique<Identifier>(name);
+            auto binOp = std::make_unique<BinaryOp>(std::move(left), "^", std::move(val));
+            assign->value = std::move(binOp);
+        }
+        else if (opType == TokenType::LSHIFT_ASSIGN)
+        {
+            auto left = std::make_unique<Identifier>(name);
+            auto binOp = std::make_unique<BinaryOp>(std::move(left), "<<", std::move(val));
+            assign->value = std::move(binOp);
+        }
+        else if (opType == TokenType::RSHIFT_ASSIGN)
+        {
+            auto left = std::make_unique<Identifier>(name);
+            auto binOp = std::make_unique<BinaryOp>(std::move(left), ">>", std::move(val));
             assign->value = std::move(binOp);
         }
         else

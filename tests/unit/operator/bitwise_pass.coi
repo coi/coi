@@ -1,0 +1,56 @@
+// Test: bitwise operations
+component BitwiseOpsTest {
+    int a = 0x0C;  // 12 (0b1100)
+    int b = 0x0A;  // 10 (0b1010)
+    
+    mut int andResult = 0;
+    mut int orResult = 0;
+    mut int xorResult = 0;
+    mut int notResult = 0;
+    mut int leftShift = 0;
+    mut int rightShift = 0;
+    
+    // Compound assignments
+    mut int compoundAnd = 0xFF;
+    mut int compoundOr = 0x0F;
+    mut int compoundXor = 0xAA;
+    mut int compoundLshift = 1;
+    mut int compoundRshift = 16;
+
+    init {
+        // Binary bitwise operations
+        andResult = a & b;        // 0b1000 = 8
+        orResult = a | b;         // 0b1110 = 14
+        xorResult = a ^ b;        // 0b0110 = 6
+        notResult = ~0;           // -1 (all bits set)
+        leftShift = 1 << 4;       // 16
+        rightShift = 32 >> 2;     // 8
+        
+        // Compound bitwise assignments
+        compoundAnd &= 0x0F;      // 0x0F
+        compoundOr |= 0xF0;       // 0xFF
+        compoundXor ^= 0x55;      // 0xFF
+        compoundLshift <<= 3;     // 8
+        compoundRshift >>= 2;     // 4
+    }
+
+    view {
+        <div>
+            <div>AND: {andResult}</div>
+            <div>OR: {orResult}</div>
+            <div>XOR: {xorResult}</div>
+            <div>NOT: {notResult}</div>
+            <div>Left Shift: {leftShift}</div>
+            <div>Right Shift: {rightShift}</div>
+            <div>Compound AND: {compoundAnd}</div>
+            <div>Compound OR: {compoundOr}</div>
+            <div>Compound XOR: {compoundXor}</div>
+            <div>Compound LShift: {compoundLshift}</div>
+            <div>Compound RShift: {compoundRshift}</div>
+        </div>
+    }
+}
+
+app {
+    root = BitwiseOpsTest;
+}

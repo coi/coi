@@ -36,8 +36,12 @@ class Parser{
         std::unique_ptr<Expression> parse_ternary();
         std::unique_ptr<Expression> parse_or();
         std::unique_ptr<Expression> parse_and();
+        std::unique_ptr<Expression> parse_bitwise_or();
+        std::unique_ptr<Expression> parse_bitwise_xor();
+        std::unique_ptr<Expression> parse_bitwise_and();
         std::unique_ptr<Expression> parse_equality();
         std::unique_ptr<Expression> parse_comparison();
+        std::unique_ptr<Expression> parse_shift();
         std::unique_ptr<Expression> parse_additive();
         std::unique_ptr<Expression> parse_postfix();
         std::unique_ptr<Expression> parse_unary();

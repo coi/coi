@@ -297,6 +297,43 @@ std::vector<Token> Lexer::tokenize(){
             advance(); advance();
             continue;
         }
+        // Bitwise shift operators (check before single < or >)
+        if (current() == '<' && peek() == '<') {
+            if (peek(2) == '=') {
+                tokens.push_back(make_token(TokenType::LSHIFT_ASSIGN, "<<="));
+                advance(); advance(); advance();
+            } else {
+                tokens.push_back(make_token(TokenType::LSHIFT, "<<"));
+                advance(); advance();
+            }
+            continue;
+        }
+        if (current() == '>' && peek() == '>') {
+            if (peek(2) == '=') {
+                tokens.push_back(make_token(TokenType::RSHIFT_ASSIGN, ">>="));
+                advance(); advance(); advance();
+            } else {
+                tokens.push_back(make_token(TokenType::RSHIFT, ">>"));
+                advance(); advance();
+            }
+            continue;
+        }
+        // Bitwise compound assignment
+        if (current() == '&' && peek() == '=') {
+            tokens.push_back(make_token(TokenType::AMPERSAND_ASSIGN, "&="));
+            advance(); advance();
+            continue;
+        }
+        if (current() == '|' && peek() == '=') {
+            tokens.push_back(make_token(TokenType::PIPE_ASSIGN, "|="));
+            advance(); advance();
+            continue;
+        }
+        if (current() == '^' && peek() == '=') {
+            tokens.push_back(make_token(TokenType::CARET_ASSIGN, "^="));
+            advance(); advance();
+            continue;
+        }
 
         // Single-character tokens
         switch (current()) {
@@ -321,7 +358,9 @@ std::vector<Token> Lexer::tokenize(){
             case '.': tokens.push_back(make_token(TokenType::DOT, ".")); break;
             case ':': tokens.push_back(make_token(TokenType::COLON, ":")); break;
             case '&': tokens.push_back(make_token(TokenType::AMPERSAND, "&")); break;
-            case '|': tokens.push_back(make_token(TokenType::UNKNOWN, "|")); break;  // Single | not supported
+            case '|': tokens.push_back(make_token(TokenType::PIPE, "|")); break;
+            case '^': tokens.push_back(make_token(TokenType::CARET, "^")); break;
+            case '~': tokens.push_back(make_token(TokenType::TILDE, "~")); break;
             default:
                 tokens.push_back(make_token(TokenType::UNKNOWN, std::string(1, current())));
         }

@@ -7,47 +7,47 @@ import "../demos/AudioPlayer.coi";
 import "../components/CodeView.coi";
 
 component DemoSection {
-    string counterCode = "component Counter \{
+    string counterCode = `component Counter {
     mut int count = 0;
 
-    def increment() : void \{
+    def increment() : void {
         count++;
-    \}
+    }
 
-    def decrement() : void \{
+    def decrement() : void {
         count--;
-    \}
+    }
 
-    view \{
-        <div class=\"counter\">
-            <div class=\"count-text\">\{count\}</div>
-            <div class=\"buttons\">
-                <Button label=\"-\" &onclick=\{decrement\} />
-                <Button label=\"+\" &onclick=\{increment\} />
+    view {
+        <div class="counter">
+            <div class="count-text">{count}</div>
+            <div class="buttons">
+                <Button label="-" &onclick={decrement} />
+                <Button label="+" &onclick={increment} />
             </div>
         </div>
-    \}
-\}";
+    }
+}`;
 
-    string animatedBoxCode = "component AnimatedBox \{
+    string animatedBoxCode = `component AnimatedBox {
     mut float x = 0;
     mut int direction = 1;
 
-    tick(float dt) \{
+    tick(float dt) {
         x += direction * dt * 200;
     
         if (x > 300) direction = -1;
         if (x < 0) direction = 1;
-    \}
+    }
 
-    view \{
-        <div class=\"container\">
-            <div class=\"box\" style=\"left: \{x\}px;\"></div>
+    view {
+        <div class="container">
+            <div class="box" style="left: \${x}px;"></div>
         </div>
-    \}
-\}";
+    }
+}`;
 
-    string canvasCode = "component CanvasDemo \{
+    string canvasCode = `component CanvasDemo {
     mut Canvas canvas;
     mut CanvasContext2D ctx;
     mut float ballX = 150;
@@ -55,139 +55,139 @@ component DemoSection {
     mut float velY = 0;
     float gravity = 1500;
 
-    mount \{
+    mount {
         canvas.setSize(300, 200);
         ctx = canvas.getContext2d();
-    \}
+    }
 
-    tick(float dt) \{
+    tick(float dt) {
         velY += gravity * dt;
         ballY += velY * dt;
         
-        if (ballY > 185) \{
+        if (ballY > 185) {
             ballY = 185;
             velY = -velY * 0.7;
-        \}
+        }
 
         ctx.clearRect(0, 0, 300, 200);
         ctx.arc(ballX, ballY, 15, 0, 6.28);
         ctx.fill();
-    \}
+    }
 
-    view \{
-        <canvas &=\{canvas\}></canvas>
-    \}
-\}";
+    view {
+        <canvas &={canvas}></canvas>
+    }
+}`;
 
-    string inputCode = "component InputDemo \{
-    mut string text = \"\";
+    string inputCode = `component InputDemo {
+    mut string text = "";
     mut int charCount = 0;
 
-    def handleInput(string s) : void \{
+    def handleInput(string s) : void {
         text = s;
         charCount = text.length();
-    \}
+    }
 
-    view \{
-        <div class=\"input-demo\">
+    view {
+        <div class="input-demo">
             <input 
-                placeholder=\"Type something...\" 
-                oninput=\{handleInput\}
+                placeholder="Type something..." 
+                oninput={handleInput}
             />
-            <div class=\"preview\">\{text\}</div>
-            <div class=\"stats\">
-                Characters: \{charCount\}
+            <div class="preview">{text}</div>
+            <div class="stats">
+                Characters: {charCount}
             </div>
         </div>
-    \}
-\}";
+    }
+}`;
 
-    string todoCode = "component TodoItem(
+    string todoCode = `component TodoItem(
     pub int id,
     pub string text,
     pub mut bool done,
     def onRemove(int) : void
-) \{
-    view \{
-        <div class=\"item\">
-            <span>\{text\}</span>
-            <button onclick=\{onRemove(id)\}>×</button>
+) {
+    view {
+        <div class="item">
+            <span>{text}</span>
+            <button onclick={onRemove(id)}>×</button>
         </div>
-    \}
-\}
+    }
+}
 
-component TodoList \{
+component TodoList {
     mut TodoItem[] todos;
     mut int nextId = 0;
 
-    init \{
-        todos.push(TodoItem(nextId++, \"Learn Coi\", true));
-        todos.push(TodoItem(nextId++, \"Build something cool\", false));
-    \}
+    init {
+        todos.push(TodoItem(nextId++, "Learn Coi", true));
+        todos.push(TodoItem(nextId++, "Build something cool", false));
+    }
 
-    def addTodo() : void \{
-        todos.push(TodoItem(nextId++, \"New task\", false));
-    \}
+    def addTodo() : void {
+        todos.push(TodoItem(nextId++, "New task", false));
+    }
 
-    def removeTodo(int id) : void \{
+    def removeTodo(int id) : void {
         mut TodoItem[] newTodos;
-        for todo in todos \{
-            if (todo.id != id) \{
+        for todo in todos {
+            if (todo.id != id) {
                 newTodos.push(todo);
-            \}
-        \}
+            }
+        }
         todos = newTodos;
-    \}
+    }
 
-    view \{
-        <for todo in todos key=\{todo.id\}>
-            <\{todo\}
-                &onRemove=\{removeTodo\}
+    view {
+        <for todo in todos key={todo.id}>
+            <{todo}
+                &onRemove={removeTodo}
             />
         </for>
-    \}
-\}";
+    }
+}`;
 
-    string audioPlayerCode = "component AudioPlayer \{
+    string audioPlayerCode = `component AudioPlayer {
     mut Audio audio;
     mut bool playing = false;
     mut float currentTime = 0;
     mut float duration = 0;
     mut float progress = 0;
 
-    mount \{
-        audio = Audio.createAudio(\"song.mp3\");
-    \}
+    mount {
+        audio = Audio.createAudio("song.mp3");
+    }
 
-    tick(float dt) \{
-        if (playing) \{
+    tick(float dt) {
+        if (playing) {
             currentTime = audio.getCurrentTime();
             duration = audio.getDuration();
-            if (duration > 0) \{
+            if (duration > 0) {
                 progress = (currentTime / duration) * 100;
-            \}
-        \}
-    \}
+            }
+        }
+    }
 
-    def togglePlay() : void \{
+    def togglePlay() : void {
         if (playing) audio.pause();
         else audio.play();
         playing = !playing;
-    \}
+    }
 
-    view \{
-        <div class=\"progress\" style=\"width:\{progress\}%\"></div>
-        <div class=\"time\">
-            <span>\{currentTime\}s</span>
-            <span>\{duration\}s</span>
+    view {
+        <div class="progress" style="width:\${progress}%"></div>
+        <div class="time">
+            <span>{currentTime}s</span>
+            <span>{duration}s</span>
         </div>
-        <button onclick=\{togglePlay\}>
+        <button onclick={togglePlay}>
             <if playing><span>⏸</span>
             <else><span>▶</span></else>
             </if>
         </button>
-    \}
-\}";
+    }
+  }`;
 
     style {
         .demo-section {

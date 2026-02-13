@@ -53,9 +53,54 @@ std::unique_ptr<Expression> Parser::parse_or()
 
 std::unique_ptr<Expression> Parser::parse_and()
 {
-    auto left = parse_equality();
+    auto left = parse_bitwise_or();
 
     while (current().type == TokenType::AND)
+    {
+        std::string op = current().value;
+        advance();
+        auto right = parse_bitwise_or();
+        left = std::make_unique<BinaryOp>(std::move(left), op, std::move(right));
+    }
+
+    return left;
+}
+
+std::unique_ptr<Expression> Parser::parse_bitwise_or()
+{
+    auto left = parse_bitwise_xor();
+
+    while (current().type == TokenType::PIPE)
+    {
+        std::string op = current().value;
+        advance();
+        auto right = parse_bitwise_xor();
+        left = std::make_unique<BinaryOp>(std::move(left), op, std::move(right));
+    }
+
+    return left;
+}
+
+std::unique_ptr<Expression> Parser::parse_bitwise_xor()
+{
+    auto left = parse_bitwise_and();
+
+    while (current().type == TokenType::CARET)
+    {
+        std::string op = current().value;
+        advance();
+        auto right = parse_bitwise_and();
+        left = std::make_unique<BinaryOp>(std::move(left), op, std::move(right));
+    }
+
+    return left;
+}
+
+std::unique_ptr<Expression> Parser::parse_bitwise_and()
+{
+    auto left = parse_equality();
+
+    while (current().type == TokenType::AMPERSAND)
     {
         std::string op = current().value;
         advance();
@@ -83,11 +128,26 @@ std::unique_ptr<Expression> Parser::parse_equality()
 
 std::unique_ptr<Expression> Parser::parse_comparison()
 {
-    auto left = parse_additive();
+    auto left = parse_shift();
 
     while (current().type == TokenType::LT ||
            (current().type == TokenType::GT && allow_gt_comparison) ||
            current().type == TokenType::LTE || current().type == TokenType::GTE)
+    {
+        std::string op = current().value;
+        advance();
+        auto right = parse_shift();
+        left = std::make_unique<BinaryOp>(std::move(left), op, std::move(right));
+    }
+
+    return left;
+}
+
+std::unique_ptr<Expression> Parser::parse_shift()
+{
+    auto left = parse_additive();
+
+    while (current().type == TokenType::LSHIFT || current().type == TokenType::RSHIFT)
     {
         std::string op = current().value;
         advance();
@@ -139,8 +199,9 @@ std::unique_ptr<Expression> Parser::parse_postfix()
 
 std::unique_ptr<Expression> Parser::parse_unary()
 {
-    // Unary operators: -, +, !
-    if (current().type == TokenType::MINUS || current().type == TokenType::PLUS || current().type == TokenType::NOT)
+    // Unary operators: -, +, !, ~
+    if (current().type == TokenType::MINUS || current().type == TokenType::PLUS || 
+        current().type == TokenType::NOT || current().type == TokenType::TILDE)
     {
         std::string op = current().value;
         advance();

@@ -695,6 +695,27 @@ if (a || b) { }  // or
 if (!a) { }      // not
 ```
 
+### Bitwise
+
+```tsx
+int and = a & b;    // bitwise AND
+int or = a | b;     // bitwise OR
+int xor = a ^ b;    // bitwise XOR
+int not = ~a;       // bitwise NOT (complement)
+int lsh = a << 2;   // left shift
+int rsh = a >> 2;   // right shift
+```
+
+**Compound bitwise assignment:**
+
+```tsx
+flags &= mask;      // AND assign
+flags |= flag;      // OR assign
+flags ^= toggle;    // XOR assign
+value <<= 1;        // left shift assign
+value >>= 1;        // right shift assign
+```
+
 ### Assignment
 
 ```tsx
