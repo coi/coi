@@ -94,6 +94,10 @@ int GL_ARRAY_BUFFER = 0x8892;      // WebGL constant
 uint32 color = 0xFF00FF;           // RGB color value
 int mask = 0x4000;                 // Bit mask
 
+// Binary literals (0b prefix)
+int flags = 0b1010;                // Binary value (10 in decimal)
+int bitMask = 0b11110000;          // Bit mask pattern
+
 // Floating point
 float32 precise = 3.14;    // 32-bit float (single precision)
 float64 speed = 3.14159;   // 64-bit float (double precision)
