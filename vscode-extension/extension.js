@@ -795,7 +795,7 @@ function getCompletions(document, position) {
 
     // Top-level completions (types, namespaces, keywords)
     // Keywords
-    const keywords = ['component', 'def', 'view', 'style', 'prop', 'mut', 'pub', 'tick', 'init', 'mount', 'if', 'else', 'for', 'while', 'return', 'import', 'app', 'struct', 'in', 'key'];
+    const keywords = ['component', 'def', 'view', 'style', 'prop', 'mut', 'pub', 'tick', 'init', 'mount', 'if', 'else', 'for', 'while', 'match', 'return', 'import', 'app', 'struct', 'in', 'key'];
     for (const kw of keywords) {
         const item = new vscode.CompletionItem(kw, vscode.CompletionItemKind.Keyword);
         items.push(item);

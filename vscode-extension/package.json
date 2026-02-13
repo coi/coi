@@ -2,7 +2,7 @@
   "name": "coi-language",
   "displayName": "Coi Language",
   "description": "Language support for Coi - syntax highlighting, completions, hover, signature help, and formatting",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "publisher": "coi-lang",
   "icon": "logo.png",
   "repository": {
