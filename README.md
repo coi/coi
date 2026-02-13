@@ -16,7 +16,7 @@ Components with native performance. Fine-grained reactivity, zero internal GC pa
 </div>
 
 > [!NOTE]
-> Coi is actively evolving. Recent syntax changes are documented in [CHANGES.md](CHANGES.md).
+> Coi is actively evolving. Check the documentation and examples for the latest features and syntax.
 
 ## What You Can Build
 
