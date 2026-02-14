@@ -1,0 +1,32 @@
+module __PROJECT_NAME__;
+
+// API client for making HTTP requests
+// Customize this for your backend integration
+
+pod ApiResponse {
+    bool success;
+    string data;
+    string error;
+}
+
+pub component Client {
+    pub mut bool loading = false;
+    pub mut string lastError = "";
+
+    pub def get(string url) : void {
+        loading = true;
+        lastError = "";
+        // TODO: Implement fetch call
+        // fetch(url, &onResponse);
+    }
+
+    def onResponse(string response) : void {
+        loading = false;
+        // Handle response
+    }
+
+    def onError(string error) : void {
+        loading = false;
+        lastError = error;
+    }
+}

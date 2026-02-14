@@ -65,7 +65,7 @@ std::filesystem::path get_executable_dir()
 }
 
 // Get the template directory relative to the executable
-static fs::path get_template_dir()
+static fs::path get_template_dir(TemplateType template_type)
 {
     fs::path exe_dir = get_executable_dir();
     if (exe_dir.empty())
@@ -73,8 +73,21 @@ static fs::path get_template_dir()
         return fs::path();
     }
 
-    // The coi binary is at repo root, template/ is a sibling
-    fs::path tpl_dir = exe_dir / "template";
+    // Determine which template to use
+    std::string template_name;
+    switch (template_type)
+    {
+    case TemplateType::Lib:
+        template_name = "lib";
+        break;
+    case TemplateType::App:
+    default:
+        template_name = "app";
+        break;
+    }
+
+    // The coi binary is at repo root, templates/ is a sibling
+    fs::path tpl_dir = exe_dir / "templates" / template_name;
     if (fs::exists(tpl_dir))
     {
         return tpl_dir;
@@ -126,6 +139,30 @@ static bool copy_template_file(const fs::path &src, const fs::path &dest,
     return true;
 }
 
+// Convert project name to PascalCase for module name (my-lib -> MyLib)
+static std::string to_pascal_case(const std::string &name)
+{
+    std::string result;
+    bool capitalize_next = true;
+    for (char c : name)
+    {
+        if (c == '-' || c == '_')
+        {
+            capitalize_next = true;
+        }
+        else if (capitalize_next)
+        {
+            result += std::toupper(c);
+            capitalize_next = false;
+        }
+        else
+        {
+            result += c;
+        }
+    }
+    return result;
+}
+
 // Validate project name (alphanumeric, hyphens, underscores)
 static bool is_valid_project_name(const std::string &name)
 {
@@ -142,9 +179,9 @@ static bool is_valid_project_name(const std::string &name)
     return std::isalpha(name[0]) || name[0] == '_';
 }
 
-int init_project(const std::string &project_name_arg)
+int init_project(const std::string &project_name_arg, TemplateType template_type)
 {
-    fs::path tpl_dir = get_template_dir();
+    fs::path tpl_dir = get_template_dir(template_type);
     if (tpl_dir.empty() || !fs::exists(tpl_dir))
     {
         ErrorHandler::cli_error("Could not find template directory.",
@@ -176,7 +213,13 @@ int init_project(const std::string &project_name_arg)
         return input.empty() ? default_val : input;
     };
 
-    print_banner("init");
+    // Determine banner suffix based on template type
+    std::string banner_suffix = "init";
+    if (template_type == TemplateType::Lib)
+    {
+        banner_suffix = "init --lib";
+    }
+    print_banner(banner_suffix.c_str());
 
     // If no name provided, prompt for it
     if (project_name.empty())
@@ -201,8 +244,10 @@ int init_project(const std::string &project_name_arg)
     }
 
     // Placeholder variables
+    std::string module_name = to_pascal_case(project_name);
     std::map<std::string, std::string> vars = {
-        {"PROJECT_NAME", project_name}};
+        {"PROJECT_NAME", project_name},
+        {"MODULE_NAME", module_name}};
 
     // Copy entire template directory recursively
     for (const auto &entry : fs::recursive_directory_iterator(tpl_dir))
@@ -240,7 +285,14 @@ int init_project(const std::string &project_name_arg)
     std::cout << std::endl;
     std::cout << "  " << DIM << "Next steps:" << RESET << std::endl;
     std::cout << "    " << CYAN << "cd " << project_name << RESET << std::endl;
-    std::cout << "    " << CYAN << "coi dev" << RESET << std::endl;
+    if (template_type == TemplateType::App)
+    {
+        std::cout << "    " << CYAN << "coi dev" << RESET << std::endl;
+    }
+    else
+    {
+        std::cout << "    " << DIM << "# Import this library into an app project" << RESET << std::endl;
+    }
     std::cout << std::endl;
 
     return 0;
@@ -392,7 +444,7 @@ void print_help(const char *program_name)
     std::cout << "  " << BRAND << BOLD << "Coi" << RESET << " " << DIM << "- WebAssembly for the Modern Web" << RESET << std::endl;
     std::cout << std::endl;
     std::cout << "  " << BOLD << "Usage:" << RESET << std::endl;
-    std::cout << "    " << CYAN << program_name << " init" << RESET << " [name]              Create a new project" << std::endl;
+    std::cout << "    " << CYAN << program_name << " init" << RESET << " [name] [--lib]      Create a new project" << std::endl;
     std::cout << "    " << CYAN << program_name << " build" << RESET << "                    Build the project" << std::endl;
     std::cout << "    " << CYAN << program_name << " dev" << RESET << " [-h]                 Build and start dev server" << std::endl;
     std::cout << "    " << CYAN << program_name << " version" << RESET << "                  Show version" << std::endl;
@@ -403,6 +455,7 @@ void print_help(const char *program_name)
     std::cout << "    " << DIM << "--cc-only" << RESET << "         Generate C++ only, skip WASM" << std::endl;
     std::cout << "    " << DIM << "--keep-cc" << RESET << "         Keep generated C++ files" << std::endl;
     std::cout << "    " << DIM << "--no-watch" << RESET << "        Disable hot reloading (dev only)" << std::endl;
+    std::cout << "    " << DIM << "--lib" << RESET << "             Create a library project (init only)" << std::endl;
     std::cout << std::endl;
     std::cout << "  " << BOLD << "Examples:" << RESET << std::endl;
     std::cout << "    " << DIM << "$" << RESET << " coi init my-app" << std::endl;

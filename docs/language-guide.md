@@ -66,10 +66,39 @@ import "utils/Math.coi";
 ```
 
 **Key Rules:**
-1. **Explicit Imports:** You must import every file you use directly. Transitive imports (imports of imports) are not available.
+1. **Explicit Imports:** You must import every file you use directly.
 2. **Accessing Components:**
    - **Same Module:** Access components directly by name (e.g., `<Button />`).
    - **Different Module:** Access via module prefix (e.g., `<TurboUI::Button />`).
+
+### Re-exporting with `pub import`
+
+Use `pub import` to re-export components from another file. This is useful for creating library entry points:
+
+```tsx
+// MyLib.coi - Library entry point
+module MyLib;
+
+pub import "components/Button.coi";
+pub import "components/Card.coi";
+pub import "components/Input.coi";
+```
+
+Now consumers can import just the library file to access all components:
+
+```tsx
+// App.coi
+import "MyLib/src/MyLib.coi";
+
+component App {
+    view {
+        <MyLib::Button label="Click" />
+        <MyLib::Card title="Hello" />
+    }
+}
+```
+
+Without `pub import`, consumers would need to import each component file directly.
 
 ## Types
 

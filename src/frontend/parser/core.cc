@@ -152,19 +152,20 @@ void Parser::parse_file()
 
     while (current().type != TokenType::END_OF_FILE)
     {
-        // Check for pub keyword before component/enum/pod
+        // Check for pub keyword before component/enum/pod/import
         bool is_public = false;
         if (current().type == TokenType::PUB)
         {
             is_public = true;
             advance();
             
-            // pub must be followed by component, enum, or pod
+            // pub must be followed by component, enum, pod, or import
             if (current().type != TokenType::COMPONENT && 
                 current().type != TokenType::ENUM && 
-                current().type != TokenType::POD)
+                current().type != TokenType::POD &&
+                current().type != TokenType::IMPORT)
             {
-                ErrorHandler::compiler_error("'pub' can only be used with component, enum, or pod declarations", current().line);
+                ErrorHandler::compiler_error("'pub' can only be used with component, enum, pod, or import declarations", current().line);
             }
         }
 
@@ -172,7 +173,7 @@ void Parser::parse_file()
         {
             advance();
             expect(TokenType::STRING_LITERAL, "Expected import path");
-            imports.push_back(tokens[pos - 1].value);
+            imports.emplace_back(tokens[pos - 1].value, is_public);
             expect(TokenType::SEMICOLON, "Expected ';'");
         }
         else if (current().type == TokenType::COMPONENT)

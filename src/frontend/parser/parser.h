@@ -7,6 +7,14 @@
 #include <string>
 #include <map>
 
+// Represents an import declaration
+struct ImportDecl {
+    std::string path;      // The import path
+    bool is_public;        // Whether this is a pub import (re-export)
+    
+    ImportDecl(const std::string& p, bool pub = false) : path(p), is_public(pub) {}
+};
+
 class Parser{
     private:
         std::vector<Token> tokens;
@@ -66,7 +74,7 @@ class Parser{
         std::vector<Component> components;
         std::vector<std::unique_ptr<DataDef>> global_data;    // Data types declared outside components
         std::vector<std::unique_ptr<EnumDef>> global_enums;  // Enums declared outside components
-        std::vector<std::string> imports;
+        std::vector<ImportDecl> imports;  // Import declarations (path + pub status)
         AppConfig app_config;
         Parser(const std::vector<Token>& toks);
         void parse_file();

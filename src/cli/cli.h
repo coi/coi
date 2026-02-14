@@ -21,9 +21,15 @@ namespace colors {
     constexpr const char* BRAND   = "\033[38;5;141m";  // Close to #9477ff
 }
 
+// Template types for project initialization
+enum class TemplateType {
+    App,    // Default application template
+    Lib     // Library/module template
+};
+
 // Initialize a new Coi project
 // Returns 0 on success, non-zero on error
-int init_project(const std::string& project_name_arg);
+int init_project(const std::string& project_name_arg, TemplateType template_type = TemplateType::App);
 
 // Build a Coi project in the current directory
 // Returns 0 on success, non-zero on error
