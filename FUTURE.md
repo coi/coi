@@ -4,6 +4,8 @@ I have a few plans and ideas for this language, adding them here :)
 
 - **Server-side**: Use `Coi` for servers too, keep server and client codebases unified. Run logic-only components on the server and share components and code between client and server.
 
+- **Self-hosted Compiler**: Bootstrap the `Coi` compiler itself to be written in `Coi`. This creates a self-hosted language where the compiler can compile itself, making the language more cohesive and allowing compiler optimizations to benefit directly from language features.
+
 - **Cross-platform**: Make `Coi` a lightweight, high-performance cross-platform language. Think Flutter-style multi-target compilation but much lighter, one `Coi` codebase should compile for web, native mobile, and desktop.
 
 - **Direct WASM Target**: I want to add an additional `WASM` target to the `Coi` compiler that compiles directly to WebAssembly instead of just the C++ target. By skipping the C++ transpilation step, I want to enable much faster compile times and significantly better hot reloadability during development.
