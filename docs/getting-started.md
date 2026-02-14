@@ -84,6 +84,41 @@ my-app/
 └── README.md
 ```
 
+#### Creating a Library
+
+To create a reusable component library instead of an app:
+
+```bash
+coi init my-lib --lib
+```
+
+This creates a library structure with `pub import` for re-exporting components:
+
+```
+my-lib/
+├── Lib.coi              # Library entry point (pub imports)
+├── src/
+│   ├── ui/
+│   │   └── Button.coi   # UI components
+│   └── api/
+│       └── Client.coi   # API utilities
+└── README.md
+```
+
+Consumers import your library's `Lib.coi` to access all exported components:
+
+```tsx
+import "my-lib/Lib.coi";
+
+component App {
+    view {
+        <MyLib::Button label="Click" />
+    }
+}
+```
+
+See [Re-exporting with pub import](language-guide.md#re-exporting-with-pub-import) for details.
+
 If no name is provided, you'll be prompted to enter one:
 
 ```bash
@@ -261,7 +296,7 @@ import "layout/Header.coi";
 
 ### Modules
 
-You can organize files into named modules using the `module` keyword at the top of the file:
+You can organize files into named modules using the `module` keyword at the top of the file. Module names must start with an uppercase letter:
 
 ```tsx
 // src/ui/Button.coi

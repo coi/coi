@@ -47,11 +47,22 @@ int main(int argc, char **argv)
     if (first_arg == "init")
     {
         std::string project_name;
-        if (argc >= 3)
+        TemplateType template_type = TemplateType::App;
+        
+        // Parse init arguments (name and --lib can be in any order)
+        for (int i = 2; i < argc; ++i)
         {
-            project_name = argv[2];
+            std::string arg = argv[i];
+            if (arg == "--lib")
+            {
+                template_type = TemplateType::Lib;
+            }
+            else if (arg[0] != '-' && project_name.empty())
+            {
+                project_name = arg;
+            }
         }
-        return init_project(project_name);
+        return init_project(project_name, template_type);
     }
 
     // Hidden command for build system to pre-generate cache
@@ -155,6 +166,8 @@ int main(int argc, char **argv)
     std::queue<std::string> file_queue;
     // Track direct imports for each file (file -> set of directly imported files)
     std::map<std::string, std::set<std::string>> file_imports;
+    // Track pub imports for re-export resolution (file -> set of pub imported files)
+    std::map<std::string, std::set<std::string>> pub_imports;
 
     try
     {
@@ -233,15 +246,20 @@ int main(int argc, char **argv)
             fs::path current_path(current_file_path);
             fs::path parent_path = current_path.parent_path();
 
-            // Track direct imports for this file
+            // Track direct imports and pub imports for this file
             std::set<std::string> direct_imports;
-            for (const auto &import_path_str : parser.imports)
+            std::set<std::string> current_pub_imports;
+            for (const auto &import_decl : parser.imports)
             {
-                fs::path import_path = parent_path / import_path_str;
+                fs::path import_path = parent_path / import_decl.path;
                 try
                 {
                     std::string abs_path = fs::canonical(import_path).string();
                     direct_imports.insert(abs_path);
+                    if (import_decl.is_public)
+                    {
+                        current_pub_imports.insert(abs_path);
+                    }
                     if (processed_files.find(abs_path) == processed_files.end())
                     {
                         file_queue.push(abs_path);
@@ -249,11 +267,47 @@ int main(int argc, char **argv)
                 }
                 catch (const std::exception &e)
                 {
-                    std::cerr << colors::RED << "Error:" << colors::RESET << " resolving import path " << import_path_str << ": " << e.what() << std::endl;
+                    std::cerr << colors::RED << "Error:" << colors::RESET << " resolving import path " << import_decl.path << ": " << e.what() << std::endl;
                     return 1;
                 }
             }
             file_imports[current_file_path] = std::move(direct_imports);
+            if (!current_pub_imports.empty())
+            {
+                pub_imports[current_file_path] = std::move(current_pub_imports);
+            }
+        }
+
+        // Expand file_imports to include transitively re-exported files via pub imports
+        // If A imports B and B has `pub import C`, then A should also have access to C's exports
+        bool changed = true;
+        while (changed)
+        {
+            changed = false;
+            for (auto &[file, imports] : file_imports)
+            {
+                std::set<std::string> to_add;
+                for (const auto &imported_file : imports)
+                {
+                    // Check if imported_file has pub imports
+                    auto pub_it = pub_imports.find(imported_file);
+                    if (pub_it != pub_imports.end())
+                    {
+                        for (const auto &reexported : pub_it->second)
+                        {
+                            if (imports.find(reexported) == imports.end())
+                            {
+                                to_add.insert(reexported);
+                            }
+                        }
+                    }
+                }
+                if (!to_add.empty())
+                {
+                    imports.insert(to_add.begin(), to_add.end());
+                    changed = true;
+                }
+            }
         }
 
         std::cerr << "All files processed. Total components: " << all_components.size() << std::endl;

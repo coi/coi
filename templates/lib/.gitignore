@@ -1,0 +1,15 @@
+# Build output
+dist/
+
+# Cache
+.coi_cache/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+*.swp
+*.swo
+.vscode/
+.idea/

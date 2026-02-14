@@ -1,0 +1,53 @@
+module __MODULE_NAME__;
+
+// A reusable button component
+pub component Button(string label, string variant = "primary") {
+    style {
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .btn:hover {
+            transform: translateY(-1px);
+        }
+        .btn:active {
+            transform: translateY(0);
+        }
+        .primary {
+            background: #9477ff;
+            color: white;
+        }
+        .primary:hover {
+            background: #7c5ce7;
+        }
+        .secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+        .secondary:hover {
+            background: #e0e0e0;
+        }
+        .outline {
+            background: transparent;
+            border: 2px solid #9477ff;
+            color: #9477ff;
+        }
+        .outline:hover {
+            background: rgba(148, 119, 255, 0.1);
+        }
+    }
+
+    view {
+        <button class="btn {variant}">
+            {label}
+        </button>
+    }
+}

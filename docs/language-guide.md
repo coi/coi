@@ -11,6 +11,7 @@ Coi enforces naming conventions to distinguish between different constructs:
 | Components | `UpperCase` | `component Counter` | ✓ Yes |
 | Pod types | `UpperCase` | `pod User` | ✓ Yes |
 | Enums | `UpperCase` | `enum Mode` | ✓ Yes |
+| Modules | `UpperCase` | `module MyLib` | ✓ Yes |
 | Methods | `lowerCase` | `def handleClick()` | ✓ Yes |
 | Variables | `lowerCase` | `mut int count` | Recommended |
 
@@ -24,7 +25,8 @@ def handleClick() : void { }
 
 // ✗ Compile errors
 pod user { }       // Error: Pod type name must start with uppercase
-enum status { }    // Error: Enum type name must start with uppercase  
+enum status { }    // Error: Enum type name must start with uppercase
+module myLib;      // Error: Module name must start with uppercase
 def HandleClick()  // Error: Method name must start with lowercase
 ```
 
@@ -36,7 +38,7 @@ Coi uses a comprehensive module system to organize code and control visibility.
 
 ### Module Declaration
 
-Each file defines which module it belongs to using the `module` keyword at the top of the file.
+Each file defines which module it belongs to using the `module` keyword at the top of the file. Module names must start with an uppercase letter.
 
 ```tsx
 // Button.coi
@@ -66,10 +68,39 @@ import "utils/Math.coi";
 ```
 
 **Key Rules:**
-1. **Explicit Imports:** You must import every file you use directly. Transitive imports (imports of imports) are not available.
+1. **Explicit Imports:** You must import every file you use directly.
 2. **Accessing Components:**
    - **Same Module:** Access components directly by name (e.g., `<Button />`).
    - **Different Module:** Access via module prefix (e.g., `<TurboUI::Button />`).
+
+### Re-exporting with `pub import`
+
+Use `pub import` to re-export components from another file. This is useful for creating library entry points:
+
+```tsx
+// MyLib.coi - Library entry point
+module MyLib;
+
+pub import "components/Button.coi";
+pub import "components/Card.coi";
+pub import "components/Input.coi";
+```
+
+Now consumers can import just the library file to access all components:
+
+```tsx
+// App.coi
+import "MyLib/src/MyLib.coi";
+
+component App {
+    view {
+        <MyLib::Button label="Click" />
+        <MyLib::Card title="Hello" />
+    }
+}
+```
+
+Without `pub import`, consumers would need to import each component file directly.
 
 ## Types
 
