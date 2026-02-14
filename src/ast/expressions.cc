@@ -702,19 +702,11 @@ std::string PostfixOp::to_webcc() {
     return operand->to_webcc() + op;
 }
 
-void PostfixOp::collect_dependencies(std::set<std::string>& deps) {
-    operand->collect_dependencies(deps);
-}
-
 UnaryOp::UnaryOp(const std::string& o, std::unique_ptr<Expression> expr)
     : op(o), operand(std::move(expr)) {}
 
 std::string UnaryOp::to_webcc() {
     return op + operand->to_webcc();
-}
-
-void UnaryOp::collect_dependencies(std::set<std::string>& deps) {
-    operand->collect_dependencies(deps);
 }
 
 bool UnaryOp::is_static() { return operand->is_static(); }
@@ -724,17 +716,9 @@ std::string ReferenceExpression::to_webcc() {
     return operand->to_webcc();  // References are handled at call sites
 }
 
-void ReferenceExpression::collect_dependencies(std::set<std::string>& deps) {
-    operand->collect_dependencies(deps);
-}
-
 // MoveExpression - generates webcc::move() for explicit ownership transfer
 std::string MoveExpression::to_webcc() {
     return "webcc::move(" + operand->to_webcc() + ")";
-}
-
-void MoveExpression::collect_dependencies(std::set<std::string>& deps) {
-    operand->collect_dependencies(deps);
 }
 
 TernaryOp::TernaryOp(std::unique_ptr<Expression> cond, std::unique_ptr<Expression> t, std::unique_ptr<Expression> f)
