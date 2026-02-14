@@ -31,217 +31,217 @@ component AudioPlayer {
             audio.pause();
             playing = false;
         } else {
-        audio.play();
-        playing = true;
-        // Get duration after play starts
-        duration = audio.getDuration();
-    }
-}
-
-def volumeUp() : void {
-    if (volume < 100) {
-        volume = volume + 10;
-        if (volume > 100) {
-            volume = 100;
+            audio.play();
+            playing = true;
+            // Get duration after play starts
+            duration = audio.getDuration();
         }
-        float vol = volume / 100.0;
-        audio.setVolume(vol);
     }
-}
 
-def volumeDown() : void {
-    if (volume > 0) {
-        volume = volume - 10;
-        if (volume < 0) {
-            volume = 0;
+    def volumeUp() : void {
+        if (volume < 100) {
+            volume = volume + 10;
+            if (volume > 100) {
+                volume = 100;
+            }
+            float vol = volume / 100.0;
+            audio.setVolume(vol);
         }
-        float vol = volume / 100.0;
-        audio.setVolume(vol);
     }
-}
 
-style {
-    .audio-player {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    padding: 40px;
-    background: #fff;
-    border: 1px solid #eee;
-    border-radius: 12px;
-    width: 340px;
-}
-.label {
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: #999;
-    text-align: center;
-}
-.track-info {
-    text-align: center;
-}
-.track-title {
-    font-size: 18px;
-    font-weight: 600;
-    color: #1a1a1a;
-    margin-bottom: 4px;
-}
-.track-artist {
-    font-size: 13px;
-    color: #666;
-}
-.album-art {
-    width: 160px;
-    height: 160px;
-    background: linear-gradient(135deg, #9477ff 0%, #6b5ce7 100%);
-    border-radius: 12px;
-    margin: 0 auto;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 60px;
-    box-shadow: 0 4px 15px rgba(148, 119, 255, 0.3);
-}
-.progress-container {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-.progress-bar {
-    width: 100%;
-    height: 6px;
-    background: #eee;
-    border-radius: 3px;
-    overflow: hidden;
-}
-.progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #9477ff, #b19fff);
-    border-radius: 3px;
-    transition: width 0.1s linear;
-}
-.time-info {
-    display: flex;
-    justify-content: space-between;
-    font-size: 12px;
-    color: #666;
-}
-.controls {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 20px;
-}
-.play-btn {
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    background: #9477ff;
-    border: none;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 20px;
-    color: #fff;
-    transition: all 0.2s ease;
-    box-shadow: 0 4px 15px rgba(148, 119, 255, 0.4);
-}
-.play-btn:hover {
-    transform: scale(1.05);
-    background: #a388ff;
-}
-.volume-container {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-.volume-icon {
-    font-size: 16px;
-    color: #666;
-}
-.volume-bar {
-    flex: 1;
-    height: 6px;
-    background: #eee;
-    border-radius: 3px;
-    overflow: hidden;
-}
-.volume-fill {
-    height: 100%;
-    background: #9477ff;
-    border-radius: 3px;
-    transition: width 0.1s ease;
-}
-.volume-btn {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: #f5f5f5;
-    border: 1px solid #eee;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-    color: #666;
-    transition: all 0.2s ease;
-}
-.volume-btn:hover {
-    background: #9477ff;
-    color: #fff;
-    border-color: #9477ff;
-}
-.volume-text {
-    font-size: 12px;
-    color: #666;
-    width: 35px;
-    text-align: right;
-}
-}
+    def volumeDown() : void {
+        if (volume > 0) {
+            volume = volume - 10;
+            if (volume < 0) {
+                volume = 0;
+            }
+            float vol = volume / 100.0;
+            audio.setVolume(vol);
+        }
+    }
 
-view {
-    <div class = "audio-player">
-        <div class = "label" > Audio Player < /div>
+    style {
+        .audio-player {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            padding: 40px;
+            background: #fff;
+            border: 1px solid #eee;
+            border-radius: 12px;
+            width: 340px;
+        }
+        .label {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #999;
+            text-align: center;
+        }
+        .track-info {
+            text-align: center;
+        }
+        .track-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 4px;
+        }
+        .track-artist {
+            font-size: 13px;
+            color: #666;
+        }
+        .album-art {
+            width: 160px;
+            height: 160px;
+            background: linear-gradient(135deg, #9477ff 0%, #6b5ce7 100%);
+            border-radius: 12px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 60px;
+            box-shadow: 0 4px 15px rgba(148, 119, 255, 0.3);
+        }
+        .progress-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #eee;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #9477ff, #b19fff);
+            border-radius: 3px;
+            transition: width 0.1s linear;
+        }
+        .time-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #666;
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+        }
+        .play-btn {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: #9477ff;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: #fff;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 15px rgba(148, 119, 255, 0.4);
+        }
+        .play-btn:hover {
+            transform: scale(1.05);
+            background: #a388ff;
+        }
+        .volume-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .volume-icon {
+            font-size: 16px;
+            color: #666;
+        }
+        .volume-bar {
+            flex: 1;
+            height: 6px;
+            background: #eee;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .volume-fill {
+            height: 100%;
+            background: #9477ff;
+            border-radius: 3px;
+            transition: width 0.1s ease;
+        }
+        .volume-btn {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: #f5f5f5;
+            border: 1px solid #eee;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            color: #666;
+            transition: all 0.2s ease;
+        }
+        .volume-btn:hover {
+            background: #9477ff;
+            color: #fff;
+            border-color: #9477ff;
+        }
+        .volume-text {
+            font-size: 12px;
+            color: #666;
+            width: 35px;
+            text-align: right;
+        }
+    }
 
-    <div class = "album-art" > 🎵 < /div>
+    view {
+        <div class="audio-player">
+            <div class="label"> Audio Player </div>
 
-<div class = "track-info">
-    <div class = "track-title" > Coify < /div>
-<div class = "track-artist" > Demo Track < /div>
-</div>
+            <div class="album-art"> 🎵 </div>
 
-<div class = "progress-container">
-    <div class = "progress-bar">
-        <div class = "progress-fill" style = "width: ${progress}%;"></div>
-</div>
-<div class = "time-info">
-    <span > {currentTime}s < /span>
-<span > {duration}s < /span>
-</div>
-</div>
+            <div class="track-info">
+                <div class="track-title"> Coify </div>
+                <div class="track-artist"> Demo Track </div>
+            </div>
 
-<div class = "controls">
-    <button class = "play-btn" onclick = {togglePlay}>
-        <if playing>
-            <span > ⏸ < /span>
-        <else>
-            <span > ▶ < /span>
-    </else>
-</if>
-</button>
-</div>
+            <div class="progress-container">
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: ${progress}%;"></div>
+                </div>
+                <div class="time-info">
+                    <span> {currentTime}s </span>
+                    <span> {duration}s </span>
+                </div>
+            </div>
 
-<div class = "volume-container">
-    <span class = "volume-icon" > 🔊 < /span>
-<button class = "volume-btn" onclick = {volumeDown} > − < /button>
-<div class = "volume-bar">
-    <div class = "volume-fill" style = "width: ${volume}%;"></div>
-</div>
-<button class = "volume-btn" onclick = {volumeUp} > + < /button>
-<span class = "volume-text" > {volume}% < /span>
-</div>
-</div>
-}
+            <div class="controls">
+                <button class="play-btn" onclick={togglePlay}>
+                    <if playing>
+                        <span> ⏸ </span>
+                        <else>
+                            <span> ▶ </span>
+                        </else>
+                    </if>
+                </button>
+            </div>
+
+            <div class="volume-container">
+                <span class="volume-icon"> 🔊 </span>
+                <button class="volume-btn" onclick={volumeDown}> − </button>
+                <div class="volume-bar">
+                    <div class="volume-fill" style="width: ${volume}%;"></div>
+                </div>
+                <button class="volume-btn" onclick={volumeUp}> + </button>
+                <span class="volume-text"> {volume}% </span>
+            </div>
+        </div>
+    }
 }
