@@ -96,7 +96,7 @@ This creates a library structure with `pub import` for re-exporting components:
 
 ```
 my-lib/
-├── mod.coi              # Library entry point (pub imports)
+├── Lib.coi              # Library entry point (pub imports)
 ├── src/
 │   ├── ui/
 │   │   └── Button.coi   # UI components
@@ -105,10 +105,10 @@ my-lib/
 └── README.md
 ```
 
-Consumers import your library's `mod.coi` to access all exported components:
+Consumers import your library's `Lib.coi` to access all exported components:
 
 ```tsx
-import "my-lib/mod.coi";
+import "my-lib/Lib.coi";
 
 component App {
     view {

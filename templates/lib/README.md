@@ -10,7 +10,7 @@ Copy this library folder into your project and import it.
 
 ```tsx
 // Import the library (re-exports all public components)
-import "__PROJECT_NAME__/mod.coi";
+import "__PROJECT_NAME__/Lib.coi";
 
 component App {
     view {
@@ -23,7 +23,7 @@ component App {
 
 ```
 __PROJECT_NAME__/
-├── mod.coi           # Library entry point (pub imports)
+├── Lib.coi           # Library entry point (pub imports)
 ├── src/
 │   ├── ui/           # UI components
 │   │   └── Button.coi
