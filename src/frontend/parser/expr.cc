@@ -343,12 +343,27 @@ std::unique_ptr<Expression> Parser::parse_primary()
         int identifier_line = current().line;
         advance();
 
-        // Check for enum access: EnumName::Value
+        // Check for namespaced access: Module::Value or Module::Type(...)
         if (current().type == TokenType::DOUBLE_COLON)
         {
             advance();
             std::string value_name = current().value;
-            expect(TokenType::IDENTIFIER, "Expected enum value name after '::'");
+            expect(TokenType::IDENTIFIER, "Expected name after '::'");
+            
+            // Check if this is a namespaced constructor call: Module::Type(...)
+            if (current().type == TokenType::LPAREN && std::isupper(value_name[0]))
+            {
+                advance(); // consume '('
+                auto parsed_args = parse_call_args(TokenType::RPAREN);
+                expect(TokenType::RPAREN, "Expected ')'");
+                
+                // Create a component construction with qualified name
+                auto comp_expr = std::make_unique<ComponentConstruction>(name + "::" + value_name);
+                comp_expr->args = std::move(parsed_args);
+                return comp_expr;
+            }
+            
+            // Otherwise treat as enum access
             return std::make_unique<EnumAccess>(name, value_name);
         }
 

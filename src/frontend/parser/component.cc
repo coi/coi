@@ -216,8 +216,9 @@ Component Parser::parse_component()
     comp.name = current().value;
     comp.line = current().line;
 
-    // Check for collisions with built-in types
-    if (DefSchema::instance().is_handle(comp.name))
+    // Check for collisions with built-in types (only for non-namespaced components)
+    // Namespaced components like Supabase::Storage can safely shadow built-in types
+    if (module_name.empty() && DefSchema::instance().is_handle(comp.name))
     {
         throw std::runtime_error("Component name '" + comp.name + "' conflicts with a built-in type name at line " + std::to_string(current().line));
     }
@@ -433,6 +434,14 @@ Component Parser::parse_component()
             var_decl->type = current().value;
             var_decl->is_public = is_public;
             advance();
+
+            // Handle Module::Type syntax for namespaced types
+            if (current().type == TokenType::DOUBLE_COLON)
+            {
+                advance();
+                var_decl->type += "::" + current().value;
+                expect(TokenType::IDENTIFIER, "Expected type name after '::'");
+            }
 
             // Handle Component.EnumName type syntax for shared enums
             if (current().type == TokenType::DOT)

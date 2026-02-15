@@ -109,6 +109,7 @@ std::unique_ptr<Statement> Parser::parse_statement()
     {
         // Distinguish between Variable Declaration and other statements starting with Identifier
         // Declaration: Type Name ... | Type[] Name ... | Type[N] Name ... | Type& Name ...
+        //              Module::Type Name ... (namespaced type)
         // Assignment:  Name = ... | Name[index] = ... | Name[index].member = ...
         // Call:        Name(...)
 
@@ -120,6 +121,14 @@ std::unique_ptr<Statement> Parser::parse_statement()
         else if (next.type == TokenType::AMPERSAND)
         {
             is_type = true; // "Type& Name"
+        }
+        else if (next.type == TokenType::DOUBLE_COLON)
+        {
+            // Check for "Module::Type Name" pattern
+            if (peek(2).type == TokenType::IDENTIFIER && peek(3).type == TokenType::IDENTIFIER)
+            {
+                is_type = true; // Module::Type Name
+            }
         }
         else if (next.type == TokenType::LBRACKET)
         {
@@ -140,6 +149,14 @@ std::unique_ptr<Statement> Parser::parse_statement()
 
         std::string type = current().value;
         advance();
+
+        // Handle Module::Type syntax for namespaced types
+        if (current().type == TokenType::DOUBLE_COLON)
+        {
+            advance();
+            type += "::" + current().value;
+            expect(TokenType::IDENTIFIER, "Expected type name after '::'");
+        }
 
         // Handle reference type
         bool is_reference = false;
