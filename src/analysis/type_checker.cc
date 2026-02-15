@@ -513,11 +513,10 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                             
                             if (is_instance_method) {
                                 // Instance method called statically - error with helpful message
-                                std::cerr << "\033[1;31mError:\033[0m '" << method_name 
-                                          << "' is an instance method on '" << entry->method->params[0].type 
-                                          << "' and cannot be called on '" << obj_name 
-                                          << "'. Use instance." << method_name << "(...) instead at line " 
-                                          << func->line << std::endl;
+                                ErrorHandler::type_error(
+                                    "'" + method_name + "' is an instance method on '" + entry->method->params[0].type +
+                                    "' and cannot be called on '" + obj_name + "'. Use instance." + method_name + "(...) instead",
+                                    func->line);
                                 exit(1);
                             }
                             is_valid_schema_call = true;
@@ -540,8 +539,7 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                 // If not in scope and not a handle/enum/schema-namespace/static-method-type, it's undefined
                 if (!is_handle && !is_enum && !is_valid_schema_call && !has_static_method)
                 {
-                    std::cerr << "\033[1;31mError:\033[0m Undefined variable '" << obj_name 
-                              << "' in method call at line " << func->line << std::endl;
+                    ErrorHandler::type_error("Undefined variable '" + obj_name + "' in method call", func->line);
                     exit(1);
                 }
             }
@@ -643,9 +641,10 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                         else
                         {
                             // Invalid: trying to call instance method statically with wrong type
-                            std::cerr << "\033[1;31mError:\033[0m '" << method_name << "' is an instance method on '" 
-                                      << entry->method->params[0].type << "' and cannot be called on '" << obj_name 
-                                      << "'. Use instance." << method_name << "(...) instead at line " << func->line << std::endl;
+                            ErrorHandler::type_error(
+                                "'" + method_name + "' is an instance method on '" + entry->method->params[0].type +
+                                "' and cannot be called on '" + obj_name + "'. Use instance." + method_name + "(...) instead",
+                                func->line);
                             exit(1);
                         }
                     }
@@ -673,8 +672,10 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                         }
                         else
                         {
-                            std::cerr << "\033[1;31mError:\033[0m Method '" << method_name << "' does not belong to '" 
-                                      << obj_name << "'. It belongs to the '" << entry->ns << "' namespace at line " << func->line << std::endl;
+                            ErrorHandler::type_error(
+                                "Method '" + method_name + "' does not belong to '" + obj_name +
+                                "'. It belongs to the '" + entry->ns + "' namespace",
+                                func->line);
                             exit(1);
                         }
                     }
@@ -688,8 +689,10 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
 
             if (actual_args != (expected_args - param_offset))
             {
-                std::cerr << "\033[1;31mError:\033[0m Function '" << full_name << "' expects " << (expected_args - param_offset)
-                          << " arguments but got " << actual_args << " at line " << func->line << std::endl;
+                ErrorHandler::type_error(
+                    "Function '" + full_name + "' expects " + std::to_string(expected_args - param_offset) +
+                    " arguments but got " + std::to_string(actual_args),
+                    func->line);
                 exit(1);
             }
 
@@ -703,8 +706,10 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
 
                 if (!is_compatible_type(arg_type, expected_type))
                 {
-                    std::cerr << "\033[1;31mError:\033[0m Argument " << (i + 1) << " of '" << full_name << "' expects '" << expected_type
-                              << "' but got '" << arg_type << "' at line " << func->line << std::endl;
+                    ErrorHandler::type_error(
+                        "Argument " + std::to_string(i + 1) + " of '" + full_name + "' expects '" + expected_type +
+                        "' but got '" + arg_type + "'",
+                        func->line);
                     exit(1);
                 }
             }
@@ -718,7 +723,9 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                 std::string type = scope.at(obj_name);
                 if (DefSchema::instance().is_handle(type))
                 {
-                    std::cerr << "\033[1;31mError:\033[0m Method '" << method_name << "' not found for type '" << type << "' at line " << func->line << std::endl;
+                    ErrorHandler::type_error(
+                        "Method '" + method_name + "' not found for type '" + type + "'",
+                        func->line);
                     exit(1);
                 }
             }
@@ -768,14 +775,11 @@ void validate_types(const std::vector<Component> &components,
     for (const auto &c : components) {
         if (DefSchema::instance().is_handle(c.name))
         {
-            std::cerr << "Error: Component name '" << c.name
-                      << "' conflicts with built-in handle type from defs. "
-                      << "Rename the component to avoid collisions with standard library types.";
-            if (c.line > 0)
-            {
-                std::cerr << " (line " << c.line << ")";
-            }
-            std::cerr << std::endl;
+            ErrorHandler::type_error(
+                "Component name '" + c.name +
+                "' conflicts with built-in handle type from defs. "
+                "Rename the component to avoid collisions with standard library types.",
+                c.line);
             exit(1);
         }
 
@@ -832,9 +836,10 @@ void validate_types(const std::vector<Component> &components,
             // Check if the field type is a no-copy type
             if (DefSchema::instance().is_nocopy(base_type))
             {
-                std::cerr << "\033[1;31mError:\033[0m Data type '" << data_def->name 
-                          << "' cannot contain no-copy field '" << field.name << "' of type '" << field.type << "'. "
-                          << "Data types are value types (copyable) and cannot contain no-copy types like Canvas, Audio, WebSocket, etc." << std::endl;
+                ErrorHandler::type_error(
+                    "Data type '" + data_def->name + "' cannot contain no-copy field '" + field.name +
+                    "' of type '" + field.type + "'. Data types are value types (copyable) and cannot contain "
+                    "no-copy types like Canvas, Audio, WebSocket, etc.");
                 exit(1);
             }
         }
@@ -870,9 +875,10 @@ void validate_types(const std::vector<Component> &components,
                 // Check if the field type is a no-copy type
                 if (DefSchema::instance().is_nocopy(base_type))
                 {
-                    std::cerr << "\033[1;31mError:\033[0m Data type '" << data_def->name 
-                              << "' cannot contain no-copy field '" << field.name << "' of type '" << field.type << "'. "
-                              << "Data types are value types (copyable) and cannot contain no-copy types like Canvas, Audio, WebSocket, etc." << std::endl;
+                    ErrorHandler::type_error(
+                        "Data type '" + data_def->name + "' cannot contain no-copy field '" + field.name +
+                        "' of type '" + field.type + "'. Data types are value types (copyable) and cannot contain "
+                        "no-copy types like Canvas, Audio, WebSocket, etc.");
                     exit(1);
                 }
             }
@@ -887,8 +893,9 @@ void validate_types(const std::vector<Component> &components,
             // and should never be exposed to third parties
             if (param->is_public && param->is_reference)
             {
-                std::cerr << "Error: Reference parameter '" << param->name << "' cannot be public. "
-                          << "References point to the parent's data and exposing them would break encapsulation." << std::endl;
+                ErrorHandler::type_error(
+                    "Reference parameter '" + param->name + "' cannot be public. References point to the "
+                    "parent's data and exposing them would break encapsulation.");
                 exit(1);
             }
 
@@ -897,7 +904,8 @@ void validate_types(const std::vector<Component> &components,
                 std::string init = infer_expression_type(param->default_value.get(), scope);
                 if (init != "unknown" && !is_compatible_type(init, type))
                 {
-                    std::cerr << "Error: Parameter '" << param->name << "' expects '" << type << "' but initialized with '" << init << "'" << std::endl;
+                    ErrorHandler::type_error(
+                        "Parameter '" + param->name + "' expects '" + type + "' but initialized with '" + init + "'");
                     exit(1);
                 }
             }
@@ -911,15 +919,17 @@ void validate_types(const std::vector<Component> &components,
             // Disallow pub on reference state variables for the same reason
             if (var->is_public && var->is_reference)
             {
-                std::cerr << "Error: Reference variable '" << var->name << "' cannot be public. "
-                          << "References point to other data and exposing them would break encapsulation." << std::endl;
+                ErrorHandler::type_error(
+                    "Reference variable '" + var->name + "' cannot be public. References point to other data "
+                    "and exposing them would break encapsulation.");
                 exit(1);
             }
 
             // Disallow uninitialized references (they must be bound immediately)
             if (var->is_reference && !var->initializer)
             {
-                std::cerr << "Error: Reference variable '" << var->name << "' must be initialized. References cannot be left unbound." << std::endl;
+                ErrorHandler::type_error(
+                    "Reference variable '" + var->name + "' must be initialized. References cannot be left unbound.");
                 exit(1);
             }
 
@@ -936,8 +946,9 @@ void validate_types(const std::vector<Component> &components,
                             std::string owner_type = it->second;
                             if (component_names.count(owner_type))
                             {
-                                std::cerr << "Error: Storing reference to child component property is not allowed (upward reference): "
-                                          << var->name << " = " << id->name << "." << member->member << std::endl;
+                                ErrorHandler::type_error(
+                                    "Storing reference to child component property is not allowed (upward reference): " +
+                                    var->name + " = " + id->name + "." + member->member);
                                 exit(1);
                             }
                         }
@@ -956,10 +967,10 @@ void validate_types(const std::vector<Component> &components,
                 // Error: cannot create a reference to a moved value (Type& name := :expr)
                 if (var->is_reference && var->is_move)
                 {
-                    std::cerr << "\033[1;31mError:\033[0m Cannot create reference to moved value. "
-                              << "Use either 'Type& " << var->name << " = expr' (reference) or "
-                              << "'Type " << var->name << " := :expr' (move), not both. "
-                              << "At line " << var->line << std::endl;
+                    ErrorHandler::type_error(
+                        "Cannot create reference to moved value. Use either 'Type& " + var->name +
+                        " = expr' (reference) or 'Type " + var->name + " := :expr' (move), not both.",
+                        var->line);
                     exit(1);
                 }
                 
@@ -968,16 +979,18 @@ void validate_types(const std::vector<Component> &components,
                 if (!var->is_move && !var->is_reference && DefSchema::instance().is_nocopy(type)
                     && dynamic_cast<Identifier*>(var->initializer.get()))
                 {
-                    std::cerr << "\033[1;31mError:\033[0m Cannot copy '" << type << "' - it is a nocopy type. "
-                              << "Use '" << var->name << " := :source' (move) or '" << var->name << " = &source' (reference) instead. "
-                              << "At line " << var->line << std::endl;
+                    ErrorHandler::type_error(
+                        "Cannot copy '" + type + "' - it is a nocopy type. Use '" + var->name +
+                        " := :source' (move) or '" + var->name + " = &source' (reference) instead.",
+                        var->line);
                     exit(1);
                 }
                 
                 std::string init = infer_expression_type(var->initializer.get(), scope);
                 if (init != "unknown" && !is_compatible_type(init, type))
                 {
-                    std::cerr << "Error: Variable '" << var->name << "' expects '" << type << "' but initialized with '" << init << "'" << std::endl;
+                    ErrorHandler::type_error(
+                        "Variable '" + var->name + "' expects '" + type + "' but initialized with '" + init + "'");
                     exit(1);
                 }
             }
@@ -1033,8 +1046,9 @@ void validate_types(const std::vector<Component> &components,
                 
                 if (auto id = dynamic_cast<Identifier*>(expr)) {
                     if (moved_vars.count(id->name)) {
-                        std::cerr << "\033[1;31mError:\033[0m Use of moved variable '" << id->name 
-                                  << "' at line " << line << ". Variable was moved and can no longer be used." << std::endl;
+                        ErrorHandler::type_error(
+                            "Use of moved variable '" + id->name + "'. Variable was moved and can no longer be used.",
+                            line);
                         exit(1);
                     }
                 }
@@ -1088,20 +1102,21 @@ void validate_types(const std::vector<Component> &components,
                             bool arg_is_move = arg.is_move || dynamic_cast<MoveExpression*>(arg.value.get());
                             
                             if (arg_is_ref && !param_is_ref) {
-                                std::cerr << "\033[1;31mError:\033[0m Argument " << (i + 1) 
-                                          << " of '" << call->name << "' is passed by reference (&) "
-                                          << "but parameter '" << target_method->params[i].name 
-                                          << "' is not a reference type. Remove '&' or change parameter to '"
-                                          << target_method->params[i].type << "&' at line " << line << std::endl;
+                                ErrorHandler::type_error(
+                                    "Argument " + std::to_string(i + 1) + " of '" + call->name +
+                                    "' is passed by reference (&) but parameter '" + target_method->params[i].name +
+                                    "' is not a reference type. Remove '&' or change parameter to '" +
+                                    target_method->params[i].type + "&'",
+                                    line);
                                 exit(1);
                             }
                             // Check for :arg (move expression)
                             else if (arg_is_move && param_is_ref) {
-                                std::cerr << "\033[1;31mError:\033[0m Argument " << (i + 1) 
-                                          << " of '" << call->name << "' is passed by move (:) "
-                                          << "but parameter '" << target_method->params[i].name 
-                                          << "' is a reference. Use '&' for reference or remove ':' at line " 
-                                          << line << std::endl;
+                                ErrorHandler::type_error(
+                                    "Argument " + std::to_string(i + 1) + " of '" + call->name +
+                                    "' is passed by move (:) but parameter '" + target_method->params[i].name +
+                                    "' is a reference. Use '&' for reference or remove ':'",
+                                    line);
                                 exit(1);
                             }
                         }
@@ -1168,10 +1183,10 @@ void validate_types(const std::vector<Component> &components,
                         // Error: cannot create a reference to a moved value (Type& name := expr)
                         if (decl->is_reference && decl->is_move)
                         {
-                            std::cerr << "\033[1;31mError:\033[0m Cannot create reference to moved value. "
-                                      << "Use either 'Type& " << decl->name << " = expr' (reference) or "
-                                      << "'Type " << decl->name << " := expr' (move), not both. "
-                                      << "At line " << decl->line << std::endl;
+                            ErrorHandler::type_error(
+                                "Cannot create reference to moved value. Use either 'Type& " + decl->name +
+                                " = expr' (reference) or 'Type " + decl->name + " := expr' (move), not both.",
+                                decl->line);
                             exit(1);
                         }
                         
@@ -1180,16 +1195,19 @@ void validate_types(const std::vector<Component> &components,
                         if (!decl->is_move && !decl->is_reference && DefSchema::instance().is_nocopy(type)
                             && dynamic_cast<Identifier*>(decl->initializer.get()))
                         {
-                            std::cerr << "\033[1;31mError:\033[0m Cannot copy '" << type << "' - it is a nocopy type. "
-                                      << "Use '" << decl->name << " := :source' (move) or '" << decl->name << " = &source' (reference) instead. "
-                                      << "At line " << decl->line << std::endl;
+                            ErrorHandler::type_error(
+                                "Cannot copy '" + type + "' - it is a nocopy type. Use '" + decl->name +
+                                " := :source' (move) or '" + decl->name + " = &source' (reference) instead.",
+                                decl->line);
                             exit(1);
                         }
                         
                         std::string init = infer_expression_type(decl->initializer.get(), current_scope);
                         if (init != "unknown" && !is_compatible_type(init, type))
                         {
-                    std::cerr << "\033[1;31mError:\033[0m Variable '" << decl->name << "' expects '" << type << "' but got '" << init << "' at line " << decl->line << std::endl;
+                            ErrorHandler::type_error(
+                                "Variable '" + decl->name + "' expects '" + type + "' but got '" + init + "'",
+                                decl->line);
                             exit(1);
                         }
                     }
@@ -1203,8 +1221,9 @@ void validate_types(const std::vector<Component> &components,
                 {
                     // Check if the target variable itself was moved
                     if (moved_vars.count(assign->name)) {
-                        std::cerr << "\033[1;31mError:\033[0m Assignment to moved variable '" << assign->name 
-                                  << "' at line " << assign->line << ". Variable was moved and can no longer be used." << std::endl;
+                        ErrorHandler::type_error(
+                            "Assignment to moved variable '" + assign->name + "'. Variable was moved and can no longer be used.",
+                            assign->line);
                         exit(1);
                     }
                     
@@ -1227,9 +1246,10 @@ void validate_types(const std::vector<Component> &components,
                     if (!assign->is_move && DefSchema::instance().is_nocopy(var_type)
                         && dynamic_cast<Identifier*>(assign->value.get()))
                     {
-                        std::cerr << "\033[1;31mError:\033[0m Cannot copy '" << var_type << "' - it is a nocopy type. "
-                                  << "Use '" << assign->name << " := :source' (move) instead. "
-                                  << "At line " << assign->line << std::endl;
+                        ErrorHandler::type_error(
+                            "Cannot copy '" + var_type + "' - it is a nocopy type. Use '" + assign->name +
+                            " := :source' (move) instead.",
+                            assign->line);
                         exit(1);
                     }
                     
@@ -1242,7 +1262,9 @@ void validate_types(const std::vector<Component> &components,
                     {
                         if (!is_compatible_type(val_type, var_type))
                         {
-                            std::cerr << "\033[1;31mError:\033[0m Assigning '" << val_type << "' to '" << assign->name << "' of type '" << var_type << "' at line " << assign->line << std::endl;
+                            ErrorHandler::type_error(
+                                "Assigning '" + val_type + "' to '" + assign->name + "' of type '" + var_type + "'",
+                                assign->line);
                             exit(1);
                         }
                     }
@@ -1327,8 +1349,9 @@ void validate_types(const std::vector<Component> &components,
                     
                     if (element_type != "unknown" && !is_compatible_type(element_type, value_type))
                     {
-                        std::cerr << "Type error: Cannot assign '" << value_type 
-                                  << "' to array element of type '" << element_type << "'" << std::endl;
+                        ErrorHandler::type_error(
+                            "Cannot assign '" + value_type + "' to array element of type '" + element_type + "'",
+                            idx_assign->line);
                         exit(1);
                     }
                     
@@ -1336,7 +1359,7 @@ void validate_types(const std::vector<Component> &components,
                     std::string index_type = infer_expression_type(idx_assign->index.get(), current_scope);
                     if (index_type != "int32" && index_type != "float64" && index_type != "float32" && index_type != "unknown")
                     {
-                        std::cerr << "Type error: Array index must be numeric, got '" << index_type << "'" << std::endl;
+                        ErrorHandler::type_error("Array index must be numeric, got '" + index_type + "'", idx_assign->line);
                         exit(1);
                     }
                 }
@@ -1383,12 +1406,13 @@ void validate_types(const std::vector<Component> &components,
                             access_desc = "expression";
                         }
                         
-                        std::cerr << "Error: Cannot assign to member '" << member_assign->member 
-                                  << "' of component '" << obj_type << "' (via " << access_desc << "). "
-                                  << "Component state can only be modified from within the component itself. "
-                                  << "Use a public method like 'set" 
-                                  << (char)std::toupper(member_assign->member[0]) 
-                                  << member_assign->member.substr(1) << "()' instead." << std::endl;
+                        ErrorHandler::type_error(
+                            "Cannot assign to member '" + member_assign->member + "' of component '" + obj_type +
+                            "' (via " + access_desc + "). Component state can only be modified from within the "
+                            "component itself. Use a public method like 'set" +
+                            std::string(1, (char)std::toupper(member_assign->member[0])) +
+                            member_assign->member.substr(1) + "()' instead.",
+                            member_assign->line);
                         exit(1);
                     }
                     
@@ -1429,11 +1453,12 @@ void validate_types(const std::vector<Component> &components,
                                             
                                             if (!modified_vars.empty())
                                             {
-                                                std::cerr << "\033[1;31mError:\033[0m Cannot call mutating method '" 
-                                                          << method_name << "' on const component variable '" 
-                                                          << obj_name << "'. Declare as 'mut " << obj_type << " " 
-                                                          << obj_name << "' to allow mutation. At line " 
-                                                          << expr_stmt->line << std::endl;
+                                                ErrorHandler::type_error(
+                                                    "Cannot call mutating method '" + method_name +
+                                                    "' on const component variable '" + obj_name +
+                                                    "'. Declare as 'mut " + obj_type + " " + obj_name +
+                                                    "' to allow mutation.",
+                                                    expr_stmt->line);
                                                 exit(1);
                                             }
                                             break;
@@ -1458,15 +1483,18 @@ void validate_types(const std::vector<Component> &components,
                         // Has a return value
                         if (expected_return == "void")
                         {
-                            std::cerr << "Type error: Cannot return a value from void function '" 
-                                      << method.name << "'" << std::endl;
+                            ErrorHandler::type_error(
+                                "Cannot return a value from void function '" + method.name + "'",
+                                ret_stmt->line);
                             exit(1);
                         }
                         std::string actual_return = infer_expression_type(ret_stmt->value.get(), current_scope);
                         if (actual_return != "unknown" && !is_compatible_type(actual_return, expected_return))
                         {
-                            std::cerr << "Type error: Function '" << method.name << "' expects return type '" 
-                                      << expected_return << "' but got '" << actual_return << "'" << std::endl;
+                            ErrorHandler::type_error(
+                                "Function '" + method.name + "' expects return type '" + expected_return +
+                                "' but got '" + actual_return + "'",
+                                ret_stmt->line);
                             exit(1);
                         }
                     }
@@ -1475,8 +1503,9 @@ void validate_types(const std::vector<Component> &components,
                         // No return value (bare 'return;')
                         if (expected_return != "void")
                         {
-                            std::cerr << "Type error: Function '" << method.name 
-                                      << "' must return a value of type '" << expected_return << "'" << std::endl;
+                            ErrorHandler::type_error(
+                                "Function '" + method.name + "' must return a value of type '" + expected_return + "'",
+                                ret_stmt->line);
                             exit(1);
                         }
                     }
@@ -2137,9 +2166,11 @@ void validate_type_imports(const std::vector<Component> &components,
             {
                 if (!is_type_accessible(base_type, comp.source_file, it->second))
                 {
-                    throw std::runtime_error(
-                        "Type '" + base_type + "' is not directly imported in component '" + comp.name + 
-                        "' (parameter '" + param->name + "') at line " + std::to_string(param->line));
+                    ErrorHandler::type_error(
+                        "Type '" + base_type + "' is not directly imported in component '" + comp.name +
+                        "' (parameter '" + param->name + "')",
+                        param->line);
+                    exit(1);
                 }
             }
             
@@ -2148,9 +2179,11 @@ void validate_type_imports(const std::vector<Component> &components,
             {
                 if (!is_type_accessible(base_type, comp.source_file, it->second))
                 {
-                    throw std::runtime_error(
-                        "Enum '" + base_type + "' is not directly imported in component '" + comp.name + 
-                        "' (parameter '" + param->name + "') at line " + std::to_string(param->line));
+                    ErrorHandler::type_error(
+                        "Enum '" + base_type + "' is not directly imported in component '" + comp.name +
+                        "' (parameter '" + param->name + "')",
+                        param->line);
+                    exit(1);
                 }
             }
         }
@@ -2164,9 +2197,11 @@ void validate_type_imports(const std::vector<Component> &components,
             {
                 if (!is_type_accessible(base_type, comp.source_file, it->second))
                 {
-                    throw std::runtime_error(
-                        "Type '" + base_type + "' is not directly imported in component '" + comp.name + 
-                        "' (state variable '" + state->name + "') at line " + std::to_string(state->line));
+                    ErrorHandler::type_error(
+                        "Type '" + base_type + "' is not directly imported in component '" + comp.name +
+                        "' (state variable '" + state->name + "')",
+                        state->line);
+                    exit(1);
                 }
             }
             
@@ -2174,9 +2209,11 @@ void validate_type_imports(const std::vector<Component> &components,
             {
                 if (!is_type_accessible(base_type, comp.source_file, it->second))
                 {
-                    throw std::runtime_error(
-                        "Enum '" + base_type + "' is not directly imported in component '" + comp.name + 
-                        "' (state variable '" + state->name + "') at line " + std::to_string(state->line));
+                    ErrorHandler::type_error(
+                        "Enum '" + base_type + "' is not directly imported in component '" + comp.name +
+                        "' (state variable '" + state->name + "')",
+                        state->line);
+                    exit(1);
                 }
             }
         }
