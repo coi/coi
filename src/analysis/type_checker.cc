@@ -614,6 +614,12 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                             }
                         }
                     }
+                    // If obj is in scope but types don't match, skip schema validation.
+                    // This handles component method calls that happen to share names with schema methods.
+                    if (!implicit_obj)
+                    {
+                        return "unknown";
+                    }
                 }
                 else
                 {
