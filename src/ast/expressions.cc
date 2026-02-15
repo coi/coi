@@ -835,6 +835,11 @@ std::string ComponentConstruction::to_webcc() {
             resolved_name = convert_type(qualified_ctor);
         }
     }
+    // Explicit namespaced constructors (e.g., Supabase::Auth(...))
+    // must be lowered to C++ type names (Supabase_Auth(...)).
+    if (resolved_name.find("::") != std::string::npos) {
+        resolved_name = convert_type(resolved_name);
+    }
     std::string result = resolved_name + "(";
     for (size_t i = 0; i < args.size(); i++) {
         if (i > 0) result += ", ";
