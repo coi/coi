@@ -80,6 +80,7 @@ void generate_css_file(
         if (!comp.css.empty())
         {
             std::string raw = comp.css;
+            std::string scope_name = qualified_name(comp.module_name, comp.name);
             size_t pos = 0;
 
             // Helper lambda to scope a single selector
@@ -93,11 +94,11 @@ void generate_css_file(
                 size_t colon = trimmed.find(':');
                 if (colon != std::string::npos)
                 {
-                    return trimmed.substr(0, colon) + "[coi-scope=\"" + comp.name + "\"]" + trimmed.substr(colon);
+                    return trimmed.substr(0, colon) + "[coi-scope=\"" + scope_name + "\"]" + trimmed.substr(colon);
                 }
                 else
                 {
-                    return trimmed + "[coi-scope=\"" + comp.name + "\"]";
+                    return trimmed + "[coi-scope=\"" + scope_name + "\"]";
                 }
             };
 
