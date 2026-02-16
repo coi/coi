@@ -77,19 +77,111 @@ import "@supabase";      // .coi/pkgs/supabase/Mod.coi
 import "@ui-kit/Button"; // .coi/pkgs/ui-kit/Button.coi
 ```
 
-## Create and Publish a Package
+## Creating a Package
 
-Use the package template to create a publishable package:
+To create a reusable component package:
 
 ```bash
 coi init my-pkg --pkg
 ```
 
-Then:
+This creates a package structure:
 
-1. Build your package code in `src/` and export public APIs from `Mod.coi`.
-2. Fill out `registry-entry.json` (name, repository, description, keywords, release metadata).
-3. Copy `registry-entry.json` into the registry repo as `packages/<your-package>.json`.
-4. Open a PR to publish it.
+```
+my-pkg/
+├── Mod.coi              # Package entry point (pub imports)
+├── registry-entry.json  # Registry metadata template
+├── src/
+│   ├── ui/
+│   │   └── Button.coi   # UI components
+│   └── api/
+│       └── Client.coi   # API utilities
+└── README.md
+```
 
-For full registry rules and validation details, see [Registry docs](https://github.com/coi-lang/registry/blob/main/README.md).
+### Package Entry Point (`Mod.coi`)
+
+`Mod.coi` is the entry point that consumers import. Use `pub import` to re-export your public components:
+
+```tsx
+// Mod.coi
+pub import "src/ui/Button";
+pub import "src/api/Client";
+```
+
+Consumers then import your package:
+
+```tsx
+import "@my-pkg";
+
+component App {
+    view {
+        <MyPkg::Button label="Click" />
+    }
+}
+```
+
+See [Re-exporting with pub import](language-guide.md#re-exporting-with-pub-import) for details.
+
+### Testing Your Package
+
+To test components locally before publishing:
+
+```bash
+coi init test-app
+cd test-app
+mkdir -p .coi/pkgs
+cp -r ../my-pkg .coi/pkgs/
+coi dev
+```
+
+Then import with `@my-pkg` in your test app.
+
+## Publishing to the Registry
+
+The [Coi Registry](https://github.com/coi-lang/registry) is the community package index. Packages created with `--pkg` include a `registry-entry.json` template ready for submission.
+
+### Prepare `registry-entry.json`
+
+Fill in these fields:
+
+| Field | Description |
+|-------|-------------|
+| `name` | Package ID (must match filename when submitted) |
+| `repository` | GitHub URL (e.g., `https://github.com/you/my-pkg`) |
+| `description` | Short description of your package |
+| `keywords` | Search keywords (e.g., `["coi", "ui", "components"]`) |
+
+For each release in the `releases` array:
+
+| Field | Description |
+|-------|-------------|
+| `version` | Semver (e.g., `0.1.0`, `1.2.3-beta`) |
+| `compiler-drop.min` | Minimum compiler drop your package supports (optimistic) |
+| `compiler-drop.tested-on` | Compiler drop you actually tested with |
+| `source.commit` | Git commit SHA (40 hex chars) |
+| `source.sha256` | SHA256 of the commit tarball |
+| `releasedAt` | Release date (YYYY-MM-DD) |
+
+> [!TIP]
+> Registry CI can auto-populate `source.commit` and `source.sha256` if you leave the placeholder values. Just make sure your repo has the release commit pushed.
+
+### Submit to Registry
+
+1. Fork the [registry repo](https://github.com/coi-lang/registry)
+2. Copy your `registry-entry.json` to `packages/<your-package>.json`
+3. Validate locally:
+   ```bash
+   python3 scripts/validate_registry.py --offline
+   ```
+4. Open a PR — CI validates and can fill in missing source fields
+
+### Publishing New Versions
+
+To release a new version, add a new entry to the `releases` array in your package file (newest first) and open a PR.
+
+### Requirements
+
+- Repository must be public on GitHub
+- License must be MIT (registry CI enforces this)
+- Each release must pin exact source code via `commit` + `sha256` for supply chain security

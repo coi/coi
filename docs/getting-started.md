@@ -92,48 +92,9 @@ To create a reusable component package instead of an app:
 coi init my-pkg --pkg
 ```
 
-This creates a package structure with `pub import` for re-exporting components:
+This creates a package structure with `Mod.coi` as the entry point and a `registry-entry.json` template for publishing.
 
-```
-my-pkg/
-├── Mod.coi              # Package entry point (pub imports)
-├── registry-entry.json  # Registry metadata file for publishing
-├── src/
-│   ├── ui/
-│   │   └── Button.coi   # UI components
-│   └── api/
-│       └── Client.coi   # API utilities
-└── README.md
-```
-
-Consumers import your package's `Mod.coi` to access all exported components:
-
-```tsx
-import "@my-pkg";
-
-component App {
-    view {
-        <MyPkg::Button label="Click" />
-    }
-}
-```
-
-See [Re-exporting with pub import](language-guide.md#re-exporting-with-pub-import) for details.
-
-#### Registry File (`registry-entry.json`)
-
-Packages created with `coi init my-pkg --pkg` include a `registry-entry.json` file.
-
-Use this file when publishing your package to the community package index:
-
-1. Fill in repository/description/keywords
-2. Set `compiler-drop.min` (optimistic compatibility)
-3. Set `compiler-drop.tested-on` (latest compiler drop you verified)
-4. Copy it into the registry repo under `packages/{your-pkg-name}.json`
-
-Registry docs and validation rules:
-
-- [Coi Package Registry README](https://github.com/coi-lang/registry/blob/main/README.md)
+See [Package Manager](package-manager.md#creating-a-package) for the full workflow on creating and publishing packages.
 
 If no name is provided, you'll be prompted to enter one:
 
@@ -214,47 +175,20 @@ This also generates `dist/App.cc` so you can inspect the generated C++ code.
 
 ### Package Management
 
-Coi has a built-in package manager for adding community packages from the [registry](https://github.com/coi-lang/registry).
-
-> [!NOTE]
-> For the full package workflow (lockfile, imports, updates, and publishing), see [Package Manager](package-manager.md).
-
-#### Adding a Package
+Coi has a built-in package manager for adding community packages:
 
 ```bash
-coi add supabase
-# or pin a specific release
-coi add supabase 0.1.0
+coi add supabase        # Add a package
+coi install             # Install from coi.lock
 ```
 
-This:
-1. Resolves a release from the registry (latest release with `compiler-drop.min` compatible with your current compiler drop, unless a specific version is provided)
-2. Downloads it to `.coi/pkgs/supabase/`
-3. Creates/updates `coi.lock` to track the version
-
-Then import it in your code:
+Then import it:
 
 ```tsx
 import "@supabase";
 ```
 
-#### Installing from Lock File
-
-When cloning a project or after pulling updates, install all packages from `coi.lock`:
-
-```bash
-coi install
-```
-
-#### Other Commands
-
-| Command | Description |
-|---------|-------------|
-| `coi remove <package>` | Remove a package |
-| `coi update [package]` | Update one or all packages |
-| `coi list` | List installed packages |
-
-The `coi.lock` file should be committed to version control so collaborators get the same package versions.
+See [Package Manager](package-manager.md) for the full workflow.
 
 ## Your First Component
 

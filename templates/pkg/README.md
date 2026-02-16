@@ -55,26 +55,9 @@ coi dev
 
 ## Publish to Registry
 
-This template includes `registry-entry.json` — your package's registry file.
+This template includes `registry-entry.json` for publishing to the [Coi Registry](https://github.com/coi-lang/registry).
 
-Before submitting:
-
-1. Replace `YOUR_GITHUB_USERNAME` with your GitHub username or org in `repository`
-2. Fill in `description` and `keywords`
-3. Set `compiler-drop.min` (optimistic) and `compiler-drop.tested-on` (verified)
-4. Replace `__COMMIT_SHA__` with your release commit (40-char hex)
-5. Replace `__TARBALL_SHA256__` with the SHA256 of your tarball (or let CI compute it)
-6. Keep your GitHub repo license as MIT (registry CI enforces this)
-
-**Supply Chain Security:** Each release requires `source.commit` and `source.sha256` to pin exact code and enable integrity verification. Registry CI can auto-populate these with `--auto-source` if you leave the placeholders.
-
-To submit:
-
-1. Copy `registry-entry.json` to the registry repo as `packages/__PROJECT_NAME__.json`
-2. (Optional) place it in a shard directory, e.g. `packages/ab/__PROJECT_NAME__.json`
-3. Open a PR — CI will validate and optionally fill in missing source fields
-
-When releasing new versions, add entries to the `releases` array in your package file.
+See the [Publishing Guide](https://github.com/io-eric/coi/blob/main/docs/package-manager.md#publishing-to-the-registry) for step-by-step instructions.
 
 ## Learn More
 
