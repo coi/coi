@@ -125,10 +125,11 @@ int main(int argc, char **argv)
         if (argc < 3)
         {
             std::cerr << colors::RED << "Error:" << colors::RESET << " Package name required" << std::endl;
-            std::cerr << "  Usage: coi add <package-name>" << std::endl;
+            std::cerr << "  Usage: coi add <package-name> [version]" << std::endl;
             return 1;
         }
-        return add_package(argv[2]);
+        std::string requested_version = (argc >= 4) ? argv[3] : "";
+        return add_package(argv[2], requested_version);
     }
 
     if (first_arg == "install")

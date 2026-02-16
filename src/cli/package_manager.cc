@@ -1,11 +1,13 @@
 #include "package_manager.h"
 #include "cli.h"
+#include "version.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
 #include <cstdlib>
 #include <regex>
 #include <array>
+#include <vector>
 
 using namespace colors;
 
@@ -31,80 +33,122 @@ static std::string extract_json_string(const std::string& json, const std::strin
     return json.substr(start, end - start);
 }
 
-// Extract version from releases array (gets first/latest version)
-static std::string extract_latest_version(const std::string& json) {
-    // Find releases array
-    size_t pos = json.find("\"releases\"");
-    if (pos == std::string::npos) return "";
-    
-    pos = json.find('[', pos);
-    if (pos == std::string::npos) return "";
-    
-    // Find first version in releases
-    pos = json.find("\"version\"", pos);
-    if (pos == std::string::npos) return "";
-    
-    pos = json.find(':', pos);
-    if (pos == std::string::npos) return "";
-    
-    pos = json.find('"', pos);
-    if (pos == std::string::npos) return "";
-    
-    size_t start = pos + 1;
-    size_t end = json.find('"', start);
-    if (end == std::string::npos) return "";
-    
-    return json.substr(start, end - start);
+struct RegistryRelease {
+    std::string version;
+    int min_drop = 0;
+    int tested_on = 0;
+    std::string commit;
+    std::string sha256;
+};
+
+static bool extract_string_field(const std::string& json, const std::string& key, std::string& out) {
+    std::regex re("\"" + key + "\"\\s*:\\s*\"([^\"]+)\"");
+    std::smatch m;
+    if (std::regex_search(json, m, re) && m.size() > 1) {
+        out = m[1].str();
+        return true;
+    }
+    return false;
 }
 
-// Extract commit and sha256 from releases[0].source
-static void extract_release_source(const std::string& json, std::string& commit, std::string& sha256) {
-    commit.clear();
-    sha256.clear();
+static bool extract_int_field(const std::string& json, const std::string& key, int& out) {
+    std::regex re("\"" + key + "\"\\s*:\\s*([0-9]+)");
+    std::smatch m;
+    if (std::regex_search(json, m, re) && m.size() > 1) {
+        out = std::stoi(m[1].str());
+        return true;
+    }
+    return false;
+}
 
-    // Find releases array
-    size_t pos = json.find("\"releases\"");
-    if (pos == std::string::npos) return;
+static std::vector<std::string> extract_release_objects(const std::string& json) {
+    std::vector<std::string> releases;
 
-    pos = json.find('[', pos);
-    if (pos == std::string::npos) return;
+    size_t releases_pos = json.find("\"releases\"");
+    if (releases_pos == std::string::npos) return releases;
 
-    // Find first release's source object
-    size_t source_pos = json.find("\"source\"", pos);
-    if (source_pos == std::string::npos) return;
+    size_t array_start = json.find('[', releases_pos);
+    if (array_start == std::string::npos) return releases;
 
-    // Make sure source is before the next release (before next },{)
-    size_t next_release = json.find("},{", pos);
-    if (next_release != std::string::npos && source_pos > next_release) return;
+    bool in_string = false;
+    bool escape = false;
+    int brace_depth = 0;
+    size_t object_start = std::string::npos;
 
-    // Find commit within source
-    size_t commit_pos = json.find("\"commit\"", source_pos);
-    if (commit_pos != std::string::npos) {
-        size_t colon = json.find(':', commit_pos);
-        if (colon != std::string::npos) {
-            size_t q1 = json.find('"', colon + 1);
-            if (q1 != std::string::npos) {
-                size_t q2 = json.find('"', q1 + 1);
-                if (q2 != std::string::npos) {
-                    commit = json.substr(q1 + 1, q2 - q1 - 1);
+    for (size_t i = array_start + 1; i < json.size(); ++i) {
+        char c = json[i];
+
+        if (escape) {
+            escape = false;
+            continue;
+        }
+
+        if (c == '\\') {
+            escape = true;
+            continue;
+        }
+
+        if (c == '"') {
+            in_string = !in_string;
+            continue;
+        }
+
+        if (in_string) continue;
+
+        if (c == '{') {
+            if (brace_depth == 0) {
+                object_start = i;
+            }
+            brace_depth++;
+            continue;
+        }
+
+        if (c == '}') {
+            if (brace_depth > 0) {
+                brace_depth--;
+                if (brace_depth == 0 && object_start != std::string::npos) {
+                    releases.push_back(json.substr(object_start, i - object_start + 1));
+                    object_start = std::string::npos;
                 }
             }
+            continue;
+        }
+
+        if (c == ']' && brace_depth == 0) {
+            break;
         }
     }
 
-    // Find sha256 within source
-    size_t sha256_pos = json.find("\"sha256\"", source_pos);
-    if (sha256_pos != std::string::npos) {
-        size_t colon = json.find(':', sha256_pos);
-        if (colon != std::string::npos) {
-            size_t q1 = json.find('"', colon + 1);
-            if (q1 != std::string::npos) {
-                size_t q2 = json.find('"', q1 + 1);
-                if (q2 != std::string::npos) {
-                    sha256 = json.substr(q1 + 1, q2 - q1 - 1);
-                }
-            }
-        }
+    return releases;
+}
+
+static bool parse_release(const std::string& release_json, RegistryRelease& release) {
+    if (!extract_string_field(release_json, "version", release.version)) return false;
+
+    std::smatch drop_match;
+    std::regex drop_re("\"compiler-drop\"\\s*:\\s*\\{[^\\}]*\"min\"\\s*:\\s*([0-9]+)[^\\}]*\"tested-on\"\\s*:\\s*([0-9]+)");
+    if (!std::regex_search(release_json, drop_match, drop_re) || drop_match.size() < 3) {
+        return false;
+    }
+    release.min_drop = std::stoi(drop_match[1].str());
+    release.tested_on = std::stoi(drop_match[2].str());
+
+    std::smatch source_match;
+    std::regex source_re("\"source\"\\s*:\\s*\\{[^\\}]*\"commit\"\\s*:\\s*\"([^\"]+)\"[^\\}]*\"sha256\"\\s*:\\s*\"([^\"]+)\"");
+    if (!std::regex_search(release_json, source_match, source_re) || source_match.size() < 3) {
+        return false;
+    }
+    release.commit = source_match[1].str();
+    release.sha256 = source_match[2].str();
+
+    return true;
+}
+
+static int get_current_compiler_drop() {
+    try {
+        return std::stoi(GIT_COMMIT_COUNT);
+    } catch (...) {
+        return 0;
     }
 }
 
@@ -251,7 +295,7 @@ bool write_lock_file(const fs::path& lock_path, const std::map<std::string, Lock
     return true;
 }
 
-bool fetch_package_info(const std::string& package_name, PackageInfo& package_info) {
+bool fetch_package_info(const std::string& package_name, PackageInfo& package_info, const std::string& requested_version) {
     std::string url = REGISTRY_BASE_URL + package_name + ".json";
     
     // Use curl to fetch
@@ -274,12 +318,65 @@ bool fetch_package_info(const std::string& package_name, PackageInfo& package_in
     
     package_info.name = extract_json_string(json, "name");
     package_info.repository = extract_json_string(json, "repository");
-    package_info.version = extract_latest_version(json);
-    extract_release_source(json, package_info.commit, package_info.sha256);
     
     if (package_info.name.empty() || package_info.repository.empty()) {
         return false;
     }
+
+    std::vector<std::string> release_objects = extract_release_objects(json);
+    if (release_objects.empty()) {
+        std::cerr << RED << "Error:" << RESET << " Package '" << package_name << "' has no releases in registry" << std::endl;
+        return false;
+    }
+
+    int current_drop = get_current_compiler_drop();
+    RegistryRelease selected;
+    bool found = false;
+
+    for (const auto& release_json : release_objects) {
+        RegistryRelease candidate;
+        if (!parse_release(release_json, candidate)) {
+            continue;
+        }
+
+        if (!requested_version.empty()) {
+            if (candidate.version != requested_version) {
+                continue;
+            }
+
+            if (current_drop > 0 && candidate.min_drop > current_drop) {
+                std::cerr << RED << "Error:" << RESET << " Requested " << package_name << "@" << requested_version
+                          << " requires compiler drop >= " << candidate.min_drop
+                          << " (current: " << current_drop << ")" << std::endl;
+                return false;
+            }
+
+            selected = candidate;
+            found = true;
+            break;
+        }
+
+        if (current_drop <= 0 || candidate.min_drop <= current_drop) {
+            selected = candidate;
+            found = true;
+            break;
+        }
+    }
+
+    if (!found) {
+        if (!requested_version.empty()) {
+            std::cerr << RED << "Error:" << RESET << " Version '" << requested_version
+                      << "' not found for package '" << package_name << "'" << std::endl;
+        } else {
+            std::cerr << RED << "Error:" << RESET << " No compatible release found for package '" << package_name << "'"
+                      << " on compiler drop " << current_drop << std::endl;
+        }
+        return false;
+    }
+
+    package_info.version = selected.version;
+    package_info.commit = selected.commit;
+    package_info.sha256 = selected.sha256;
     
     // commit and sha256 are required for security
     if (package_info.commit.empty() || package_info.sha256.empty()) {
@@ -373,8 +470,8 @@ int add_package(const std::string& package_name, const std::string& version) {
     
     // Fetch package info from registry
     PackageInfo info;
-    if (!fetch_package_info(package_name, info)) {
-        std::cerr << RED << "Error:" << RESET << " Package '" << package_name << "' not found in registry" << std::endl;
+    if (!fetch_package_info(package_name, info, version)) {
+        std::cerr << RED << "Error:" << RESET << " Could not resolve installable release for package '" << package_name << "'" << std::endl;
         return 1;
     }
     

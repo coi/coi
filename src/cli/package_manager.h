@@ -59,7 +59,7 @@ bool write_lock_file(const fs::path& lock_path, const std::map<std::string, Lock
 
 // Fetch package info from registry
 // Returns true on success and fills package_info
-bool fetch_package_info(const std::string& package_name, PackageInfo& package_info);
+bool fetch_package_info(const std::string& package_name, PackageInfo& package_info, const std::string& version = "");
 
 // Download/clone a package to destination
 bool download_package(const PackageInfo& info, const fs::path& dest);
