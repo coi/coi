@@ -79,8 +79,8 @@ static fs::path get_template_dir(TemplateType template_type)
     std::string template_name;
     switch (template_type)
     {
-    case TemplateType::Lib:
-        template_name = "lib";
+    case TemplateType::Pkg:
+        template_name = "pkg";
         break;
     case TemplateType::App:
     default:
@@ -217,9 +217,9 @@ int init_project(const std::string &project_name_arg, TemplateType template_type
 
     // Determine banner suffix based on template type
     std::string banner_suffix = "init";
-    if (template_type == TemplateType::Lib)
+    if (template_type == TemplateType::Pkg)
     {
-        banner_suffix = "init --lib";
+        banner_suffix = "init --pkg";
     }
     print_banner(banner_suffix.c_str());
 
@@ -304,7 +304,7 @@ int init_project(const std::string &project_name_arg, TemplateType template_type
     }
     else
     {
-        std::cout << "    " << DIM << "# Import this library into an app project" << RESET << std::endl;
+        std::cout << "    " << DIM << "# Import this package into an app project" << RESET << std::endl;
     }
     std::cout << std::endl;
 
@@ -457,9 +457,14 @@ void print_help(const char *program_name)
     std::cout << "  " << BRAND << BOLD << "Coi" << RESET << " " << DIM << "- WebAssembly for the Modern Web" << RESET << std::endl;
     std::cout << std::endl;
     std::cout << "  " << BOLD << "Usage:" << RESET << std::endl;
-    std::cout << "    " << CYAN << program_name << " init" << RESET << " [name] [--lib]      Create a new project" << std::endl;
+    std::cout << "    " << CYAN << program_name << " init" << RESET << " [name] [--pkg]      Create a new project" << std::endl;
     std::cout << "    " << CYAN << program_name << " build" << RESET << "                    Build the project" << std::endl;
-    std::cout << "    " << CYAN << program_name << " dev" << RESET << " [-h]                 Build and start dev server" << std::endl;
+    std::cout << "    " << CYAN << program_name << " dev" << RESET << " [--no-watch]         Build and start dev server" << std::endl;
+    std::cout << "    " << CYAN << program_name << " add" << RESET << " <package>            Add a package from registry" << std::endl;
+    std::cout << "    " << CYAN << program_name << " install" << RESET << "                  Install packages from coi.lock" << std::endl;
+    std::cout << "    " << CYAN << program_name << " remove" << RESET << " <package>         Remove a package" << std::endl;
+    std::cout << "    " << CYAN << program_name << " update" << RESET << " [package]         Update package(s)" << std::endl;
+    std::cout << "    " << CYAN << program_name << " list" << RESET << "                     List installed packages" << std::endl;
     std::cout << "    " << CYAN << program_name << " version" << RESET << "                  Show version" << std::endl;
     std::cout << "    " << CYAN << program_name << RESET << " <file.coi> [options]    Compile a .coi file" << std::endl;
     std::cout << std::endl;
@@ -468,10 +473,11 @@ void print_help(const char *program_name)
     std::cout << "    " << DIM << "--cc-only" << RESET << "         Generate C++ only, skip WASM" << std::endl;
     std::cout << "    " << DIM << "--keep-cc" << RESET << "         Keep generated C++ files" << std::endl;
     std::cout << "    " << DIM << "--no-watch" << RESET << "        Disable hot reloading (dev only)" << std::endl;
-    std::cout << "    " << DIM << "--lib" << RESET << "             Create a library project (init only)" << std::endl;
+    std::cout << "    " << DIM << "--pkg" << RESET << "             Create a package (init only)" << std::endl;
     std::cout << std::endl;
     std::cout << "  " << BOLD << "Examples:" << RESET << std::endl;
     std::cout << "    " << DIM << "$" << RESET << " coi init my-app" << std::endl;
     std::cout << "    " << DIM << "$" << RESET << " cd my-app && coi dev" << std::endl;
+    std::cout << "    " << DIM << "$" << RESET << " coi add supabase" << std::endl;
     std::cout << std::endl;
 }

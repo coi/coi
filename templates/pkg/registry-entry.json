@@ -1,16 +1,20 @@
 {
-  "$schema": "https://coi-lang.dev/schemas/library.schema.json",
+  "$schema": "https://coi-lang.dev/schemas/package.schema.json",
   "name": "__PROJECT_NAME__",
   "schema-version": 1,
   "repository": "https://github.com/YOUR_GITHUB_USERNAME/__PROJECT_NAME__",
-  "description": "A Coi library.",
-  "keywords": ["coi", "library"],
+  "description": "A Coi package.",
+  "keywords": ["coi", "package"],
   "releases": [
     {
       "version": "0.1.0",
       "compiler-drop": {
         "min": __COI_DROP__,
         "tested-on": __COI_DROP__
+      },
+      "source": {
+        "commit": "__COMMIT_SHA__",
+        "sha256": "__TARBALL_SHA256__"
       },
       "releasedAt": "__TODAY_DATE__"
     }

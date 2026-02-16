@@ -2,7 +2,7 @@
 dist/
 
 # Cache
-.coi_cache/
+.coi/
 
 # OS files
 .DS_Store

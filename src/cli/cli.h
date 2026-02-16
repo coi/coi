@@ -24,7 +24,7 @@ namespace colors {
 // Template types for project initialization
 enum class TemplateType {
     App,    // Default application template
-    Lib     // Library/module template
+    Pkg     // Package template
 };
 
 // Initialize a new Coi project

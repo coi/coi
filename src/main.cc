@@ -5,6 +5,7 @@
 #include "analysis/type_checker.h"
 #include "cli/cli.h"
 #include "cli/error.h"
+#include "cli/package_manager.h"
 #include "analysis/include_detector.h"
 #include "analysis/feature_detector.h"
 #include "analysis/dependency_resolver.h"
@@ -49,13 +50,13 @@ int main(int argc, char **argv)
         std::string project_name;
         TemplateType template_type = TemplateType::App;
         
-        // Parse init arguments (name and --lib can be in any order)
+        // Parse init arguments (name and --pkg can be in any order)
         for (int i = 2; i < argc; ++i)
         {
             std::string arg = argv[i];
-            if (arg == "--lib")
+            if (arg == "--pkg")
             {
-                template_type = TemplateType::Lib;
+                template_type = TemplateType::Pkg;
             }
             else if (arg[0] != '-' && project_name.empty())
             {
@@ -118,6 +119,48 @@ int main(int argc, char **argv)
         return dev_project(keep_cc, cc_only, hot_reloading);
     }
 
+    // Package management commands
+    if (first_arg == "add")
+    {
+        if (argc < 3)
+        {
+            std::cerr << colors::RED << "Error:" << colors::RESET << " Package name required" << std::endl;
+            std::cerr << "  Usage: coi add <package-name>" << std::endl;
+            return 1;
+        }
+        return add_package(argv[2]);
+    }
+
+    if (first_arg == "install")
+    {
+        return install_packages();
+    }
+
+    if (first_arg == "remove")
+    {
+        if (argc < 3)
+        {
+            std::cerr << colors::RED << "Error:" << colors::RESET << " Package name required" << std::endl;
+            std::cerr << "  Usage: coi remove <package-name>" << std::endl;
+            return 1;
+        }
+        return remove_package(argv[2]);
+    }
+
+    if (first_arg == "list")
+    {
+        return list_packages();
+    }
+
+    if (first_arg == "update")
+    {
+        if (argc >= 3)
+        {
+            return update_package(argv[2]);
+        }
+        return update_all_packages();
+    }
+
     // From here on, we're doing actual compilation - load DefSchema
     load_def_schema();
 
@@ -156,6 +199,27 @@ int main(int argc, char **argv)
     {
         std::cerr << "No input file specified." << std::endl;
         return 1;
+    }
+
+    // Determine project root (where .coi/pkgs/ lives)
+    // If input is src/App.coi, project root is the parent of src/
+    fs::path project_root;
+    try
+    {
+        fs::path input_abs = fs::canonical(input_file);
+        if (input_abs.parent_path().filename() == "src")
+        {
+            project_root = input_abs.parent_path().parent_path();
+        }
+        else
+        {
+            // Fall back to current working directory
+            project_root = fs::current_path();
+        }
+    }
+    catch (const std::exception &e)
+    {
+        project_root = fs::current_path();
     }
 
     std::vector<Component> all_components;
@@ -251,7 +315,34 @@ int main(int argc, char **argv)
             std::set<std::string> current_pub_imports;
             for (const auto &import_decl : parser.imports)
             {
-                fs::path import_path = parent_path / import_decl.path;
+                fs::path import_path;
+                const std::string &import_str = import_decl.path;
+                
+                if (!import_str.empty() && import_str[0] == '@')
+                {
+                    // Package import: @pkg-name -> .coi/pkgs/pkg-name/Mod.coi
+                    //                 @pkg-name/path -> .coi/pkgs/pkg-name/path.coi
+                    std::string pkg_path = import_str.substr(1);
+                    
+                    // If no slash, it's just a package name - default to Mod.coi
+                    if (pkg_path.find('/') == std::string::npos)
+                    {
+                        pkg_path += "/Mod.coi";
+                    }
+                    // Append .coi extension if not present
+                    else if (pkg_path.size() < 4 || pkg_path.substr(pkg_path.size() - 4) != ".coi")
+                    {
+                        pkg_path += ".coi";
+                    }
+                    
+                    import_path = project_root / ".coi" / "pkgs" / pkg_path;
+                }
+                else
+                {
+                    // Relative import
+                    import_path = parent_path / import_str;
+                }
+                
                 try
                 {
                     std::string abs_path = fs::canonical(import_path).string();
@@ -344,10 +435,10 @@ int main(int argc, char **argv)
         }
 
         // Create cache directory in project folder (alongside output dir)
-        fs::path cache_dir = final_output_dir.parent_path() / ".coi_cache";
+        fs::path cache_dir = final_output_dir.parent_path() / ".coi" / "cache";
         if (final_output_dir.filename() == ".")
         {
-            cache_dir = fs::current_path() / ".coi_cache";
+            cache_dir = fs::current_path() / ".coi" / "cache";
         }
         fs::create_directories(cache_dir);
 

@@ -162,10 +162,15 @@ Open `http://localhost:8000` in your browser.
 | Command | Description |
 |---------|-------------|
 | `coi init [name]` | Create a new app project |
-| `coi init [name] --lib` | Create a new library project |
+| `coi init [name] --pkg` | Create a new package |
 | `coi build` | Build the project |
 | `coi dev` | Build and start dev server (with hot reload) |
 | `coi dev --no-watch` | Dev server without hot reload |
+| `coi add <package>` | Add a package from registry |
+| `coi install` | Install packages from coi.lock |
+| `coi remove <package>` | Remove a package |
+| `coi update [package]` | Update package(s) to latest |
+| `coi list` | List installed packages |
 | `coi version` | Show the Coi compiler version |
 | `coi <file.coi> --out <dir>` | Compile a single file |
 

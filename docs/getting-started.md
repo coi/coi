@@ -84,19 +84,19 @@ my-app/
 └── README.md
 ```
 
-#### Creating a Library
+#### Creating a Package
 
-To create a reusable component library instead of an app:
+To create a reusable component package instead of an app:
 
 ```bash
-coi init my-lib --lib
+coi init my-pkg --pkg
 ```
 
-This creates a library structure with `pub import` for re-exporting components:
+This creates a package structure with `pub import` for re-exporting components:
 
 ```
-my-lib/
-├── Lib.coi              # Library entry point (pub imports)
+my-pkg/
+├── Mod.coi              # Package entry point (pub imports)
 ├── registry-entry.json  # Registry metadata file for publishing
 ├── src/
 │   ├── ui/
@@ -106,14 +106,14 @@ my-lib/
 └── README.md
 ```
 
-Consumers import your library's `Lib.coi` to access all exported components:
+Consumers import your package's `Mod.coi` to access all exported components:
 
 ```tsx
-import "my-lib/Lib.coi";
+import "@my-pkg";
 
 component App {
     view {
-        <MyLib::Button label="Click" />
+        <MyPkg::Button label="Click" />
     }
 }
 ```
@@ -122,18 +122,18 @@ See [Re-exporting with pub import](language-guide.md#re-exporting-with-pub-impor
 
 #### Registry File (`registry-entry.json`)
 
-Libraries created with `coi init my-lib --lib` include a `registry-entry.json` file.
+Packages created with `coi init my-pkg --pkg` include a `registry-entry.json` file.
 
-Use this file when publishing your library to the community library index:
+Use this file when publishing your package to the community package index:
 
 1. Fill in repository/description/keywords
 2. Set `compiler-drop.min` (optimistic compatibility)
 3. Set `compiler-drop.tested-on` (latest compiler drop you verified)
-4. Copy it into the registry repo under `libraries/{your-lib-name}.json`
+4. Copy it into the registry repo under `packages/{your-pkg-name}.json`
 
 Registry docs and validation rules:
 
-- [Coi Library Registry README](https://github.com/coi-lang/registry/blob/main/README.md)
+- [Coi Package Registry README](https://github.com/coi-lang/registry/blob/main/README.md)
 
 If no name is provided, you'll be prompted to enter one:
 
@@ -211,6 +211,45 @@ coi App.coi --out ./dist --keep-cc
 ```
 
 This also generates `dist/App.cc` so you can inspect the generated C++ code.
+
+### Package Management
+
+Coi has a built-in package manager for adding community packages from the [registry](https://github.com/coi-lang/registry).
+
+#### Adding a Package
+
+```bash
+coi add supabase
+```
+
+This:
+1. Fetches the package info from the registry
+2. Downloads it to `.coi/pkgs/supabase/`
+3. Creates/updates `coi.lock` to track the version
+
+Then import it in your code:
+
+```tsx
+import "@supabase";
+```
+
+#### Installing from Lock File
+
+When cloning a project or after pulling updates, install all packages from `coi.lock`:
+
+```bash
+coi install
+```
+
+#### Other Commands
+
+| Command | Description |
+|---------|-------------|
+| `coi remove <package>` | Remove a package |
+| `coi update [package]` | Update one or all packages |
+| `coi list` | List installed packages |
+
+The `coi.lock` file should be committed to version control so collaborators get the same package versions.
 
 ## Your First Component
 
@@ -300,15 +339,21 @@ my-app/
 Coi uses a strict, explicit import system.
 
 ```tsx
+// Local imports (relative to current file)
 import "components/Button.coi";
 import "layout/Header.coi";
+
+// Package imports (from .coi/pkgs/)
+import "@supabase";            // resolves to .coi/pkgs/supabase/Mod.coi
+import "@ui-kit/Button";       // resolves to .coi/pkgs/ui-kit/Button.coi
 ```
 
 ### Import Rules
 
-1. **Relative Paths**: Imports are relative to the current file.
-2. **Explicit Only**: There are no "transitive imports". If `A` imports `B`, and `B` imports `C`, `A` cannot use `C` unless it imports `C` directly.
-3. **Visibility**: You can only use components that are marked with `pub` if they are in a different module.
+1. **Relative Paths**: Local imports are relative to the current file.
+2. **Package Imports**: Paths starting with `@` resolve to `.coi/pkgs/`. Just `@pkg` imports `Mod.coi` by default.
+3. **Explicit Only**: There are no "transitive imports". If `A` imports `B`, and `B` imports `C`, `A` cannot use `C` unless it imports `C` directly.
+4. **Visibility**: You can only use components that are marked with `pub` if they are in a different module.
 
 ### Modules
 
