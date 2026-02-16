@@ -158,6 +158,27 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    // Determine project root (where .coi/pkgs/ lives)
+    // If input is src/App.coi, project root is the parent of src/
+    fs::path project_root;
+    try
+    {
+        fs::path input_abs = fs::canonical(input_file);
+        if (input_abs.parent_path().filename() == "src")
+        {
+            project_root = input_abs.parent_path().parent_path();
+        }
+        else
+        {
+            // Fall back to current working directory
+            project_root = fs::current_path();
+        }
+    }
+    catch (const std::exception &e)
+    {
+        project_root = fs::current_path();
+    }
+
     std::vector<Component> all_components;
     std::vector<std::unique_ptr<DataDef>> all_global_data;
     std::vector<std::unique_ptr<EnumDef>> all_global_enums;
@@ -251,7 +272,34 @@ int main(int argc, char **argv)
             std::set<std::string> current_pub_imports;
             for (const auto &import_decl : parser.imports)
             {
-                fs::path import_path = parent_path / import_decl.path;
+                fs::path import_path;
+                const std::string &import_str = import_decl.path;
+                
+                if (!import_str.empty() && import_str[0] == '@')
+                {
+                    // Package import: @pkg-name -> .coi/pkgs/pkg-name/Mod.coi
+                    //                 @pkg-name/path -> .coi/pkgs/pkg-name/path.coi
+                    std::string pkg_path = import_str.substr(1);
+                    
+                    // If no slash, it's just a package name - default to Mod.coi
+                    if (pkg_path.find('/') == std::string::npos)
+                    {
+                        pkg_path += "/Mod.coi";
+                    }
+                    // Append .coi extension if not present
+                    else if (pkg_path.size() < 4 || pkg_path.substr(pkg_path.size() - 4) != ".coi")
+                    {
+                        pkg_path += ".coi";
+                    }
+                    
+                    import_path = project_root / ".coi" / "pkgs" / pkg_path;
+                }
+                else
+                {
+                    // Relative import
+                    import_path = parent_path / import_str;
+                }
+                
                 try
                 {
                     std::string abs_path = fs::canonical(import_path).string();

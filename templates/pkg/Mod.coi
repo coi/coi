@@ -1,8 +1,8 @@
 // __PROJECT_NAME__ - A Coi component package
 //
-// Import this file to access all exported components:
+// Import this package to access all exported components:
 //
-//   import "__PROJECT_NAME__/Mod.coi";
+//   import "@__PROJECT_NAME__";
 //   <__MODULE_NAME__::Button label="Click" />
 
 module __MODULE_NAME__;

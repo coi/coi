@@ -125,16 +125,16 @@ See [Re-exporting with pub import](language-guide.md#re-exporting-with-pub-impor
 
 Packages created with `coi init my-pkg --pkg` include a `registry-entry.json` file.
 
-Use this file when publishing your library to the community library index:
+Use this file when publishing your package to the community package index:
 
 1. Fill in repository/description/keywords
 2. Set `compiler-drop.min` (optimistic compatibility)
 3. Set `compiler-drop.tested-on` (latest compiler drop you verified)
-4. Copy it into the registry repo under `libraries/{your-lib-name}.json`
+4. Copy it into the registry repo under `packages/{your-pkg-name}.json`
 
 Registry docs and validation rules:
 
-- [Coi Library Registry README](https://github.com/coi-lang/registry/blob/main/README.md)
+- [Coi Package Registry README](https://github.com/coi-lang/registry/blob/main/README.md)
 
 If no name is provided, you'll be prompted to enter one:
 
@@ -301,15 +301,21 @@ my-app/
 Coi uses a strict, explicit import system.
 
 ```tsx
+// Local imports (relative to current file)
 import "components/Button.coi";
 import "layout/Header.coi";
+
+// Package imports (from .coi/pkgs/)
+import "@supabase";            // resolves to .coi/pkgs/supabase/Mod.coi
+import "@ui-kit/Button";       // resolves to .coi/pkgs/ui-kit/Button.coi
 ```
 
 ### Import Rules
 
-1. **Relative Paths**: Imports are relative to the current file.
-2. **Explicit Only**: There are no "transitive imports". If `A` imports `B`, and `B` imports `C`, `A` cannot use `C` unless it imports `C` directly.
-3. **Visibility**: You can only use components that are marked with `pub` if they are in a different module.
+1. **Relative Paths**: Local imports are relative to the current file.
+2. **Package Imports**: Paths starting with `@` resolve to `.coi/pkgs/`. Just `@pkg` imports `Mod.coi` by default.
+3. **Explicit Only**: There are no "transitive imports". If `A` imports `B`, and `B` imports `C`, `A` cannot use `C` unless it imports `C` directly.
+4. **Visibility**: You can only use components that are marked with `pub` if they are in a different module.
 
 ### Modules
 

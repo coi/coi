@@ -4,17 +4,17 @@ A Coi component package.
 
 ## Installation
 
-Copy this package folder into your project and import it.
+Copy this package folder into your project's `.coi/pkgs/` directory.
 
 ## Usage
 
 ```tsx
 // Import the package (re-exports all public components)
-import "__PROJECT_NAME__/Mod.coi";
+import "@__PROJECT_NAME__";
 
 component App {
     view {
-        <__PROJECT_NAME__::Button label="Click me" />
+        <__MODULE_NAME__::Button label="Click me" />
     }
 }
 ```
@@ -48,7 +48,8 @@ To test components, create a test app that imports this package:
 ```bash
 coi init test-app
 cd test-app
-# Copy your package into the project and import it
+mkdir -p .coi/pkgs
+# Copy your package into .coi/pkgs/ and import with @package-name
 coi dev
 ```
 

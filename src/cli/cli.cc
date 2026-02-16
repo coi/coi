@@ -304,7 +304,7 @@ int init_project(const std::string &project_name_arg, TemplateType template_type
     }
     else
     {
-        std::cout << "    " << DIM << "# Import this library into an app project" << RESET << std::endl;
+        std::cout << "    " << DIM << "# Import this package into an app project" << RESET << std::endl;
     }
     std::cout << std::endl;
 
