@@ -12,6 +12,10 @@
         "min": __COI_DROP__,
         "tested-on": __COI_DROP__
       },
+      "source": {
+        "commit": "__COMMIT_SHA__",
+        "sha256": "__TARBALL_SHA256__"
+      },
       "releasedAt": "__TODAY_DATE__"
     }
   ],

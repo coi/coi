@@ -12,14 +12,16 @@ struct PackageInfo {
     std::string name;
     std::string version;
     std::string repository;
-    std::string commit;  // Optional: specific commit to pin
+    std::string commit;   // Git commit SHA for this release
+    std::string sha256;   // SHA256 of the release tarball
 };
 
 // Lock file entry
 struct LockEntry {
     std::string version;
     std::string repository;
-    std::string commit;
+    std::string commit;   // Git commit SHA pinned for this version
+    std::string sha256;   // SHA256 of the release tarball for verification
 };
 
 // Add a package to the project
