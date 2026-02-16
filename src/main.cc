@@ -344,10 +344,10 @@ int main(int argc, char **argv)
         }
 
         // Create cache directory in project folder (alongside output dir)
-        fs::path cache_dir = final_output_dir.parent_path() / ".coi_cache";
+        fs::path cache_dir = final_output_dir.parent_path() / ".coi" / "cache";
         if (final_output_dir.filename() == ".")
         {
-            cache_dir = fs::current_path() / ".coi_cache";
+            cache_dir = fs::current_path() / ".coi" / "cache";
         }
         fs::create_directories(cache_dir);
 

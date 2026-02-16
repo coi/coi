@@ -1,15 +1,15 @@
 # __PROJECT_NAME__
 
-A Coi component library.
+A Coi component package.
 
 ## Installation
 
-Copy this library folder into your project and import it.
+Copy this package folder into your project and import it.
 
 ## Usage
 
 ```tsx
-// Import the library (re-exports all public components)
+// Import the package (re-exports all public components)
 import "__PROJECT_NAME__/Lib.coi";
 
 component App {
@@ -23,7 +23,7 @@ component App {
 
 ```
 __PROJECT_NAME__/
-├── Lib.coi           # Library entry point (pub imports)
+├── Lib.coi           # Package entry point (pub imports)
 ├── registry-entry.json # Ready-to-submit registry metadata template
 ├── src/
 │   ├── ui/           # UI components
@@ -43,18 +43,18 @@ __PROJECT_NAME__/
 
 ## Development
 
-To test components, create a test app that imports this library:
+To test components, create a test app that imports this package:
 
 ```bash
 coi init test-app
 cd test-app
-# Copy your library into the project and import it
+# Copy your package into the project and import it
 coi dev
 ```
 
 ## Publish to Registry
 
-This template includes `registry-entry.json` — your library's registry file.
+This template includes `registry-entry.json` — your package's registry file.
 
 Before submitting:
 
@@ -65,11 +65,11 @@ Before submitting:
 
 To submit:
 
-1. Copy `registry-entry.json` to the registry repo as `libraries/__PROJECT_NAME__.json`
-2. (Optional) place it in a shard directory, e.g. `libraries/ab/__PROJECT_NAME__.json`
+1. Copy `registry-entry.json` to the registry repo as `packages/__PROJECT_NAME__.json`
+2. (Optional) place it in a shard directory, e.g. `packages/ab/__PROJECT_NAME__.json`
 3. Open a PR
 
-When releasing new versions, add entries to the `releases` array in your library file.
+When releasing new versions, add entries to the `releases` array in your package file.
 
 ## Learn More
 

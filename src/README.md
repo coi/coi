@@ -159,7 +159,7 @@ python tests/run.py all
 1. Check lexer output (tokens)
 2. Verify parser constructs correct AST
 3. Ensure type checker passes
-4. Inspect generated C++ in `.coi_cache/app.cc` (use `--keep-cc`)
+4. Inspect generated C++ in `.coi/cache/app.cc` (use `--keep-cc`)
 
 ### Tracing Feature Detection
 Feature detector scans the AST for Web API calls and determines which WebCC features to link.

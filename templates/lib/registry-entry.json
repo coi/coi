@@ -1,10 +1,10 @@
 {
-  "$schema": "https://coi-lang.dev/schemas/library.schema.json",
+  "$schema": "https://coi-lang.dev/schemas/package.schema.json",
   "name": "__PROJECT_NAME__",
   "schema-version": 1,
   "repository": "https://github.com/YOUR_GITHUB_USERNAME/__PROJECT_NAME__",
-  "description": "A Coi library.",
-  "keywords": ["coi", "library"],
+  "description": "A Coi package.",
+  "keywords": ["coi", "package"],
   "releases": [
     {
       "version": "0.1.0",
