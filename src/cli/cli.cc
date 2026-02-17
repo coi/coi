@@ -444,6 +444,7 @@ void print_version()
     std::cout << BRAND << "              '  .    o         " << RESET << std::endl;
     std::cout << std::endl;
     std::cout << "  " << BRAND << BOLD << "Coi Compiler" << RESET
+              << " " << DIM << "·" << RESET << " " << CYAN << COI_DROP_CODENAME << RESET
               << " "  << "(" << CYAN << "Drop " << GIT_COMMIT_COUNT << " · " << GIT_COMMIT_HASH << RESET << ")" << RESET << std::endl;
     std::cout << "  " << DIM << "Source Date: " << GIT_COMMIT_DATE << RESET << std::endl;
     std::cout << std::endl;
