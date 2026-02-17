@@ -8,9 +8,9 @@
   "releases": [
     {
       "version": "0.1.0",
-      "compiler-drop": {
-        "min": __COI_DROP__,
-        "tested-on": __COI_DROP__
+      "compiler": {
+        "pond": 0,
+        "min-drop": 350
       },
       "source": {
         "commit": "__COMMIT_SHA__",

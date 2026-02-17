@@ -3,7 +3,7 @@ cxx = clang++
 cflags = -std=c++20 -O0 -Isrc
 
 rule gen_version
-  command = sh -c 'count=$$(git rev-list --count --first-parent HEAD 2>/dev/null || echo unknown); hash=$$(git log -1 --format=%h 2>/dev/null || echo unknown); date=$$(git log -1 --format=%cd --date=format:"%b %d %Y" 2>/dev/null || echo unknown); codename="Filling Pond"; { echo "#pragma once"; echo "#define GIT_COMMIT_COUNT \"$$count\""; echo "#define GIT_COMMIT_HASH \"$$hash\""; echo "#define GIT_COMMIT_DATE \"$$date\""; echo "#define COI_DROP_CODENAME \"$$codename\""; } > $out'
+  command = sh -c 'count=$$(git rev-list --count --first-parent HEAD 2>/dev/null || echo unknown); hash=$$(git log -1 --format=%h 2>/dev/null || echo unknown); date=$$(git log -1 --format=%cd --date=format:"%b %d %Y" 2>/dev/null || echo unknown); pond_number=0; pond_start_commit_count=0; { echo "#pragma once"; echo "#define GIT_COMMIT_COUNT \"$$count\""; echo "#define GIT_COMMIT_HASH \"$$hash\""; echo "#define GIT_COMMIT_DATE \"$$date\""; echo "#define COI_POND_NUMBER \"$$pond_number\""; echo "#define COI_POND_START_COMMIT_COUNT \"$$pond_start_commit_count\""; } > $out'
   description = GEN_VERSION
   restat = 1
 

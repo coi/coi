@@ -12,6 +12,8 @@ struct PackageInfo {
     std::string name;
     std::string version;
     std::string repository;
+    int pond = -1;
+    int min_drop = 0;
     std::string commit;   // Git commit SHA for this release
     std::string sha256;   // SHA256 of the release tarball
 };
@@ -20,6 +22,8 @@ struct PackageInfo {
 struct LockEntry {
     std::string version;
     std::string repository;
+    int pond = -1;
+    int min_drop = 0;
     std::string commit;   // Git commit SHA pinned for this version
     std::string sha256;   // SHA256 of the release tarball for verification
 };

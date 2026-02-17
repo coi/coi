@@ -36,6 +36,15 @@ static void print_banner(const char *cmd)
     std::cout << std::endl;
 }
 
+static std::string get_pond_name(int pond_number)
+{
+    if (pond_number < 0)
+    {
+        pond_number = 0;
+    }
+    return "Filling Pond " + std::to_string(pond_number);
+}
+
 // Get the directory where the coi executable is located
 std::filesystem::path get_executable_dir()
 {
@@ -436,6 +445,27 @@ int dev_project(bool keep_cc, bool cc_only, bool hot_reloading)
 
 void print_version()
 {
+    int total_count = 0;
+    int pond_number = 0;
+    int pond_start_commit_count = 0;
+    try
+    {
+        total_count = std::stoi(GIT_COMMIT_COUNT);
+        pond_number = std::stoi(COI_POND_NUMBER);
+        pond_start_commit_count = std::stoi(COI_POND_START_COMMIT_COUNT);
+    }
+    catch (...)
+    {
+        total_count = 0;
+        pond_number = 0;
+        pond_start_commit_count = 0;
+    }
+    int pond_drop = total_count - pond_start_commit_count;
+    if (pond_drop < 0)
+    {
+        pond_drop = 0;
+    }
+
     std::cout << std::endl;
     std::cout << BRAND << "              .  o  ..          " << RESET << std::endl;
     std::cout << BRAND << "          o  .    '   .  o      " << RESET << std::endl;
@@ -444,8 +474,8 @@ void print_version()
     std::cout << BRAND << "              '  .    o         " << RESET << std::endl;
     std::cout << std::endl;
     std::cout << "  " << BRAND << BOLD << "Coi Compiler" << RESET
-              << " " << DIM << "·" << RESET << " " << CYAN << COI_DROP_CODENAME << RESET
-              << " "  << "(" << CYAN << "Drop " << GIT_COMMIT_COUNT << " · " << GIT_COMMIT_HASH << RESET << ")" << RESET << std::endl;
+              << " " << DIM << "·" << RESET << " " << CYAN << get_pond_name(pond_number) << RESET
+              << " "  << "(" << CYAN << "Drop " << pond_drop << " · " << GIT_COMMIT_HASH << RESET << ")" << RESET << std::endl;
     std::cout << "  " << DIM << "Source Date: " << GIT_COMMIT_DATE << RESET << std::endl;
     std::cout << std::endl;
 }

@@ -28,9 +28,11 @@ coi add supabase 0.1.0
 ```
 
 This command:
-1. Resolves a release from the registry (latest release with compatible `compiler-drop.min`, unless a specific version is provided)
+1. Resolves a release from the registry (latest release with compatible `compiler.pond` and `compiler.min-drop`, unless a specific version is provided)
 2. Downloads the package into `.coi/pkgs/<package>/`
 3. Creates or updates `coi.lock`
+
+See [Versioning](versioning.md) for the Pond & Drop compatibility model.
 
 Then import it in your Coi code:
 
@@ -90,7 +92,7 @@ This creates a package structure:
 ```
 my-pkg/
 ├── Mod.coi              # Package entry point (pub imports)
-├── registry-entry.json  # Registry metadata template
+├── package.json         # Registry metadata template
 ├── src/
 │   ├── ui/
 │   │   └── Button.coi   # UI components
@@ -139,9 +141,9 @@ Then import with `@my-pkg` in your test app.
 
 ## Publishing to the Registry
 
-The [Coi Registry](https://github.com/coi-lang/registry) is the community package index. Packages created with `--pkg` include a `registry-entry.json` template ready for submission.
+The [Coi Registry](https://github.com/coi-lang/registry) is the community package index. Packages created with `--pkg` include a `package.json` template ready for submission.
 
-### Prepare `registry-entry.json`
+### Prepare `package.json`
 
 Fill in these fields:
 
@@ -157,8 +159,8 @@ For each release in the `releases` array:
 | Field | Description |
 |-------|-------------|
 | `version` | Semver (e.g., `0.1.0`, `1.2.3-beta`) |
-| `compiler-drop.min` | Minimum compiler drop your package supports (optimistic) |
-| `compiler-drop.tested-on` | Compiler drop you actually tested with |
+| `compiler.pond` | Compiler contract version (must match current pond) |
+| `compiler.min-drop` | Minimum compiler drop your package supports inside that pond |
 | `source.commit` | Git commit SHA (40 hex chars) |
 | `source.sha256` | SHA256 of the commit tarball |
 | `releasedAt` | Release date (YYYY-MM-DD) |
@@ -169,7 +171,7 @@ For each release in the `releases` array:
 ### Submit to Registry
 
 1. Fork the [registry repo](https://github.com/coi-lang/registry)
-2. Copy your `registry-entry.json` to `packages/<your-package>.json`
+2. Copy your `package.json` to `packages/<your-package>.json`
 3. Validate locally:
    ```bash
    python3 scripts/validate_registry.py --offline

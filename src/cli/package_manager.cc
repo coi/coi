@@ -35,8 +35,8 @@ static std::string extract_json_string(const std::string& json, const std::strin
 
 struct RegistryRelease {
     std::string version;
+    int pond = 0;
     int min_drop = 0;
-    int tested_on = 0;
     std::string commit;
     std::string sha256;
 };
@@ -125,13 +125,13 @@ static std::vector<std::string> extract_release_objects(const std::string& json)
 static bool parse_release(const std::string& release_json, RegistryRelease& release) {
     if (!extract_string_field(release_json, "version", release.version)) return false;
 
-    std::smatch drop_match;
-    std::regex drop_re("\"compiler-drop\"\\s*:\\s*\\{[^\\}]*\"min\"\\s*:\\s*([0-9]+)[^\\}]*\"tested-on\"\\s*:\\s*([0-9]+)");
-    if (!std::regex_search(release_json, drop_match, drop_re) || drop_match.size() < 3) {
+    std::smatch compiler_match;
+    std::regex compiler_re("\"compiler\"\\s*:\\s*\\{[^\\}]*\"pond\"\\s*:\\s*([0-9]+)[^\\}]*\"min-drop\"\\s*:\\s*([0-9]+)");
+    if (!std::regex_search(release_json, compiler_match, compiler_re) || compiler_match.size() < 3) {
         return false;
     }
-    release.min_drop = std::stoi(drop_match[1].str());
-    release.tested_on = std::stoi(drop_match[2].str());
+    release.pond = std::stoi(compiler_match[1].str());
+    release.min_drop = std::stoi(compiler_match[2].str());
 
     std::smatch source_match;
     std::regex source_re("\"source\"\\s*:\\s*\\{[^\\}]*\"commit\"\\s*:\\s*\"([^\"]+)\"[^\\}]*\"sha256\"\\s*:\\s*\"([^\"]+)\"");
@@ -146,7 +146,18 @@ static bool parse_release(const std::string& release_json, RegistryRelease& rele
 
 static int get_current_compiler_drop() {
     try {
-        return std::stoi(GIT_COMMIT_COUNT);
+        int total_count = std::stoi(GIT_COMMIT_COUNT);
+        int pond_start_commit_count = std::stoi(COI_POND_START_COMMIT_COUNT);
+        int pond_drop = total_count - pond_start_commit_count;
+        return pond_drop < 0 ? 0 : pond_drop;
+    } catch (...) {
+        return 0;
+    }
+}
+
+static int get_current_compiler_pond() {
+    try {
+        return std::stoi(COI_POND_NUMBER);
     } catch (...) {
         return 0;
     }
@@ -213,6 +224,16 @@ std::map<std::string, LockEntry> read_lock_file(const fs::path& lock_path) {
         if (quote2 == std::string::npos) return "";
         return line.substr(quote1 + 1, quote2 - quote1 - 1);
     };
+
+    auto extract_int_value = [](const std::string& line, const std::string& key, int& out) -> bool {
+        std::regex re("\\\"" + key + "\\\"\\s*:\\s*([0-9]+)");
+        std::smatch m;
+        if (std::regex_search(line, m, re) && m.size() > 1) {
+            out = std::stoi(m[1].str());
+            return true;
+        }
+        return false;
+    };
     
     while (std::getline(file, line)) {
         if (line.find("\"packages\"") != std::string::npos) {
@@ -247,6 +268,12 @@ std::map<std::string, LockEntry> read_lock_file(const fs::path& lock_path) {
         
         std::string sha256 = extract_value(line, "sha256");
         if (!sha256.empty()) current_entry.sha256 = sha256;
+
+        int pond = 0;
+        if (extract_int_value(line, "pond", pond)) current_entry.pond = pond;
+
+        int min_drop = 0;
+        if (extract_int_value(line, "min-drop", min_drop)) current_entry.min_drop = min_drop;
         
         // End of entry
         if (line.find('}') != std::string::npos) {
@@ -285,6 +312,12 @@ bool write_lock_file(const fs::path& lock_path, const std::map<std::string, Lock
         }
         if (!entry.sha256.empty()) {
             file << ",\n      \"sha256\": \"" << entry.sha256 << "\"";
+        }
+        if (entry.pond >= 0) {
+            file << ",\n      \"pond\": " << entry.pond;
+        }
+        if (entry.min_drop > 0) {
+            file << ",\n      \"min-drop\": " << entry.min_drop;
         }
         file << "\n    }";
     }
@@ -330,6 +363,7 @@ bool fetch_package_info(const std::string& package_name, PackageInfo& package_in
     }
 
     int current_drop = get_current_compiler_drop();
+    int current_pond = get_current_compiler_pond();
     RegistryRelease selected;
     bool found = false;
 
@@ -344,6 +378,13 @@ bool fetch_package_info(const std::string& package_name, PackageInfo& package_in
                 continue;
             }
 
+            if (candidate.pond != current_pond) {
+                std::cerr << RED << "Error:" << RESET << " Requested " << package_name << "@" << requested_version
+                          << " targets pond " << candidate.pond
+                          << " (current: " << current_pond << ")" << std::endl;
+                return false;
+            }
+
             if (current_drop > 0 && candidate.min_drop > current_drop) {
                 std::cerr << RED << "Error:" << RESET << " Requested " << package_name << "@" << requested_version
                           << " requires compiler drop >= " << candidate.min_drop
@@ -354,6 +395,10 @@ bool fetch_package_info(const std::string& package_name, PackageInfo& package_in
             selected = candidate;
             found = true;
             break;
+        }
+
+        if (candidate.pond != current_pond) {
+            continue;
         }
 
         if (current_drop <= 0 || candidate.min_drop <= current_drop) {
@@ -369,12 +414,14 @@ bool fetch_package_info(const std::string& package_name, PackageInfo& package_in
                       << "' not found for package '" << package_name << "'" << std::endl;
         } else {
             std::cerr << RED << "Error:" << RESET << " No compatible release found for package '" << package_name << "'"
-                      << " on compiler drop " << current_drop << std::endl;
+                      << " on compiler pond " << current_pond << ", drop " << current_drop << std::endl;
         }
         return false;
     }
 
     package_info.version = selected.version;
+    package_info.pond = selected.pond;
+    package_info.min_drop = selected.min_drop;
     package_info.commit = selected.commit;
     package_info.sha256 = selected.sha256;
     
@@ -497,6 +544,8 @@ int add_package(const std::string& package_name, const std::string& version) {
     LockEntry entry;
     entry.version = info.version;
     entry.repository = info.repository;
+    entry.pond = info.pond;
+    entry.min_drop = info.min_drop;
     entry.commit = info.commit;
     entry.sha256 = info.sha256;
     packages[package_name] = entry;
@@ -543,6 +592,8 @@ int install_packages() {
     int installed = 0;
     int skipped = 0;
     int failed = 0;
+    int current_pond = get_current_compiler_pond();
+    int current_drop = get_current_compiler_drop();
     
     for (const auto& [name, entry] : packages) {
         fs::path pkg_dest = pkgs_dir / name;
@@ -555,11 +606,34 @@ int install_packages() {
         }
         
         std::cout << "  " << DIM << "Installing " << name << "@" << entry.version << "..." << RESET << std::endl;
+
+        if (entry.pond >= 0 && entry.min_drop > 0) {
+            if (entry.pond != current_pond) {
+                std::cerr << "  " << RED << "✗" << RESET << " " << name << "@" << entry.version
+                          << " requires pond " << entry.pond
+                          << " (current: " << current_pond << ")" << std::endl;
+                failed++;
+                continue;
+            }
+
+            if (current_drop < entry.min_drop) {
+                std::cerr << "  " << RED << "✗" << RESET << " " << name << "@" << entry.version
+                          << " requires drop >= " << entry.min_drop
+                          << " (current: " << current_drop << ")" << std::endl;
+                failed++;
+                continue;
+            }
+        } else {
+            std::cout << "  " << YELLOW << "!" << RESET << " Missing pond/min-drop metadata for " << name
+                      << " in coi.lock; skipping compatibility check" << std::endl;
+        }
         
         PackageInfo info;
         info.name = name;
         info.version = entry.version;
         info.repository = entry.repository;
+        info.pond = entry.pond;
+        info.min_drop = entry.min_drop;
         info.commit = entry.commit;
         info.sha256 = entry.sha256;
         
@@ -702,6 +776,8 @@ int update_package(const std::string& package_name) {
     // Update lock file
     current.version = info.version;
     current.repository = info.repository;
+    current.pond = info.pond;
+    current.min_drop = info.min_drop;
     current.commit = info.commit;
     current.sha256 = info.sha256;
     write_lock_file(lock_path, packages);
@@ -755,6 +831,8 @@ int update_all_packages() {
         if (download_package(info, pkg_dest)) {
             entry.version = info.version;
             entry.repository = info.repository;
+            entry.pond = info.pond;
+            entry.min_drop = info.min_drop;
             entry.commit = info.commit;
             entry.sha256 = info.sha256;
             updated++;

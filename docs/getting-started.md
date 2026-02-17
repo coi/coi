@@ -92,7 +92,7 @@ To create a reusable component package instead of an app:
 coi init my-pkg --pkg
 ```
 
-This creates a package structure with `Mod.coi` as the entry point and a `registry-entry.json` template for publishing.
+This creates a package structure with `Mod.coi` as the entry point and a `package.json` template for publishing.
 
 See [Package Manager](package-manager.md#creating-a-package) for the full workflow on creating and publishing packages.
 

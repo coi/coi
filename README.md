@@ -212,6 +212,7 @@ my-app/
 - [Styling](docs/styling.md): Scoped and global CSS
 - [Platform APIs](docs/api-reference.md): Canvas, Storage, Audio, Fetch, and more
 - [Package Manager](docs/package-manager.md): Registry packages, lockfile workflow, add/install/update/remove
+- [Versioning](docs/versioning.md): Pond & Drop compatibility model and release philosophy
 - [Editor Support](docs/tooling.md): VS Code, Sublime Text, and Zed extensions
 
 ## Community

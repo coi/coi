@@ -24,7 +24,7 @@ component App {
 ```
 __PROJECT_NAME__/
 ├── Mod.coi           # Package entry point (pub imports)
-├── registry-entry.json # Ready-to-submit registry metadata template
+├── package.json      # Ready-to-submit registry metadata template
 ├── src/
 │   ├── ui/           # UI components
 │   │   └── Button.coi
@@ -55,7 +55,7 @@ coi dev
 
 ## Publish to Registry
 
-This template includes `registry-entry.json` for publishing to the [Coi Registry](https://github.com/coi-lang/registry).
+This template includes `package.json` for publishing to the [Coi Registry](https://github.com/coi-lang/registry).
 
 See the [Publishing Guide](https://github.com/io-eric/coi/blob/main/docs/package-manager.md#publishing-to-the-registry) for step-by-step instructions.
 
