@@ -193,9 +193,9 @@ int self_upgrade()
     {
         std::cout << "  " << GREEN << "✓" << RESET << " Upgraded Coi" << std::endl;
     }
-    std::cout << "  " << DIM << "From Pond " << before_pond << " · Drop " << before_drop
+    std::cout << "  " << CYAN << "From Pond " << before_pond << " · Drop " << before_drop
               << " (" << before_hash << ")" << RESET << std::endl;
-    std::cout << "  " << DIM << "To   Pond " << after_pond << " · Drop " << after_drop
+    std::cout << "  " << CYAN << "To   Pond " << after_pond << " · Drop " << after_drop
               << " (" << after_hash << ")" << RESET << std::endl;
     std::cout << std::endl;
 
