@@ -732,7 +732,7 @@ int list_packages() {
 }
 
 int update_package(const std::string& package_name) {
-    print_pkg_banner("update");
+    print_pkg_banner("upgrade");
     std::cout << std::endl;
     
     fs::path project_root = fs::current_path();
@@ -790,7 +790,7 @@ int update_package(const std::string& package_name) {
 }
 
 int update_all_packages() {
-    print_pkg_banner("update");
+    print_pkg_banner("upgrade");
     std::cout << std::endl;
     
     fs::path project_root = fs::current_path();

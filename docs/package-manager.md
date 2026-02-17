@@ -16,7 +16,7 @@ Coi includes a built-in package manager for installing community packages from t
 | `coi add <package> [version]` | Add latest compatible release or a specific version |
 | `coi install` | Install all packages listed in `coi.lock` |
 | `coi remove <package>` | Remove a package |
-| `coi update [package]` | Update one package or all packages |
+| `coi upgrade [package]` | Upgrade one package or all packages |
 | `coi list` | List installed packages |
 
 ## Add a Package
@@ -50,18 +50,18 @@ coi install
 
 This reads `coi.lock` and installs exact versions into `.coi/pkgs/`.
 
-## Update and Remove
+## Upgrade and Remove
 
-Update one package:
+Upgrade one package:
 
 ```bash
-coi update supabase
+coi upgrade supabase
 ```
 
-Update all packages:
+Upgrade all packages:
 
 ```bash
-coi update
+coi upgrade
 ```
 
 Remove a package:

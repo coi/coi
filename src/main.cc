@@ -153,7 +153,7 @@ int main(int argc, char **argv)
         return list_packages();
     }
 
-    if (first_arg == "update")
+    if (first_arg == "upgrade")
     {
         if (argc >= 3)
         {

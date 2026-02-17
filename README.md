@@ -172,7 +172,7 @@ Open `http://localhost:8000` in your browser.
 | `coi add <package> [version]` | Add latest compatible release or a specific version |
 | `coi install` | Install packages from coi.lock |
 | `coi remove <package>` | Remove a package |
-| `coi update [package]` | Update package(s) to latest |
+| `coi upgrade [package]` | Upgrade package(s) to latest |
 | `coi list` | List installed packages |
 | `coi version` | Show the Coi compiler version |
 | `coi <file.coi> --out <dir>` | Compile a single file |
