@@ -39,6 +39,10 @@ int build_project(bool keep_cc = false, bool cc_only = false, bool silent_banner
 // Returns 0 on success, non-zero on error  
 int dev_project(bool keep_cc = false, bool cc_only = false, bool hot_reloading = false);
 
+// Upgrade the local Coi compiler checkout by pulling latest changes and rebuilding
+// Returns 0 on success, non-zero on error
+int self_upgrade();
+
 // Print help message
 void print_help(const char* program_name);
 
