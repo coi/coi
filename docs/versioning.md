@@ -62,5 +62,3 @@ Example:
 
 - Pond starts when total commit count is `350` → set `pond_start_commit_count = 350`
 - Later total commit count is `356` → runtime drop is `6`
-
-So yes—declaring a new pond is exactly setting the pond start commit count and incrementing pond number.
