@@ -173,6 +173,7 @@ Open `http://localhost:8000` in your browser.
 | `coi install` | Install packages from coi.lock |
 | `coi remove <package>` | Remove a package |
 | `coi upgrade [package]` | Upgrade package(s) to latest |
+| `coi self-upgrade` | Pull latest Coi source and rebuild compiler |
 | `coi list` | List installed packages |
 | `coi version` | Show the Coi compiler version |
 | `coi <file.coi> --out <dir>` | Compile a single file |

@@ -10,6 +10,9 @@
 #include <limits.h>
 #include <chrono>
 #include <iomanip>
+#include <array>
+#include <regex>
+#include <sys/wait.h>
 
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
@@ -43,6 +46,160 @@ static std::string get_pond_name(int pond_number)
         pond_number = 0;
     }
     return "Filling Pond " + std::to_string(pond_number);
+}
+
+static int get_current_drop_from_macros()
+{
+    int total_count = 0;
+    int pond_start_commit_count = 0;
+    try
+    {
+        total_count = std::stoi(GIT_COMMIT_COUNT);
+        pond_start_commit_count = std::stoi(COI_POND_START_COMMIT_COUNT);
+    }
+    catch (...)
+    {
+        return 0;
+    }
+
+    int pond_drop = total_count - pond_start_commit_count;
+    return pond_drop < 0 ? 0 : pond_drop;
+}
+
+static bool exec_command_capture(const std::string &cmd, std::string &output)
+{
+    std::array<char, 256> buffer;
+    output.clear();
+
+    FILE *pipe = popen(cmd.c_str(), "r");
+    if (!pipe)
+    {
+        return false;
+    }
+
+    while (fgets(buffer.data(), static_cast<int>(buffer.size()), pipe) != nullptr)
+    {
+        output += buffer.data();
+    }
+
+    int status = pclose(pipe);
+    if (status == -1)
+    {
+        return false;
+    }
+
+    return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+}
+
+int self_upgrade()
+{
+    print_banner("self-upgrade");
+
+    fs::path repo_root = get_executable_dir();
+    if (repo_root.empty())
+    {
+        ErrorHandler::cli_error("Could not determine Coi installation directory.");
+        return 1;
+    }
+
+    fs::path git_dir = repo_root / ".git";
+    fs::path build_script = repo_root / "build.sh";
+    fs::path coi_binary = repo_root / "coi";
+
+    if (!fs::exists(git_dir) || !fs::exists(build_script) || !fs::exists(coi_binary))
+    {
+        ErrorHandler::cli_error("self-upgrade requires a git checkout of the Coi repository.",
+                                "Expected .git, build.sh, and coi binary in: " + repo_root.string());
+        return 1;
+    }
+
+    int before_pond = 0;
+    try
+    {
+        before_pond = std::stoi(COI_POND_NUMBER);
+    }
+    catch (...)
+    {
+        before_pond = 0;
+    }
+    int before_drop = get_current_drop_from_macros();
+    std::string before_hash = GIT_COMMIT_HASH;
+
+    fs::path previous_cwd = fs::current_path();
+    fs::current_path(repo_root);
+
+    std::cout << "  " << DIM << "Pulling latest changes..." << RESET << std::endl;
+    int pull_ret = system("git pull --ff-only");
+    if (pull_ret != 0)
+    {
+        fs::current_path(previous_cwd);
+        ErrorHandler::cli_error("git pull failed.", "Resolve git issues and try again.");
+        return 1;
+    }
+
+    std::cout << "  " << DIM << "Rebuilding compiler..." << RESET << std::endl;
+    int build_ret = system("./build.sh");
+    fs::current_path(previous_cwd);
+
+    if (build_ret != 0)
+    {
+        ErrorHandler::cli_error("build.sh failed.", "Fix build issues, then run coi self-upgrade again.");
+        return 1;
+    }
+
+    std::string version_output;
+    std::string version_cmd = "\"" + coi_binary.string() + "\" --version";
+    int after_pond = before_pond;
+    int after_drop = before_drop;
+    std::string after_hash = before_hash;
+
+    if (exec_command_capture(version_cmd, version_output))
+    {
+        std::smatch m;
+        std::regex pond_re("Filling Pond ([0-9]+)");
+        std::regex drop_re("Drop ([0-9]+)");
+
+        if (std::regex_search(version_output, m, pond_re) && m.size() > 1)
+        {
+            after_pond = std::stoi(m[1].str());
+        }
+        if (std::regex_search(version_output, m, drop_re) && m.size() > 1)
+        {
+            after_drop = std::stoi(m[1].str());
+        }
+    }
+
+    std::string git_hash_output;
+    std::string git_hash_cmd = "cd \"" + repo_root.string() + "\" && git rev-parse --short HEAD";
+    if (exec_command_capture(git_hash_cmd, git_hash_output))
+    {
+        while (!git_hash_output.empty() &&
+               (git_hash_output.back() == '\n' || git_hash_output.back() == '\r' || git_hash_output.back() == ' ' || git_hash_output.back() == '\t'))
+        {
+            git_hash_output.pop_back();
+        }
+        if (!git_hash_output.empty())
+        {
+            after_hash = git_hash_output;
+        }
+    }
+
+    std::cout << std::endl;
+    if (before_pond == after_pond && before_drop == after_drop)
+    {
+        std::cout << "  " << GREEN << "✓" << RESET << " Coi is already up to date" << std::endl;
+    }
+    else
+    {
+        std::cout << "  " << GREEN << "✓" << RESET << " Upgraded Coi" << std::endl;
+    }
+    std::cout << "  " << DIM << "From Pond " << before_pond << " · Drop " << before_drop
+              << " (" << before_hash << ")" << RESET << std::endl;
+    std::cout << "  " << DIM << "To   Pond " << after_pond << " · Drop " << after_drop
+              << " (" << after_hash << ")" << RESET << std::endl;
+    std::cout << std::endl;
+
+    return 0;
 }
 
 // Get the directory where the coi executable is located
@@ -495,6 +652,7 @@ void print_help(const char *program_name)
     std::cout << "    " << CYAN << program_name << " install" << RESET << "                  Install packages from coi.lock" << std::endl;
     std::cout << "    " << CYAN << program_name << " remove" << RESET << " <package>         Remove a package" << std::endl;
     std::cout << "    " << CYAN << program_name << " upgrade" << RESET << " [package]        Upgrade package(s)" << std::endl;
+    std::cout << "    " << CYAN << program_name << " self-upgrade" << RESET << "              Pull and rebuild Coi" << std::endl;
     std::cout << "    " << CYAN << program_name << " list" << RESET << "                     List installed packages" << std::endl;
     std::cout << "    " << CYAN << program_name << " version" << RESET << "                  Show version" << std::endl;
     std::cout << "    " << CYAN << program_name << RESET << " <file.coi> [options]    Compile a .coi file" << std::endl;
@@ -510,5 +668,6 @@ void print_help(const char *program_name)
     std::cout << "    " << DIM << "$" << RESET << " coi init my-app" << std::endl;
     std::cout << "    " << DIM << "$" << RESET << " cd my-app && coi dev" << std::endl;
     std::cout << "    " << DIM << "$" << RESET << " coi add supabase" << std::endl;
+    std::cout << "    " << DIM << "$" << RESET << " coi self-upgrade" << std::endl;
     std::cout << std::endl;
 }

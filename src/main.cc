@@ -119,6 +119,11 @@ int main(int argc, char **argv)
         return dev_project(keep_cc, cc_only, hot_reloading);
     }
 
+    if (first_arg == "self-upgrade")
+    {
+        return self_upgrade();
+    }
+
     // Package management commands
     if (first_arg == "add")
     {
