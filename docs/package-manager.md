@@ -55,7 +55,7 @@ This reads `coi.lock` and installs exact versions into `.coi/pkgs/`.
 Upgrade one package:
 
 ```bash
-coi upgrade coi/supabase
+coi upgrade @coi/supabase
 ```
 
 Upgrade all packages:
@@ -67,7 +67,7 @@ coi upgrade
 Remove a package:
 
 ```bash
-coi remove coi/supabase
+coi remove @coi/supabase
 ```
 
 ## Import Resolution
