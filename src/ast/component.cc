@@ -420,12 +420,20 @@ std::string Component::to_webcc(CompilerSession &session)
         {
             return type_name;
         }
+        if (session.data_type_names.count(type_name))
+        {
+            return type_name;
+        }
         if (type_name.find("::") != std::string::npos)
         {
             return type_name;
         }
         std::string same_module = qualified_name(module_name, type_name);
         if (session.component_info.find(same_module) != session.component_info.end())
+        {
+            return same_module;
+        }
+        if (session.data_type_names.count(same_module))
         {
             return same_module;
         }

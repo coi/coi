@@ -21,6 +21,7 @@ struct ComponentMemberInfo {
 struct CompilerSession {
     std::set<std::string> components_with_tick;  // Components that have tick methods
     std::map<std::string, ComponentMemberInfo> component_info;  // Component name -> member info
+    std::set<std::string> data_type_names;  // Fully-qualified data type names (e.g., "Supabase_Credentials")
 };
 
 // Represents a dependency on a member of an object (e.g., net.connected)

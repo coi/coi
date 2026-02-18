@@ -127,6 +127,12 @@ void generate_cpp_code(
         session.component_info[qualified_name(comp->module_name, comp->name)] = info;
     }
 
+    // Populate global data type names for module-level type resolution
+    for (const auto &data_def : all_global_data)
+    {
+        session.data_type_names.insert(qualified_name(data_def->module_name, data_def->name));
+    }
+
     // Output global enums (defined outside components)
     for (const auto &enum_def : all_global_enums)
     {
