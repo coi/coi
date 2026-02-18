@@ -10,8 +10,6 @@ I have a few plans and ideas for this language, adding them here :)
 
 - **Direct WASM Target**: I want to add an additional `WASM` target to the `Coi` compiler that compiles directly to WebAssembly instead of just the C++ target. By skipping the C++ transpilation step, I want to enable much faster compile times and significantly better hot reloadability during development.
 
-- **Package manager**: A `Coi` package manager for publishing/consuming packages, versioning, and dependency management (don’t think I need to explain this one :P)
-
 - **Time Travel & Deterministic Debugging**: Because `Coi` targets WebAssembly and has deterministic memory management (no GC), add a compiler flag that instruments binaries as a "flight recorder" to record state transitions and input events. Users can "Export Trace" and replay their exact session frame-by-frame in the VS Code extension, replay is 100% bit-identical.
 
 
