@@ -55,8 +55,10 @@ struct Statement : ASTNode {};
 // Context for component-local type resolution and method signature tracking
 struct ComponentTypeContext {
     std::string component_name;                // Current component being compiled
+    std::string module_name;                   // Current component module name
     std::set<std::string> local_data_types;    // Data types defined in this component
     std::set<std::string> local_enum_types;    // Enum types defined in this component
+    std::set<std::string> global_data_types;   // Fully-qualified global data type names
     std::map<std::string, int> method_param_counts;  // Method name -> param count
     std::map<std::string, std::string> component_symbol_types; // Component params/state name -> type
     std::map<std::string, std::string> method_symbol_types;    // Current method params/locals name -> type
@@ -76,11 +78,19 @@ struct ComponentTypeContext {
         component_symbol_types.clear();
         method_symbol_types.clear();
     }
+
+    void set_module_scope(const std::string& mod_name,
+                          const std::set<std::string>& global_types) {
+        module_name = mod_name;
+        global_data_types = global_types;
+    }
     
     void clear() {
         component_name.clear();
+        module_name.clear();
         local_data_types.clear();
         local_enum_types.clear();
+        global_data_types.clear();
         method_param_counts.clear();
         component_symbol_types.clear();
         method_symbol_types.clear();
@@ -130,6 +140,10 @@ struct ComponentTypeContext {
         if (component_name.empty()) return type;
         if (local_data_types.count(type) || local_enum_types.count(type)) {
             return component_name + "_" + type;
+        }
+        std::string module_scoped = module_name.empty() ? type : (module_name + "_" + type);
+        if (global_data_types.count(module_scoped)) {
+            return module_scoped;
         }
         return type;
     }
