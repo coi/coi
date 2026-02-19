@@ -1088,33 +1088,9 @@ std::string Component::to_webcc(CompilerSession &session)
                 ss << "        }\n";
                 ss << "        " << elements_vec << ".clear();\n";
                 ss << "        \n";
-
-                // Recreate all items using insert_before to maintain DOM order
-                std::string anchor_var = "_loop_" + std::to_string(region.loop_id) + "_anchor";
                 ss << "        g_view_depth++;\n";
-                ss << "        for (auto& " << region.var_name << " : " << region.iterable_expr << ") {\n";
-
-                // Transform append_child to insert_before for proper DOM ordering
-                std::string item_code = region.item_creation_code;
-                item_code = transform_to_insert_before(item_code, parent_var, anchor_var);
-                std::stringstream indented;
-                std::istringstream iss(item_code);
-                std::string line;
-                while (std::getline(iss, line))
-                {
-                    if (!line.empty())
-                    {
-                        indented << "        " << line << "\n";
-                    }
-                }
-                ss << indented.str();
-
-                // Track the created root element
-                if (!region.root_element_var.empty())
-                {
-                    ss << "            " << elements_vec << ".push_back(" << region.root_element_var << ");\n";
-                }
-
+                ss << "        for (int _idx = 0; _idx < _new_count; _idx++) {\n";
+                ss << "            _sync_loop_" << region.loop_id << "_item(_idx);\n";
                 ss << "        }\n";
                 ss << "        if (--g_view_depth == 0) webcc::flush();\n";
                 ss << "        " << count_var << " = _new_count;\n";
@@ -1255,11 +1231,13 @@ std::string Component::to_webcc(CompilerSession &session)
 
         ss << "    void _sync_loop_" << region.loop_id << "_item(int _idx) {\n";
         ss << "        if (_idx < 0 || _idx >= (int)" << region.iterable_expr << ".size()) return;\n";
-        ss << "        if (_idx >= (int)" << elements_vec << ".size()) return;\n";
-        ss << "        webcc::handle _old = " << elements_vec << "[_idx];\n";
-        ss << "        g_dispatcher.remove(_old);\n";
-        ss << "        webcc::dom::remove_element(_old);\n";
-        ss << "        webcc::handle _ref = (_idx + 1 < (int)" << elements_vec << ".size()) ? " << elements_vec << "[_idx + 1] : " << anchor_var << ";\n";
+        ss << "        webcc::handle _ref = " << anchor_var << ";\n";
+        ss << "        if (_idx < (int)" << elements_vec << ".size()) {\n";
+        ss << "            webcc::handle _old = " << elements_vec << "[_idx];\n";
+        ss << "            g_dispatcher.remove(_old);\n";
+        ss << "            webcc::dom::remove_element(_old);\n";
+        ss << "            _ref = (_idx + 1 < (int)" << elements_vec << ".size()) ? " << elements_vec << "[_idx + 1] : " << anchor_var << ";\n";
+        ss << "        }\n";
         ss << "        auto& " << region.var_name << " = " << region.iterable_expr << "[_idx];\n";
 
         std::string item_code = transform_to_insert_before(region.item_creation_code, parent_var, "_ref");
@@ -1274,7 +1252,8 @@ std::string Component::to_webcc(CompilerSession &session)
             }
         }
         ss << indented.str();
-        ss << "        " << elements_vec << "[_idx] = " << region.root_element_var << ";\n";
+        ss << "        if (_idx < (int)" << elements_vec << ".size()) " << elements_vec << "[_idx] = " << region.root_element_var << ";\n";
+        ss << "        else " << elements_vec << ".push_back(" << region.root_element_var << ");\n";
         ss << "    }\n";
     }
 
