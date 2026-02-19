@@ -435,25 +435,74 @@ void HTMLElement::generate_code(ViewCodegenContext& ctx)
         {
             ctx.ss << "        webcc::dom::add_click_listener(" << var << ");\n";
             bool is_call = dynamic_cast<FunctionCall *>(attr.value.get()) != nullptr;
-            ctx.event_handlers.push_back({my_id, "click", attr.value->to_webcc(), is_call});
+            if (ctx.in_loop)
+            {
+                // In loops, register handler inline with lambda capturing loop variable
+                std::string capture = build_lambda_capture(ctx.loop_var_name);
+                std::string handler_code = attr.value->to_webcc();
+                if (is_call)
+                    ctx.ss << "        g_dispatcher.set(" << var << ", " << capture << "() { " << handler_code << "; });\n";
+                else
+                    ctx.ss << "        g_dispatcher.set(" << var << ", " << capture << "() { " << handler_code << "(); });\n";
+            }
+            else
+            {
+                ctx.event_handlers.push_back({my_id, "click", attr.value->to_webcc(), is_call});
+            }
         }
         else if (attr.name == "oninput")
         {
             ctx.ss << "        webcc::dom::add_input_listener(" << var << ");\n";
             bool is_call = dynamic_cast<FunctionCall *>(attr.value.get()) != nullptr;
-            ctx.event_handlers.push_back({my_id, "input", attr.value->to_webcc(), is_call});
+            if (ctx.in_loop)
+            {
+                std::string capture = build_lambda_capture(ctx.loop_var_name);
+                std::string handler_code = attr.value->to_webcc();
+                if (is_call)
+                    ctx.ss << "        g_input_dispatcher.set(" << var << ", " << capture << "(const webcc::string& _value) { " << handler_code << "; });\n";
+                else
+                    ctx.ss << "        g_input_dispatcher.set(" << var << ", " << capture << "(const webcc::string& _value) { " << handler_code << "(_value); });\n";
+            }
+            else
+            {
+                ctx.event_handlers.push_back({my_id, "input", attr.value->to_webcc(), is_call});
+            }
         }
         else if (attr.name == "onchange")
         {
             ctx.ss << "        webcc::dom::add_change_listener(" << var << ");\n";
             bool is_call = dynamic_cast<FunctionCall *>(attr.value.get()) != nullptr;
-            ctx.event_handlers.push_back({my_id, "change", attr.value->to_webcc(), is_call});
+            if (ctx.in_loop)
+            {
+                std::string capture = build_lambda_capture(ctx.loop_var_name);
+                std::string handler_code = attr.value->to_webcc();
+                if (is_call)
+                    ctx.ss << "        g_change_dispatcher.set(" << var << ", " << capture << "(const webcc::string& _value) { " << handler_code << "; });\n";
+                else
+                    ctx.ss << "        g_change_dispatcher.set(" << var << ", " << capture << "(const webcc::string& _value) { " << handler_code << "(_value); });\n";
+            }
+            else
+            {
+                ctx.event_handlers.push_back({my_id, "change", attr.value->to_webcc(), is_call});
+            }
         }
         else if (attr.name == "onkeydown")
         {
             ctx.ss << "        webcc::dom::add_keydown_listener(" << var << ");\n";
             bool is_call = dynamic_cast<FunctionCall *>(attr.value.get()) != nullptr;
-            ctx.event_handlers.push_back({my_id, "keydown", attr.value->to_webcc(), is_call});
+            if (ctx.in_loop)
+            {
+                std::string capture = build_lambda_capture(ctx.loop_var_name);
+                std::string handler_code = attr.value->to_webcc();
+                if (is_call)
+                    ctx.ss << "        g_keydown_dispatcher.set(" << var << ", " << capture << "(int _keycode) { " << handler_code << "; });\n";
+                else
+                    ctx.ss << "        g_keydown_dispatcher.set(" << var << ", " << capture << "(int _keycode) { " << handler_code << "(_keycode); });\n";
+            }
+            else
+            {
+                ctx.event_handlers.push_back({my_id, "keydown", attr.value->to_webcc(), is_call});
+            }
         }
         else
         {

@@ -985,8 +985,6 @@ std::string MatchExpr::to_webcc() {
     if (!has_else && !first) {
         // Close the last if without else
         code += "        }\n";
-        // Add a default return (shouldn't reach here if patterns are exhaustive)
-        code += "        return {};\n";
     }
     
     code += "    }()";
