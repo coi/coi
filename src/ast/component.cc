@@ -35,6 +35,14 @@ struct ArrayLoopInfo
 };
 std::map<std::string, ArrayLoopInfo> g_array_loops;
 
+// Map loop variable name -> keyed HTML loop info for member-mutation fast paths
+struct HtmlLoopVarInfo
+{
+    int loop_id;
+    std::string iterable_expr;
+};
+std::map<std::string, HtmlLoopVarInfo> g_html_loop_var_infos;
+
 // ============================================================================
 // Utility Functions
 // ============================================================================
@@ -579,6 +587,7 @@ std::string Component::to_webcc(CompilerSession &session)
 
     // Populate global context for keyed HTML loops over non-component arrays
     g_array_loops.clear();
+    g_html_loop_var_infos.clear();
     for (const auto &region : loop_regions)
     {
         if (region.is_keyed && region.is_html_loop)
@@ -593,6 +602,11 @@ std::string Component::to_webcc(CompilerSession &session)
             info.root_element_var = region.root_element_var;
             info.is_only_child = region.is_only_child;
             g_array_loops[region.iterable_expr] = info;
+
+            HtmlLoopVarInfo var_info;
+            var_info.loop_id = region.loop_id;
+            var_info.iterable_expr = region.iterable_expr;
+            g_html_loop_var_infos[region.var_name] = var_info;
         }
     }
 
@@ -907,6 +921,7 @@ std::string Component::to_webcc(CompilerSession &session)
             }
         }
         ss << "    }\n";
+
     }
 
     // Generate _update_{varname}() methods
@@ -1228,6 +1243,41 @@ std::string Component::to_webcc(CompilerSession &session)
         ss << "    }\n";
     }
 
+    // Generate _sync_loop_X_item() methods for keyed HTML loops (single-item patch)
+    for (const auto &region : loop_regions)
+    {
+        if (!(region.is_keyed && region.is_html_loop) || region.root_element_var.empty())
+            continue;
+
+        std::string elements_vec = "_loop_" + std::to_string(region.loop_id) + "_elements";
+        std::string parent_var = "_loop_" + std::to_string(region.loop_id) + "_parent";
+        std::string anchor_var = "_loop_" + std::to_string(region.loop_id) + "_anchor";
+
+        ss << "    void _sync_loop_" << region.loop_id << "_item(int _idx) {\n";
+        ss << "        if (_idx < 0 || _idx >= (int)" << region.iterable_expr << ".size()) return;\n";
+        ss << "        if (_idx >= (int)" << elements_vec << ".size()) return;\n";
+        ss << "        webcc::handle _old = " << elements_vec << "[_idx];\n";
+        ss << "        g_dispatcher.remove(_old);\n";
+        ss << "        webcc::dom::remove_element(_old);\n";
+        ss << "        webcc::handle _ref = (_idx + 1 < (int)" << elements_vec << ".size()) ? " << elements_vec << "[_idx + 1] : " << anchor_var << ";\n";
+        ss << "        auto& " << region.var_name << " = " << region.iterable_expr << "[_idx];\n";
+
+        std::string item_code = transform_to_insert_before(region.item_creation_code, parent_var, "_ref");
+        std::stringstream indented;
+        std::istringstream iss(item_code);
+        std::string line;
+        while (std::getline(iss, line))
+        {
+            if (!line.empty())
+            {
+                indented << "        " << line << "\n";
+            }
+        }
+        ss << indented.str();
+        ss << "        " << elements_vec << "[_idx] = " << region.root_element_var << ";\n";
+        ss << "    }\n";
+    }
+
     // Map from variable to if IDs
     std::map<std::string, std::vector<int>> var_to_if_ids;
     for (const auto &region : if_regions)
@@ -1513,7 +1563,8 @@ std::string Component::to_webcc(CompilerSession &session)
             {
                 // Skip _sync_loop for component arrays with inline operations
                 // Those are handled inline in statements (push/pop/clear) or in Assignment (full reassignment)
-                if (g_component_array_loops.find(mod) == g_component_array_loops.end())
+                if (g_component_array_loops.find(mod) == g_component_array_loops.end() &&
+                    g_array_loops.find(mod) == g_array_loops.end())
                 {
                     for (int loop_id : var_to_loop_ids[mod])
                     {

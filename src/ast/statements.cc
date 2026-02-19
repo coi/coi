@@ -35,6 +35,13 @@ struct ArrayLoopInfo
 };
 extern std::map<std::string, ArrayLoopInfo> g_array_loops;
 
+struct HtmlLoopVarInfo
+{
+    int loop_id;
+    std::string iterable_expr;
+};
+extern std::map<std::string, HtmlLoopVarInfo> g_html_loop_var_infos;
+
 std::string VarDeclaration::to_webcc()
 {
     ComponentTypeContext::instance().set_method_symbol_type(name, type);
@@ -306,15 +313,42 @@ std::string MemberAssignment::to_webcc()
         val = "webcc::move(" + val + ")";
     }
 
+    std::string obj = object->to_webcc();
+    std::string result;
     if (compound_op.empty())
     {
-        return object->to_webcc() + "." + member + " = " + val + ";";
+        result = obj + "." + member + " = " + val + ";";
     }
     else
     {
-        std::string obj = object->to_webcc();
-        return obj + "." + member + " = " + obj + "." + member + " " + compound_op + " " + val + ";";
+        result = obj + "." + member + " = " + obj + "." + member + " " + compound_op + " " + val + ";";
     }
+
+    // Fast path: if assigning to a keyed HTML loop item member (e.g., task.status = ...),
+    // patch only that loop item instead of re-syncing the whole loop.
+    Expression *root = object.get();
+    while (auto member_acc = dynamic_cast<MemberAccess *>(root))
+    {
+        root = member_acc->object.get();
+    }
+    if (auto id = dynamic_cast<Identifier *>(root))
+    {
+        auto it = g_html_loop_var_infos.find(id->name);
+        if (it != g_html_loop_var_infos.end())
+        {
+            const auto &info = it->second;
+            std::string idx_var = "__coi_loop_idx_" + id->name;
+            result += "\n{\n";
+            result += "    int " + idx_var + " = -1;\n";
+            result += "    for (int __i = 0; __i < (int)" + info.iterable_expr + ".size(); __i++) {\n";
+            result += "        if (&" + info.iterable_expr + "[__i] == &" + id->name + ") { " + idx_var + " = __i; break; }\n";
+            result += "    }\n";
+            result += "    if (" + idx_var + " >= 0) _sync_loop_" + std::to_string(info.loop_id) + "_item(" + idx_var + ");\n";
+            result += "}";
+        }
+    }
+
+    return result;
 }
 
 void MemberAssignment::collect_dependencies(std::set<std::string> &deps)
