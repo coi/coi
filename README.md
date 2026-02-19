@@ -60,15 +60,15 @@ Coi gives you composable components, fine-grained reactivity, type safety, and t
 ## Example
 
 ```tsx
+// Type-safe enum
+enum Status { Todo, Done }
+
 // Define a data structure
 pod Task {
     int id;
     string text;
     Status status;
 }
-
-// Type-safe enum
-enum Status { Todo, Done }
 
 component App {
     mut Task[] tasks;
