@@ -21,6 +21,20 @@ struct ComponentArrayLoopInfo
 };
 std::map<std::string, ComponentArrayLoopInfo> g_component_array_loops;
 
+// Info for inlining DOM operations on keyed HTML loops over non-component arrays
+struct ArrayLoopInfo
+{
+    int loop_id;
+    std::string parent_var;         // e.g., "_loop_0_parent"
+    std::string anchor_var;         // e.g., "_loop_0_anchor"
+    std::string elements_vec_name;  // e.g., "_loop_0_elements"
+    std::string var_name;           // Loop variable name (e.g., "task")
+    std::string item_creation_code; // Code to render one item
+    std::string root_element_var;   // Root element handle var for one item (e.g., "_el_2")
+    bool is_only_child;             // True if loop is only child of parent element
+};
+std::map<std::string, ArrayLoopInfo> g_array_loops;
+
 // ============================================================================
 // Utility Functions
 // ============================================================================
@@ -560,6 +574,25 @@ std::string Component::to_webcc(CompilerSession &session)
             info.is_member_ref_loop = true;
             info.is_only_child = region.is_only_child;
             g_component_array_loops[region.iterable_expr] = info;
+        }
+    }
+
+    // Populate global context for keyed HTML loops over non-component arrays
+    g_array_loops.clear();
+    for (const auto &region : loop_regions)
+    {
+        if (region.is_keyed && region.is_html_loop)
+        {
+            ArrayLoopInfo info;
+            info.loop_id = region.loop_id;
+            info.parent_var = "_loop_" + std::to_string(region.loop_id) + "_parent";
+            info.anchor_var = "_loop_" + std::to_string(region.loop_id) + "_anchor";
+            info.elements_vec_name = "_loop_" + std::to_string(region.loop_id) + "_elements";
+            info.var_name = region.var_name;
+            info.item_creation_code = transform_to_insert_before(region.item_creation_code, info.parent_var, info.anchor_var);
+            info.root_element_var = region.root_element_var;
+            info.is_only_child = region.is_only_child;
+            g_array_loops[region.iterable_expr] = info;
         }
     }
 
