@@ -113,7 +113,7 @@
         },
         {
           "comment": "Standalone function calls (excluding keywords like if, else, for, while)",
-          "match": "\\b(?!(?:if|else|for|while|return|component|def|view|tick|init|mount|app|import|struct|style|type|global|in|computed|enum|key)\\b)([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(",
+          "match": "\\b(?!(?:if|else|for|while|match|return|component|def|view|tick|init|mount|app|import|struct|style|type|global|in|computed|enum|key)\\b)([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(",
           "captures": {
             "1": { "name": "entity.name.function.coi" }
           }
