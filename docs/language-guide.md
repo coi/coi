@@ -915,6 +915,55 @@ pub def reset() : void {
 }
 ```
 
+### Multiple Return Values
+
+Functions can return multiple values using tuple-style syntax:
+
+```tsx
+def getUser() : (string name, int age) {
+    return ("Alice", 30);
+}
+```
+
+Tuple element names in the return signature are optional:
+
+```tsx
+def getUser() : (string, int) {
+    return ("Alice", 30);
+}
+```
+
+Destructure them at the call site:
+
+```tsx
+(string name, int age) = getUser();
+```
+
+You can ignore values by omitting the variable name in the destructuring pattern:
+
+```tsx
+(int id, string) = getUser();  // second value is ignored
+```
+
+Tuple returns are statically typed:
+- Return element count must match the function signature
+- Return element types must match in order
+- Destructured variables use the types you declare in the tuple pattern
+
+`mut` is supported in destructuring when you need to reassign one of the values:
+
+```tsx
+(mut int left, int right) = getPair();
+left = left + 1;
+```
+
+Without `mut`, destructured variables are immutable:
+
+```tsx
+(int left, int right) = getPair();
+left++;  // compile error: left is immutable
+```
+
 ## Next Steps
 
 - [Components](components.md) — Component syntax, lifecycle, props
