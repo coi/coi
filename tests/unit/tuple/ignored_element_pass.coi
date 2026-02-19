@@ -1,0 +1,19 @@
+// Test: tuple destructuring can ignore elements by omitting the name
+component TupleIgnoredElement {
+    def getPair(): (int, string) {
+        return (42, "unused");
+    }
+
+    def test(): int {
+        (int value, string) = getPair();
+        return value;
+    }
+
+    view {
+        <div>{test()}</div>
+    }
+}
+
+app {
+    root = TupleIgnoredElement;
+}

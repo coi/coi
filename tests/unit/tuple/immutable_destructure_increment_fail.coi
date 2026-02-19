@@ -1,0 +1,19 @@
+// Test: non-mut tuple destructured variable cannot be incremented
+component TupleImmutableIncrement {
+    def getPair(): (int, string) {
+        return (1, "x");
+    }
+
+    init {
+        (int a, string) = getPair();
+        a++;
+    }
+
+    view {
+        <div>test</div>
+    }
+}
+
+app {
+    root = TupleImmutableIncrement;
+}

@@ -1,0 +1,18 @@
+// Test: tuple return type can omit element names
+component TupleOptionalReturnNames {
+    def getPair(): (int, string) {
+        return (7, "ok");
+    }
+
+    def test(): void {
+        (int n, string msg) = getPair();
+    }
+
+    view {
+        <div>test</div>
+    }
+}
+
+app {
+    root = TupleOptionalReturnNames;
+}

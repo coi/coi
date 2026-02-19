@@ -1,0 +1,18 @@
+// Test: ignored tuple elements cannot be marked mut
+component TupleIgnoredMut {
+    def getPair(): (int, string) {
+        return (1, "x");
+    }
+
+    init {
+        (int a, mut string) = getPair();
+    }
+
+    view {
+        <div>test</div>
+    }
+}
+
+app {
+    root = TupleIgnoredMut;
+}
