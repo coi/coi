@@ -214,6 +214,7 @@ static void emit_loop_region_members(std::stringstream &ss, const std::vector<Lo
     for (const auto &region : loop_regions)
     {
         ss << "    webcc::handle _loop_" << region.loop_id << "_parent;\n";
+        ss << "    webcc::handle _loop_" << region.loop_id << "_anchor;\n";
         if (region.is_keyed)
         {
             // Simple count tracking - no map needed for inline sync
@@ -1040,11 +1041,14 @@ std::string Component::to_webcc(CompilerSession &session)
                 ss << "        " << elements_vec << ".clear();\n";
                 ss << "        \n";
 
-                // Recreate all items
+                // Recreate all items using insert_before to maintain DOM order
+                std::string anchor_var = "_loop_" + std::to_string(region.loop_id) + "_anchor";
                 ss << "        g_view_depth++;\n";
                 ss << "        for (auto& " << region.var_name << " : " << region.iterable_expr << ") {\n";
 
+                // Transform append_child to insert_before for proper DOM ordering
                 std::string item_code = region.item_creation_code;
+                item_code = transform_to_insert_before(item_code, parent_var, anchor_var);
                 std::stringstream indented;
                 std::istringstream iss(item_code);
                 std::string line;
@@ -1082,11 +1086,13 @@ std::string Component::to_webcc(CompilerSession &session)
                 ss << "        }\n";
                 ss << "        \n";
 
-                // Recreate all items in current array order with fresh views
+                // Recreate all items in current array order with fresh views using insert_before for proper DOM ordering
+                std::string anchor_var = "_loop_" + std::to_string(region.loop_id) + "_anchor";
                 ss << "        g_view_depth++;\n";
                 ss << "        for (auto& " << region.var_name << " : " << region.iterable_expr << ") {\n";
 
                 std::string item_code = region.item_creation_code;
+                item_code = transform_to_insert_before(item_code, parent_var, anchor_var);
                 std::stringstream indented;
                 std::istringstream iss(item_code);
                 std::string line;
@@ -1114,11 +1120,13 @@ std::string Component::to_webcc(CompilerSession &session)
             if (!region.component_type.empty())
             {
                 std::string vec_name = "_loop_" + region.component_type + "s";
+                std::string anchor_var = "_loop_" + std::to_string(region.loop_id) + "_anchor";
 
                 ss << "        if (new_count > old_count) {\n";
                 ss << "            for (int " << region.var_name << " = old_count; " << region.var_name << " < new_count; " << region.var_name << "++) {\n";
 
                 std::string item_code = region.item_creation_code;
+                item_code = transform_to_insert_before(item_code, region.parent_element, anchor_var);
                 std::stringstream indented;
                 std::istringstream iss(item_code);
                 std::string line;
@@ -1151,11 +1159,13 @@ std::string Component::to_webcc(CompilerSession &session)
             else if (region.is_html_loop)
             {
                 std::string vec_name = "_loop_" + std::to_string(region.loop_id) + "_elements";
+                std::string anchor_var = "_loop_" + std::to_string(region.loop_id) + "_anchor";
 
                 ss << "        if (new_count > old_count) {\n";
                 ss << "            for (int " << region.var_name << " = old_count; " << region.var_name << " < new_count; " << region.var_name << "++) {\n";
 
                 std::string item_code = region.item_creation_code;
+                item_code = transform_to_insert_before(item_code, region.parent_element, anchor_var);
                 std::stringstream indented;
                 std::istringstream iss(item_code);
                 std::string line;

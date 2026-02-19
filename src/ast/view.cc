@@ -1095,6 +1095,10 @@ void ViewForRangeStatement::generate_code(ViewCodegenContext& ctx)
     ctx.loop_regions->push_back(region);
 
     ctx.ss << "        _loop_" << my_loop_id << "_parent = " << ctx.parent << ";\n";
+    // Create anchor element to maintain DOM position during re-syncs
+    ctx.ss << "        _loop_" << my_loop_id << "_anchor = webcc::handle(webcc::next_deferred_handle());\n";
+    ctx.ss << "        webcc::dom::create_text_node_deferred(_loop_" << my_loop_id << "_anchor, \"\");\n";
+    ctx.ss << "        webcc::dom::append_child(" << ctx.parent << ", _loop_" << my_loop_id << "_anchor);\n";
     ctx.ss << "        _sync_loop_" << my_loop_id << "();\n";
 }
 
@@ -1192,6 +1196,10 @@ void ViewForEachStatement::generate_code(ViewCodegenContext& ctx)
     ctx.loop_regions->push_back(region);
 
     ctx.ss << "        _loop_" << my_loop_id << "_parent = " << ctx.parent << ";\n";
+    // Create anchor element to maintain DOM position during re-syncs
+    ctx.ss << "        _loop_" << my_loop_id << "_anchor = webcc::handle(webcc::next_deferred_handle());\n";
+    ctx.ss << "        webcc::dom::create_text_node_deferred(_loop_" << my_loop_id << "_anchor, \"\");\n";
+    ctx.ss << "        webcc::dom::append_child(" << ctx.parent << ", _loop_" << my_loop_id << "_anchor);\n";
     ctx.ss << "        _sync_loop_" << my_loop_id << "();\n";
 }
 
