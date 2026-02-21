@@ -532,11 +532,9 @@ component App {
                 if (meta.has(User.name)) {
                     System.log("Name found: " + data.name);
                 }
-                yield 0;
             };
             Error(string error) => {
                 System.log("Parse error: " + error);
-                yield 0;
             };
         };
     }
