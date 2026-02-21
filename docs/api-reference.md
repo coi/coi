@@ -596,7 +596,7 @@ pod User {
 `Json.parse(...)` is consumed through `match` using `Success(...)` and `Error(...)` arms:
 
 ```tsx
-match (Json.parse(User, json)) {
+string res = match (Json.parse(User, json)) {
     Success(User data, Meta meta) => {
         // use data + field presence
         yield data.name;
@@ -610,7 +610,7 @@ match (Json.parse(User, json)) {
 For arrays:
 
 ```tsx
-match (Json.parse(User[], jsonArray)) {
+int len = match (Json.parse(User[], jsonArray)) {
     Success(User[] data, UserMeta[] metas) => data.length();
     Error(string message) => 0;
 };
@@ -629,11 +629,9 @@ match (Json.parse(User, payload)) {
         if (meta.has(User.age)) {
             System.log("Age: ${u.age}");
         }
-        yield 0;
     };
     Error(string error) => {
         System.log("Parse error: " + error);
-        yield 0;
     };
 }
 ```
@@ -650,11 +648,9 @@ component UserLoader {
             Success(User u, Meta meta) => {
                 user = u;
                 status = "Loaded: " + u.name;
-                yield 0;
             };
             Error(string error) => {
                 status = "Parse error: " + error;
-                yield 0;
             };
         };
     }
@@ -714,11 +710,9 @@ component ShowList {
                         // shows[i].title was present
                     }
                 }
-                yield 0;
             };
             Error(string error) => {
                 status = "Parse error: " + error;
-                yield 0;
             };
         };
     }
@@ -757,7 +751,6 @@ match (Json.parse(User, payload)) {
     Success(User u, Meta meta) => {
         meta.has(User.name);  // true
         meta.has(User.age);   // false (was null)
-        yield 0;
     };
     Error(string error) => {
         yield 0;
