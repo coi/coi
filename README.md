@@ -15,8 +15,10 @@ Components with native performance. Fine-grained reactivity, zero internal GC pa
 
 </div>
 
-> [!NOTE]
-> Coi is actively evolving. Check the documentation and examples for the latest features and syntax.
+> [!WARNING]
+> **Experimental Status**: Coi is in active development with frequent syntax changes and API adjustments. 
+> * **Production**: Not recommended.
+> * **Hobby Projects**: Encouraged! Feedback is appreciated as the language stabilizes.
 
 ## What You Can Build
 
