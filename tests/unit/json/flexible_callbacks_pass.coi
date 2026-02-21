@@ -1,4 +1,4 @@
-// Test: Flexible callback signatures - users can omit params they don't need
+// Test: Match-based JSON parsing with selective binding
 pod User {
     string name;
     int age;
@@ -8,25 +8,21 @@ component FlexibleCallbackTest {
     mut string status = "Not started";
     mut User user;
 
-    // onSuccess with only data param (no meta)
-    def handleUserSimple(User u) : void {
+    def handleSuccess(User u, Meta meta) : void {
         user = u;
         status = "Got user: ${u.name}";
     }
 
-    // onError with no params
-    def handleErrorSimple() : void {
-        status = "Error occurred";
+    def handleError(string error) : void {
+        status = "Error: " + error;
     }
 
     def parseJson() : void {
         string json = `{"name": "Bob", "age": 30}`;
-        Json.parse(
-            User,
-            json,
-            &onSuccess = handleUserSimple,
-            &onError = handleErrorSimple
-        );
+        match (Json.parse(User, json)) {
+            Success(User u, Meta meta) => handleSuccess(u, meta),
+            Error(string error) => handleError(error)
+        };
     }
 
     view {

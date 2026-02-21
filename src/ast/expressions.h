@@ -210,6 +210,7 @@ struct MatchPattern {
         Literal,    // Direct value match: 42, "hello", true
         Enum,       // EnumType::Value
         Pod,        // PodType{field = value, ...} or PodType{field, ...} (capture/binding)
+        Variant,    // Variant(arg, ...) e.g., Success(User user, Meta meta)
         Else        // else (default case)
     };
     
@@ -225,6 +226,13 @@ struct MatchPattern {
         std::unique_ptr<Expression> value;  // nullptr for binding pattern like User{name}
     };
     std::vector<FieldPattern> fields;
+
+    // For Kind::Variant: typed bindings in constructor-like patterns
+    struct VariantBinding {
+        std::string type;
+        std::string name;
+    };
+    std::vector<VariantBinding> variant_bindings;
     
     MatchPattern() = default;
     MatchPattern(MatchPattern&&) = default;
@@ -252,4 +260,14 @@ struct MatchExpr : Expression {
     std::string to_webcc() override;
     void collect_dependencies(std::set<std::string>& deps) override;
     bool is_static() override;
+};
+
+// Block expression for match arm bodies that contain statements
+// Generated as an IIFE expression so it can be used where an expression is required.
+struct BlockExpr : Expression {
+    std::vector<std::unique_ptr<Statement>> statements;
+
+    std::string to_webcc() override;
+    void collect_dependencies(std::set<std::string>& deps) override;
+    bool is_static() override { return false; }
 };

@@ -250,9 +250,25 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
         return code;
     }
     
-    // Json.parse - supports both positional and named callback arguments
+    // Json.parse - returns a result value consumed via match
     if (intrinsic_name == "json_parse") {
-        if (args.size() < 2) return "";
+        if (args.size() != 2) {
+            ErrorHandler::compiler_error(
+                "Json.parse now takes exactly 2 arguments: Json.parse(Type, json). "
+                "Callback arguments (&onSuccess/&onError) were removed.");
+        }
+
+        for (const auto& arg : args) {
+            if (!arg.name.empty()) {
+                ErrorHandler::compiler_error(
+                    "Json.parse does not support named arguments. Use: Json.parse(Type, json)");
+            }
+            if (arg.is_reference) {
+                ErrorHandler::compiler_error(
+                    "Json.parse callback/reference arguments are not supported. "
+                    "Use match(Json.parse(...)) with Success(...) / Error(...).");
+            }
+        }
         
         // First arg is data type identifier (e.g., "User" or "User[]")
         // Resolve component-local types (e.g., "TestStruct" -> "App_TestStruct")
@@ -270,33 +286,7 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
         
         // Second arg is JSON string expression
         std::string json_expr = args[1].value->to_webcc();
-        
-        // Find callbacks - support both positional and named arguments
-        std::string on_success, on_error;
-        for (size_t i = 2; i < args.size(); i++) {
-            const auto& arg = args[i];
-            // Enforce & prefix for callback arguments
-            if (!arg.is_reference) {
-                ErrorHandler::compiler_error("Callback argument must use '&' prefix (e.g., &" + arg.value->to_webcc() + ")");
-            }
-            if (!arg.name.empty()) {
-                // Named argument
-                if (arg.name == "onSuccess") {
-                    on_success = arg.value->to_webcc();
-                } else if (arg.name == "onError") {
-                    on_error = arg.value->to_webcc();
-                }
-            } else {
-                // Positional argument: arg[2] = onSuccess, arg[3] = onError
-                if (i == 2) {
-                    on_success = arg.value->to_webcc();
-                } else if (i == 3) {
-                    on_error = arg.value->to_webcc();
-                }
-            }
-        }
-        
-        return generate_json_parse(data_type, json_expr, on_success, on_error);
+        return generate_json_parse(data_type, json_expr);
     }
     
     return "";  // Unknown intrinsic
@@ -739,6 +729,22 @@ MemberAccess::MemberAccess(std::unique_ptr<Expression> obj, const std::string& m
 std::string MemberAccess::to_webcc() {
     // Check if this is a shared constant access (e.g., Math.PI)
     if (auto id = dynamic_cast<Identifier*>(object.get())) {
+        std::string resolved_type = ComponentTypeContext::instance().resolve(id->name);
+
+        // Check for JSON field token access (e.g., User.name -> __coi_field_User_name)
+        const std::vector<DataField>* fields = DataTypeRegistry::instance().lookup(resolved_type);
+        if (!fields && resolved_type != id->name) {
+            fields = DataTypeRegistry::instance().lookup(id->name);
+            resolved_type = id->name;
+        }
+        if (fields) {
+            for (const auto& field : *fields) {
+                if (field.name == member) {
+                    return field_token_symbol_name(resolved_type, member);
+                }
+            }
+        }
+
         // Check if it's a type with a shared constant
         if (!id->name.empty() && std::isupper(id->name[0])) {
             if (auto* method_def = DefSchema::instance().lookup_method(id->name, member)) {
@@ -954,6 +960,16 @@ std::string MatchExpr::to_webcc() {
                 }
             }
         }
+        else if (arm.pattern.kind == MatchPattern::Kind::Variant) {
+            condition = "_match_subject.is_" + arm.pattern.type_name + "()";
+            if (!arm.pattern.variant_bindings.empty()) {
+                bindings += "            const auto& __coi_variant = _match_subject.as_" + arm.pattern.type_name + "();\n";
+                for (size_t i = 0; i < arm.pattern.variant_bindings.size(); ++i) {
+                    bindings += "            const auto& " + arm.pattern.variant_bindings[i].name +
+                                " = __coi_variant._" + std::to_string(i) + ";\n";
+                }
+            }
+        }
         
         if (first) {
             code += "        if (" + condition + ") {\n";
@@ -1019,5 +1035,20 @@ bool MatchExpr::is_static() {
         if (!arm.body->is_static()) return false;
     }
     return true;
+}
+
+std::string BlockExpr::to_webcc() {
+    std::string code = "([&]() {\n";
+    for (const auto& stmt : statements) {
+        code += "            " + stmt->to_webcc() + "\n";
+    }
+    code += "        }())";
+    return code;
+}
+
+void BlockExpr::collect_dependencies(std::set<std::string>& deps) {
+    for (const auto& stmt : statements) {
+        stmt->collect_dependencies(deps);
+    }
 }
 

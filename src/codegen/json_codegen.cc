@@ -4,6 +4,7 @@
 
 #include "json_codegen.h"
 #include <sstream>
+#include <cctype>
 
 // ============================================================================
 // DataTypeRegistry Implementation
@@ -98,36 +99,34 @@ static std::string get_array_element_type(const std::string& type) {
     return type.substr(0, type.size() - 2);
 }
 
-// Generate callback invocation based on user's method param count
-static std::string generate_callback_call(
-    const std::string& callback_name,
-    bool is_array,
-    bool is_error = false)
-{
-    if (callback_name.empty()) return "";
-    
-    int param_count = ComponentTypeContext::instance().get_method_param_count(callback_name);
-    
-    std::stringstream ss;
-    ss << "this->" << callback_name << "(";
-    
-    if (is_error) {
-        // onError: 0 params = no arg, 1+ params = pass error string
-        if (param_count >= 1) {
-            ss << "webcc::string(\"" << (is_array ? "Expected JSON array" : "Invalid JSON") << "\")";
-        }
-    } else {
-        // onSuccess: 0 params = no args, 1 param = data only, 2+ params = data + meta
-        if (is_array) {
-            if (param_count >= 1) ss << "webcc::move(_results)";
-            if (param_count >= 2) ss << ", webcc::move(_metas)";
+// Convert type names like App_User[] to valid C++ identifier suffixes.
+static std::string sanitize_type_for_symbol(const std::string& type) {
+    std::string symbol;
+    symbol.reserve(type.size() + 8);
+    for (char c : type) {
+        if (std::isalnum(static_cast<unsigned char>(c)) || c == '_') {
+            symbol += c;
         } else {
-            if (param_count >= 1) ss << "webcc::move(_result)";
-            if (param_count >= 2) ss << ", webcc::move(_meta)";
+            symbol += '_';
         }
     }
-    
-    ss << ")";
+    return symbol;
+}
+
+std::string field_token_symbol_name(const std::string& data_type, const std::string& field_name) {
+    return "__coi_field_" + sanitize_type_for_symbol(data_type) + "_" + field_name;
+}
+
+std::string generate_field_token_constants(const std::string& data_type) {
+    auto* fields = DataTypeRegistry::instance().lookup(data_type);
+    if (!fields) return "";
+
+    std::stringstream ss;
+    for (uint32_t i = 0; i < fields->size(); i++) {
+        ss << "static constexpr uint32_t "
+           << field_token_symbol_name(data_type, (*fields)[i].name)
+           << " = " << i << ";\n";
+    }
     return ss.str();
 }
 
@@ -263,9 +262,7 @@ static void generate_object_fields_parse(std::stringstream& ss,
 // Generate JSON parse code for root-level arrays (e.g., Json.parse(User[], ...))
 static std::string generate_json_parse_array(
     const std::string& array_type,
-    const std::string& json_expr,
-    const std::string& on_success_callback,
-    const std::string& on_error_callback)
+    const std::string& json_expr)
 {
     std::string elem_type = get_array_element_type(array_type);
     if (!DataTypeRegistry::instance().lookup(elem_type)) {
@@ -277,15 +274,33 @@ static std::string generate_json_parse_array(
     ss << "            webcc::string_view _json = " << json_expr << ";\n";
     ss << "            const char* _s = _json.data();\n";
     ss << "            uint32_t _len = _json.length();\n";
+    ss << "            struct __JsonParseResult {\n";
+    ss << "                struct __SuccessPayload {\n";
+    ss << "                    webcc::vector<" << elem_type << "> _0;\n";
+    ss << "                    webcc::vector<" << elem_type << "Meta> _1;\n";
+    ss << "                };\n";
+    ss << "                struct __ErrorPayload {\n";
+    ss << "                    webcc::string _0;\n";
+    ss << "                };\n";
+    ss << "                bool ok;\n";
+    ss << "                webcc::vector<" << elem_type << "> value;\n";
+    ss << "                webcc::vector<" << elem_type << "Meta> meta;\n";
+    ss << "                webcc::string error;\n";
+    ss << "                __SuccessPayload success;\n";
+    ss << "                __ErrorPayload error_payload;\n";
+    ss << "                bool is_Success() const { return ok; }\n";
+    ss << "                bool is_Error() const { return !ok; }\n";
+    ss << "                const __SuccessPayload& as_Success() const { return success; }\n";
+    ss << "                const __ErrorPayload& as_Error() const { return error_payload; }\n";
+    ss << "            } _r{};\n";
     ss << "            uint32_t _p = json::skip_ws(_s, 0, _len);\n";
     ss << "            if (_p >= _len || _s[_p] != '[') {\n";
-    if (!on_error_callback.empty()) {
-        ss << "                " << generate_callback_call(on_error_callback, true, true) << ";\n";
-    }
-    ss << "                return;\n";
+    ss << "                _r.ok = false;\n";
+    ss << "                _r.error = \"Expected JSON array\";\n";
+    ss << "                _r.error_payload._0 = _r.error;\n";
+    ss << "                return _r;\n";
     ss << "            }\n";
-    ss << "            webcc::vector<" << elem_type << "> _results;\n";
-    ss << "            webcc::vector<" << elem_type << "Meta> _metas;\n";
+    ss << "            _r.ok = true;\n";
     ss << "            json::for_each(_s, _p, _len, [&](const char* _es, uint32_t _ep, uint32_t _elen) {\n";
     ss << "                auto _ev = json::isolate(_es, _ep, _elen);\n";
     ss << "                if (_ev.length() > 0) {\n";
@@ -293,26 +308,24 @@ static std::string generate_json_parse_array(
     ss << "                    " << elem_type << "Meta _elem_meta{};\n";
     ss << "                    bool _ok;\n";
     generate_object_fields_parse(ss, elem_type, "_elem", "_elem_meta", "_ev.data()", "_ev.length()", "_ok", "                    ");
-    ss << "                    _results.push_back(webcc::move(_elem));\n";
-    ss << "                    _metas.push_back(webcc::move(_elem_meta));\n";
+    ss << "                    _r.value.push_back(webcc::move(_elem));\n";
+    ss << "                    _r.meta.push_back(webcc::move(_elem_meta));\n";
     ss << "                }\n";
     ss << "            });\n";
-    if (!on_success_callback.empty()) {
-        ss << "            " << generate_callback_call(on_success_callback, true, false) << ";\n";
-    }
+    ss << "            _r.success._0 = _r.value;\n";
+    ss << "            _r.success._1 = _r.meta;\n";
+    ss << "            return _r;\n";
     ss << "        }()";
     return ss.str();
 }
 
 std::string generate_json_parse(
     const std::string& data_type,
-    const std::string& json_expr,
-    const std::string& on_success_callback,
-    const std::string& on_error_callback)
+    const std::string& json_expr)
 {
     // Check if this is an array type at the root level (e.g., "User[]")
     if (is_array_type(data_type)) {
-        return generate_json_parse_array(data_type, json_expr, on_success_callback, on_error_callback);
+        return generate_json_parse_array(data_type, json_expr);
     }
     
     if (!DataTypeRegistry::instance().lookup(data_type)) {
@@ -324,19 +337,37 @@ std::string generate_json_parse(
     ss << "            webcc::string_view _json = " << json_expr << ";\n";
     ss << "            const char* _s = _json.data();\n";
     ss << "            uint32_t _len = _json.length();\n";
+    ss << "            struct __JsonParseResult {\n";
+    ss << "                struct __SuccessPayload {\n";
+    ss << "                    " << data_type << " _0;\n";
+    ss << "                    " << data_type << "Meta _1;\n";
+    ss << "                };\n";
+    ss << "                struct __ErrorPayload {\n";
+    ss << "                    webcc::string _0;\n";
+    ss << "                };\n";
+    ss << "                bool ok;\n";
+    ss << "                " << data_type << " value;\n";
+    ss << "                " << data_type << "Meta meta;\n";
+    ss << "                webcc::string error;\n";
+    ss << "                __SuccessPayload success;\n";
+    ss << "                __ErrorPayload error_payload;\n";
+    ss << "                bool is_Success() const { return ok; }\n";
+    ss << "                bool is_Error() const { return !ok; }\n";
+    ss << "                const __SuccessPayload& as_Success() const { return success; }\n";
+    ss << "                const __ErrorPayload& as_Error() const { return error_payload; }\n";
+    ss << "            } _r{};\n";
     ss << "            if (!json::is_valid(_s, _len)) {\n";
-    if (!on_error_callback.empty()) {
-        ss << "                " << generate_callback_call(on_error_callback, false, true) << ";\n";
-    }
-    ss << "                return;\n";
+    ss << "                _r.ok = false;\n";
+    ss << "                _r.error = \"Invalid JSON\";\n";
+    ss << "                _r.error_payload._0 = _r.error;\n";
+    ss << "                return _r;\n";
     ss << "            }\n";
-    ss << "            " << data_type << " _result{};\n";
-    ss << "            " << data_type << "Meta _meta{};\n";
+    ss << "            _r.ok = true;\n";
     ss << "            bool _ok;\n";
-    generate_object_fields_parse(ss, data_type, "_result", "_meta", "_s", "_len", "_ok", "            ");
-    if (!on_success_callback.empty()) {
-        ss << "            " << generate_callback_call(on_success_callback, false, false) << ";\n";
-    }
+    generate_object_fields_parse(ss, data_type, "_r.value", "_r.meta", "_s", "_len", "_ok", "            ");
+    ss << "            _r.success._0 = _r.value;\n";
+    ss << "            _r.success._1 = _r.meta;\n";
+    ss << "            return _r;\n";
     ss << "        }()";
     return ss.str();
 }

@@ -1,5 +1,4 @@
-// Test: JSON parsing with component-local pod types
-// Component-local types should work with Json.parse and have correct Meta types
+// Test: JSON parsing with component-local pod types and match-based API
 
 component JsonApp {
     pod User {
@@ -8,22 +7,25 @@ component JsonApp {
     }
     
     mut string result = "not parsed";
-    
-    def onSuccess(User user, UserMeta meta) : void {
-        if (meta.has_name() && meta.has_age()) {
+
+    def handleSuccess(User user, Meta meta) : void {
+        if (meta.has(User.name) && meta.has(User.age)) {
             result = "User: " + user.name + ", age " + user.age;
         } else {
             result = "Partial data";
         }
     }
-    
-    def onError(string error) : void {
+
+    def handleError(string error) : void {
         result = "Error: " + error;
     }
     
     mount {
         string jsonData = `{"name": "Bob", "age": 30}`;
-        Json.parse(User, jsonData, &onSuccess = onSuccess, &onError = onError);
+        match (Json.parse(User, jsonData)) {
+            Success(User user, Meta meta) => handleSuccess(user, meta),
+            Error(string error) => handleError(error)
+        };
     }
     
     view {

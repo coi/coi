@@ -1,40 +1,35 @@
 // Coi JSON Parsing Definitions
-// Provides type-safe JSON parsing with callbacks
+// Provides type-safe JSON parsing with exhaustive result pattern matching
 
 // =========================================================
 // Json (static utilities - not instantiable)
 // =========================================================
-// Usage: Json.parse(Type, jsonString, &onSuccess = handler, &onError = errorHandler)
+// Usage: match (Json.parse(Type, jsonString)) { Success(Type data, Meta meta) => ..., Error(string message) => ... }
+
+// Field reference token type for Meta.has(Type.field) checks.
+@builtin
+@alias("uint32")
+type field {}
+
+// Generic JSON parse metadata API.
+@builtin
+type Meta {
+    // Example: meta.has(User.name)
+    shared def has(field f): bool
+}
+
+// Opaque result type used for match-based Json.parse results.
+@builtin
+type Result {}
 
 type Json {
-    // Parse JSON string into a data type (compiler intrinsic)
-    // First argument is a data type name (must be defined with `data { ... }`)
-    // 
-    // Example:
-    //   data User { string name; int age; }
-    //   
-    //   def handleUser(User data, UserMeta meta) : void {
-    //       if (meta.has_name()) {
-    //           System.log(data.name);
-    //       }
-    //   }
-    //   
-    //   Json.parse(
-    //       User,
-    //       jsonString,
-    //       &onSuccess = handleUser,
-    //       &onError = handleError
-    //   );
-    //
-    // The onSuccess callback receives the data AND a meta struct with presence bits.
-    // The onError callback receives an error message string.
+    // Parse JSON string into a data type and return a Result-pattern value.
+    // Must be consumed through match with Success(...) and Error(...).
     @intrinsic("json_parse")
     shared def parse(
         data DataType,
-        string json,
-        def onSuccess(DataType, DataTypeMeta) : void = void,
-        def onError(string) : void = void
-    ): void
+        string json
+    ): Result
 
     // Stringify a data type instance to JSON (compiler intrinsic)
     // 

@@ -32,14 +32,16 @@ private:
     std::map<std::string, std::vector<DataField>> types_;
 };
 
-// Generate the JSON parse code for a specific data type and callbacks
+// Generate the JSON parse expression for a specific data type
 // Returns empty string if type is not found
 std::string generate_json_parse(
     const std::string& data_type,           // e.g., "User"
-    const std::string& json_expr,            // e.g., "jsonString"
-    const std::string& on_success_callback,  // e.g., "handleUser" or empty
-    const std::string& on_error_callback     // e.g., "handleError" or empty
+    const std::string& json_expr             // e.g., "jsonString"
 );
+
+// Field token helpers used by Meta.has(Type.field)
+std::string field_token_symbol_name(const std::string& data_type, const std::string& field_name);
+std::string generate_field_token_constants(const std::string& data_type);
 
 // Generate the Meta struct definition for a data type
 // Returns the struct code (e.g., "struct UserMeta : json::MetaBase { ... }")

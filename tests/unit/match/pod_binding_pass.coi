@@ -9,9 +9,9 @@ component MatchPodBindingTest {
     
     def greet(User u) : string {
         return match (u) {
-            User{name = "io-eric"}  => { "Hello, creator!" };
-            User{name}              => { "Hello, ${name}!" };
-            else                    => { "Hello, stranger!" };
+            User{name = "io-eric"}  => { yield "Hello, creator!"; };
+            User{name}              => { yield  "Hello, ${name}!"; };
+            else                    => "Hello, stranger!";
         };
     }
 
