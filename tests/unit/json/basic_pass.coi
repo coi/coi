@@ -19,10 +19,10 @@ component JsonTest {
                 } else {
                     status = "Partial data received";
                 }
-            },
+            };
             Error(string error) => {
                 status = "Error: " + error;
-            }
+            };
         };
     }
 

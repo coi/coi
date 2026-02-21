@@ -20,8 +20,8 @@ component FlexibleCallbackTest {
     def parseJson() : void {
         string json = `{"name": "Bob", "age": 30}`;
         match (Json.parse(User, json)) {
-            Success(User u, Meta meta) => handleSuccess(u, meta),
-            Error(string error) => handleError(error)
+            Success(User u, Meta meta) => handleSuccess(u, meta);
+            Error(string error) => handleError(error);
         };
     }
 

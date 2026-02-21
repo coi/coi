@@ -32,8 +32,8 @@ component MixedTypes {
     mount {
         string jsonData = `{"message": "OK", "code": 200}`;
         match (Json.parse(Response, jsonData)) {
-            Success(Response r, Meta meta) => handleSuccess(r, meta),
-            Error(string error) => handleError(error)
+            Success(Response r, Meta meta) => handleSuccess(r, meta);
+            Error(string error) => handleError(error);
         };
     }
     

@@ -26,8 +26,8 @@ component JsonArrayTest {
     mount {
         string jsonArray = `[{"title":"Breaking Bad","id":1},{"title":"Game of Thrones","id":2}]`;
         match (Json.parse(Show[], jsonArray)) {
-            Success(Show[] shows, ShowMeta[] metas) => handleSuccess(shows, metas),
-            Error(string error) => handleError(error)
+            Success(Show[] shows, ShowMeta[] metas) => handleSuccess(shows, metas);
+            Error(string error) => handleError(error);
         };
     }
     

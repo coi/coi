@@ -23,8 +23,8 @@ component JsonApp {
     mount {
         string jsonData = `{"name": "Bob", "age": 30}`;
         match (Json.parse(User, jsonData)) {
-            Success(User user, Meta meta) => handleSuccess(user, meta),
-            Error(string error) => handleError(error)
+            Success(User user, Meta meta) => handleSuccess(user, meta);
+            Error(string error) => handleError(error);
         };
     }
     

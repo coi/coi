@@ -36,8 +36,8 @@ component TemplateStringTest {
         ]`;
 
         match (Json.parse(Show[], jsonArray)) {
-            Success(Show[] shows, ShowMeta[] metas) => handleSuccess(shows, metas),
-            Error(string error) => handleError(error)
+            Success(Show[] shows, ShowMeta[] metas) => handleSuccess(shows, metas);
+            Error(string error) => handleError(error);
         };
     }
     
