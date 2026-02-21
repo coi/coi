@@ -566,8 +566,8 @@ Type-safe JSON parsing with compile-time schema validation and presence tracking
 
 | Method | Description |
 |--------|-------------|
-| `Json.parse(Type, json, &onSuccess=..., &onError=...)` | Parse JSON object into a pod type (static) |
-| `Json.parse(Type[], json, &onSuccess=..., &onError=...)` | Parse JSON array into a vector of pod types (static) |
+| `Json.parse(Type, json)` | Parse JSON object and return a result for `match` |
+| `Json.parse(Type[], json)` | Parse JSON array and return a result for `match` |
 | `Json.stringify(value)` | Convert pod type to JSON string (static) |
 
 ### Defining Pod Types
@@ -591,45 +591,48 @@ pod User {
 }
 ```
 
-### Callback Signatures
+### Result Pattern
 
-**For single object parsing (`Json.parse(Type, ...)`):**
+`Json.parse(...)` is consumed through `match` using `Success(...)` and `Error(...)` arms:
 
-| Callback | Signature | Description |
-|----------|-----------|-------------|
-| `onSuccess` | `def handler(Type data, TypeMeta meta) : void` | Called with parsed data and presence info |
-| `onError` | `def handler() : void` | Called when JSON structure is malformed |
+```tsx
+string res = match (Json.parse(User, json)) {
+    Success(User data, Meta meta) => {
+        // use data + field presence
+        yield data.name;
+    };
+    Error(string message) => {
+        yield message;
+    };
+};
+```
 
-**For array parsing (`Json.parse(Type[], ...)`):**
+For arrays:
 
-| Callback | Signature | Description |
-|----------|-----------|-------------|
-| `onSuccess` | `def handler(Type[] data, TypeMeta[] metas) : void` | Called with array of parsed data and meta structs |
-| `onError` | `def handler() : void` | Called when JSON structure is malformed |
-
-**Note:** `onError` is only called for invalid JSON structure (unbalanced braces, unclosed strings, etc.). Missing fields or type mismatches don't trigger errors - instead, those fields simply won't be marked as present in the meta struct.
+```tsx
+int len = match (Json.parse(User[], jsonArray)) {
+    Success(User[] data, UserMeta[] metas) => data.length();
+    Error(string message) => 0;
+};
+```
 
 ### Meta Structs (Presence Checking)
 
-The `onSuccess` callback receives a **meta data** that tracks which fields were present in the JSON. This handles optional/nullable fields gracefully:
+`Success(..., Meta meta)` provides presence checking for the parsed pod fields. This handles optional/nullable fields gracefully:
 
 ```tsx
-def handleUser(User u, UserMeta meta) : void {
-    // Check if fields were present in JSON
-    if (meta.has_name()) {
-        System.log("Name: " + u.name);
-    }
-    
-    if (meta.has_age()) {
-        System.log("Age: {u.age}");
-    }
-    
-    // Nested objects have nested meta
-    if (meta.has_address()) {
-        if (meta.address.has_city()) {
-            System.log("City: " + u.address.city);
+match (Json.parse(User, payload)) {
+    Success(User u, Meta meta) => {
+        if (meta.has(User.name)) {
+            System.log("Name: " + u.name);
         }
-    }
+        if (meta.has(User.age)) {
+            System.log("Age: ${u.age}");
+        }
+    };
+    Error(string error) => {
+        System.log("Parse error: " + error);
+    };
 }
 ```
 
@@ -641,21 +644,15 @@ component UserLoader {
     mut User user;
 
     def handleSuccess(string data) : void {
-        Json.parse(
-            User,
-            data,
-            &onSuccess = handleParsedUser,
-            &onError = handleParseError
-        );
-    }
-
-    def handleParsedUser(User u, UserMeta meta) : void {
-        user = u;
-        status = "Loaded: " + u.name;
-    }
-
-    def handleParseError(string error) : void {
-        status = "Parse error: " + error;
+        match (Json.parse(User, data)) {
+            Success(User u, Meta meta) => {
+                user = u;
+                status = "Loaded: " + u.name;
+            };
+            Error(string error) => {
+                status = "Parse error: " + error;
+            };
+        };
     }
 
     def handleFetchError(string error) : void {
@@ -694,22 +691,6 @@ component ShowList {
     mut Show[] shows = [];
     mut string status = "Ready";
     
-    def handleShows(Show[] parsedShows, ShowMeta[] metas) : void {
-        shows = parsedShows;
-        status = "Loaded {parsedShows.length()} shows";
-        
-        // Each element has its own meta
-        for (int i = 0; i < metas.length(); i++) {
-            if (metas[i].has_title()) {
-                // shows[i].title was present
-            }
-        }
-    }
-    
-    def handleError() : void {
-        status = "Parse error";
-    }
-    
     mount {
         // Use template strings for clean JSON with interpolation
         string favShow = "Better Call Saul";
@@ -718,8 +699,22 @@ component ShowList {
             {"title": "Breaking Bad", "id": 1},
             {"title": "{favShow}", "id": 2}
         ]`;
-        
-        Json.parse(Show[], jsonData, &onSuccess = handleShows, &onError = handleError);
+
+        match (Json.parse(Show[], jsonData)) {
+            Success(Show[] parsedShows, ShowMeta[] metas) => {
+                shows = parsedShows;
+                status = "Loaded {parsedShows.length()} shows";
+                // Each element has its own meta
+                for (int i = 0; i < metas.length(); i++) {
+                    if (metas[i].has_title()) {
+                        // shows[i].title was present
+                    }
+                }
+            };
+            Error(string error) => {
+                status = "Parse error: " + error;
+            };
+        };
     }
     
     view {
@@ -752,9 +747,14 @@ JSON `null` values are handled gracefully - the field is simply not marked as pr
 
 ```tsx
 // JSON: {"name": "Alice", "age": null}
-def handle(User u, UserMeta meta) : void {
-    meta.has_name();  // true
-    meta.has_age();   // false (was null)
+match (Json.parse(User, payload)) {
+    Success(User u, Meta meta) => {
+        meta.has(User.name);  // true
+        meta.has(User.age);   // false (was null)
+    };
+    Error(string error) => {
+        yield 0;
+    };
 }
 ```
 

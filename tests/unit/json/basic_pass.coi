@@ -1,4 +1,4 @@
-// Test: Basic JSON parsing with callbacks
+// Test: Basic JSON parsing with match-based result
 pod User {
     string name;
     int age;
@@ -9,27 +9,21 @@ component JsonTest {
     mut string status = "Not started";
     mut User user;
 
-    def handleUser(User u, UserMeta meta) : void {
-        user = u;
-        if (meta.has_name() && meta.has_age()) {
-            status = "Success: ${u.name}, ${u.age}";
-        } else {
-            status = "Partial data received";
-        }
-    }
-
-    def handleError(string error) : void {
-        status = "Error: " + error;
-    }
-
     def parseJson() : void {
         string json = `{"name": "Alice", "age": 25, "email": "alice@example.com"}`;
-        Json.parse(
-            User,
-            json,
-            &onSuccess = handleUser,
-            &onError = handleError
-        );
+        match (Json.parse(User, json)) {
+            Success(User u, Meta meta) => {
+                user = u;
+                if (meta.has(User.name) && meta.has(User.age)) {
+                    status = "Success: ${u.name}, ${u.age}";
+                } else {
+                    status = "Partial data received";
+                }
+            };
+            Error(string error) => {
+                status = "Error: " + error;
+            };
+        };
     }
 
     view {

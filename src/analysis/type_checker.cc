@@ -9,6 +9,8 @@
 
 // Global set of known enum type names (populated during validation)
 static std::set<std::string> g_enum_types;
+// Global map of known data types to their field names (for Meta.has(Type.field))
+static std::map<std::string, std::set<std::string>> g_data_type_fields;
 
 // Forward declarations
 std::string normalize_type(const std::string &type);
@@ -136,6 +138,39 @@ static bool is_enum_type(const std::string &t) {
         std::string enum_name = t.substr(dot_pos + 1);
         return g_enum_types.count(enum_name) > 0;
     }
+    return false;
+}
+
+// Check if a type is a known data type
+static bool is_data_type(const std::string &t) {
+    if (g_data_type_fields.count(t))
+        return true;
+    size_t dot_pos = t.find('.');
+    if (dot_pos != std::string::npos) {
+        std::string module_qualified = t;
+        std::replace(module_qualified.begin(), module_qualified.end(), '.', '_');
+        return g_data_type_fields.count(module_qualified) > 0;
+    }
+    return false;
+}
+
+// Check if a field exists on a known data type
+static bool has_data_field(const std::string& type_name, const std::string& field_name) {
+    auto it = g_data_type_fields.find(type_name);
+    if (it != g_data_type_fields.end() && it->second.count(field_name)) {
+        return true;
+    }
+
+    size_t dot_pos = type_name.find('.');
+    if (dot_pos != std::string::npos) {
+        std::string module_qualified = type_name;
+        std::replace(module_qualified.begin(), module_qualified.end(), '.', '_');
+        auto mit = g_data_type_fields.find(module_qualified);
+        if (mit != g_data_type_fields.end() && mit->second.count(field_name)) {
+            return true;
+        }
+    }
+
     return false;
 }
 
@@ -375,9 +410,15 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
         // First check if the object identifier exists in scope or is an enum type
         if (auto id = dynamic_cast<Identifier *>(member->object.get()))
         {
+            // Data field token access: Type.field (used by Meta.has(Type.field))
+            if (is_data_type(id->name) && has_data_field(id->name, member->member)) {
+                return "field";
+            }
+
             // If it's an enum type, this is valid (e.g., Color::Red)
             // Also valid if it's a type in DefSchema (e.g., Math.PI, System.log)
-            if (!is_enum_type(id->name) && 
+            if (!is_enum_type(id->name) &&
+                !is_data_type(id->name) &&
                 scope.find(id->name) == scope.end() &&
                 DefSchema::instance().lookup_type(id->name) == nullptr)
             {
@@ -492,6 +533,14 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
             }
             else if (!is_compatible_type(arm_type, result_type) && !is_compatible_type(result_type, arm_type))
             {
+                if (arm_type == "void" || result_type == "void")
+                {
+                    ErrorHandler::type_error(
+                        "Match expression mixes value and non-value arms. "
+                        "Use 'yield <expr>;' inside block arms when the match result is used",
+                        arm.line);
+                    exit(1);
+                }
                 ErrorHandler::type_error("Match arm has incompatible type '" + arm_type + 
                     "' (expected '" + result_type + "')", arm.line);
                 exit(1);
@@ -499,6 +548,36 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
         }
         
         return result_type;
+    }
+
+    // Block expression type inference
+    // Prefer explicit yield (parsed as ReturnStatement), then fallback to final expression statement.
+    if (auto block = dynamic_cast<BlockExpr *>(expr))
+    {
+        if (block->statements.empty())
+        {
+            return "void";
+        }
+
+        for (auto it = block->statements.rbegin(); it != block->statements.rend(); ++it)
+        {
+            if (auto* ret_stmt = dynamic_cast<ReturnStatement *>((*it).get()))
+            {
+                if (ret_stmt->value)
+                {
+                    return infer_expression_type(ret_stmt->value.get(), scope);
+                }
+                return "void";
+            }
+        }
+
+        auto* last_expr_stmt = dynamic_cast<ExpressionStatement *>(block->statements.back().get());
+        if (!last_expr_stmt || !last_expr_stmt->expression)
+        {
+            return "void";
+        }
+
+        return infer_expression_type(last_expr_stmt->expression.get(), scope);
     }
 
     if (auto func = dynamic_cast<FunctionCall *>(expr))
@@ -829,6 +908,7 @@ void validate_types(const std::vector<Component> &components,
 
     // Collect all enum type names (for enum <-> int conversion checking)
     g_enum_types.clear();
+    g_data_type_fields.clear();
     
     // Add global enums
     for (const auto &e : global_enums)
@@ -852,6 +932,40 @@ void validate_types(const std::vector<Component> &components,
 
     // Validate global data type fields - they cannot contain no-copy types
     validate_data_fields_no_copy(global_data);
+
+    // Add global data types and fields
+    for (const auto &d : global_data)
+    {
+        std::set<std::string> fields;
+        for (const auto &f : d->fields)
+        {
+            fields.insert(f.name);
+        }
+        g_data_type_fields[d->name] = fields;
+        if (!d->module_name.empty())
+        {
+            g_data_type_fields[d->module_name + "_" + d->name] = fields;
+        }
+    }
+
+    // Add component-local data types and fields
+    for (const auto &comp : components)
+    {
+        for (const auto &d : comp.data)
+        {
+            std::set<std::string> fields;
+            for (const auto &f : d->fields)
+            {
+                fields.insert(f.name);
+            }
+            g_data_type_fields[d->name] = fields;
+            g_data_type_fields[comp.name + "_" + d->name] = fields;
+            if (!comp.module_name.empty())
+            {
+                g_data_type_fields[comp.module_name + "_" + comp.name + "_" + d->name] = fields;
+            }
+        }
+    }
 
     for (const auto &comp : components)
     {

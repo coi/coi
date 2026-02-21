@@ -512,7 +512,7 @@ for item in inventory {
 
 ### JSON Parsing
 
-Pod types can be automatically parsed from JSON using `Json.parse()`:
+Pod types can be automatically parsed from JSON using `Json.parse()` and consumed via `match`:
 
 ```tsx
 pod User {
@@ -523,41 +523,29 @@ pod User {
 
 component App {
     mut User user;
-    
-    def handleParsed(User data, UserMeta meta) : void {
-        user = data;
-        
-        // Meta struct provides presence detection
-        if (meta.has_name()) {
-            System.log("Name found: " + data.name);
-        }
-    }
-    
-    def handleError(string error) : void {
-        System.log("Parse error: " + error);
-    }
-    
+
     init {
-        string json = "\{\"name\": \"Alice\", \"age\": 25\}";
-        Json.parse(
-            User,
-            json,
-            &onSuccess = handleParsed,
-            &onError = handleError
-        );
+        string json = `{"name": "Alice", "age": 25}`;
+        match (Json.parse(User, json)) {
+            Success(User data, Meta meta) => {
+                user = data;
+                if (meta.has(User.name)) {
+                    System.log("Name found: " + data.name);
+                }
+            };
+            Error(string error) => {
+                System.log("Parse error: " + error);
+            };
+        };
     }
 }
 ```
 
-For each pod type, a corresponding **Meta struct** is automatically generated with `has_fieldName()` methods to check field presence:
+For each pod type, a corresponding **Meta struct** is automatically generated. Check field presence with `meta.has(Type.field)`:
 
 ```tsx
-// UserMeta is generated automatically:
-// struct UserMeta {
-//     bool has_name();
-//     bool has_age();
-//     bool has_email();
-// }
+if (meta.has(User.name)) { /* ... */ }
+if (meta.has(User.email)) { /* ... */ }
 ```
 
 See [API Reference - JSON](api-reference.md#json) for more details and examples.
@@ -703,6 +691,35 @@ string message = match (status) {
     Status::Pending => "Loading...";
     Status::Success => "Done!";
     Status::Error => "Failed";
+};
+```
+
+Arms support two forms:
+- **Shorthand expression arm**: `Pattern => expression;`
+- **Block arm**: `Pattern => { ... };`
+
+When a `match` is used as a value (e.g., assigned to a variable or returned), block arms must `yield` a value:
+
+```tsx
+string label = match (status) {
+    Status::Pending => { 
+        System.log("pending");
+        yield "Loading...";
+    };
+    else => "Ready";
+};
+```
+
+When a `match` is used as a statement (side effects only), `yield` is optional:
+
+```tsx
+match (status) {
+    Status::Pending => {
+        System.log("pending");
+    };
+    else => {
+        System.log("ready");
+    };
 };
 ```
 

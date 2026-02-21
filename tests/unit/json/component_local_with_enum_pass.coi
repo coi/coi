@@ -15,23 +15,26 @@ component MixedTypes {
     
     mut Status status = Status::Pending;
     mut Response response;
-    
-    def handleResponse(Response r, ResponseMeta meta) : void {
+
+    def handleSuccess(Response r, Meta meta) : void {
         response = r;
-        if (meta.has_code() && r.code == 200) {
+        if (meta.has(Response.code) && r.code == 200) {
             status = Status::Success;
         } else {
             status = Status::Error;
         }
     }
-    
+
     def handleError(string error) : void {
         status = Status::Error;
     }
     
     mount {
         string jsonData = `{"message": "OK", "code": 200}`;
-        Json.parse(Response, jsonData, &onSuccess = handleResponse, &onError = handleError);
+        match (Json.parse(Response, jsonData)) {
+            Success(Response r, Meta meta) => handleSuccess(r, meta);
+            Error(string error) => handleError(error);
+        };
     }
     
     view {

@@ -1,0 +1,22 @@
+// Test: match arms cannot be comma-separated
+component MatchCommaSeparatorTest {
+    enum Role {
+        Admin,
+        User
+    }
+
+    def label(Role role) : string {
+        return match (role) {
+            Role::Admin => "Admin",
+            Role::User => "User";
+        };
+    }
+
+    view {
+        <div>{label(Role::Admin)}</div>
+    }
+}
+
+app {
+    root = MatchCommaSeparatorTest;
+}

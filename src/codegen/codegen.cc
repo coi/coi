@@ -67,7 +67,7 @@ void generate_cpp_code(
     DataTypeRegistry::instance().clear();
     for (const auto &data_def : all_global_data)
     {
-        DataTypeRegistry::instance().register_type(data_def->name, data_def->fields);
+        DataTypeRegistry::instance().register_type(qualified_name(data_def->module_name, data_def->name), data_def->fields);
     }
     for (const auto &comp : all_components)
     {
@@ -227,6 +227,23 @@ void generate_cpp_code(
         ComponentTypeContext::instance().clear();
     }
     out << "\n";
+
+    // Output field token constants for Meta.has(Type.field)
+    if (features.json)
+    {
+        for (const auto &data_def : all_global_data)
+        {
+            out << generate_field_token_constants(qualified_name(data_def->module_name, data_def->name));
+        }
+        for (const auto &comp : all_components)
+        {
+            for (const auto &data_def : comp.data)
+            {
+                out << generate_field_token_constants(qualified_name(comp.module_name, comp.name) + "_" + data_def->name);
+            }
+        }
+        out << "\n";
+    }
 
     // Output Meta structs for JSON parsing (if Json.parse is used)
     if (features.json)

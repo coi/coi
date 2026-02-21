@@ -10,9 +10,9 @@ component MatchEnumTest {
     
     def getRoleColor(Role r) : string {
         return match (r) {
-            Role::Admin => { "Red" };
-            Role::User  => { "Blue" };
-            else        => { "Gray" };
+            Role::Admin => { yield "Red"; };
+            Role::User  => { yield "Blue"; };
+            else        => { yield "Gray"; };
         };
     }
     

@@ -518,11 +518,12 @@ std::unique_ptr<Expression> Parser::parse_primary()
     ErrorHandler::compiler_error("Unexpected token in expression: " + current().value + " (Type: " + std::to_string((int)current().type) + ")", current().line);
 }
 
-// Parse match expression: match (subject) { pattern => { result }, ... }
+// Parse match expression: match (subject) { pattern => expr, pattern => { ... yield expr; ... }, ... }
 // Patterns:
 //   - Enum: EnumType::Value
 //   - Pod with value: PodType{field = value, ...}
 //   - Pod with binding: PodType{field, ...} (captures field into local)
+//   - Variant: Success(Type value, Meta meta) / Error(string message)
 //   - else: default case
 std::unique_ptr<Expression> Parser::parse_match()
 {
@@ -572,6 +573,63 @@ std::unique_ptr<Expression> Parser::parse_match()
             arm.pattern.enum_value = current().value;
             expect(TokenType::IDENTIFIER, "Expected enum value after '::'");
         }
+        // Check for variant pattern: Variant(Type name, ...)
+        else if (current().type == TokenType::IDENTIFIER && peek().type == TokenType::LPAREN)
+        {
+            arm.pattern.kind = MatchPattern::Kind::Variant;
+            arm.pattern.type_name = current().value;  // constructor/variant name (e.g., Success/Error)
+            advance(); // skip variant name
+            advance(); // skip '('
+
+            while (current().type != TokenType::RPAREN && current().type != TokenType::END_OF_FILE)
+            {
+                MatchPattern::VariantBinding binding;
+                binding.type = current().value;
+
+                if (current().type == TokenType::INT || current().type == TokenType::STRING ||
+                    current().type == TokenType::FLOAT || current().type == TokenType::FLOAT32 ||
+                    current().type == TokenType::BOOL || current().type == TokenType::IDENTIFIER)
+                {
+                    advance();
+                }
+                else
+                {
+                    ErrorHandler::compiler_error("Expected type in variant pattern", current().line);
+                }
+
+                if (current().type == TokenType::DOUBLE_COLON)
+                {
+                    advance();
+                    binding.type += "::" + current().value;
+                    expect(TokenType::IDENTIFIER, "Expected type name after '::' in variant pattern");
+                }
+
+                if (current().type == TokenType::LBRACKET)
+                {
+                    advance();
+                    expect(TokenType::RBRACKET, "Expected ']' for array type in variant pattern");
+                    binding.type += "[]";
+                }
+
+                binding.name = current().value;
+                expect(TokenType::IDENTIFIER, "Expected variable name in variant pattern");
+
+                arm.pattern.variant_bindings.push_back(std::move(binding));
+
+                if (current().type == TokenType::COMMA)
+                {
+                    advance();
+                    if (current().type == TokenType::RPAREN)
+                        break;
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            expect(TokenType::RPAREN, "Expected ')' after variant pattern");
+        }
         // Check for pod pattern: TypeName{field = value, ...} or TypeName{field, ...}
         else if (current().type == TokenType::IDENTIFIER && peek().type == TokenType::LBRACE)
         {
@@ -611,18 +669,46 @@ std::unique_ptr<Expression> Parser::parse_match()
         }
         else
         {
-            ErrorHandler::compiler_error("Expected pattern (literal, EnumType::Value, PodType{...}, or else) in match arm", current().line);
+            ErrorHandler::compiler_error("Expected pattern (literal, EnumType::Value, Variant(...), PodType{...}, or else) in match arm", current().line);
         }
         
         // Expect '=>'
         expect(TokenType::ARROW, "Expected '=>' after match pattern");
         
-        // Parse the arm body - either a block { expr } or a simple expression
+        // Parse the arm body.
+        // - Braced block may contain statements and optional explicit `yield` statements.
+        // - Non-braced form is shorthand expression arm.
         if (current().type == TokenType::LBRACE)
         {
             advance(); // skip '{'
-            arm.body = parse_expression();
+            auto block = std::make_unique<BlockExpr>();
+
+            while (current().type != TokenType::RBRACE && current().type != TokenType::END_OF_FILE)
+            {
+                // Match-arm explicit yield: yield <expr>;
+                // Parsed locally so we don't introduce a global keyword change.
+                if (current().type == TokenType::IDENTIFIER && current().value == "yield")
+                {
+                    int yield_line = current().line;
+                    advance(); // skip 'yield'
+
+                    auto ret = std::make_unique<ReturnStatement>();
+                    if (current().type != TokenType::SEMICOLON)
+                    {
+                        ret->value = parse_expression();
+                    }
+                    expect(TokenType::SEMICOLON, "Expected ';' after yield expression");
+                    ret->line = yield_line;
+                    block->statements.push_back(std::move(ret));
+                    continue;
+                }
+
+                block->statements.push_back(parse_statement());
+            }
+
             expect(TokenType::RBRACE, "Expected '}' after match arm body");
+
+            arm.body = std::move(block);
         }
         else
         {
@@ -632,11 +718,8 @@ std::unique_ptr<Expression> Parser::parse_match()
         
         match_expr->arms.push_back(std::move(arm));
         
-        // Optional semicolon or comma between arms
-        if (current().type == TokenType::SEMICOLON || current().type == TokenType::COMMA)
-        {
-            advance();
-        }
+        // Require semicolon after each match arm (router-style consistency)
+        expect(TokenType::SEMICOLON, "Expected ';' after match arm");
     }
     
     expect(TokenType::RBRACE, "Expected '}' to close match expression");
