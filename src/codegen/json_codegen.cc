@@ -37,7 +37,7 @@ std::string generate_meta_struct(const std::string& data_type) {
     if (!fields) return "";
     
     std::stringstream ss;
-    ss << "struct " << data_type << "Meta : json::MetaBase {\n";
+    ss << "struct " << data_type << "Meta : __coi_json::MetaBase {\n";
     
     // Generate has_fieldName() methods for each field
     uint32_t i = 0;
@@ -65,16 +65,16 @@ std::string generate_meta_struct(const std::string& data_type) {
 // Map Coi types to extraction calls
 static std::string get_extractor(const std::string& type, const std::string& pos_var) {
     if (type == "string") {
-        return "json::ext_str(_s, " + pos_var + ", _len)";
+        return "__coi_json::ext_str(_s, " + pos_var + ", _len)";
     }
     if (type == "int") {
-        return "json::ext_int(_s, " + pos_var + ", _len, _ok)";
+        return "__coi_json::ext_int(_s, " + pos_var + ", _len, _ok)";
     }
     if (type == "float") {
-        return "json::ext_float(_s, " + pos_var + ", _len, _ok)";
+        return "__coi_json::ext_float(_s, " + pos_var + ", _len, _ok)";
     }
     if (type == "bool") {
-        return "json::ext_bool(_s, " + pos_var + ", _len, _ok)";
+        return "__coi_json::ext_bool(_s, " + pos_var + ", _len, _ok)";
     }
     // Nested data type - will need recursive parsing
     if (!type.empty() && std::isupper(type[0])) {
@@ -152,12 +152,12 @@ static void generate_primitive_field_parse(std::stringstream& ss,
                                             const std::string& len_var,
                                             const std::string& ok_var,
                                             const std::string& indent) {
-    ss << indent << "if (!json::is_null(" << src_var << ", " << pos_var << ", " << len_var << ")) {\n";
+    ss << indent << "if (!__coi_json::is_null(" << src_var << ", " << pos_var << ", " << len_var << ")) {\n";
     if (field_type == "string") {
-        ss << indent << "    " << result_var << "." << field_name << " = json::ext_str(" << src_var << ", " << pos_var << ", " << len_var << ");\n";
+        ss << indent << "    " << result_var << "." << field_name << " = __coi_json::ext_str(" << src_var << ", " << pos_var << ", " << len_var << ");\n";
         ss << indent << "    " << meta_var << ".set(" << field_idx << ");\n";
     } else {
-        ss << indent << "    " << result_var << "." << field_name << " = json::ext_" << field_type << "(" << src_var << ", " << pos_var << ", " << len_var << ", " << ok_var << ");\n";
+        ss << indent << "    " << result_var << "." << field_name << " = __coi_json::ext_" << field_type << "(" << src_var << ", " << pos_var << ", " << len_var << ", " << ok_var << ");\n";
         ss << indent << "    if (" << ok_var << ") " << meta_var << ".set(" << field_idx << ");\n";
     }
     ss << indent << "}\n";
@@ -174,18 +174,18 @@ static void generate_array_field_parse(std::stringstream& ss,
                                         const std::string& pos_var,
                                         const std::string& len_var,
                                         const std::string& indent) {
-    ss << indent << "auto _arr_view = json::isolate(" << src_var << ", " << pos_var << ", " << len_var << ");\n";
+    ss << indent << "auto _arr_view = __coi_json::isolate(" << src_var << ", " << pos_var << ", " << len_var << ");\n";
     ss << indent << "if (_arr_view.length() > 0) {\n";
-    ss << indent << "    json::for_each(_arr_view.data(), 0, _arr_view.length(), [&](const char* _aes, uint32_t _aep, uint32_t _aelen) {\n";
+    ss << indent << "    __coi_json::for_each(_arr_view.data(), 0, _arr_view.length(), [&](const char* _aes, uint32_t _aep, uint32_t _aelen) {\n";
     
     if (elem_type == "string") {
-        ss << indent << "        " << result_var << "." << field_name << ".push_back(json::ext_str(_aes, _aep, _aelen));\n";
+        ss << indent << "        " << result_var << "." << field_name << ".push_back(__coi_json::ext_str(_aes, _aep, _aelen));\n";
     } else if (elem_type == "int" || elem_type == "float" || elem_type == "bool") {
         ss << indent << "        bool _aok;\n";
-        ss << indent << "        " << result_var << "." << field_name << ".push_back(json::ext_" << elem_type << "(_aes, _aep, _aelen, _aok));\n";
+        ss << indent << "        " << result_var << "." << field_name << ".push_back(__coi_json::ext_" << elem_type << "(_aes, _aep, _aelen, _aok));\n";
     } else if (!elem_type.empty() && std::isupper(elem_type[0]) && DataTypeRegistry::instance().lookup(elem_type)) {
         // Nested data type array
-        ss << indent << "        auto _ae_view = json::isolate(_aes, _aep, _aelen);\n";
+        ss << indent << "        auto _ae_view = __coi_json::isolate(_aes, _aep, _aelen);\n";
         ss << indent << "        if (_ae_view.length() > 0) {\n";
         ss << indent << "            " << elem_type << " _ae{};\n";
         ss << indent << "            " << elem_type << "Meta _ae_meta{};\n";
@@ -213,7 +213,7 @@ static void generate_nested_field_parse(std::stringstream& ss,
                                          const std::string& pos_var,
                                          const std::string& len_var,
                                          const std::string& indent) {
-    ss << indent << "auto _nv = json::isolate(" << src_var << ", " << pos_var << ", " << len_var << ");\n";
+    ss << indent << "auto _nv = __coi_json::isolate(" << src_var << ", " << pos_var << ", " << len_var << ");\n";
     ss << indent << "if (_nv.length() > 0) {\n";
     ss << indent << "    bool _n_ok;\n";
     generate_object_fields_parse(ss, nested_type, 
@@ -239,9 +239,9 @@ static void generate_object_fields_parse(std::stringstream& ss,
     
     for (uint32_t i = 0; i < fields->size(); i++) {
         const auto& field = (*fields)[i];
-        ss << indent << "if (uint32_t _fp = json::find_key(" << src_var << ", " << len_var << ", \"" 
+        ss << indent << "if (uint32_t _fp = __coi_json::find_key(" << src_var << ", " << len_var << ", \"" 
            << field.name << "\", " << field.name.length() << ")) {\n";
-        ss << indent << "    _fp = json::skip_ws(" << src_var << ", _fp, " << len_var << ");\n";
+        ss << indent << "    _fp = __coi_json::skip_ws(" << src_var << ", _fp, " << len_var << ");\n";
         
         if (is_array_type(field.type)) {
             generate_array_field_parse(ss, get_array_element_type(field.type), field.name, i,
@@ -293,7 +293,7 @@ static std::string generate_json_parse_array(
     ss << "                const __SuccessPayload& as_Success() const { return success; }\n";
     ss << "                const __ErrorPayload& as_Error() const { return error_payload; }\n";
     ss << "            } _r{};\n";
-    ss << "            uint32_t _p = json::skip_ws(_s, 0, _len);\n";
+    ss << "            uint32_t _p = __coi_json::skip_ws(_s, 0, _len);\n";
     ss << "            if (_p >= _len || _s[_p] != '[') {\n";
     ss << "                _r.ok = false;\n";
     ss << "                _r.error = \"Expected JSON array\";\n";
@@ -301,8 +301,8 @@ static std::string generate_json_parse_array(
     ss << "                return _r;\n";
     ss << "            }\n";
     ss << "            _r.ok = true;\n";
-    ss << "            json::for_each(_s, _p, _len, [&](const char* _es, uint32_t _ep, uint32_t _elen) {\n";
-    ss << "                auto _ev = json::isolate(_es, _ep, _elen);\n";
+    ss << "            __coi_json::for_each(_s, _p, _len, [&](const char* _es, uint32_t _ep, uint32_t _elen) {\n";
+    ss << "                auto _ev = __coi_json::isolate(_es, _ep, _elen);\n";
     ss << "                if (_ev.length() > 0) {\n";
     ss << "                    " << elem_type << " _elem{};\n";
     ss << "                    " << elem_type << "Meta _elem_meta{};\n";
@@ -356,7 +356,7 @@ std::string generate_json_parse(
     ss << "                const __SuccessPayload& as_Success() const { return success; }\n";
     ss << "                const __ErrorPayload& as_Error() const { return error_payload; }\n";
     ss << "            } _r{};\n";
-    ss << "            if (!json::is_valid(_s, _len)) {\n";
+    ss << "            if (!__coi_json::is_valid(_s, _len)) {\n";
     ss << "                _r.ok = false;\n";
     ss << "                _r.error = \"Invalid JSON\";\n";
     ss << "                _r.error_payload._0 = _r.error;\n";
@@ -381,7 +381,7 @@ void emit_json_runtime(std::ostream& out) {
 // ============================================================================
 // JSON Runtime Helpers (auto-generated by Coi compiler)
 // ============================================================================
-namespace json {
+namespace __coi_json {
 
 struct MetaBase {
     uint32_t bits = 0;
@@ -521,7 +521,7 @@ inline void for_each(const char* s, uint32_t p, uint32_t len, F fn) {
     }
 }
 
-} // namespace json
+} // namespace __coi_json
 
 )";
 }

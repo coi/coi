@@ -117,6 +117,40 @@ FeatureFlags detect_features(const std::vector<Component> &components,
             scan_expr(ternary->true_expr.get());
             scan_expr(ternary->false_expr.get());
         }
+        else if (auto *match = dynamic_cast<MatchExpr *>(expr))
+        {
+            // Scan match subject (e.g., Json.parse(User, json))
+            scan_expr(match->subject.get());
+            // Scan each arm's body expression
+            for (auto &arm : match->arms)
+            {
+                scan_expr(arm.body.get());
+            }
+        }
+        else if (auto *block = dynamic_cast<BlockExpr *>(expr))
+        {
+            // Forward-declare scan_stmt handling via recursive lambda call
+            for (auto &s : block->statements)
+            {
+                // scan_stmt is defined below, need to handle inline
+                if (auto *expr_stmt = dynamic_cast<ExpressionStatement *>(s.get()))
+                {
+                    scan_expr(expr_stmt->expression.get());
+                }
+                else if (auto *var_decl = dynamic_cast<VarDeclaration *>(s.get()))
+                {
+                    scan_expr(var_decl->initializer.get());
+                }
+                else if (auto *assign = dynamic_cast<Assignment *>(s.get()))
+                {
+                    scan_expr(assign->value.get());
+                }
+                else if (auto *ret = dynamic_cast<ReturnStatement *>(s.get()))
+                {
+                    scan_expr(ret->value.get());
+                }
+            }
+        }
     };
 
     std::function<void(Statement *)> scan_stmt = [&](Statement *stmt)

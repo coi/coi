@@ -67,7 +67,7 @@ void generate_cpp_code(
     DataTypeRegistry::instance().clear();
     for (const auto &data_def : all_global_data)
     {
-        DataTypeRegistry::instance().register_type(data_def->name, data_def->fields);
+        DataTypeRegistry::instance().register_type(qualified_name(data_def->module_name, data_def->name), data_def->fields);
     }
     for (const auto &comp : all_components)
     {
