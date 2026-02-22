@@ -9,8 +9,8 @@
     {
       "version": "0.1.0",
       "compiler": {
-        "pond": 0,
-        "min-drop": 350
+        "pond": __COI_POND__,
+        "min-drop": __COI_MIN_DROP__
       },
       "source": {
         "commit": "__COMMIT_SHA__",

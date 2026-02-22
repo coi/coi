@@ -413,6 +413,16 @@ int init_project(const std::string &project_name_arg, TemplateType template_type
 
     // Placeholder variables
     std::string module_name = to_pascal_case(project_name);
+    int current_pond = 0;
+    try
+    {
+        current_pond = std::stoi(COI_POND_NUMBER);
+    }
+    catch (...)
+    {
+        current_pond = 0;
+    }
+    int current_drop = get_current_drop_from_macros();
     
     // Get today's date as YYYY-MM-DD
     auto now = std::chrono::system_clock::now();
@@ -425,6 +435,8 @@ int init_project(const std::string &project_name_arg, TemplateType template_type
     std::map<std::string, std::string> vars = {
         {"PROJECT_NAME", project_name},
         {"MODULE_NAME", module_name},
+        {"COI_POND", std::to_string(current_pond)},
+        {"COI_MIN_DROP", std::to_string(current_drop)},
         {"COI_DROP", GIT_COMMIT_COUNT},
         {"TODAY_DATE", today_date}};
 
