@@ -296,17 +296,42 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
         if (args.empty()) return "";
         
         std::string url = args[0].value->to_webcc();
+        std::string headers = "\"\"";
+        bool headers_set = false;
         std::string code = "[&]() {\n";
-        code += "            auto _req = webcc::fetch::get(" + url + ");\n";
         
+        size_t callback_position = 0;
         for (size_t i = 1; i < args.size(); i++) {
             const auto& arg = args[i];
+            if (!arg.is_reference) {
+                if (headers_set) {
+                    ErrorHandler::compiler_error("fetch.get accepts a single headers argument (JSON string). Combine all headers into one object string, e.g. '{\"Authorization\":\"Bearer ...\",\"Content-Type\":\"application/json\"}'.");
+                }
+                if (!arg.name.empty() && arg.name != "headers") {
+                    ErrorHandler::compiler_error("Invalid named argument '" + arg.name + "' for fetch.get");
+                }
+                headers = arg.value->to_webcc();
+                headers_set = true;
+                continue;
+            }
+            callback_position++;
+        }
+
+        code += "            auto _req = webcc::fetch::get(" + url + ", " + headers + ");\n";
+        
+        callback_position = 0;
+        for (size_t i = 1; i < args.size(); i++) {
+            const auto& arg = args[i];
+            if (!arg.is_reference) {
+                continue;
+            }
             // Enforce & prefix for callback arguments
             if (!arg.is_reference) {
                 ErrorHandler::compiler_error("Callback argument must use '&' prefix (e.g., &" + arg.value->to_webcc() + ")");
             }
             std::string callback = arg.value->to_webcc();
-            std::string event_name = !arg.name.empty() ? arg.name : (i == 1 ? "onSuccess" : "onError");
+            std::string event_name = !arg.name.empty() ? arg.name : (callback_position == 0 ? "onSuccess" : "onError");
+            callback_position++;
             int param_count = ComponentTypeContext::instance().get_method_param_count(callback);
             
             if (event_name == "onSuccess") {
@@ -321,6 +346,8 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
                 } else {
                     code += "            g_fetch_error_dispatcher.set(_req, [this](const webcc::string&) { this->" + callback + "(); });\n";
                 }
+            } else {
+                ErrorHandler::compiler_error("Invalid callback name '" + event_name + "' for fetch.get (expected onSuccess or onError)");
             }
         }
         
@@ -335,17 +362,42 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
         
         std::string url = args[0].value->to_webcc();
         std::string body = args[1].value->to_webcc();
+        std::string headers = "\"\"";
+        bool headers_set = false;
         std::string code = "[&]() {\n";
-        code += "            auto _req = webcc::fetch::post(" + url + ", " + body + ");\n";
-        
+
+        size_t callback_position = 0;
         for (size_t i = 2; i < args.size(); i++) {
             const auto& arg = args[i];
+            if (!arg.is_reference) {
+                if (headers_set) {
+                    ErrorHandler::compiler_error("fetch.post accepts a single headers argument (JSON string). Combine all headers into one object string, e.g. '{\"Authorization\":\"Bearer ...\",\"Content-Type\":\"application/json\"}'.");
+                }
+                if (!arg.name.empty() && arg.name != "headers") {
+                    ErrorHandler::compiler_error("Invalid named argument '" + arg.name + "' for fetch.post");
+                }
+                headers = arg.value->to_webcc();
+                headers_set = true;
+                continue;
+            }
+            callback_position++;
+        }
+
+        code += "            auto _req = webcc::fetch::post(" + url + ", " + body + ", " + headers + ");\n";
+        
+        callback_position = 0;
+        for (size_t i = 2; i < args.size(); i++) {
+            const auto& arg = args[i];
+            if (!arg.is_reference) {
+                continue;
+            }
             // Enforce & prefix for callback arguments
             if (!arg.is_reference) {
                 ErrorHandler::compiler_error("Callback argument must use '&' prefix (e.g., &" + arg.value->to_webcc() + ")");
             }
             std::string callback = arg.value->to_webcc();
-            std::string event_name = !arg.name.empty() ? arg.name : (i == 2 ? "onSuccess" : "onError");
+            std::string event_name = !arg.name.empty() ? arg.name : (callback_position == 0 ? "onSuccess" : "onError");
+            callback_position++;
             int param_count = ComponentTypeContext::instance().get_method_param_count(callback);
             
             if (event_name == "onSuccess") {
@@ -360,6 +412,8 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
                 } else {
                     code += "            g_fetch_error_dispatcher.set(_req, [this](const webcc::string&) { this->" + callback + "(); });\n";
                 }
+            } else {
+                ErrorHandler::compiler_error("Invalid callback name '" + event_name + "' for fetch.post (expected onSuccess or onError)");
             }
         }
         
@@ -374,17 +428,42 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
 
         std::string url = args[0].value->to_webcc();
         std::string body = args[1].value->to_webcc();
+        std::string headers = "\"\"";
+        bool headers_set = false;
         std::string code = "[&]() {\n";
-        code += "            auto _req = webcc::fetch::patch(" + url + ", " + body + ");\n";
 
+        size_t callback_position = 0;
         for (size_t i = 2; i < args.size(); i++) {
             const auto& arg = args[i];
+            if (!arg.is_reference) {
+                if (headers_set) {
+                    ErrorHandler::compiler_error("fetch.patch accepts a single headers argument (JSON string). Combine all headers into one object string, e.g. '{\"Authorization\":\"Bearer ...\",\"Content-Type\":\"application/json\"}'.");
+                }
+                if (!arg.name.empty() && arg.name != "headers") {
+                    ErrorHandler::compiler_error("Invalid named argument '" + arg.name + "' for fetch.patch");
+                }
+                headers = arg.value->to_webcc();
+                headers_set = true;
+                continue;
+            }
+            callback_position++;
+        }
+
+        code += "            auto _req = webcc::fetch::patch(" + url + ", " + body + ", " + headers + ");\n";
+
+        callback_position = 0;
+        for (size_t i = 2; i < args.size(); i++) {
+            const auto& arg = args[i];
+            if (!arg.is_reference) {
+                continue;
+            }
             // Enforce & prefix for callback arguments
             if (!arg.is_reference) {
                 ErrorHandler::compiler_error("Callback argument must use '&' prefix (e.g., &" + arg.value->to_webcc() + ")");
             }
             std::string callback = arg.value->to_webcc();
-            std::string event_name = !arg.name.empty() ? arg.name : (i == 2 ? "onSuccess" : "onError");
+            std::string event_name = !arg.name.empty() ? arg.name : (callback_position == 0 ? "onSuccess" : "onError");
+            callback_position++;
             int param_count = ComponentTypeContext::instance().get_method_param_count(callback);
 
             if (event_name == "onSuccess") {
@@ -399,6 +478,8 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
                 } else {
                     code += "            g_fetch_error_dispatcher.set(_req, [this](const webcc::string&) { this->" + callback + "(); });\n";
                 }
+            } else {
+                ErrorHandler::compiler_error("Invalid callback name '" + event_name + "' for fetch.patch (expected onSuccess or onError)");
             }
         }
 
