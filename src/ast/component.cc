@@ -1,6 +1,7 @@
 #include "component.h"
 #include "formatter.h"
 #include "../defs/def_parser.h"
+#include "../codegen/codegen_utils.h"
 #include <cctype>
 #include <algorithm>
 #include <sstream>
@@ -477,10 +478,14 @@ std::string Component::to_webcc(CompilerSession &session)
     ComponentTypeContext::instance().set(qualified_name(module_name, name), local_data_names, local_enum_names);
     ComponentTypeContext::instance().set_module_scope(module_name, session.data_type_names);
     
-    // Register method param counts for intrinsic callback codegen
+    // Register method signatures for member function reference lambda generation
     for (const auto &m : methods)
     {
-        ComponentTypeContext::instance().register_method(m.name, m.params.size());
+        std::vector<std::string> param_types;
+        for (const auto &p : m.params) {
+            param_types.push_back(p.type);
+        }
+        ComponentTypeContext::instance().register_method_signature(m.name, m.return_type, param_types);
     }
 
     // Populate global context for reference params
@@ -673,6 +678,20 @@ std::string Component::to_webcc(CompilerSession &session)
             if (DefSchema::instance().is_handle(var->type))
             {
                 ss << "{" << var->initializer->to_webcc() << "}";
+            }
+            // Handle member function reference assigned to webcc::function type
+            else if (var->type.find("webcc::function<") == 0)
+            {
+                if (auto *ref_expr = dynamic_cast<ReferenceExpression *>(var->initializer.get()))
+                {
+                    // Get the method name from the reference operand
+                    std::string method_name = ref_expr->operand->to_webcc();
+                    ss << " = " << generate_member_function_lambda(var->type, method_name);
+                }
+                else
+                {
+                    ss << " = " << var->initializer->to_webcc();
+                }
             }
             else
             {
