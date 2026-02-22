@@ -12,30 +12,187 @@ extern std::set<std::string> g_ref_props;
 // Current assignment target (set by Assignment::to_webcc for WebSocket lifetime tracking)
 std::string g_ws_assignment_target;
 
-// Helper to expand @inline templates like "${this}.length()" or "${this}.substr(${0}, ${1})"
+// Helper to expand @inline templates like "${this}.length()" or "$self.is_valid()" or "${0}"
 static std::string expand_inline_template(const std::string& tmpl, const std::string& receiver,
                                           const std::vector<CallArg>& args) {
     std::string result;
     for (size_t i = 0; i < tmpl.size(); ++i) {
-        if (tmpl[i] == '$' && i + 1 < tmpl.size() && tmpl[i + 1] == '{') {
-            size_t end = tmpl.find('}', i + 2);
-            if (end != std::string::npos) {
-                std::string var = tmpl.substr(i + 2, end - i - 2);
-                if (var == "this") {
-                    result += receiver;
-                } else {
-                    // Numeric index like ${0}, ${1}
-                    int idx = std::stoi(var);
-                    if (idx >= 0 && idx < (int)args.size()) {
-                        result += args[idx].value->to_webcc();
+        if (tmpl[i] == '$' && i + 1 < tmpl.size()) {
+            // Check for $self (simple identifier form)
+            if (tmpl.substr(i, 5) == "$self") {
+                result += receiver;
+                i += 4;  // Skip "self" (the loop will handle $ and move to next char)
+                continue;
+            }
+            // Check for ${...} (brace form)
+            if (tmpl[i + 1] == '{') {
+                size_t end = tmpl.find('}', i + 2);
+                if (end != std::string::npos) {
+                    std::string var = tmpl.substr(i + 2, end - i - 2);
+                    if (var == "this") {
+                        result += receiver;
+                    } else {
+                        // Numeric index like ${0}, ${1}
+                        int idx = std::stoi(var);
+                        if (idx >= 0 && idx < (int)args.size()) {
+                            result += args[idx].value->to_webcc();
+                        }
                     }
+                    i = end;
+                    continue;
                 }
-                i = end;
+            }
+        }
+        result += tmpl[i];
+    }
+    return result;
+}
+
+// Helper to expand @inline templates with raw string arguments (for string template embedded expressions)
+static std::string expand_inline_template_raw(const std::string& tmpl, const std::string& receiver,
+                                              const std::vector<std::string>& raw_args) {
+    std::string result;
+    for (size_t i = 0; i < tmpl.size(); ++i) {
+        if (tmpl[i] == '$' && i + 1 < tmpl.size()) {
+            if (tmpl[i + 1] == '{') {
+                size_t end = tmpl.find('}', i + 2);
+                if (end != std::string::npos) {
+                    std::string var = tmpl.substr(i + 2, end - i - 2);
+                    if (var == "this") {
+                        result += receiver;
+                    } else {
+                        int idx = std::stoi(var);
+                        if (idx >= 0 && idx < (int)raw_args.size()) {
+                            result += raw_args[idx];
+                        }
+                    }
+                    i = end;
+                    continue;
+                }
+            } else if (tmpl.substr(i, 5) == "$self") {
+                // Handle $self (used in WebSocket @inline)
+                result += receiver;
+                i += 4;  // Skip "self" ($ already consumed by i+=1 after continue isn't called)
                 continue;
             }
         }
         result += tmpl[i];
     }
+    return result;
+}
+
+// Forward declaration for transform_embedded_expression
+static std::string transform_embedded_expression(const std::string& expr);
+
+// Helper to parse raw argument strings from a method call expression
+// e.g., "arg1, arg2" -> ["arg1", "arg2"]
+static std::vector<std::string> parse_raw_args(const std::string& args_str) {
+    std::vector<std::string> result;
+    int depth = 0;
+    std::string current;
+    for (size_t i = 0; i < args_str.size(); ++i) {
+        char c = args_str[i];
+        if (c == '(' || c == '[' || c == '{') depth++;
+        else if (c == ')' || c == ']' || c == '}') depth--;
+        else if (c == ',' && depth == 0) {
+            // Trim whitespace
+            size_t start = current.find_first_not_of(" \t");
+            size_t end = current.find_last_not_of(" \t");
+            if (start != std::string::npos) {
+                result.push_back(current.substr(start, end - start + 1));
+            }
+            current.clear();
+            continue;
+        }
+        current += c;
+    }
+    if (!current.empty()) {
+        size_t start = current.find_first_not_of(" \t");
+        size_t end = current.find_last_not_of(" \t");
+        if (start != std::string::npos) {
+            result.push_back(current.substr(start, end - start + 1));
+        }
+    }
+    // Recursively transform nested expressions in arguments
+    for (auto& arg : result) {
+        arg = transform_embedded_expression(arg);
+    }
+    return result;
+}
+
+// Transform a raw expression string by applying DefSchema @inline templates
+// This handles method calls like "obj.method(args)" embedded in string templates
+static std::string transform_embedded_expression(const std::string& expr) {
+    // Find the last dot before the opening paren (for method call)
+    size_t paren_pos = expr.find('(');
+    if (paren_pos == std::string::npos) {
+        // No method call, return as-is
+        return expr;
+    }
+    
+    // Find the matching closing paren
+    int depth = 1;
+    size_t close_paren = paren_pos + 1;
+    while (close_paren < expr.size() && depth > 0) {
+        if (expr[close_paren] == '(') depth++;
+        else if (expr[close_paren] == ')') depth--;
+        close_paren++;
+    }
+    if (depth != 0) return expr;  // Unbalanced parens
+    close_paren--;  // Point to the actual close paren
+    
+    // Find the dot before the method name
+    size_t dot_pos = expr.rfind('.', paren_pos);
+    if (dot_pos == std::string::npos || dot_pos == 0) {
+        return expr;  // No object.method pattern
+    }
+    
+    std::string obj = expr.substr(0, dot_pos);
+    std::string method = expr.substr(dot_pos + 1, paren_pos - dot_pos - 1);
+    std::string args_str = expr.substr(paren_pos + 1, close_paren - paren_pos - 1);
+    std::string suffix = (close_paren + 1 < expr.size()) ? expr.substr(close_paren + 1) : "";
+    
+    // Recursively transform the object part (handles chained calls)
+    obj = transform_embedded_expression(obj);
+    
+    // Parse arguments
+    std::vector<std::string> raw_args = parse_raw_args(args_str);
+    
+    // Try to find @inline method in DefSchema
+    // First check string methods
+    if (auto* method_def = DefSchema::instance().lookup_method("string", method, raw_args.size())) {
+        if (method_def->mapping_type == MappingType::Inline) {
+            return expand_inline_template_raw(method_def->mapping_value, obj, raw_args) + suffix;
+        }
+    }
+    
+    // Check array methods
+    if (auto* method_def = DefSchema::instance().lookup_method("array", method, raw_args.size())) {
+        if (method_def->mapping_type == MappingType::Inline) {
+            return expand_inline_template_raw(method_def->mapping_value, obj, raw_args) + suffix;
+        }
+    }
+    
+    // Check WebSocket and other typed methods by resolving symbol type
+    std::string obj_type = ComponentTypeContext::instance().get_symbol_type(obj);
+    if (!obj_type.empty()) {
+        obj_type = ComponentTypeContext::instance().resolve(obj_type);
+        obj_type = DefSchema::instance().resolve_alias(obj_type);
+        
+        if (auto* method_def = DefSchema::instance().lookup_method(obj_type, method, raw_args.size())) {
+            if (method_def->mapping_type == MappingType::Inline) {
+                return expand_inline_template_raw(method_def->mapping_value, obj, raw_args) + suffix;
+            }
+        }
+    }
+    
+    // No transformation found, reconstruct with transformed parts
+    std::string result = obj + "." + method + "(";
+    for (size_t i = 0; i < raw_args.size(); ++i) {
+        if (i > 0) result += ", ";
+        result += raw_args[i];
+    }
+    result += ")" + suffix;
     return result;
 }
 
@@ -370,7 +527,8 @@ std::string StringLiteral::to_webcc() {
     for(size_t i=0; i<parts.size(); ++i) {
         if(i > 0) code += ", ";
         if(parts[i].is_expr) {
-            code += parts[i].content;
+            // Transform embedded expressions to apply @inline templates (e.g., subStr -> substr)
+            code += transform_embedded_expression(parts[i].content);
         } else {
             std::string escaped;
             for(char c : parts[i].content) {
@@ -795,7 +953,28 @@ std::string UnaryOp::to_webcc() {
 bool UnaryOp::is_static() { return operand->is_static(); }
 
 // ReferenceExpression - pass by reference (borrow, no ownership transfer)
+// When referencing a member function, generates a lambda wrapper for C++ compatibility
 std::string ReferenceExpression::to_webcc() {
+    // Check if this is a reference to a component method
+    if (auto* id = dynamic_cast<Identifier*>(operand.get())) {
+        const std::string& method_name = id->name;
+        auto* sig = ComponentTypeContext::instance().get_method_signature(method_name);
+        if (sig) {
+            // Generate lambda wrapper: [this](const T0& _arg0, ...) { this->methodName(_arg0, ...); }
+            std::string result = "[this](";
+            for (size_t i = 0; i < sig->param_types.size(); ++i) {
+                if (i > 0) result += ", ";
+                result += "const " + convert_type(sig->param_types[i]) + "& _arg" + std::to_string(i);
+            }
+            result += ") { this->" + method_name + "(";
+            for (size_t i = 0; i < sig->param_types.size(); ++i) {
+                if (i > 0) result += ", ";
+                result += "_arg" + std::to_string(i);
+            }
+            result += "); }";
+            return result;
+        }
+    }
     return operand->to_webcc();  // References are handled at call sites
 }
 
