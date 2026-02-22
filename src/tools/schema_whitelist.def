@@ -92,11 +92,11 @@ clear
 
 [fetch]
 // FetchRequest.get with optional callback parameters (compiler intrinsic)
-@intrinsic("fetch_get") shared def get(string url, def onSuccess(string): void = void, def onError(string): void = void): FetchRequest
+@intrinsic("fetch_get") shared def get(string url, string headers = "", def onSuccess(string): void = void, def onError(string): void = void): FetchRequest
 // FetchRequest.post with optional callback parameters (compiler intrinsic)
-@intrinsic("fetch_post") shared def post(string url, string body, def onSuccess(string): void = void, def onError(string): void = void): FetchRequest
+@intrinsic("fetch_post") shared def post(string url, string body, string headers = "", def onSuccess(string): void = void, def onError(string): void = void): FetchRequest
 // FetchRequest.patch with optional callback parameters (compiler intrinsic)
-@intrinsic("fetch_patch") shared def patch(string url, string body, def onSuccess(string): void = void, def onError(string): void = void): FetchRequest
+@intrinsic("fetch_patch") shared def patch(string url, string body, string headers = "", def onSuccess(string): void = void, def onError(string): void = void): FetchRequest
 
 [system]
 log
