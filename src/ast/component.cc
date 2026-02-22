@@ -806,6 +806,7 @@ std::string Component::to_webcc(CompilerSession &session)
     {
         std::string update_code;
         std::set<std::string> dependencies;
+        std::set<MemberDependency> member_dependencies;
         std::string method_name;
     };
 
@@ -882,6 +883,10 @@ std::string Component::to_webcc(CompilerSession &session)
             {
                 element_attr_bindings[key].dependencies.insert(dep);
             }
+            for (const auto &mem_dep : binding.member_dependencies)
+            {
+                element_attr_bindings[key].member_dependencies.insert(mem_dep);
+            }
         }
     }
 
@@ -913,6 +918,16 @@ std::string Component::to_webcc(CompilerSession &session)
             entry.if_region_id = key.if_region_id;
             entry.in_then_branch = key.in_then_branch;
             var_update_entries[dep].push_back(entry);
+        }
+    }
+
+    // Build map from member dependencies to update method names
+    std::map<MemberDependency, std::set<std::string>> member_dep_update_methods;
+    for (const auto &[key, binding] : element_attr_bindings)
+    {
+        for (const auto &mem_dep : binding.member_dependencies)
+        {
+            member_dep_update_methods[mem_dep].insert(binding.method_name);
         }
     }
 
@@ -1690,7 +1705,7 @@ std::string Component::to_webcc(CompilerSession &session)
         emit_event_registration(ss, element_count, event_handlers, "keydown", "_keydown_mask", "g_keydown_dispatcher", "int k", "k");
     }
 
-    // Wire up onChange callbacks for child component pub mut members
+    // Wire up onChange callbacks for child component pub mut members (in if conditions)
     for (const auto &region : if_regions)
     {
         for (const auto &mem_dep : region.member_dependencies)
@@ -1698,6 +1713,18 @@ std::string Component::to_webcc(CompilerSession &session)
             std::string callback_name = make_callback_name(mem_dep.member);
             ss << "        " << mem_dep.object << "." << callback_name << " = [this]() { _sync_if_" << region.if_id << "(); };\n";
         }
+    }
+
+    // Wire up onChange callbacks for child component pub mut members (in view bindings)
+    for (const auto &[mem_dep, methods] : member_dep_update_methods)
+    {
+        std::string callback_name = make_callback_name(mem_dep.member);
+        ss << "        " << mem_dep.object << "." << callback_name << " = [this]() {";
+        for (const auto &method_name : methods)
+        {
+            ss << " " << method_name << "();";
+        }
+        ss << " };\n";
     }
 
     // Wire up nested component reactivity (e.g., Vector.x/y -> Ball._update_x/y)
@@ -1768,6 +1795,18 @@ std::string Component::to_webcc(CompilerSession &session)
                 ss << "        " << param->name << "." << callback_name << " = [this]() { _update_" << member << "(); };\n";
             }
         }
+    }
+
+    // Re-wire member dependency callbacks after reallocation
+    for (const auto &[mem_dep, methods] : member_dep_update_methods)
+    {
+        std::string callback_name = make_callback_name(mem_dep.member);
+        ss << "        " << mem_dep.object << "." << callback_name << " = [this]() {";
+        for (const auto &method_name : methods)
+        {
+            ss << " " << method_name << "();";
+        }
+        ss << " };\n";
     }
 
     ss << "    }\n";

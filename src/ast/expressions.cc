@@ -719,6 +719,11 @@ void BinaryOp::collect_dependencies(std::set<std::string>& deps) {
     right->collect_dependencies(deps);
 }
 
+void BinaryOp::collect_member_dependencies(std::set<MemberDependency>& member_deps) {
+    left->collect_member_dependencies(member_deps);
+    right->collect_member_dependencies(member_deps);
+}
+
 std::string FunctionCall::args_to_string() {
     if (args.empty()) return "\"\"";
 
@@ -1025,6 +1030,10 @@ void FunctionCall::collect_dependencies(std::set<std::string>& deps) {
     for(auto& arg : args) arg.value->collect_dependencies(deps);
 }
 
+void FunctionCall::collect_member_dependencies(std::set<MemberDependency>& member_deps) {
+    for(auto& arg : args) arg.value->collect_member_dependencies(member_deps);
+}
+
 MemberAccess::MemberAccess(std::unique_ptr<Expression> obj, const std::string& mem)
     : object(std::move(obj)), member(mem) {}
 
@@ -1133,6 +1142,12 @@ void TernaryOp::collect_dependencies(std::set<std::string>& deps) {
     false_expr->collect_dependencies(deps);
 }
 
+void TernaryOp::collect_member_dependencies(std::set<MemberDependency>& member_deps) {
+    condition->collect_member_dependencies(member_deps);
+    true_expr->collect_member_dependencies(member_deps);
+    false_expr->collect_member_dependencies(member_deps);
+}
+
 bool TernaryOp::is_static() {
     return condition->is_static() && true_expr->is_static() && false_expr->is_static();
 }
@@ -1194,6 +1209,11 @@ std::string IndexAccess::to_webcc() {
 void IndexAccess::collect_dependencies(std::set<std::string>& deps) {
     array->collect_dependencies(deps);
     index->collect_dependencies(deps);
+}
+
+void IndexAccess::collect_member_dependencies(std::set<MemberDependency>& member_deps) {
+    array->collect_member_dependencies(member_deps);
+    index->collect_member_dependencies(member_deps);
 }
 
 std::string EnumAccess::to_webcc() {
