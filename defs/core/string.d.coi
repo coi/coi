@@ -7,7 +7,7 @@ type string {
     @inline("${this}.length()")
     def length(): int
 
-    @inline("${this}.at(${0})")
+    @inline("(int32_t)(${this}[${0}])")
     def charAt(int index): int
 
     @inline("${this}.substr(${0})")

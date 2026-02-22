@@ -176,7 +176,26 @@ std::string Assignment::to_webcc()
         g_ws_assignment_target = name;
     }
 
-    std::string rhs = value->to_webcc();
+    std::string rhs;
+    
+    // Handle member function reference assigned to webcc::function type
+    if (target_type.find("webcc::function<") == 0)
+    {
+        if (auto *ref_expr = dynamic_cast<ReferenceExpression *>(value.get()))
+        {
+            // Get the method name from the reference operand
+            std::string method_name = ref_expr->operand->to_webcc();
+            rhs = generate_member_function_lambda(target_type, method_name);
+        }
+        else
+        {
+            rhs = value->to_webcc();
+        }
+    }
+    else
+    {
+        rhs = value->to_webcc();
+    }
     
     // Clear the target after generating the RHS
     g_ws_assignment_target.clear();

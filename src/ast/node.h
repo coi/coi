@@ -60,6 +60,14 @@ struct ComponentTypeContext {
     std::set<std::string> local_enum_types;    // Enum types defined in this component
     std::set<std::string> global_data_types;   // Fully-qualified global data type names
     std::map<std::string, int> method_param_counts;  // Method name -> param count
+    
+    // Store full method signatures for lambda generation
+    struct MethodSignature {
+        std::string return_type;
+        std::vector<std::string> param_types;
+    };
+    std::map<std::string, MethodSignature> method_signatures;  // Method name -> signature
+    
     std::map<std::string, std::string> component_symbol_types; // Component params/state name -> type
     std::map<std::string, std::string> method_symbol_types;    // Current method params/locals name -> type
     
@@ -75,6 +83,7 @@ struct ComponentTypeContext {
         local_data_types = data_types;
         local_enum_types = enum_types;
         method_param_counts.clear();
+        method_signatures.clear();
         component_symbol_types.clear();
         method_symbol_types.clear();
     }
@@ -92,6 +101,7 @@ struct ComponentTypeContext {
         local_enum_types.clear();
         global_data_types.clear();
         method_param_counts.clear();
+        method_signatures.clear();
         component_symbol_types.clear();
         method_symbol_types.clear();
     }
@@ -129,10 +139,30 @@ struct ComponentTypeContext {
         method_param_counts[name] = param_count;
     }
     
+    // Register a method's full signature (return type + param types)
+    void register_method_signature(const std::string& name, const std::string& ret_type, const std::vector<std::string>& param_types) {
+        MethodSignature sig;
+        sig.return_type = ret_type;
+        sig.param_types = param_types;
+        method_signatures[name] = sig;
+        method_param_counts[name] = static_cast<int>(param_types.size());
+    }
+    
     // Get a method's param count (-1 if unknown)
     int get_method_param_count(const std::string& name) const {
         auto it = method_param_counts.find(name);
         return it != method_param_counts.end() ? it->second : -1;
+    }
+    
+    // Get a method's full signature (nullptr if unknown)
+    const MethodSignature* get_method_signature(const std::string& name) const {
+        auto it = method_signatures.find(name);
+        return it != method_signatures.end() ? &it->second : nullptr;
+    }
+    
+    // Check if a method exists
+    bool has_method(const std::string& name) const {
+        return method_signatures.count(name) > 0;
     }
     
     // Check if a type is component-local and return prefixed name if so
