@@ -175,4 +175,4 @@ The type checker normalizes types and checks compatibility, handling:
 
 - **Unit tests**: `tests/unit/` - Test individual compiler components
 - **Integration tests**: `tests/integration/` - Test full compilation pipeline
-- **Benchmark**: `benchmark/` - Performance comparisons with other frameworks
+- **Benchmark**: https://github.com/coi/benchmarks - Performance comparisons with other frameworks

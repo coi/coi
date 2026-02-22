@@ -36,7 +36,7 @@ Coi gives you composable components, fine-grained reactivity, type safety, and t
 > [!IMPORTANT]
 > Coi isn't another JavaScript framework, it's a new language for the web, built from scratch to feel like a component framework but compile to high-performance WebAssembly. You get static types, strict checking, and native-speed execution without the overhead of a heavy JavaScript runtime.
 
-- **Bundle Size Matters**: In our counter app example, Coi is 40% smaller than Svelte, 72% smaller than Vue, and 88% smaller than React (see [benchmarks](benchmark/)). Faster downloads, faster startup, better mobile experience.
+- **Bundle Size Matters**: In our counter app example, Coi is 40% smaller than Svelte, 72% smaller than Vue, and 88% smaller than React (see [benchmarks](https://github.com/coi/benchmarks)). Faster downloads, faster startup, better mobile experience.
 - **Animations & Real-Time Apps**: No garbage collection pauses means consistent 60fps animations and responsive interactions. Perfect for dashboards, games, and live data apps.
 - **Type Safety from Day One**: Catch bugs at compile-time, not runtime. Props, state, and platform APIs are fully typed.
 - **No Virtual DOM**: Coi uses a fine-grained reactive system. Instead of "diffing" a virtual tree in JS, the compiler generates direct, surgical DOM updates triggered by WASM logic. This eliminates VDOM overhead and minimizes the work the browser has to do.
@@ -128,10 +128,10 @@ app {
 
 ## Benchmarks
 
-In [benchmarks](benchmark/) comparing Coi, React, Vue, and Svelte, Coi delivers the smallest bundle size and competitive DOM performance. See the results below:
+In [benchmarks](https://github.com/coi/benchmarks) comparing Coi, React, Vue, and Svelte, Coi delivers the smallest bundle size and competitive DOM performance. See the results below:
 
 <p align="center">
-  <img src="benchmark/benchmark_results.svg" alt="Benchmark Results" width="600">
+    <img src="https://github.com/coi/benchmarks/blob/main/suites/framework/results/benchmark_results.svg" alt="Benchmark Results" width="600">
 </p>
 
 
