@@ -598,9 +598,16 @@ std::string FunctionCall::to_webcc() {
                     obj_type = DefSchema::instance().resolve_alias(obj_type);
 
                     map_method = DefSchema::instance().lookup_method(obj_type, method_name, args.size());
-                    if (map_method && !map_method->is_shared && map_method->mapping_type == MappingType::Map) {
-                        pass_obj = true;
-                        obj_arg = obj;
+                    if (map_method && !map_method->is_shared) {
+                        if (map_method->mapping_type == MappingType::Inline) {
+                            // Handle @inline methods for typed instance calls (e.g., socket.isConnected())
+                            return expand_inline_template(map_method->mapping_value, obj, args);
+                        } else if (map_method->mapping_type == MappingType::Map) {
+                            pass_obj = true;
+                            obj_arg = obj;
+                        } else {
+                            map_method = nullptr;
+                        }
                     } else {
                         map_method = nullptr;
                     }
