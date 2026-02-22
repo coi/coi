@@ -714,16 +714,6 @@ std::string BinaryOp::to_webcc() {
     return "(" + left->to_webcc() + " " + op + " " + right->to_webcc() + ")";
 }
 
-void BinaryOp::collect_dependencies(std::set<std::string>& deps) {
-    left->collect_dependencies(deps);
-    right->collect_dependencies(deps);
-}
-
-void BinaryOp::collect_member_dependencies(std::set<MemberDependency>& member_deps) {
-    left->collect_member_dependencies(member_deps);
-    right->collect_member_dependencies(member_deps);
-}
-
 std::string FunctionCall::args_to_string() {
     if (args.empty()) return "\"\"";
 
@@ -1022,16 +1012,22 @@ std::string FunctionCall::to_webcc() {
     return result;
 }
 
+std::vector<Expression*> FunctionCall::get_children() {
+    std::vector<Expression*> children;
+    for (auto& arg : args) children.push_back(arg.value.get());
+    return children;
+}
+
 void FunctionCall::collect_dependencies(std::set<std::string>& deps) {
+    // Handle object.method() calls - extract the object name
     size_t dot_pos = name.find('.');
     if (dot_pos != std::string::npos) {
         deps.insert(name.substr(0, dot_pos));
     }
-    for(auto& arg : args) arg.value->collect_dependencies(deps);
-}
-
-void FunctionCall::collect_member_dependencies(std::set<MemberDependency>& member_deps) {
-    for(auto& arg : args) arg.value->collect_member_dependencies(member_deps);
+    // Also traverse children via get_children()
+    for (auto* child : get_children()) {
+        if (child) child->collect_dependencies(deps);
+    }
 }
 
 MemberAccess::MemberAccess(std::unique_ptr<Expression> obj, const std::string& mem)
@@ -1071,15 +1067,15 @@ std::string MemberAccess::to_webcc() {
     return object->to_webcc() + "." + member;
 }
 
-void MemberAccess::collect_dependencies(std::set<std::string>& deps) {
-    object->collect_dependencies(deps);
-}
-
 void MemberAccess::collect_member_dependencies(std::set<MemberDependency>& member_deps) {
+    // Add this object.member as a dependency
     if (auto id = dynamic_cast<Identifier*>(object.get())) {
         member_deps.insert({id->name, member});
     }
-    object->collect_member_dependencies(member_deps);
+    // Also traverse children via get_children()
+    for (auto* child : get_children()) {
+        if (child) child->collect_member_dependencies(member_deps);
+    }
 }
 
 PostfixOp::PostfixOp(std::unique_ptr<Expression> expr, const std::string& o)
@@ -1136,18 +1132,6 @@ std::string TernaryOp::to_webcc() {
     return "(" + condition->to_webcc() + " ? " + true_expr->to_webcc() + " : " + false_expr->to_webcc() + ")";
 }
 
-void TernaryOp::collect_dependencies(std::set<std::string>& deps) {
-    condition->collect_dependencies(deps);
-    true_expr->collect_dependencies(deps);
-    false_expr->collect_dependencies(deps);
-}
-
-void TernaryOp::collect_member_dependencies(std::set<MemberDependency>& member_deps) {
-    condition->collect_member_dependencies(member_deps);
-    true_expr->collect_member_dependencies(member_deps);
-    false_expr->collect_member_dependencies(member_deps);
-}
-
 bool TernaryOp::is_static() {
     return condition->is_static() && true_expr->is_static() && false_expr->is_static();
 }
@@ -1162,8 +1146,10 @@ std::string ArrayLiteral::to_webcc() {
     return code;
 }
 
-void ArrayLiteral::collect_dependencies(std::set<std::string>& deps) {
-    for (auto& elem : elements) elem->collect_dependencies(deps);
+std::vector<Expression*> ArrayLiteral::get_children() {
+    std::vector<Expression*> children;
+    for (auto& elem : elements) children.push_back(elem.get());
+    return children;
 }
 
 bool ArrayLiteral::is_static() {
@@ -1190,11 +1176,6 @@ std::string ArrayRepeatLiteral::to_webcc() {
     return value->to_webcc();
 }
 
-void ArrayRepeatLiteral::collect_dependencies(std::set<std::string>& deps) {
-    value->collect_dependencies(deps);
-    count->collect_dependencies(deps);
-}
-
 bool ArrayRepeatLiteral::is_static() {
     return value->is_static();
 }
@@ -1204,16 +1185,6 @@ IndexAccess::IndexAccess(std::unique_ptr<Expression> arr, std::unique_ptr<Expres
 
 std::string IndexAccess::to_webcc() {
     return array->to_webcc() + "[" + index->to_webcc() + "]";
-}
-
-void IndexAccess::collect_dependencies(std::set<std::string>& deps) {
-    array->collect_dependencies(deps);
-    index->collect_dependencies(deps);
-}
-
-void IndexAccess::collect_member_dependencies(std::set<MemberDependency>& member_deps) {
-    array->collect_member_dependencies(member_deps);
-    index->collect_member_dependencies(member_deps);
 }
 
 std::string EnumAccess::to_webcc() {
@@ -1249,8 +1220,10 @@ std::string ComponentConstruction::to_webcc() {
     return result;
 }
 
-void ComponentConstruction::collect_dependencies(std::set<std::string>& deps) {
-    for (auto& arg : args) arg.value->collect_dependencies(deps);
+std::vector<Expression*> ComponentConstruction::get_children() {
+    std::vector<Expression*> children;
+    for (auto& arg : args) children.push_back(arg.value.get());
+    return children;
 }
 
 // Match expression code generation

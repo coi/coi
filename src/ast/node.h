@@ -47,6 +47,23 @@ struct ASTNode {
 // Base for expressions (things that return values)
 struct Expression : ASTNode {
     virtual bool is_static() { return false; }
+    
+    // Returns child expressions for traversal. Override in subclasses with children.
+    virtual std::vector<Expression*> get_children() { return {}; }
+    
+    // Default implementation: traverse all children
+    void collect_dependencies(std::set<std::string>& deps) override {
+        for (auto* child : get_children()) {
+            if (child) child->collect_dependencies(deps);
+        }
+    }
+    
+    // Default implementation: traverse all children
+    void collect_member_dependencies(std::set<MemberDependency>& member_deps) override {
+        for (auto* child : get_children()) {
+            if (child) child->collect_member_dependencies(member_deps);
+        }
+    }
 };
 
 // Base for statements (actions)
