@@ -1114,17 +1114,7 @@ std::string Component::to_webcc(CompilerSession &session)
 
                 std::string item_code = region.item_creation_code;
                 item_code = transform_to_insert_before(item_code, parent_var, anchor_var);
-                std::stringstream indented;
-                std::istringstream iss(item_code);
-                std::string line;
-                while (std::getline(iss, line))
-                {
-                    if (!line.empty())
-                    {
-                        indented << "        " << line << "\n";
-                    }
-                }
-                ss << indented.str();
+                ss << indent_code(item_code, "        ");
 
                 ss << "        }\n";
                 ss << "        if (--g_view_depth == 0) webcc::flush();\n";
@@ -1148,17 +1138,7 @@ std::string Component::to_webcc(CompilerSession &session)
 
                 std::string item_code = region.item_creation_code;
                 item_code = transform_to_insert_before(item_code, region.parent_element, anchor_var);
-                std::stringstream indented;
-                std::istringstream iss(item_code);
-                std::string line;
-                while (std::getline(iss, line))
-                {
-                    if (!line.empty())
-                    {
-                        indented << "    " << line << "\n";
-                    }
-                }
-                ss << indented.str();
+                ss << indent_code(item_code, "    ");
                 ss << "            }\n";
 
                 ss << "            for (int _i = 0; _i < old_count; _i++) " << vec_name << "[_i]._rebind();\n";
@@ -1187,17 +1167,7 @@ std::string Component::to_webcc(CompilerSession &session)
 
                 std::string item_code = region.item_creation_code;
                 item_code = transform_to_insert_before(item_code, region.parent_element, anchor_var);
-                std::stringstream indented;
-                std::istringstream iss(item_code);
-                std::string line;
-                while (std::getline(iss, line))
-                {
-                    if (!line.empty())
-                    {
-                        indented << "    " << line << "\n";
-                    }
-                }
-                ss << indented.str();
+                ss << indent_code(item_code, "    ");
 
                 if (!region.root_element_var.empty())
                 {
@@ -1238,17 +1208,7 @@ std::string Component::to_webcc(CompilerSession &session)
         ss << "        auto& " << region.var_name << " = " << region.iterable_expr << "[_idx];\n";
 
         std::string item_code = transform_to_insert_before(region.item_creation_code, parent_var, "_ref");
-        std::stringstream indented;
-        std::istringstream iss(item_code);
-        std::string line;
-        while (std::getline(iss, line))
-        {
-            if (!line.empty())
-            {
-                indented << "        " << line << "\n";
-            }
-        }
-        ss << indented.str();
+        ss << indent_code(item_code, "        ");
         ss << "        if (_idx < (int)" << elements_vec << ".size()) " << elements_vec << "[_idx] = " << region.root_element_var << ";\n";
         ss << "        else " << elements_vec << ".push_back(" << region.root_element_var << ");\n";
         ss << "    }\n";
@@ -1585,6 +1545,53 @@ std::string Component::to_webcc(CompilerSession &session)
         generate_method(method);
     }
 
+    auto emit_all_event_registrations = [&]() {
+        if (masks.click)
+        {
+            emit_event_registration(ss, element_count, event_handlers, "click", "_click_mask", "g_dispatcher", "", "");
+        }
+        if (masks.input)
+        {
+            emit_event_registration(ss, element_count, event_handlers, "input", "_input_mask", "g_input_dispatcher", "const webcc::string& v", "v");
+        }
+        if (masks.change)
+        {
+            emit_event_registration(ss, element_count, event_handlers, "change", "_change_mask", "g_change_dispatcher", "const webcc::string& v", "v");
+        }
+        if (masks.keydown)
+        {
+            emit_event_registration(ss, element_count, event_handlers, "keydown", "_keydown_mask", "g_keydown_dispatcher", "int k", "k");
+        }
+    };
+
+    auto emit_member_dependency_callbacks = [&]() {
+        for (const auto &[mem_dep, methods] : member_dep_update_methods)
+        {
+            std::string callback_name = make_callback_name(mem_dep.member);
+            ss << "        " << mem_dep.object << "." << callback_name << " = [this]() {";
+            for (const auto &method_name : methods)
+            {
+                ss << " " << method_name << "();";
+            }
+            ss << " };\n";
+        }
+    };
+
+    auto emit_nested_component_reactivity = [&]() {
+        for (const auto &param : params)
+        {
+            auto it = session.component_info.find(resolve_component_type(param->type));
+            if (it != session.component_info.end() && !it->second.pub_mut_members.empty())
+            {
+                for (const auto &member : it->second.pub_mut_members)
+                {
+                    std::string callback_name = make_callback_name(member);
+                    ss << "        " << param->name << "." << callback_name << " = [this]() { _update_" << member << "(); };\n";
+                }
+            }
+        }
+    };
+
     // Event handlers
     for (auto &handler : event_handlers)
     {
@@ -1651,22 +1658,7 @@ std::string Component::to_webcc(CompilerSession &session)
     // End view - flushes only at outermost level, then register event handlers
     ss << "        if (--g_view_depth == 0) webcc::flush();\n";
     // Register event handlers
-    if (masks.click)
-    {
-        emit_event_registration(ss, element_count, event_handlers, "click", "_click_mask", "g_dispatcher", "", "");
-    }
-    if (masks.input)
-    {
-        emit_event_registration(ss, element_count, event_handlers, "input", "_input_mask", "g_input_dispatcher", "const webcc::string& v", "v");
-    }
-    if (masks.change)
-    {
-        emit_event_registration(ss, element_count, event_handlers, "change", "_change_mask", "g_change_dispatcher", "const webcc::string& v", "v");
-    }
-    if (masks.keydown)
-    {
-        emit_event_registration(ss, element_count, event_handlers, "keydown", "_keydown_mask", "g_keydown_dispatcher", "int k", "k");
-    }
+    emit_all_event_registrations();
 
     // Wire up onChange callbacks for child component pub mut members (in if conditions)
     for (const auto &region : if_regions)
@@ -1679,32 +1671,10 @@ std::string Component::to_webcc(CompilerSession &session)
     }
 
     // Wire up onChange callbacks for child component pub mut members (in view bindings)
-    for (const auto &[mem_dep, methods] : member_dep_update_methods)
-    {
-        std::string callback_name = make_callback_name(mem_dep.member);
-        ss << "        " << mem_dep.object << "." << callback_name << " = [this]() {";
-        for (const auto &method_name : methods)
-        {
-            ss << " " << method_name << "();";
-        }
-        ss << " };\n";
-    }
+    emit_member_dependency_callbacks();
 
     // Wire up nested component reactivity (e.g., Vector.x/y -> Ball._update_x/y)
-    for (const auto &param : params)
-    {
-        // Check if this param is a component type with pub_mut_members
-        auto it = session.component_info.find(resolve_component_type(param->type));
-        if (it != session.component_info.end() && !it->second.pub_mut_members.empty())
-        {
-            // Wire each pub_mut_member's onChange to our _update_{member}() method
-            for (const auto &member : it->second.pub_mut_members)
-            {
-                std::string callback_name = make_callback_name(member);
-                ss << "        " << param->name << "." << callback_name << " = [this]() { _update_" << member << "(); };\n";
-            }
-        }
-    }
+    emit_nested_component_reactivity();
 
     if (has_mount)
         ss << "        _user_mount();\n";
@@ -1728,49 +1698,14 @@ std::string Component::to_webcc(CompilerSession &session)
     ss << "    void _rebind() {\n";
     if (!event_handlers.empty())
     {
-        if (masks.click)
-        {
-            emit_event_registration(ss, element_count, event_handlers, "click", "_click_mask", "g_dispatcher", "", "");
-        }
-        if (masks.input)
-        {
-            emit_event_registration(ss, element_count, event_handlers, "input", "_input_mask", "g_input_dispatcher", "const webcc::string& v", "v");
-        }
-        if (masks.change)
-        {
-            emit_event_registration(ss, element_count, event_handlers, "change", "_change_mask", "g_change_dispatcher", "const webcc::string& v", "v");
-        }
-        if (masks.keydown)
-        {
-            emit_event_registration(ss, element_count, event_handlers, "keydown", "_keydown_mask", "g_keydown_dispatcher", "int k", "k");
-        }
+        emit_all_event_registrations();
     }
 
     // Re-wire nested component reactivity after reallocation
-    for (const auto &param : params)
-    {
-        auto it = session.component_info.find(resolve_component_type(param->type));
-        if (it != session.component_info.end() && !it->second.pub_mut_members.empty())
-        {
-            for (const auto &member : it->second.pub_mut_members)
-            {
-                std::string callback_name = make_callback_name(member);
-                ss << "        " << param->name << "." << callback_name << " = [this]() { _update_" << member << "(); };\n";
-            }
-        }
-    }
+    emit_nested_component_reactivity();
 
     // Re-wire member dependency callbacks after reallocation
-    for (const auto &[mem_dep, methods] : member_dep_update_methods)
-    {
-        std::string callback_name = make_callback_name(mem_dep.member);
-        ss << "        " << mem_dep.object << "." << callback_name << " = [this]() {";
-        for (const auto &method_name : methods)
-        {
-            ss << " " << method_name << "();";
-        }
-        ss << " };\n";
-    }
+    emit_member_dependency_callbacks();
 
     ss << "    }\n";
 
