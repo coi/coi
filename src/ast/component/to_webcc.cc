@@ -115,58 +115,8 @@ static std::string indent_code(const std::string &code, const std::string &prefi
 }
 
 // ============================================================================
-// Event Handler Bitmask Helpers
-// ============================================================================
-
-static EventMasks compute_event_masks(const std::vector<EventHandler> &handlers)
-{
-    EventMasks masks;
-    for (const auto &handler : handlers)
-    {
-        if (handler.element_id < 64)
-        {
-            uint64_t bit = 1ULL << handler.element_id;
-            if (handler.event_type == "click")
-                masks.click |= bit;
-            else if (handler.event_type == "input")
-                masks.input |= bit;
-            else if (handler.event_type == "change")
-                masks.change |= bit;
-            else if (handler.event_type == "keydown")
-                masks.keydown |= bit;
-        }
-    }
-    return masks;
-}
-
-static std::set<int> get_elements_for_event(const std::vector<EventHandler> &handlers, const std::string &event_type)
-{
-    std::set<int> elements;
-    for (const auto &handler : handlers)
-    {
-        if (handler.event_type == event_type)
-        {
-            elements.insert(handler.element_id);
-        }
-    }
-    return elements;
-}
-
-// ============================================================================
 // Code Generation Helpers
 // ============================================================================
-
-static void emit_event_mask_constants(std::stringstream &ss, const EventMasks &masks)
-{
-    if (masks.click)
-        ss << "    static constexpr uint64_t _click_mask = 0x" << std::hex << masks.click << std::dec << "ULL;\n";
-    if (masks.input)
-        ss << "    static constexpr uint64_t _input_mask = 0x" << std::hex << masks.input << std::dec << "ULL;\n";
-    if (masks.change)
-        ss << "    static constexpr uint64_t _change_mask = 0x" << std::hex << masks.change << std::dec << "ULL;\n";
-    if (masks.keydown)
-        ss << "    static constexpr uint64_t _keydown_mask = 0x" << std::hex << masks.keydown << std::dec << "ULL;\n";
-}
 
 static void emit_component_members(std::stringstream &ss, const std::map<std::string, int> &component_members)
 {
@@ -219,39 +169,6 @@ static void emit_if_region_members(std::stringstream &ss, const std::vector<IfRe
     }
 }
 
-// Generate event handler switch cases for a specific event type
-static void emit_handler_switch_cases(std::stringstream &ss,
-                                      const std::vector<EventHandler> &handlers,
-                                      const std::string &event_type,
-                                      const std::string &suffix = "")
-{
-    for (const auto &handler : handlers)
-    {
-        if (handler.event_type == event_type)
-        {
-            ss << "                case " << handler.element_id << ": _handler_"
-               << handler.element_id << "_" << event_type << "(" << suffix << "); break;\n";
-        }
-    }
-}
-
-// Generate event dispatcher registration for a specific event type
-static void emit_event_registration(std::stringstream &ss,
-                                    int element_count,
-                                    const std::vector<EventHandler> &handlers,
-                                    const std::string &event_type,
-                                    const std::string &mask_name,
-                                    const std::string &dispatcher_name,
-                                    const std::string &lambda_params,
-                                    const std::string &call_suffix)
-{
-    ss << "        for (int i = 0; i < " << element_count << "; i++) if ((" << mask_name
-       << " & (1ULL << i)) && el[i].is_valid()) " << dispatcher_name << ".set(el[i], [this, i](" << lambda_params << ") {\n";
-    ss << "            switch(i) {\n";
-    emit_handler_switch_cases(ss, handlers, event_type, call_suffix);
-    ss << "            }\n";
-    ss << "        });\n";
-}
 
 // ============================================================================
 // Tree Traversal Functions
@@ -1459,25 +1376,6 @@ std::string Component::to_webcc(CompilerSession &session)
         generate_method(method);
     }
 
-    auto emit_all_event_registrations = [&]() {
-        if (masks.click)
-        {
-            emit_event_registration(ss, element_count, event_handlers, "click", "_click_mask", "g_dispatcher", "", "");
-        }
-        if (masks.input)
-        {
-            emit_event_registration(ss, element_count, event_handlers, "input", "_input_mask", "g_input_dispatcher", "const webcc::string& v", "v");
-        }
-        if (masks.change)
-        {
-            emit_event_registration(ss, element_count, event_handlers, "change", "_change_mask", "g_change_dispatcher", "const webcc::string& v", "v");
-        }
-        if (masks.keydown)
-        {
-            emit_event_registration(ss, element_count, event_handlers, "keydown", "_keydown_mask", "g_keydown_dispatcher", "int k", "k");
-        }
-    };
-
     auto emit_member_dependency_callbacks = [&]() {
         for (const auto &[mem_dep, methods] : member_dep_update_methods)
         {
@@ -1572,7 +1470,7 @@ std::string Component::to_webcc(CompilerSession &session)
     // End view - flushes only at outermost level, then register event handlers
     ss << "        if (--g_view_depth == 0) webcc::flush();\n";
     // Register event handlers
-    emit_all_event_registrations();
+    emit_all_event_registrations(ss, element_count, event_handlers, masks);
 
     // Wire up onChange callbacks for child component pub mut members (in if conditions)
     for (const auto &region : if_regions)
@@ -1612,7 +1510,7 @@ std::string Component::to_webcc(CompilerSession &session)
     ss << "    void _rebind() {\n";
     if (!event_handlers.empty())
     {
-        emit_all_event_registrations();
+        emit_all_event_registrations(ss, element_count, event_handlers, masks);
     }
 
     // Re-wire nested component reactivity after reallocation
