@@ -23,7 +23,13 @@ The Coi compiler transforms `.coi` files into WebAssembly applications through s
 - **expressions.cc** - Expression nodes (literals, operators, function calls)
 - **statements.cc** - Statement nodes (if, for, assignments)
 - **definitions.cc** - Definition nodes (data types, enums)
-- **component.cc** - Component AST and view tree generation
+- **codegen_state.{cc,h}** - Shared mutable state used during component lowering
+- **component/component.h** - Component AST types and component emit interfaces
+- **component/to_webcc.cc** - Main component-to-C++ generation coordinator
+- **component/traversal.cc** - Component tree traversal helpers
+- **component/emit_events.cc** - Event mask/registration code emission helpers
+- **component/emit_router.cc** - Router-related component emission
+- **component/emit_lifecycle.cc** - Lifecycle/destroy/remove-view/tick emission
 - **view.cc** - View hierarchy handling
 - **formatter.cc** - Code formatting utilities
 

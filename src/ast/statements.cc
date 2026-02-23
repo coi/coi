@@ -1,46 +1,7 @@
 #include "statements.h"
+#include "codegen_state.h"
 #include "../defs/def_parser.h"
 #include "../codegen/codegen_utils.h"
-
-// Reference to per-component context for reference props
-extern std::set<std::string> g_ref_props;
-
-// Current assignment target for WebSocket lifetime tracking
-extern std::string g_ws_assignment_target;
-
-// Info for inlining DOM operations on component arrays used in for-each loops
-struct ComponentArrayLoopInfo
-{
-    int loop_id;
-    std::string component_type;
-    std::string parent_var;
-    std::string var_name;
-    std::string item_creation_code;
-    bool is_member_ref_loop;
-    bool is_only_child;
-};
-extern std::map<std::string, ComponentArrayLoopInfo> g_component_array_loops;
-
-// Info for inlining DOM operations on keyed HTML loops over non-component arrays
-struct ArrayLoopInfo
-{
-    int loop_id;
-    std::string parent_var;
-    std::string anchor_var;
-    std::string elements_vec_name;
-    std::string var_name;
-    std::string item_creation_code;
-    std::string root_element_var;
-    bool is_only_child;
-};
-extern std::map<std::string, ArrayLoopInfo> g_array_loops;
-
-struct HtmlLoopVarInfo
-{
-    int loop_id;
-    std::string iterable_expr;
-};
-extern std::map<std::string, HtmlLoopVarInfo> g_html_loop_var_infos;
 
 std::string VarDeclaration::to_webcc()
 {

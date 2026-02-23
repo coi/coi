@@ -7,4 +7,4 @@
 #include "statements.h"
 #include "definitions.h"
 #include "view.h"
-#include "component.h"
+#include "component/component.h"
