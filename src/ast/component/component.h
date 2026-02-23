@@ -1,9 +1,11 @@
 #pragma once
 
-#include "node.h"
-#include "definitions.h"
-#include "statements.h"
-#include "view.h"
+#include "../node.h"
+#include "../definitions.h"
+#include "../statements.h"
+#include "../view.h"
+#include <cstdint>
+#include <sstream>
 
 // Route entry for router block
 struct RouteEntry {
@@ -50,3 +52,21 @@ struct AppConfig {
     std::string description;
     std::string lang = "en";
 };
+
+struct EventMasks
+{
+    uint64_t click = 0;
+    uint64_t input = 0;
+    uint64_t change = 0;
+    uint64_t keydown = 0;
+};
+
+void emit_component_router_methods(std::stringstream &ss, const Component &component);
+
+void emit_component_lifecycle_methods(std::stringstream &ss,
+                                      CompilerSession &session,
+                                      const Component &component,
+                                      const EventMasks &masks,
+                                      const std::vector<IfRegion> &if_regions,
+                                      int element_count,
+                                      const std::map<std::string, int> &component_members);
