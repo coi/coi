@@ -80,9 +80,10 @@ build build/obj/ast/statements.o: cxx src/ast/statements.cc
 build build/obj/ast/definitions.o: cxx src/ast/definitions.cc
 build build/obj/ast/view.o: cxx src/ast/view.cc
 build build/obj/ast/component.o: cxx src/ast/component.cc
+build build/obj/ast/codegen_state.o: cxx src/ast/codegen_state.cc
 
 # Link Coi
-build coi: link build/obj/main.o build/obj/frontend/lexer.o build/obj/frontend/parser/core.o build/obj/frontend/parser/expr.o build/obj/frontend/parser/stmt.o build/obj/frontend/parser/view.o build/obj/frontend/parser/component.o build/obj/analysis/type_checker.o build/obj/cli/cli.o build/obj/cli/package_manager.o build/obj/defs/def_parser.o build/obj/codegen/json_codegen.o build/obj/analysis/include_detector.o build/obj/analysis/feature_detector.o build/obj/analysis/dependency_resolver.o build/obj/defs/def_loader.o build/obj/codegen/codegen.o build/obj/codegen/css_generator.o build/obj/ast/node.o build/obj/ast/expressions.o build/obj/ast/formatter.o build/obj/ast/statements.o build/obj/ast/definitions.o build/obj/ast/view.o build/obj/ast/component.o
+build coi: link build/obj/main.o build/obj/frontend/lexer.o build/obj/frontend/parser/core.o build/obj/frontend/parser/expr.o build/obj/frontend/parser/stmt.o build/obj/frontend/parser/view.o build/obj/frontend/parser/component.o build/obj/analysis/type_checker.o build/obj/cli/cli.o build/obj/cli/package_manager.o build/obj/defs/def_parser.o build/obj/codegen/json_codegen.o build/obj/analysis/include_detector.o build/obj/analysis/feature_detector.o build/obj/analysis/dependency_resolver.o build/obj/defs/def_loader.o build/obj/codegen/codegen.o build/obj/codegen/css_generator.o build/obj/ast/node.o build/obj/ast/expressions.o build/obj/ast/formatter.o build/obj/ast/statements.o build/obj/ast/definitions.o build/obj/ast/view.o build/obj/ast/component.o build/obj/ast/codegen_state.o
 
 # Generate def cache at build time
 rule gen_def_cache

@@ -1,48 +1,11 @@
 #include "component.h"
+#include "codegen_state.h"
 #include "formatter.h"
 #include "../defs/def_parser.h"
 #include "../codegen/codegen_utils.h"
 #include <cctype>
 #include <algorithm>
 #include <sstream>
-
-// Per-component context for tracking reference props
-std::set<std::string> g_ref_props;
-
-// Info for inlining DOM operations on component arrays used in for-each loops
-struct ComponentArrayLoopInfo
-{
-    int loop_id;
-    std::string component_type;
-    std::string parent_var;         // e.g., "_loop_0_parent"
-    std::string var_name;           // Loop variable name (e.g., "row")
-    std::string item_creation_code; // Code to render one item
-    bool is_member_ref_loop;        // True if <varName/> syntax is used
-    bool is_only_child;             // True if loop is only child of parent element
-};
-std::map<std::string, ComponentArrayLoopInfo> g_component_array_loops;
-
-// Info for inlining DOM operations on keyed HTML loops over non-component arrays
-struct ArrayLoopInfo
-{
-    int loop_id;
-    std::string parent_var;         // e.g., "_loop_0_parent"
-    std::string anchor_var;         // e.g., "_loop_0_anchor"
-    std::string elements_vec_name;  // e.g., "_loop_0_elements"
-    std::string var_name;           // Loop variable name (e.g., "task")
-    std::string item_creation_code; // Code to render one item
-    std::string root_element_var;   // Root element handle var for one item (e.g., "_el_2")
-    bool is_only_child;             // True if loop is only child of parent element
-};
-std::map<std::string, ArrayLoopInfo> g_array_loops;
-
-// Map loop variable name -> keyed HTML loop info for member-mutation fast paths
-struct HtmlLoopVarInfo
-{
-    int loop_id;
-    std::string iterable_expr;
-};
-std::map<std::string, HtmlLoopVarInfo> g_html_loop_var_infos;
 
 // ============================================================================
 // Utility Functions

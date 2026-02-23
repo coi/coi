@@ -1,16 +1,11 @@
 #include "expressions.h"
+#include "codegen_state.h"
 #include "formatter.h"
 #include "node.h" 
 #include "../defs/def_parser.h"
 #include "../codegen/json_codegen.h"
 #include "../cli/error.h"
 #include <cctype>
-
-// Reference to per-component context for reference props
-extern std::set<std::string> g_ref_props;
-
-// Current assignment target (set by Assignment::to_webcc for WebSocket lifetime tracking)
-std::string g_ws_assignment_target;
 
 // Helper to expand @inline templates like "${this}.length()" or "$self.is_valid()" or "${0}"
 static std::string expand_inline_template(const std::string& tmpl, const std::string& receiver,
