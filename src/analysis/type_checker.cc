@@ -40,7 +40,7 @@ static std::string extract_base_type(const std::string &type)
 
 static bool is_function_value_type(const std::string &type)
 {
-    return type.rfind("webcc::function<", 0) == 0;
+    return type.rfind("coi::function<", 0) == 0 || type.rfind("webcc::function<", 0) == 0;
 }
 
 static void validate_data_fields_no_copy(const std::vector<std::unique_ptr<DataDef>> &data_defs)
@@ -1966,8 +1966,8 @@ void validate_view_hierarchy(const std::vector<Component> &components,
                             }
                             if (!declared_param->is_reference && passed_prop.is_reference)
                             {
-                                // Allow & syntax for function params (webcc::function)
-                                if (declared_param->type.find("webcc::function") == 0)
+                                // Allow & syntax for function params (coi::function)
+                                if (declared_param->type.find("coi::function") == 0 || declared_param->type.find("webcc::function") == 0)
                                 {
                                     // OK - but also validate callback argument types
                                 }

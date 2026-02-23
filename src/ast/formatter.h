@@ -22,7 +22,7 @@ void flatten_string_concat(Expression* expr, std::vector<Expression*>& parts);
 std::string generate_formatter_appends(const std::vector<std::string>& parts);
 std::string generate_formatter_appends(const std::vector<Expression*>& parts);
 
-// Generate formatter code that returns a webcc::string (expression context)
+// Generate formatter code that returns a coi::string (expression context)
 std::string generate_formatter_expr(const std::vector<Expression*>& parts);
 
 // Generate formatter code as a statement block that calls a function with c_str()

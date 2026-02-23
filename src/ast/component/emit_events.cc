@@ -89,11 +89,11 @@ void emit_all_event_registrations(std::stringstream &ss,
     }
     if (masks.input)
     {
-        emit_event_registration(ss, element_count, handlers, "input", "_input_mask", "g_input_dispatcher", "const webcc::string& v", "v");
+        emit_event_registration(ss, element_count, handlers, "input", "_input_mask", "g_input_dispatcher", "const coi::string& v", "v");
     }
     if (masks.change)
     {
-        emit_event_registration(ss, element_count, handlers, "change", "_change_mask", "g_change_dispatcher", "const webcc::string& v", "v");
+        emit_event_registration(ss, element_count, handlers, "change", "_change_mask", "g_change_dispatcher", "const coi::string& v", "v");
     }
     if (masks.keydown)
     {

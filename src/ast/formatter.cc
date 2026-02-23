@@ -39,7 +39,7 @@ std::string generate_formatter_appends(const std::vector<Expression*>& parts) {
 std::string generate_formatter_expr(const std::vector<Expression*>& parts) {
     std::string code = "([&]() { webcc::hybrid_formatter<" + std::to_string(FORMATTER_BUFFER_SIZE) + "> _fmt; ";
     code += generate_formatter_appends(parts);
-    code += "return webcc::string(_fmt.c_str()); }())";
+    code += "return coi::string(_fmt.c_str()); }())";
     return code;
 }
 

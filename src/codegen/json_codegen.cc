@@ -271,21 +271,21 @@ static std::string generate_json_parse_array(
     
     std::stringstream ss;
     ss << "[&]() {\n";
-    ss << "            webcc::string_view _json = " << json_expr << ";\n";
+    ss << "            coi::string_view _json = " << json_expr << ";\n";
     ss << "            const char* _s = _json.data();\n";
     ss << "            uint32_t _len = _json.length();\n";
     ss << "            struct __JsonParseResult {\n";
     ss << "                struct __SuccessPayload {\n";
-    ss << "                    webcc::vector<" << elem_type << "> _0;\n";
-    ss << "                    webcc::vector<" << elem_type << "Meta> _1;\n";
+    ss << "                    coi::vector<" << elem_type << "> _0;\n";
+    ss << "                    coi::vector<" << elem_type << "Meta> _1;\n";
     ss << "                };\n";
     ss << "                struct __ErrorPayload {\n";
-    ss << "                    webcc::string _0;\n";
+    ss << "                    coi::string _0;\n";
     ss << "                };\n";
     ss << "                bool ok;\n";
-    ss << "                webcc::vector<" << elem_type << "> value;\n";
-    ss << "                webcc::vector<" << elem_type << "Meta> meta;\n";
-    ss << "                webcc::string error;\n";
+    ss << "                coi::vector<" << elem_type << "> value;\n";
+    ss << "                coi::vector<" << elem_type << "Meta> meta;\n";
+    ss << "                coi::string error;\n";
     ss << "                __SuccessPayload success;\n";
     ss << "                __ErrorPayload error_payload;\n";
     ss << "                bool is_Success() const { return ok; }\n";
@@ -308,8 +308,8 @@ static std::string generate_json_parse_array(
     ss << "                    " << elem_type << "Meta _elem_meta{};\n";
     ss << "                    bool _ok;\n";
     generate_object_fields_parse(ss, elem_type, "_elem", "_elem_meta", "_ev.data()", "_ev.length()", "_ok", "                    ");
-    ss << "                    _r.value.push_back(webcc::move(_elem));\n";
-    ss << "                    _r.meta.push_back(webcc::move(_elem_meta));\n";
+    ss << "                    _r.value.push_back(coi::move(_elem));\n";
+    ss << "                    _r.meta.push_back(coi::move(_elem_meta));\n";
     ss << "                }\n";
     ss << "            });\n";
     ss << "            _r.success._0 = _r.value;\n";
@@ -334,7 +334,7 @@ std::string generate_json_parse(
     
     std::stringstream ss;
     ss << "[&]() {\n";
-    ss << "            webcc::string_view _json = " << json_expr << ";\n";
+    ss << "            coi::string_view _json = " << json_expr << ";\n";
     ss << "            const char* _s = _json.data();\n";
     ss << "            uint32_t _len = _json.length();\n";
     ss << "            struct __JsonParseResult {\n";
@@ -343,12 +343,12 @@ std::string generate_json_parse(
     ss << "                    " << data_type << "Meta _1;\n";
     ss << "                };\n";
     ss << "                struct __ErrorPayload {\n";
-    ss << "                    webcc::string _0;\n";
+    ss << "                    coi::string _0;\n";
     ss << "                };\n";
     ss << "                bool ok;\n";
     ss << "                " << data_type << " value;\n";
     ss << "                " << data_type << "Meta meta;\n";
-    ss << "                webcc::string error;\n";
+    ss << "                coi::string error;\n";
     ss << "                __SuccessPayload success;\n";
     ss << "                __ErrorPayload error_payload;\n";
     ss << "                bool is_Success() const { return ok; }\n";
@@ -426,7 +426,7 @@ inline uint32_t find_key(const char* s, uint32_t len, const char* key, uint32_t 
     return 0;
 }
 
-inline webcc::string_view isolate(const char* s, uint32_t p, uint32_t len) {
+inline coi::string_view isolate(const char* s, uint32_t p, uint32_t len) {
     if (p >= len) return {};
     char open = s[p];
     if (open != '{' && open != '[') return {};
@@ -438,13 +438,13 @@ inline webcc::string_view isolate(const char* s, uint32_t p, uint32_t len) {
         if (c == '"') { p++; while (p < len && s[p] != '"') { if (s[p] == '\\') p++; p++; } p++; }
         else { if (c == open) depth++; else if (c == close) depth--; p++; }
     }
-    return depth == 0 ? webcc::string_view(s + start, p - start) : webcc::string_view();
+    return depth == 0 ? coi::string_view(s + start, p - start) : coi::string_view();
 }
 
-inline webcc::string ext_str(const char* s, uint32_t p, uint32_t len) {
+inline coi::string ext_str(const char* s, uint32_t p, uint32_t len) {
     if (p >= len || s[p] != '"') return {};
     p++;
-    webcc::string r;
+    coi::string r;
     while (p < len && s[p] != '"') {
         if (s[p] == '\\' && p + 1 < len) {
             p++;

@@ -23,7 +23,7 @@ void emit_component_router_methods(std::stringstream &ss, const Component &compo
     }
 
     // navigate() method - changes route and updates browser URL
-    ss << "    void navigate(const webcc::string& route) {\n";
+    ss << "    void navigate(const coi::string& route) {\n";
     ss << "        if (_current_route == route) return;\n";
     ss << "        _current_route = route;\n";
     ss << "        webcc::system::push_state(route);\n";
@@ -32,7 +32,7 @@ void emit_component_router_methods(std::stringstream &ss, const Component &compo
     ss << "    }\n";
 
     // _handle_popstate() method - called when browser back/forward buttons are clicked
-    ss << "    void _handle_popstate(const webcc::string& path) {\n";
+    ss << "    void _handle_popstate(const coi::string& path) {\n";
     ss << "        if (_current_route == path) return;\n";
     ss << "        _current_route = path;\n";
     // For popstate, we don't need to validate - _sync_route will handle fallback via else

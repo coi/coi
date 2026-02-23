@@ -22,9 +22,33 @@ void generate_cpp_code(
     out << "#include \"webcc/core/function.h\"\n";
     out << "#include \"webcc/core/allocator.h\"\n";
     out << "#include \"webcc/core/new.h\"\n";
+    out << "#include \"webcc/core/string.h\"\n";
     out << "#include \"webcc/core/array.h\"\n";
     out << "#include \"webcc/core/vector.h\"\n";
     out << "#include \"webcc/core/random.h\"\n";
+    out << "#include \"webcc/core/math.h\"\n";
+    out << "\n";
+    out << "namespace coi {\n";
+    out << "using string = webcc::string;\n";
+    out << "using string_view = webcc::string_view;\n";
+    out << "template<typename T> using vector = webcc::vector<T>;\n";
+    out << "template<typename T, size_t N> using array = webcc::array<T, N>;\n";
+    out << "template<typename Signature> using function = webcc::function<Signature>;\n";
+    out << "using webcc::move;\n";
+    out << "using webcc::malloc;\n";
+    out << "namespace math {\n";
+    out << "inline constexpr float PI = webcc::PI;\n";
+    out << "inline constexpr float HALF_PI = webcc::HALF_PI;\n";
+    out << "inline constexpr float TAU = webcc::TAU;\n";
+    out << "inline constexpr float DEG2RAD = webcc::DEG2RAD;\n";
+    out << "inline constexpr float RAD2DEG = webcc::RAD2DEG;\n";
+    out << "inline float abs(float x) { return webcc::abs(x); }\n";
+    out << "inline float sqrt(float x) { return webcc::sqrt(x); }\n";
+    out << "inline float sin(float x) { return webcc::sin(x); }\n";
+    out << "inline float cos(float x) { return webcc::cos(x); }\n";
+    out << "inline float tan(float x) { return webcc::tan(x); }\n";
+    out << "}\n";
+    out << "}\n";
 
     // Sort components topologically so dependencies come first
     auto sorted_components = topological_sort_components(all_components);
@@ -245,8 +269,8 @@ void generate_cpp_code(
     out << "\n";
 
     // Forward declare global navigation functions (defined after components)
-    out << "void g_app_navigate(const webcc::string& route);\n";
-    out << "webcc::string g_app_get_route();\n\n";
+    out << "void g_app_navigate(const coi::string& route);\n";
+    out << "coi::string g_app_get_route();\n\n";
 
     for (auto *comp : sorted_components)
     {
@@ -280,14 +304,14 @@ void generate_cpp_code(
 
     if (features.router)
     {
-        out << "void g_app_navigate(const webcc::string& route) { if (app) app->navigate(route); }\n";
-        out << "webcc::string g_app_get_route() { return app ? app->_current_route : \"\"; }\n";
+        out << "void g_app_navigate(const coi::string& route) { if (app) app->navigate(route); }\n";
+        out << "coi::string g_app_get_route() { return app ? app->_current_route : \"\"; }\n";
     }
     else
     {
         // Stub functions if no router - prevents linker errors
-        out << "void g_app_navigate(const webcc::string& route) {}\n";
-        out << "webcc::string g_app_get_route() { return \"\"; }\n";
+        out << "void g_app_navigate(const coi::string& route) {}\n";
+        out << "coi::string g_app_get_route() { return \"\"; }\n";
     }
 
     out << "void dispatch_events(const webcc::Event* events, uint32_t event_count) {\n";
@@ -323,8 +347,8 @@ void generate_cpp_code(
     out << "int main() {\n";
     out << "    // We allocate the app on the heap because the stack is destroyed when main() returns.\n";
     out << "    // The app needs to persist for the event loop (update_wrapper).\n";
-    out << "    // We use webcc::malloc to ensure memory is tracked by the framework.\n";
-    out << "    void* app_mem = webcc::malloc(sizeof(" << root_qualified << "));\n";
+    out << "    // We use coi::malloc so backend allocation is abstracted per target.\n";
+    out << "    void* app_mem = coi::malloc(sizeof(" << root_qualified << "));\n";
     out << "    app = new (app_mem) " << root_qualified << "();\n";
     emit_feature_init(out, features, root_qualified);
     out << "    app->view();\n";

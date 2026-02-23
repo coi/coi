@@ -11,7 +11,7 @@ static std::string coi_type_to_cpp(const std::string& type) {
     if (type == "float" || type == "float64") return "double";
     if (type == "float32") return "float";
     if (type == "bool") return "bool";
-    if (type == "string") return "webcc::string";
+    if (type == "string") return "coi::string";
     return "int32_t";  // default
 }
 
@@ -459,9 +459,9 @@ void HTMLElement::generate_code(ViewCodegenContext& ctx)
                 std::string capture = build_lambda_capture(ctx.loop_var_name);
                 std::string handler_code = attr.value->to_webcc();
                 if (is_call)
-                    ctx.ss << "        g_input_dispatcher.set(" << var << ", " << capture << "(const webcc::string& _value) { " << handler_code << "; });\n";
+                    ctx.ss << "        g_input_dispatcher.set(" << var << ", " << capture << "(const coi::string& _value) { " << handler_code << "; });\n";
                 else
-                    ctx.ss << "        g_input_dispatcher.set(" << var << ", " << capture << "(const webcc::string& _value) { " << handler_code << "(_value); });\n";
+                    ctx.ss << "        g_input_dispatcher.set(" << var << ", " << capture << "(const coi::string& _value) { " << handler_code << "(_value); });\n";
             }
             else
             {
@@ -477,9 +477,9 @@ void HTMLElement::generate_code(ViewCodegenContext& ctx)
                 std::string capture = build_lambda_capture(ctx.loop_var_name);
                 std::string handler_code = attr.value->to_webcc();
                 if (is_call)
-                    ctx.ss << "        g_change_dispatcher.set(" << var << ", " << capture << "(const webcc::string& _value) { " << handler_code << "; });\n";
+                    ctx.ss << "        g_change_dispatcher.set(" << var << ", " << capture << "(const coi::string& _value) { " << handler_code << "; });\n";
                 else
-                    ctx.ss << "        g_change_dispatcher.set(" << var << ", " << capture << "(const webcc::string& _value) { " << handler_code << "(_value); });\n";
+                    ctx.ss << "        g_change_dispatcher.set(" << var << ", " << capture << "(const coi::string& _value) { " << handler_code << "(_value); });\n";
             }
             else
             {
@@ -594,7 +594,7 @@ void HTMLElement::generate_code(ViewCodegenContext& ctx)
                     args += child->to_webcc();
                     first = false;
                 }
-                code = "webcc::string::concat(" + args + ")";
+                code = "coi::string::concat(" + args + ")";
             }
             else
             {
@@ -631,7 +631,7 @@ void HTMLElement::generate_code(ViewCodegenContext& ctx)
                 args += child->to_webcc();
                 first = false;
             }
-            b.value_code = (children.size() == 1) ? children[0]->to_webcc() : "webcc::string::concat(" + args + ")";
+            b.value_code = (children.size() == 1) ? children[0]->to_webcc() : "coi::string::concat(" + args + ")";
             for (auto &child : children) {
                 child->collect_dependencies(b.dependencies);
                 child->collect_member_dependencies(b.member_dependencies);
@@ -959,7 +959,7 @@ void ViewRawElement::generate_code(ViewCodegenContext& ctx)
                 args += child->to_webcc();
                 first = false;
             }
-            code = "webcc::string::concat(" + args + ")";
+            code = "coi::string::concat(" + args + ")";
         }
         else
         {
@@ -997,7 +997,7 @@ void ViewRawElement::generate_code(ViewCodegenContext& ctx)
             args += child->to_webcc();
             first = false;
         }
-        b.value_code = (children.size() == 1) ? children[0]->to_webcc() : "webcc::string::concat(" + args + ")";
+        b.value_code = (children.size() == 1) ? children[0]->to_webcc() : "coi::string::concat(" + args + ")";
         for (auto &child : children) {
             child->collect_dependencies(b.dependencies);
             child->collect_member_dependencies(b.member_dependencies);

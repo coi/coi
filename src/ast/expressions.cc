@@ -202,9 +202,9 @@ static std::string generate_ws_dispatcher(const std::string& event_type,
     if (event_type == "onMessage") {
         // onMessage can accept 0 or 1 (string) param
         if (param_count >= 1) {
-            return "g_ws_message_dispatcher.set(" + ws_obj + ", [this](const webcc::string& msg) { this->" + callback + "(msg); })";
+            return "g_ws_message_dispatcher.set(" + ws_obj + ", [this](const coi::string& msg) { this->" + callback + "(msg); })";
         } else {
-            return "g_ws_message_dispatcher.set(" + ws_obj + ", [this](const webcc::string&) { this->" + callback + "(); })";
+            return "g_ws_message_dispatcher.set(" + ws_obj + ", [this](const coi::string&) { this->" + callback + "(); })";
         }
     } else if (event_type == "onOpen") {
         return "g_ws_open_dispatcher.set(" + ws_obj + ", [this]() { this->" + callback + "(); })";
@@ -331,15 +331,15 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
             
             if (event_name == "onSuccess") {
                 if (param_count >= 1) {
-                    code += "            g_fetch_success_dispatcher.set(_req, [this](const webcc::string& data) { this->" + callback + "(data); });\n";
+                    code += "            g_fetch_success_dispatcher.set(_req, [this](const coi::string& data) { this->" + callback + "(data); });\n";
                 } else {
-                    code += "            g_fetch_success_dispatcher.set(_req, [this](const webcc::string&) { this->" + callback + "(); });\n";
+                    code += "            g_fetch_success_dispatcher.set(_req, [this](const coi::string&) { this->" + callback + "(); });\n";
                 }
             } else if (event_name == "onError") {
                 if (param_count >= 1) {
-                    code += "            g_fetch_error_dispatcher.set(_req, [this](const webcc::string& error) { this->" + callback + "(error); });\n";
+                    code += "            g_fetch_error_dispatcher.set(_req, [this](const coi::string& error) { this->" + callback + "(error); });\n";
                 } else {
-                    code += "            g_fetch_error_dispatcher.set(_req, [this](const webcc::string&) { this->" + callback + "(); });\n";
+                    code += "            g_fetch_error_dispatcher.set(_req, [this](const coi::string&) { this->" + callback + "(); });\n";
                 }
             } else {
                 ErrorHandler::compiler_error("Invalid callback name '" + event_name + "' for fetch.get (expected onSuccess or onError)");
@@ -397,15 +397,15 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
             
             if (event_name == "onSuccess") {
                 if (param_count >= 1) {
-                    code += "            g_fetch_success_dispatcher.set(_req, [this](const webcc::string& data) { this->" + callback + "(data); });\n";
+                    code += "            g_fetch_success_dispatcher.set(_req, [this](const coi::string& data) { this->" + callback + "(data); });\n";
                 } else {
-                    code += "            g_fetch_success_dispatcher.set(_req, [this](const webcc::string&) { this->" + callback + "(); });\n";
+                    code += "            g_fetch_success_dispatcher.set(_req, [this](const coi::string&) { this->" + callback + "(); });\n";
                 }
             } else if (event_name == "onError") {
                 if (param_count >= 1) {
-                    code += "            g_fetch_error_dispatcher.set(_req, [this](const webcc::string& error) { this->" + callback + "(error); });\n";
+                    code += "            g_fetch_error_dispatcher.set(_req, [this](const coi::string& error) { this->" + callback + "(error); });\n";
                 } else {
-                    code += "            g_fetch_error_dispatcher.set(_req, [this](const webcc::string&) { this->" + callback + "(); });\n";
+                    code += "            g_fetch_error_dispatcher.set(_req, [this](const coi::string&) { this->" + callback + "(); });\n";
                 }
             } else {
                 ErrorHandler::compiler_error("Invalid callback name '" + event_name + "' for fetch.post (expected onSuccess or onError)");
@@ -463,15 +463,15 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
 
             if (event_name == "onSuccess") {
                 if (param_count >= 1) {
-                    code += "            g_fetch_success_dispatcher.set(_req, [this](const webcc::string& data) { this->" + callback + "(data); });\n";
+                    code += "            g_fetch_success_dispatcher.set(_req, [this](const coi::string& data) { this->" + callback + "(data); });\n";
                 } else {
-                    code += "            g_fetch_success_dispatcher.set(_req, [this](const webcc::string&) { this->" + callback + "(); });\n";
+                    code += "            g_fetch_success_dispatcher.set(_req, [this](const coi::string&) { this->" + callback + "(); });\n";
                 }
             } else if (event_name == "onError") {
                 if (param_count >= 1) {
-                    code += "            g_fetch_error_dispatcher.set(_req, [this](const webcc::string& error) { this->" + callback + "(error); });\n";
+                    code += "            g_fetch_error_dispatcher.set(_req, [this](const coi::string& error) { this->" + callback + "(error); });\n";
                 } else {
-                    code += "            g_fetch_error_dispatcher.set(_req, [this](const webcc::string&) { this->" + callback + "(); });\n";
+                    code += "            g_fetch_error_dispatcher.set(_req, [this](const coi::string&) { this->" + callback + "(); });\n";
                 }
             } else {
                 ErrorHandler::compiler_error("Invalid callback name '" + event_name + "' for fetch.patch (expected onSuccess or onError)");
@@ -599,7 +599,7 @@ std::string StringLiteral::to_webcc() {
         return "\"" + escaped + "\"";
     }
 
-    std::string code = "webcc::string::concat(";
+    std::string code = "coi::string::concat(";
     for(size_t i=0; i<parts.size(); ++i) {
         if(i > 0) code += ", ";
         if(parts[i].is_expr) {
@@ -712,7 +712,7 @@ std::string BinaryOp::to_webcc() {
 std::string FunctionCall::args_to_string() {
     if (args.empty()) return "\"\"";
 
-    std::string result = "webcc::string::concat(";
+    std::string result = "coi::string::concat(";
     for(size_t i = 0; i < args.size(); i++){
         if(i > 0) result += ", ";
         result += args[i].value->to_webcc();
@@ -1115,9 +1115,9 @@ std::string ReferenceExpression::to_webcc() {
     return operand->to_webcc();  // References are handled at call sites
 }
 
-// MoveExpression - generates webcc::move() for explicit ownership transfer
+// MoveExpression - generates coi::move() for explicit ownership transfer
 std::string MoveExpression::to_webcc() {
-    return "webcc::move(" + operand->to_webcc() + ")";
+    return "coi::move(" + operand->to_webcc() + ")";
 }
 
 TernaryOp::TernaryOp(std::unique_ptr<Expression> cond, std::unique_ptr<Expression> t, std::unique_ptr<Expression> f)

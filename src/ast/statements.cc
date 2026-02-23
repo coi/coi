@@ -32,7 +32,7 @@ std::string VarDeclaration::to_webcc()
         
         // Use count from repeat initializer (overrides fixed_size if both present)
         std::string count_str = repeat->count->to_webcc();
-        std::string arr_type = "webcc::array<" + convert_type(elem_type) + ", " + count_str + ">";
+        std::string arr_type = "coi::array<" + convert_type(elem_type) + ", " + count_str + ">";
         
         if (is_mutable)
         {
@@ -65,7 +65,7 @@ std::string VarDeclaration::to_webcc()
             if (!is_mutable)
             {
                 size_t count = arr_lit->elements.size();
-                std::string arr_type = "webcc::array<" + convert_type(elem_type) + ", " + std::to_string(count) + ">";
+                std::string arr_type = "coi::array<" + convert_type(elem_type) + ", " + std::to_string(count) + ">";
                 std::string result = "const " + arr_type;
                 if (is_reference)
                     result += "&";
@@ -74,7 +74,7 @@ std::string VarDeclaration::to_webcc()
             }
             
             // Mutable dynamic array - use vector with brace init (variadic constructor)
-            std::string vec_type = "webcc::vector<" + convert_type(elem_type) + ">";
+            std::string vec_type = "coi::vector<" + convert_type(elem_type) + ">";
 
             std::string result = vec_type;
             if (is_reference)
@@ -100,10 +100,10 @@ std::string VarDeclaration::to_webcc()
         // Clear the target after generating the initializer
         g_ws_assignment_target.clear();
         
-        // Wrap in webcc::move() if this is a move assignment (:=)
+        // Wrap in coi::move() if this is a move assignment (:=)
         if (is_move)
         {
-            init_code = "webcc::move(" + init_code + ")";
+            init_code = "coi::move(" + init_code + ")";
         }
         
         if (DefSchema::instance().is_handle(type))
@@ -139,8 +139,8 @@ std::string Assignment::to_webcc()
 
     std::string rhs;
     
-    // Handle member function reference assigned to webcc::function type
-    if (target_type.find("webcc::function<") == 0)
+    // Handle member function reference assigned to coi::function type
+    if (target_type.find("coi::function<") == 0)
     {
         if (auto *ref_expr = dynamic_cast<ReferenceExpression *>(value.get()))
         {
@@ -161,10 +161,10 @@ std::string Assignment::to_webcc()
     // Clear the target after generating the RHS
     g_ws_assignment_target.clear();
 
-    // Wrap in webcc::move() for move assignments
+    // Wrap in coi::move() for move assignments
     if (is_move)
     {
-        rhs = "webcc::move(" + rhs + ")";
+        rhs = "coi::move(" + rhs + ")";
     }
 
     if (!target_type.empty() && DefSchema::instance().is_handle(target_type))
@@ -225,10 +225,10 @@ std::string IndexAssignment::to_webcc()
 {
     std::string val = value->to_webcc();
     
-    // Wrap in webcc::move() for move assignments
+    // Wrap in coi::move() for move assignments
     if (is_move)
     {
-        val = "webcc::move(" + val + ")";
+        val = "coi::move(" + val + ")";
     }
 
     // Check if this is an index assignment on a component array with inline loop
@@ -287,10 +287,10 @@ std::string MemberAssignment::to_webcc()
 {
     std::string val = value->to_webcc();
     
-    // Wrap in webcc::move() for move assignments
+    // Wrap in coi::move() for move assignments
     if (is_move)
     {
-        val = "webcc::move(" + val + ")";
+        val = "coi::move(" + val + ")";
     }
 
     std::string obj = object->to_webcc();

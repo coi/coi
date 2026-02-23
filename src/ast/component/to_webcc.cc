@@ -133,7 +133,7 @@ static void emit_loop_vector_members(std::stringstream &ss, const std::set<std::
 {
     for (const auto &comp_name : loop_component_types)
     {
-        ss << "    webcc::vector<" << comp_name << "> _loop_" << comp_name << "s;\n";
+        ss << "    coi::vector<" << comp_name << "> _loop_" << comp_name << "s;\n";
     }
 }
 
@@ -154,7 +154,7 @@ static void emit_loop_region_members(std::stringstream &ss, const std::vector<Lo
         }
         if (region.is_html_loop)
         {
-            ss << "    webcc::vector<webcc::handle> _loop_" << region.loop_id << "_elements;\n";
+            ss << "    coi::vector<webcc::handle> _loop_" << region.loop_id << "_elements;\n";
         }
     }
 }
@@ -445,16 +445,16 @@ std::string Component::to_webcc(CompilerSession &session)
                 // Propagate element type to anonymous struct literals
                 arr_lit->propagate_element_type(elem_type);
                 
-                // Component state arrays with T[] type: always use webcc::vector (even if not mut).
+                // Component state arrays with T[] type: always use coi::vector (even if not mut).
                 //
                 // WHY NOT USE FIXED ARRAYS HERE?
                 // When we have `string[] items = ["a", "b", "c"]`, the array size is known
                 // at compile time (3 elements). However, if this state is passed to a child
                 // component's prop declared as `string[] items`, that prop compiles to
-                // webcc::vector<string> because the child doesn't know what size array it will
-                // receive. Using webcc::array<T, N> here would cause a type mismatch.
+                // coi::vector<string> because the child doesn't know what size array it will
+                // receive. Using coi::array<T, N> here would cause a type mismatch.
           
-                std::string vec_type = "webcc::vector<" + convert_type(resolve_component_type(elem_type)) + ">";
+                std::string vec_type = "coi::vector<" + convert_type(resolve_component_type(elem_type)) + ">";
                 ss << "    " << (var->is_mutable ? "" : "const ") << vec_type;
                 if (var->is_reference)
                     ss << "&";
@@ -473,8 +473,8 @@ std::string Component::to_webcc(CompilerSession &session)
             {
                 ss << "{" << var->initializer->to_webcc() << "}";
             }
-            // Handle member function reference assigned to webcc::function type
-            else if (var->type.find("webcc::function<") == 0)
+            // Handle member function reference assigned to coi::function type
+            else if (var->type.find("coi::function<") == 0)
             {
                 if (auto *ref_expr = dynamic_cast<ReferenceExpression *>(var->initializer.get()))
                 {
@@ -501,12 +501,12 @@ std::string Component::to_webcc(CompilerSession &session)
         // Generate callback for reference mut params
         if (param->is_reference && param->is_mutable)
         {
-            ss << "    webcc::function<void()> " << make_callback_name(param->name) << ";\n";
+            ss << "    coi::function<void()> " << make_callback_name(param->name) << ";\n";
         }
         // Generate callback for pub mut params (for parent-child reactivity)
         else if (param->is_public && param->is_mutable)
         {
-            ss << "    webcc::function<void()> " << make_callback_name(param->name) << ";\n";
+            ss << "    coi::function<void()> " << make_callback_name(param->name) << ";\n";
         }
     }
 
@@ -520,7 +520,7 @@ std::string Component::to_webcc(CompilerSession &session)
             {
                 if (var->is_mutable && var->is_public)
                 {
-                    ss << "    webcc::function<void()> " << make_callback_name(var->name) << ";\n";
+                    ss << "    coi::function<void()> " << make_callback_name(var->name) << ";\n";
                 }
                 continue;
             }
@@ -528,7 +528,7 @@ std::string Component::to_webcc(CompilerSession &session)
 
         if (var->is_public && var->is_mutable)
         {
-            ss << "    webcc::function<void()> " << make_callback_name(var->name) << ";\n";
+            ss << "    coi::function<void()> " << make_callback_name(var->name) << ";\n";
         }
     }
 
@@ -557,7 +557,7 @@ std::string Component::to_webcc(CompilerSession &session)
     // Router state (if router block defined)
     if (router)
     {
-        ss << "    webcc::string _current_route;\n";
+        ss << "    coi::string _current_route;\n";
         ss << "    webcc::handle _route_parent;\n";
         ss << "    webcc::handle _route_anchor;\n";
         // Generate component pointers for each route
@@ -646,9 +646,9 @@ std::string Component::to_webcc(CompilerSession &session)
             }
         }
 
-        if (!optimized && binding.value_code.find("webcc::string::concat(") == 0)
+        if (!optimized && binding.value_code.find("coi::string::concat(") == 0)
         {
-            std::string args_str = binding.value_code.substr(22);
+            std::string args_str = binding.value_code.substr(20);
             if (!args_str.empty() && args_str.back() == ')')
                 args_str.pop_back();
 
@@ -1422,7 +1422,7 @@ std::string Component::to_webcc(CompilerSession &session)
         }
         else if (handler.event_type == "input" || handler.event_type == "change")
         {
-            ss << "    void _handler_" << handler.element_id << "_" << handler.event_type << "(const webcc::string& _value) {\n";
+            ss << "    void _handler_" << handler.element_id << "_" << handler.event_type << "(const coi::string& _value) {\n";
             if (handler.is_function_call)
             {
                 ss << "        " << handler.handler_code << ";\n";

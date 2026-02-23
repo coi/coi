@@ -206,19 +206,19 @@ void emit_feature_globals(std::ostream &out, const FeatureFlags &f)
     // DOM event dispatchers
     if (f.click)
     {
-        out << "Dispatcher<webcc::function<void()>, 128> g_dispatcher;\n";
+        out << "Dispatcher<coi::function<void()>, 128> g_dispatcher;\n";
     }
     if (f.input)
     {
-        out << "Dispatcher<webcc::function<void(const webcc::string&)>> g_input_dispatcher;\n";
+        out << "Dispatcher<coi::function<void(const coi::string&)>> g_input_dispatcher;\n";
     }
     if (f.change)
     {
-        out << "Dispatcher<webcc::function<void(const webcc::string&)>> g_change_dispatcher;\n";
+        out << "Dispatcher<coi::function<void(const coi::string&)>> g_change_dispatcher;\n";
     }
     if (f.keydown)
     {
-        out << "Dispatcher<webcc::function<void(int)>> g_keydown_dispatcher;\n";
+        out << "Dispatcher<coi::function<void(int)>> g_keydown_dispatcher;\n";
     }
     // Runtime features
     if (f.keyboard)
@@ -227,19 +227,19 @@ void emit_feature_globals(std::ostream &out, const FeatureFlags &f)
     }
     if (f.router)
     {
-        out << "webcc::function<void(const webcc::string&)> g_popstate_callback;\n";
+        out << "coi::function<void(const coi::string&)> g_popstate_callback;\n";
     }
     if (f.websocket)
     {
-        out << "Dispatcher<webcc::function<void(const webcc::string&)>> g_ws_message_dispatcher;\n";
-        out << "Dispatcher<webcc::function<void()>> g_ws_open_dispatcher;\n";
-        out << "Dispatcher<webcc::function<void()>> g_ws_close_dispatcher;\n";
-        out << "Dispatcher<webcc::function<void()>> g_ws_error_dispatcher;\n";
+        out << "Dispatcher<coi::function<void(const coi::string&)>> g_ws_message_dispatcher;\n";
+        out << "Dispatcher<coi::function<void()>> g_ws_open_dispatcher;\n";
+        out << "Dispatcher<coi::function<void()>> g_ws_close_dispatcher;\n";
+        out << "Dispatcher<coi::function<void()>> g_ws_error_dispatcher;\n";
     }
     if (f.fetch)
     {
-        out << "Dispatcher<webcc::function<void(const webcc::string&)>> g_fetch_success_dispatcher;\n";
-        out << "Dispatcher<webcc::function<void(const webcc::string&)>> g_fetch_error_dispatcher;\n";
+        out << "Dispatcher<coi::function<void(const coi::string&)>> g_fetch_success_dispatcher;\n";
+        out << "Dispatcher<coi::function<void(const coi::string&)>> g_fetch_error_dispatcher;\n";
     }
 }
 
@@ -255,12 +255,12 @@ void emit_feature_event_handlers(std::ostream &out, const FeatureFlags &f)
     if (f.input)
     {
         out << "        } else if (e.opcode == webcc::dom::InputEvent::OPCODE) {\n";
-        out << "            if (auto evt = e.as<webcc::dom::InputEvent>()) g_input_dispatcher.dispatch(evt->handle, webcc::string(evt->value));\n";
+        out << "            if (auto evt = e.as<webcc::dom::InputEvent>()) g_input_dispatcher.dispatch(evt->handle, coi::string(evt->value));\n";
     }
     if (f.change)
     {
         out << "        } else if (e.opcode == webcc::dom::ChangeEvent::OPCODE) {\n";
-        out << "            if (auto evt = e.as<webcc::dom::ChangeEvent>()) g_change_dispatcher.dispatch(evt->handle, webcc::string(evt->value));\n";
+        out << "            if (auto evt = e.as<webcc::dom::ChangeEvent>()) g_change_dispatcher.dispatch(evt->handle, coi::string(evt->value));\n";
     }
     if (f.keydown)
     {
@@ -278,12 +278,12 @@ void emit_feature_event_handlers(std::ostream &out, const FeatureFlags &f)
     if (f.router)
     {
         out << "        } else if (e.opcode == webcc::system::PopstateEvent::OPCODE) {\n";
-        out << "            if (auto evt = e.as<webcc::system::PopstateEvent>()) { if (g_popstate_callback) g_popstate_callback(webcc::string(evt->path)); }\n";
+        out << "            if (auto evt = e.as<webcc::system::PopstateEvent>()) { if (g_popstate_callback) g_popstate_callback(coi::string(evt->path)); }\n";
     }
     if (f.websocket)
     {
         out << "        } else if (e.opcode == webcc::websocket::MessageEvent::OPCODE) {\n";
-        out << "            if (auto evt = e.as<webcc::websocket::MessageEvent>()) g_ws_message_dispatcher.dispatch(evt->handle, webcc::string(evt->data));\n";
+        out << "            if (auto evt = e.as<webcc::websocket::MessageEvent>()) g_ws_message_dispatcher.dispatch(evt->handle, coi::string(evt->data));\n";
         out << "        } else if (e.opcode == webcc::websocket::OpenEvent::OPCODE) {\n";
         out << "            if (auto evt = e.as<webcc::websocket::OpenEvent>()) g_ws_open_dispatcher.dispatch(evt->handle);\n";
         out << "        } else if (e.opcode == webcc::websocket::CloseEvent::OPCODE) {\n";
@@ -307,13 +307,13 @@ void emit_feature_event_handlers(std::ostream &out, const FeatureFlags &f)
     {
         out << "        } else if (e.opcode == webcc::fetch::SuccessEvent::OPCODE) {\n";
         out << "            if (auto evt = e.as<webcc::fetch::SuccessEvent>()) {\n";
-        out << "                g_fetch_success_dispatcher.dispatch(evt->id, webcc::string(evt->data));\n";
+        out << "                g_fetch_success_dispatcher.dispatch(evt->id, coi::string(evt->data));\n";
         out << "                g_fetch_success_dispatcher.remove(evt->id);\n";
         out << "                g_fetch_error_dispatcher.remove(evt->id);\n";
         out << "            }\n";
         out << "        } else if (e.opcode == webcc::fetch::ErrorEvent::OPCODE) {\n";
         out << "            if (auto evt = e.as<webcc::fetch::ErrorEvent>()) {\n";
-        out << "                g_fetch_error_dispatcher.dispatch(evt->id, webcc::string(evt->error));\n";
+        out << "                g_fetch_error_dispatcher.dispatch(evt->id, coi::string(evt->error));\n";
         out << "                g_fetch_success_dispatcher.remove(evt->id);\n";
         out << "                g_fetch_error_dispatcher.remove(evt->id);\n";
         out << "            }\n";
@@ -335,7 +335,7 @@ void emit_feature_init(std::ostream &out, const FeatureFlags &f, const std::stri
     }
     if (f.router)
     {
-        out << "    g_popstate_callback = [](const webcc::string& path) {\n";
+        out << "    g_popstate_callback = [](const coi::string& path) {\n";
         out << "        if (app) app->_handle_popstate(path);\n";
         out << "    };\n";
         out << "    webcc::system::init_popstate();\n";

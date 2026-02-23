@@ -4,7 +4,7 @@
 #include <algorithm>
 
 std::string convert_type(const std::string& type) {
-    if (type == "string") return "webcc::string";
+    if (type == "string") return "coi::string";
     
     // Check if this is a component-local type and prefix it
     std::string resolved_local = ComponentTypeContext::instance().resolve(type);
@@ -62,7 +62,7 @@ std::string convert_type(const std::string& type) {
     // Handle dynamic arrays: T[]
     if (type.ends_with("[]")) {
         std::string inner = type.substr(0, type.length() - 2);
-        return "webcc::vector<" + convert_type(inner) + ">";
+        return "coi::vector<" + convert_type(inner) + ">";
     }
     // Handle fixed-size arrays: T[N]
     size_t bracket_pos = type.rfind('[');
@@ -72,7 +72,7 @@ std::string convert_type(const std::string& type) {
         bool is_number = !size_str.empty() && std::all_of(size_str.begin(), size_str.end(), ::isdigit);
         if (is_number) {
             std::string inner = type.substr(0, bracket_pos);
-            return "webcc::array<" + convert_type(inner) + ", " + size_str + ">";
+            return "coi::array<" + convert_type(inner) + ", " + size_str + ">";
         }
     }
     // Check if type is a webcc handle type and add prefix
