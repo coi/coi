@@ -518,8 +518,8 @@ int main(int argc, char **argv)
                     {
                         tmpl_out << "    <meta name=\"description\" content=\"" << final_app_config.description << "\">\n";
                     }
-                    // Auto-include generated CSS
-                    tmpl_out << "    <link rel=\"stylesheet\" href=\"app.css\">\n";
+                    // Auto-include generated CSS (absolute path for nested routes)
+                    tmpl_out << "    <link rel=\"stylesheet\" href=\"/app.css\">\n";
                     tmpl_out << "</head>\n";
                     tmpl_out << "<body>\n";
                     tmpl_out << "{{script}}\n";
