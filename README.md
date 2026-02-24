@@ -15,10 +15,9 @@ Components with native performance. Fine-grained reactivity, zero internal GC pa
 
 </div>
 
-> [!WARNING]
-> **Experimental Status**: Coi is in active development with frequent syntax changes and API adjustments. 
-> * **Production**: Not recommended.
-> * **Hobby Projects**: Encouraged! Feedback is appreciated as the language stabilizes.
+> [!NOTE]
+> **Coi is in early development.** Things change fast and I want your feedback. Not ready for production, but perfect for experimenting, especially if you want to influence where the language goes.
+
 
 ## What You Can Build
 
