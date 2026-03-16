@@ -21,6 +21,35 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
             conditional_els.insert(el_id);
     }
 
+    auto emit_remove_handlers_for_element = [&](int el_id, const std::string &indent, const std::string &condition = "") {
+        for (const auto &spec : get_event_specs())
+        {
+            uint64_t mask = get_event_mask(masks, spec.type);
+            if (mask == 0 || (mask & (1ULL << el_id)) == 0)
+            {
+                continue;
+            }
+            ss << indent;
+            if (!condition.empty())
+            {
+                ss << "if (" << condition << ") ";
+            }
+            ss << spec.dispatcher_name << ".remove(el[" << el_id << "]);\n";
+        }
+    };
+
+    auto emit_remove_handlers_loop = [&](const std::string &indent) {
+        for (const auto &spec : get_event_specs())
+        {
+            if (!has_event_mask(masks, spec.type))
+            {
+                continue;
+            }
+            ss << indent << "for (int i = 0; i < " << element_count << "; i++) if ("
+               << get_event_mask_name(spec.type) << " & (1ULL << i)) " << spec.dispatcher_name << ".remove(el[i]);\n";
+        }
+    };
+
     // Determine if the view has if/else regions that control root elements
     // If so, we need to conditionally remove elements based on _if_N_state
     std::set<int> then_els, else_els;
@@ -73,14 +102,7 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
             // Remove handlers for then-branch elements
             for (int el_id : root_region->then_element_ids)
             {
-                if (masks.click && (masks.click & (1ULL << el_id)))
-                    ss << "            g_dispatcher.remove(el[" << el_id << "]);\n";
-                if (masks.input && (masks.input & (1ULL << el_id)))
-                    ss << "            g_input_dispatcher.remove(el[" << el_id << "]);\n";
-                if (masks.change && (masks.change & (1ULL << el_id)))
-                    ss << "            g_change_dispatcher.remove(el[" << el_id << "]);\n";
-                if (masks.keydown && (masks.keydown & (1ULL << el_id)))
-                    ss << "            g_keydown_dispatcher.remove(el[" << el_id << "]);\n";
+                emit_remove_handlers_for_element(el_id, "            ");
             }
             // Remove the then-branch root element
             if (!root_region->then_element_ids.empty())
@@ -91,14 +113,7 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
             // Remove handlers for else-branch elements
             for (int el_id : root_region->else_element_ids)
             {
-                if (masks.click && (masks.click & (1ULL << el_id)))
-                    ss << "            g_dispatcher.remove(el[" << el_id << "]);\n";
-                if (masks.input && (masks.input & (1ULL << el_id)))
-                    ss << "            g_input_dispatcher.remove(el[" << el_id << "]);\n";
-                if (masks.change && (masks.change & (1ULL << el_id)))
-                    ss << "            g_change_dispatcher.remove(el[" << el_id << "]);\n";
-                if (masks.keydown && (masks.keydown & (1ULL << el_id)))
-                    ss << "            g_keydown_dispatcher.remove(el[" << el_id << "]);\n";
+                emit_remove_handlers_for_element(el_id, "            ");
             }
             // Remove the else-branch root element
             if (!root_region->else_element_ids.empty())
@@ -116,14 +131,7 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
         {
             if (conditional_els.count(i))
                 continue; // Skip conditional elements
-            if (masks.click && (masks.click & (1ULL << i)))
-                ss << "        g_dispatcher.remove(el[" << i << "]);\n";
-            if (masks.input && (masks.input & (1ULL << i)))
-                ss << "        g_input_dispatcher.remove(el[" << i << "]);\n";
-            if (masks.change && (masks.change & (1ULL << i)))
-                ss << "        g_change_dispatcher.remove(el[" << i << "]);\n";
-            if (masks.keydown && (masks.keydown & (1ULL << i)))
-                ss << "        g_keydown_dispatcher.remove(el[" << i << "]);\n";
+            emit_remove_handlers_for_element(i, "        ");
         }
         // Now handle each if region's conditional elements
         for (const auto &region : if_regions)
@@ -131,26 +139,12 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
             ss << "        if (_if_" << region.if_id << "_state) {\n";
             for (int el_id : region.then_element_ids)
             {
-                if (masks.click && (masks.click & (1ULL << el_id)))
-                    ss << "            g_dispatcher.remove(el[" << el_id << "]);\n";
-                if (masks.input && (masks.input & (1ULL << el_id)))
-                    ss << "            g_input_dispatcher.remove(el[" << el_id << "]);\n";
-                if (masks.change && (masks.change & (1ULL << el_id)))
-                    ss << "            g_change_dispatcher.remove(el[" << el_id << "]);\n";
-                if (masks.keydown && (masks.keydown & (1ULL << el_id)))
-                    ss << "            g_keydown_dispatcher.remove(el[" << el_id << "]);\n";
+                emit_remove_handlers_for_element(el_id, "            ");
             }
             ss << "        } else {\n";
             for (int el_id : region.else_element_ids)
             {
-                if (masks.click && (masks.click & (1ULL << el_id)))
-                    ss << "            g_dispatcher.remove(el[" << el_id << "]);\n";
-                if (masks.input && (masks.input & (1ULL << el_id)))
-                    ss << "            g_input_dispatcher.remove(el[" << el_id << "]);\n";
-                if (masks.change && (masks.change & (1ULL << el_id)))
-                    ss << "            g_change_dispatcher.remove(el[" << el_id << "]);\n";
-                if (masks.keydown && (masks.keydown & (1ULL << el_id)))
-                    ss << "            g_keydown_dispatcher.remove(el[" << el_id << "]);\n";
+                emit_remove_handlers_for_element(el_id, "            ");
             }
             ss << "        }\n";
         }
@@ -163,14 +157,7 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
     else
     {
         // No if/else regions at all, use the original simple approach
-        if (masks.click)
-            ss << "        for (int i = 0; i < " << element_count << "; i++) if (_click_mask & (1ULL << i)) g_dispatcher.remove(el[i]);\n";
-        if (masks.input)
-            ss << "        for (int i = 0; i < " << element_count << "; i++) if (_input_mask & (1ULL << i)) g_input_dispatcher.remove(el[i]);\n";
-        if (masks.change)
-            ss << "        for (int i = 0; i < " << element_count << "; i++) if (_change_mask & (1ULL << i)) g_change_dispatcher.remove(el[i]);\n";
-        if (masks.keydown)
-            ss << "        for (int i = 0; i < " << element_count << "; i++) if (_keydown_mask & (1ULL << i)) g_keydown_dispatcher.remove(el[i]);\n";
+        emit_remove_handlers_loop("        ");
         if (element_count > 0)
         {
             ss << "        webcc::dom::remove_element(el[0]);\n";
@@ -209,8 +196,7 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
             // Remove handlers for then-branch elements
             for (int el_id : root_region->then_element_ids)
             {
-                if (masks.click && (masks.click & (1ULL << el_id)))
-                    ss << "            g_dispatcher.remove(el[" << el_id << "]);\n";
+                emit_remove_handlers_for_element(el_id, "            ");
             }
             // Remove the then-branch root element
             if (!root_region->then_element_ids.empty())
@@ -221,8 +207,7 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
             // Remove handlers for else-branch elements
             for (int el_id : root_region->else_element_ids)
             {
-                if (masks.click && (masks.click & (1ULL << el_id)))
-                    ss << "            g_dispatcher.remove(el[" << el_id << "]);\n";
+                emit_remove_handlers_for_element(el_id, "            ");
             }
             // Remove the else-branch root element
             if (!root_region->else_element_ids.empty())
@@ -242,14 +227,7 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
         {
             if (conditional_els.count(i))
                 continue; // Skip conditional elements
-            if (masks.click && (masks.click & (1ULL << i)))
-                ss << "        g_dispatcher.remove(el[" << i << "]);\n";
-            if (masks.input && (masks.input & (1ULL << i)))
-                ss << "        g_input_dispatcher.remove(el[" << i << "]);\n";
-            if (masks.change && (masks.change & (1ULL << i)))
-                ss << "        g_change_dispatcher.remove(el[" << i << "]);\n";
-            if (masks.keydown && (masks.keydown & (1ULL << i)))
-                ss << "        g_keydown_dispatcher.remove(el[" << i << "]);\n";
+            emit_remove_handlers_for_element(i, "        ");
         }
         // Now handle each if region's conditional elements
         for (const auto &region : if_regions)
@@ -257,26 +235,12 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
             ss << "        if (_if_" << region.if_id << "_state) {\n";
             for (int el_id : region.then_element_ids)
             {
-                if (masks.click && (masks.click & (1ULL << el_id)))
-                    ss << "            g_dispatcher.remove(el[" << el_id << "]);\n";
-                if (masks.input && (masks.input & (1ULL << el_id)))
-                    ss << "            g_input_dispatcher.remove(el[" << el_id << "]);\n";
-                if (masks.change && (masks.change & (1ULL << el_id)))
-                    ss << "            g_change_dispatcher.remove(el[" << el_id << "]);\n";
-                if (masks.keydown && (masks.keydown & (1ULL << el_id)))
-                    ss << "            g_keydown_dispatcher.remove(el[" << el_id << "]);\n";
+                emit_remove_handlers_for_element(el_id, "            ");
             }
             ss << "        } else {\n";
             for (int el_id : region.else_element_ids)
             {
-                if (masks.click && (masks.click & (1ULL << el_id)))
-                    ss << "            g_dispatcher.remove(el[" << el_id << "]);\n";
-                if (masks.input && (masks.input & (1ULL << el_id)))
-                    ss << "            g_input_dispatcher.remove(el[" << el_id << "]);\n";
-                if (masks.change && (masks.change & (1ULL << el_id)))
-                    ss << "            g_change_dispatcher.remove(el[" << el_id << "]);\n";
-                if (masks.keydown && (masks.keydown & (1ULL << el_id)))
-                    ss << "            g_keydown_dispatcher.remove(el[" << el_id << "]);\n";
+                emit_remove_handlers_for_element(el_id, "            ");
             }
             ss << "        }\n";
         }
@@ -298,14 +262,7 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
     {
         // No if/else regions at all, use the original simple approach
         // Remove all event handlers
-        if (masks.click)
-            ss << "        for (int i = 0; i < " << element_count << "; i++) if (_click_mask & (1ULL << i)) g_dispatcher.remove(el[i]);\n";
-        if (masks.input)
-            ss << "        for (int i = 0; i < " << element_count << "; i++) if (_input_mask & (1ULL << i)) g_input_dispatcher.remove(el[i]);\n";
-        if (masks.change)
-            ss << "        for (int i = 0; i < " << element_count << "; i++) if (_change_mask & (1ULL << i)) g_change_dispatcher.remove(el[i]);\n";
-        if (masks.keydown)
-            ss << "        for (int i = 0; i < " << element_count << "; i++) if (_keydown_mask & (1ULL << i)) g_keydown_dispatcher.remove(el[i]);\n";
+        emit_remove_handlers_loop("        ");
         // Remove child component views recursively
         for (auto const &[comp_name, count] : component_members)
         {

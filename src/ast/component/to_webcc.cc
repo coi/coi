@@ -911,7 +911,10 @@ std::string Component::to_webcc(CompilerSession &session)
 
                 // Remove all existing HTML elements and cleanup dispatcher
                 ss << "        for (auto& _el : " << elements_vec << ") {\n";
-                ss << "            g_dispatcher.remove(_el);\n";
+                for (const auto &spec : get_event_specs())
+                {
+                    ss << "            " << spec.dispatcher_name << ".remove(_el);\n";
+                }
                 ss << "            webcc::dom::remove_element(_el);\n";
                 ss << "        }\n";
                 ss << "        " << elements_vec << ".clear();\n";
@@ -1032,7 +1035,10 @@ std::string Component::to_webcc(CompilerSession &session)
         ss << "        webcc::handle _ref = " << anchor_var << ";\n";
         ss << "        if (_idx < (int)" << elements_vec << ".size()) {\n";
         ss << "            webcc::handle _old = " << elements_vec << "[_idx];\n";
-        ss << "            g_dispatcher.remove(_old);\n";
+        for (const auto &spec : get_event_specs())
+        {
+            ss << "            " << spec.dispatcher_name << ".remove(_old);\n";
+        }
         ss << "            webcc::dom::remove_element(_old);\n";
         ss << "            _ref = (_idx + 1 < (int)" << elements_vec << ".size()) ? " << elements_vec << "[_idx + 1] : " << anchor_var << ";\n";
         ss << "        }\n";
@@ -1064,10 +1070,27 @@ std::string Component::to_webcc(CompilerSession &session)
         ss << "        _if_" << region.if_id << "_state = new_state;\n";
         ss << "        \n";
 
-        std::set<int> click_els = get_elements_for_event(event_handlers, "click");
-        std::set<int> input_els = get_elements_for_event(event_handlers, "input");
-        std::set<int> change_els = get_elements_for_event(event_handlers, "change");
-        std::set<int> keydown_els = get_elements_for_event(event_handlers, "keydown");
+        std::map<std::string, std::set<int>> event_els;
+        for (const auto &spec : get_event_specs())
+        {
+            event_els[spec.type] = get_elements_for_event(event_handlers, spec.type);
+        }
+
+        auto emit_remove_handlers_for_element = [&](int el_id, const std::string &condition_prefix) {
+            for (const auto &spec : get_event_specs())
+            {
+                if (!event_els[spec.type].count(el_id))
+                {
+                    continue;
+                }
+                ss << "            ";
+                if (!condition_prefix.empty())
+                {
+                    ss << "if (" << condition_prefix << ") ";
+                }
+                ss << spec.dispatcher_name << ".remove(el[" << el_id << "]);\n";
+            }
+        };
 
         // Build sets of element IDs owned by nested ifs (to exclude from unconditional removal)
         std::set<int> else_nested_if_els;
@@ -1100,14 +1123,7 @@ std::string Component::to_webcc(CompilerSession &session)
         {
             if (else_nested_if_els.count(el_id))
                 continue; // Handled by nested-if conditional removal below
-            if (click_els.count(el_id))
-                ss << "            g_dispatcher.remove(el[" << el_id << "]);\n";
-            if (input_els.count(el_id))
-                ss << "            g_input_dispatcher.remove(el[" << el_id << "]);\n";
-            if (change_els.count(el_id))
-                ss << "            g_change_dispatcher.remove(el[" << el_id << "]);\n";
-            if (keydown_els.count(el_id))
-                ss << "            g_keydown_dispatcher.remove(el[" << el_id << "]);\n";
+            emit_remove_handlers_for_element(el_id, "");
         }
         for (int el_id : region.else_element_ids)
         {
@@ -1160,26 +1176,12 @@ std::string Component::to_webcc(CompilerSession &session)
                 {
                     for (int el_id : nested_region.then_element_ids)
                     {
-                        if (click_els.count(el_id))
-                            ss << "            if (_if_" << nested_if_id << "_state) g_dispatcher.remove(el[" << el_id << "]);\n";
-                        if (input_els.count(el_id))
-                            ss << "            if (_if_" << nested_if_id << "_state) g_input_dispatcher.remove(el[" << el_id << "]);\n";
-                        if (change_els.count(el_id))
-                            ss << "            if (_if_" << nested_if_id << "_state) g_change_dispatcher.remove(el[" << el_id << "]);\n";
-                        if (keydown_els.count(el_id))
-                            ss << "            if (_if_" << nested_if_id << "_state) g_keydown_dispatcher.remove(el[" << el_id << "]);\n";
+                        emit_remove_handlers_for_element(el_id, "_if_" + std::to_string(nested_if_id) + "_state");
                         ss << "            if (_if_" << nested_if_id << "_state) webcc::dom::remove_element(el[" << el_id << "]);\n";
                     }
                     for (int el_id : nested_region.else_element_ids)
                     {
-                        if (click_els.count(el_id))
-                            ss << "            if (!_if_" << nested_if_id << "_state) g_dispatcher.remove(el[" << el_id << "]);\n";
-                        if (input_els.count(el_id))
-                            ss << "            if (!_if_" << nested_if_id << "_state) g_input_dispatcher.remove(el[" << el_id << "]);\n";
-                        if (change_els.count(el_id))
-                            ss << "            if (!_if_" << nested_if_id << "_state) g_change_dispatcher.remove(el[" << el_id << "]);\n";
-                        if (keydown_els.count(el_id))
-                            ss << "            if (!_if_" << nested_if_id << "_state) g_keydown_dispatcher.remove(el[" << el_id << "]);\n";
+                        emit_remove_handlers_for_element(el_id, "!_if_" + std::to_string(nested_if_id) + "_state");
                         ss << "            if (!_if_" << nested_if_id << "_state) webcc::dom::remove_element(el[" << el_id << "]);\n";
                     }
                 }
@@ -1192,14 +1194,7 @@ std::string Component::to_webcc(CompilerSession &session)
         {
             if (then_nested_if_els.count(el_id))
                 continue; // Handled by nested-if conditional removal below
-            if (click_els.count(el_id))
-                ss << "            g_dispatcher.remove(el[" << el_id << "]);\n";
-            if (input_els.count(el_id))
-                ss << "            g_input_dispatcher.remove(el[" << el_id << "]);\n";
-            if (change_els.count(el_id))
-                ss << "            g_change_dispatcher.remove(el[" << el_id << "]);\n";
-            if (keydown_els.count(el_id))
-                ss << "            g_keydown_dispatcher.remove(el[" << el_id << "]);\n";
+            emit_remove_handlers_for_element(el_id, "");
         }
         for (int el_id : region.then_element_ids)
         {
@@ -1252,26 +1247,12 @@ std::string Component::to_webcc(CompilerSession &session)
                 {
                     for (int el_id : nested_region.then_element_ids)
                     {
-                        if (click_els.count(el_id))
-                            ss << "            if (_if_" << nested_if_id << "_state) g_dispatcher.remove(el[" << el_id << "]);\n";
-                        if (input_els.count(el_id))
-                            ss << "            if (_if_" << nested_if_id << "_state) g_input_dispatcher.remove(el[" << el_id << "]);\n";
-                        if (change_els.count(el_id))
-                            ss << "            if (_if_" << nested_if_id << "_state) g_change_dispatcher.remove(el[" << el_id << "]);\n";
-                        if (keydown_els.count(el_id))
-                            ss << "            if (_if_" << nested_if_id << "_state) g_keydown_dispatcher.remove(el[" << el_id << "]);\n";
+                        emit_remove_handlers_for_element(el_id, "_if_" + std::to_string(nested_if_id) + "_state");
                         ss << "            if (_if_" << nested_if_id << "_state) webcc::dom::remove_element(el[" << el_id << "]);\n";
                     }
                     for (int el_id : nested_region.else_element_ids)
                     {
-                        if (click_els.count(el_id))
-                            ss << "            if (!_if_" << nested_if_id << "_state) g_dispatcher.remove(el[" << el_id << "]);\n";
-                        if (input_els.count(el_id))
-                            ss << "            if (!_if_" << nested_if_id << "_state) g_input_dispatcher.remove(el[" << el_id << "]);\n";
-                        if (change_els.count(el_id))
-                            ss << "            if (!_if_" << nested_if_id << "_state) g_change_dispatcher.remove(el[" << el_id << "]);\n";
-                        if (keydown_els.count(el_id))
-                            ss << "            if (!_if_" << nested_if_id << "_state) g_keydown_dispatcher.remove(el[" << el_id << "]);\n";
+                        emit_remove_handlers_for_element(el_id, "!_if_" + std::to_string(nested_if_id) + "_state");
                         ss << "            if (!_if_" << nested_if_id << "_state) webcc::dom::remove_element(el[" << el_id << "]);\n";
                     }
                 }
@@ -1407,45 +1388,22 @@ std::string Component::to_webcc(CompilerSession &session)
     // Event handlers
     for (auto &handler : event_handlers)
     {
-        if (handler.event_type == "click")
+        const EventSpec *spec = find_event_spec(handler.event_type);
+        if (!spec)
         {
-            ss << "    void _handler_" << handler.element_id << "_click() {\n";
-            if (handler.is_function_call)
-            {
-                ss << "        " << handler.handler_code << ";\n";
-            }
-            else
-            {
-                ss << "        " << handler.handler_code << "();\n";
-            }
-            ss << "    }\n";
+            continue;
         }
-        else if (handler.event_type == "input" || handler.event_type == "change")
+
+        ss << "    void _handler_" << handler.element_id << "_" << handler.event_type << "(" << spec->handler_param_decl << ") {\n";
+        if (handler.is_function_call)
         {
-            ss << "    void _handler_" << handler.element_id << "_" << handler.event_type << "(const coi::string& _value) {\n";
-            if (handler.is_function_call)
-            {
-                ss << "        " << handler.handler_code << ";\n";
-            }
-            else
-            {
-                ss << "        " << handler.handler_code << "(_value);\n";
-            }
-            ss << "    }\n";
+            ss << "        " << handler.handler_code << ";\n";
         }
-        else if (handler.event_type == "keydown")
+        else
         {
-            ss << "    void _handler_" << handler.element_id << "_keydown(int _keycode) {\n";
-            if (handler.is_function_call)
-            {
-                ss << "        " << handler.handler_code << ";\n";
-            }
-            else
-            {
-                ss << "        " << handler.handler_code << "(_keycode);\n";
-            }
-            ss << "    }\n";
+            ss << "        " << handler.handler_code << "(" << spec->handler_call_arg << ");\n";
         }
+        ss << "    }\n";
     }
 
     // View method

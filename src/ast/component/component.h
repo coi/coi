@@ -53,13 +53,24 @@ struct AppConfig {
     std::string lang = "en";
 };
 
-struct EventMasks
+using EventMasks = std::map<std::string, uint64_t>;
+
+// Centralized metadata for supported DOM events used by code generation.
+struct EventSpec
 {
-    uint64_t click = 0;
-    uint64_t input = 0;
-    uint64_t change = 0;
-    uint64_t keydown = 0;
+    const char *type;                    // Event name in templates/handlers (e.g., "click", "input")
+    const char *dispatcher_name;         // Global dispatcher symbol used for bind/remove
+    const char *dispatcher_lambda_params; // Lambda signature used when registering dispatcher callback
+    const char *dispatcher_call_arg;     // Argument forwarded from dispatcher lambda into _handler_* call
+    const char *handler_param_decl;      // Generated _handler_* parameter declaration
+    const char *handler_call_arg;        // Argument passed to user callback inside generated _handler_*
 };
+
+const std::vector<EventSpec> &get_event_specs();
+const EventSpec *find_event_spec(const std::string &event_type);
+bool has_event_mask(const EventMasks &masks, const std::string &event_type);
+uint64_t get_event_mask(const EventMasks &masks, const std::string &event_type);
+std::string get_event_mask_name(const std::string &event_type);
 
 void emit_component_router_methods(std::stringstream &ss, const Component &component);
 
