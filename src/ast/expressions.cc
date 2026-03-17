@@ -536,7 +536,7 @@ std::string FloatLiteral::to_webcc() {
     return s;  // No 'f' suffix - using double (64-bit)
 }
 
-std::vector<StringLiteral::Part> StringLiteral::parse() {
+std::vector<StringLiteral::Part> StringLiteral::parse() const {
     std::vector<Part> parts;
     std::string current;
     for(size_t i=0; i<value.length(); ++i) {
@@ -1009,6 +1009,7 @@ std::string FunctionCall::to_webcc() {
 
 std::vector<Expression*> FunctionCall::get_children() {
     std::vector<Expression*> children;
+    children.reserve(args.size());
     for (auto& arg : args) children.push_back(arg.value.get());
     return children;
 }
@@ -1143,6 +1144,7 @@ std::string ArrayLiteral::to_webcc() {
 
 std::vector<Expression*> ArrayLiteral::get_children() {
     std::vector<Expression*> children;
+    children.reserve(elements.size());
     for (auto& elem : elements) children.push_back(elem.get());
     return children;
 }
@@ -1217,6 +1219,7 @@ std::string ComponentConstruction::to_webcc() {
 
 std::vector<Expression*> ComponentConstruction::get_children() {
     std::vector<Expression*> children;
+    children.reserve(args.size());
     for (auto& arg : args) children.push_back(arg.value.get());
     return children;
 }

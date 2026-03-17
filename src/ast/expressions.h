@@ -4,21 +4,21 @@
 
 struct IntLiteral : Expression {
     int value;
-    IntLiteral(int v) : value(v){}
+    explicit IntLiteral(int v) : value(v){}
     std::string to_webcc() override;
     bool is_static() override { return true; }
 };
 
 struct FloatLiteral : Expression {
     double value;
-    FloatLiteral(double v) : value(v){}
+    explicit FloatLiteral(double v) : value(v){}
     std::string to_webcc() override;
     bool is_static() override { return true; }
 };
 
 struct BoolLiteral : Expression {
     bool value;
-    BoolLiteral(bool v) : value(v){}
+    explicit BoolLiteral(bool v) : value(v){}
     std::string to_webcc() override { return value ? "true" : "false"; }
     bool is_static() override { return true; }
 };
@@ -26,14 +26,14 @@ struct BoolLiteral : Expression {
 struct StringLiteral : Expression {
     std::string value;
     bool is_template = false;  // true for backtick strings, false for double-quote strings
-    StringLiteral(const std::string& v, bool tmpl = false) : value(v), is_template(tmpl){}
+    explicit StringLiteral(const std::string& v, bool tmpl = false) : value(v), is_template(tmpl){}
     
     struct Part {
         bool is_expr;
         std::string content;
     };
 
-    std::vector<Part> parse();
+    std::vector<Part> parse() const;
     std::string to_webcc() override;
     bool is_static() override;
     // Custom implementation needed for template string parsing
@@ -43,7 +43,7 @@ struct StringLiteral : Expression {
 
 struct Identifier : Expression {
     std::string name;
-    Identifier(const std::string& n) : name(n) {}
+    explicit Identifier(const std::string& n) : name(n) {}
     std::string to_webcc() override;
     // Custom: adds this identifier as a dependency
     void collect_dependencies(std::set<std::string>& deps) override;
@@ -52,7 +52,7 @@ struct Identifier : Expression {
 // Type literal expression (for passing types as arguments, e.g., Json.parse(User[], ...))
 struct TypeLiteral : Expression {
     std::string type_name;  // e.g., "User" or "User[]"
-    TypeLiteral(const std::string& t) : type_name(t) {}
+    explicit TypeLiteral(const std::string& t) : type_name(t) {}
     std::string to_webcc() override { return type_name; }
     bool is_static() override { return true; }
 };
@@ -81,7 +81,7 @@ struct FunctionCall : Expression {
     std::vector<CallArg> args;
     int line = 0;
 
-    FunctionCall(const std::string& n) : name(n){}
+    explicit FunctionCall(const std::string& n) : name(n){}
     std::string args_to_string();
     std::string to_webcc() override;
     std::vector<Expression*> get_children() override;
@@ -202,7 +202,7 @@ struct ComponentConstruction : Expression {
     std::string component_name;
     std::vector<CallArg> args;
 
-    ComponentConstruction(const std::string& name) : component_name(name) {}
+    explicit ComponentConstruction(const std::string& name) : component_name(name) {}
     std::string to_webcc() override;
     std::vector<Expression*> get_children() override;
 };
