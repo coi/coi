@@ -220,11 +220,7 @@ static std::string generate_ws_dispatcher(const std::string& event_type,
 
 // Helper to generate intrinsic code
 static std::string generate_intrinsic(const std::string& intrinsic_name,
-                                      const std::vector<CallArg>& args) {
-
-    if (intrinsic_name == "flush") {
-        return "webcc::flush()";
-    }                                  
+                                      const std::vector<CallArg>& args) {                           
     if (intrinsic_name == "random") {
         return "webcc::random()";
     }
@@ -244,6 +240,9 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
     }
     if (intrinsic_name == "get_route" && args.empty()) {
         return "g_app_get_route()";
+    }
+    if (intrinsic_name == "is_hidden" && args.empty()) {
+        return "(webcc::system::is_hidden() != 0)";
     }
     
     // WebSocket.connect with callback arguments
