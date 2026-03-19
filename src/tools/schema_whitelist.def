@@ -115,8 +115,6 @@ is_hidden
 // Router navigation (compiler intrinsics)
 @intrinsic("navigate") shared def navigate(string route): void
 @intrinsic("get_route") shared def getRoute(): string
-// Force flush of all pending DOM operations
-@intrinsic("flush") shared def flush(): void
 
 [webgl]
 viewport
