@@ -339,6 +339,8 @@ Logging, page title, time, random numbers, and URL navigation.
 | `System.navigate(string path)` | Navigate to route (client-side routing) |
 | `System.getTime()` | Get time in seconds (float64) |
 | `System.getDateNow()` | Get milliseconds since epoch (float64) |
+| `System.getVisibilityState()` | Get document visibility state (`"visible"`, `"hidden"`, etc.) |
+| `System.isHidden()` | Check if document is hidden (`1` hidden, `0` visible) |
 | `System.random()` | Random float between 0.0 and 1.0 |
 | `System.random(int seed)` | Seeded random (for reproducibility) |
 
@@ -356,6 +358,10 @@ System.setTitle("My App");
 // Time
 float now = System.getTime();       // Seconds (high precision)
 float epoch = System.getDateNow();  // Milliseconds since epoch
+
+// Page visibility
+string visibility = System.getVisibilityState();
+bool hidden = System.isHidden();
 
 // Random numbers
 float r = System.random();          // 0.0 to 1.0
