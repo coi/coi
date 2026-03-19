@@ -110,6 +110,8 @@ get_date_now
 get_pathname
 get_search
 get_query_param
+get_visibility_state
+is_hidden
 // Router navigation (compiler intrinsics)
 @intrinsic("navigate") shared def navigate(string route): void
 @intrinsic("get_route") shared def getRoute(): string
