@@ -114,6 +114,37 @@ static std::string indent_code(const std::string &code, const std::string &prefi
     return indented.str();
 }
 
+// Check whether this component's generated code can reference a dispatcher.
+// We inspect both regular event handlers and loop item code for inline dispatcher.set(...).
+static bool component_uses_dispatcher(const std::vector<EventHandler> &handlers,
+                                      const std::vector<LoopRegion> &loop_regions,
+                                      const std::string &event_type,
+                                      const std::string &dispatcher_name)
+{
+    for (const auto &handler : handlers)
+    {
+        if (handler.event_type == event_type)
+        {
+            return true;
+        }
+    }
+
+    std::string needle = dispatcher_name + ".set(";
+    for (const auto &region : loop_regions)
+    {
+        if (region.item_creation_code.find(needle) != std::string::npos)
+        {
+            return true;
+        }
+        if (region.item_update_code.find(needle) != std::string::npos)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 // ============================================================================
 // Code Generation Helpers
 // ============================================================================
@@ -913,7 +944,10 @@ std::string Component::to_webcc(CompilerSession &session)
                 ss << "        for (auto& _el : " << elements_vec << ") {\n";
                 for (const auto &spec : get_event_specs())
                 {
-                    ss << "            " << spec.dispatcher_name << ".remove(_el);\n";
+                    if (component_uses_dispatcher(event_handlers, loop_regions, spec.type, spec.dispatcher_name))
+                    {
+                        ss << "            " << spec.dispatcher_name << ".remove(_el);\n";
+                    }
                 }
                 ss << "            webcc::dom::remove_element(_el);\n";
                 ss << "        }\n";
@@ -1037,7 +1071,10 @@ std::string Component::to_webcc(CompilerSession &session)
         ss << "            webcc::handle _old = " << elements_vec << "[_idx];\n";
         for (const auto &spec : get_event_specs())
         {
-            ss << "            " << spec.dispatcher_name << ".remove(_old);\n";
+            if (component_uses_dispatcher(event_handlers, loop_regions, spec.type, spec.dispatcher_name))
+            {
+                ss << "            " << spec.dispatcher_name << ".remove(_old);\n";
+            }
         }
         ss << "            webcc::dom::remove_element(_old);\n";
         ss << "            _ref = (_idx + 1 < (int)" << elements_vec << ".size()) ? " << elements_vec << "[_idx + 1] : " << anchor_var << ";\n";
