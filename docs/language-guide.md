@@ -1087,6 +1087,67 @@ pub def setHandler(def next(string) : void) : void {
 }
 ```
 
+## Signals and Listeners
+
+Signals provide component-to-component event delivery without direct method calls.
+
+### Declaring Signals
+
+Declare signals inside a component with `signal`:
+
+```tsx
+component Timer {
+    pub signal tick(int seconds);
+    signal localPulse();
+
+    mut int elapsed = 0;
+
+    def step() : void {
+        elapsed += 1;
+        emit tick(elapsed);
+        emit localPulse();
+    }
+}
+```
+
+- Use `pub signal` when listeners in other modules need access.
+- Signal names are typically `lowerCase`, similar to method naming style.
+
+### Emitting Signals
+
+Use `emit` to send a signal event:
+
+```tsx
+emit tick(elapsed);
+emit dataLoaded(items.size(), source);
+```
+### Listening to Signals
+
+Use a `listen {}` block in a component to subscribe to another component instance:
+
+```tsx
+component Dashboard(mut Timer& timer) {
+    mut int lastTick = 0;
+    mut bool sawEvenTick = false;
+
+    listen {
+        timer.tick => (int seconds) {
+            lastTick = seconds;
+        }
+
+        timer.tick => (int seconds) {
+            sawEvenTick = (seconds % 2) == 0;
+        }
+    }
+}
+```
+
+Rules:
+- `target.signal => (typed params) { ... }` must match the signal signature exactly.
+- Multiple listeners can subscribe to the same signal.
+- Listeners are automatically unregistered when the listening component is destroyed.
+- Cross-module listening requires the target signal to be `pub`.
+
 ## Next Steps
 
 - [Components](components.md) — Component syntax, lifecycle, props
