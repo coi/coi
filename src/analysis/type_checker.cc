@@ -1292,17 +1292,17 @@ void validate_types(const std::vector<Component> &components,
                 exit(1);
             }
 
-            if (listen.param_types.size() != signal->params.size())
+            if (listen.param_types.size() > signal->params.size())
             {
                 ErrorHandler::type_error(
                     "Listener for '" + listen.target_name + "." + listen.signal_name +
-                    "' expects " + std::to_string(signal->params.size()) + " parameter(s) but got " +
+                    "' accepts at most " + std::to_string(signal->params.size()) + " parameter(s) but got " +
                     std::to_string(listen.param_types.size()),
                     listen.line);
                 exit(1);
             }
 
-            for (size_t i = 0; i < signal->params.size(); ++i)
+            for (size_t i = 0; i < listen.param_types.size(); ++i)
             {
                 std::string expected = normalize_type(signal->params[i].type);
                 std::string actual = normalize_type(listen.param_types[i]);

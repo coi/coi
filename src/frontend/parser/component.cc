@@ -341,6 +341,13 @@ void Parser::parse_listen_block(Component &comp)
         std::vector<FunctionDef::Param> listener_params;
         while (current().type != TokenType::RPAREN && current().type != TokenType::END_OF_FILE)
         {
+            bool is_mutable = false;
+            if (current().type == TokenType::MUT)
+            {
+                is_mutable = true;
+                advance();
+            }
+
             std::string param_type = current().value;
             if (is_type_token())
             {
@@ -367,7 +374,7 @@ void Parser::parse_listen_block(Component &comp)
                 throw std::runtime_error("Expected listener parameter name at line " + std::to_string(current().line));
             }
 
-            listener_params.push_back({param_type, param_name, false, false});
+            listener_params.push_back({param_type, param_name, is_mutable, false});
             entry.param_types.push_back(param_type);
 
             if (current().type == TokenType::COMMA)

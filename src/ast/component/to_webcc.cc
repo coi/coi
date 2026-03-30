@@ -549,6 +549,8 @@ std::string Component::to_webcc(CompilerSession &session)
         std::string callback_type;
         std::string param_decl;
         std::string arg_list;
+        std::vector<std::string> converted_param_types;
+        std::vector<std::string> param_names;
         for (size_t i = 0; i < signal.params.size(); ++i)
         {
             const auto &param = signal.params[i];
@@ -562,6 +564,8 @@ std::string Component::to_webcc(CompilerSession &session)
             param_types += converted;
             param_decl += converted + " " + param.name;
             arg_list += param.name;
+            converted_param_types.push_back(converted);
+            param_names.push_back(param.name);
         }
 
         callback_type = "coi::function<void(" + param_types + ")>";
@@ -576,6 +580,50 @@ std::string Component::to_webcc(CompilerSession &session)
         ss << "        _listeners_" << signal.name << ".push_back(cb);\n";
         ss << "        return id;\n";
         ss << "    }\n";
+
+        // Zero-arg listener adapter (ignore all signal payload fields).
+        ss << "    int _add_listener_" << signal.name << "_0(coi::function<void()> cb) {\n";
+        ss << "        return _add_listener_" << signal.name << "([cb](" << param_decl << ") {\n";
+        ss << "            if (cb) cb();\n";
+        ss << "        });\n";
+        ss << "    }\n";
+
+        // Allow callback-style listeners that consume only a prefix of signal args.
+        for (size_t prefix_count = 0; prefix_count < signal.params.size(); ++prefix_count)
+        {
+            std::string prefix_types;
+            std::string prefix_params;
+            std::string full_wrapper_params;
+            std::string forward_args;
+            for (size_t i = 0; i < signal.params.size(); ++i)
+            {
+                if (i > 0)
+                {
+                    full_wrapper_params += ", ";
+                }
+                full_wrapper_params += converted_param_types[i] + " _arg" + std::to_string(i);
+
+                if (i <= prefix_count)
+                {
+                    if (!prefix_types.empty())
+                    {
+                        prefix_types += ", ";
+                        prefix_params += ", ";
+                        forward_args += ", ";
+                    }
+                    prefix_types += converted_param_types[i];
+                    prefix_params += converted_param_types[i] + " _arg" + std::to_string(i);
+                    forward_args += "_arg" + std::to_string(i);
+                }
+            }
+
+                ss << "    int _add_listener_" << signal.name << "_" << (prefix_count + 1)
+               << "(coi::function<void(" << prefix_types << ")> cb) {\n";
+            ss << "        return _add_listener_" << signal.name << "([cb](" << full_wrapper_params << ") {\n";
+            ss << "            if (cb) cb(" << forward_args << ");\n";
+            ss << "        });\n";
+            ss << "    }\n";
+        }
 
         ss << "    void _remove_listener_" << signal.name << "(int id) {\n";
         ss << "        for (int i = 0; i < (int)_listener_ids_" << signal.name << ".size(); ++i) {\n";
@@ -1479,8 +1527,8 @@ std::string Component::to_webcc(CompilerSession &session)
                 lambda_args += arg_name;
             }
 
-            ss << "        if (_listen_reg_" << idx << " == 0) _listen_reg_" << idx << " = "
-                    << target_expr << "._add_listener_" << entry.signal_name
+                ss << "        if (_listen_reg_" << idx << " == 0) _listen_reg_" << idx << " = "
+                    << target_expr << "._add_listener_" << entry.signal_name << "_" << entry.param_types.size()
                << "([this](" << lambda_params << ") { this->"
                << entry.handler_method_name << "(" << lambda_args << "); });\n";
         }
