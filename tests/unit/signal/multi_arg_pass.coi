@@ -1,0 +1,31 @@
+// Test: signal with multiple arguments and matching listener signature
+component Counter {
+    pub signal changed(int value, string label, bool large);
+
+    mut int n = 0;
+
+    def bump() : void {
+        n += 1;
+        emit changed(n, "count", n > 10);
+    }
+}
+
+component App {
+    mut Counter c;
+    mut string msg = "";
+
+    listen {
+        c.changed => (int value, string label, bool large) {
+            msg = label + ": " + value + " large=" + large;
+        }
+    }
+
+    view {
+        <button onclick={c.bump}>Bump</button>
+        <div>{msg}</div>
+    }
+}
+
+app {
+    root = App;
+}

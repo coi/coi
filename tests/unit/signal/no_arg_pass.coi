@@ -1,0 +1,27 @@
+// Test: zero-argument signals and empty listener parameter list
+component Pinger {
+    pub signal pinged();
+
+    tick(float dt) {
+        emit pinged();
+    }
+}
+
+component App {
+    mut Pinger p;
+    mut int seen = 0;
+
+    listen {
+        p.pinged => () {
+            seen += 1;
+        }
+    }
+
+    view {
+        <div>{seen}</div>
+    }
+}
+
+app {
+    root = App;
+}
