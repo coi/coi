@@ -573,6 +573,8 @@ std::string Component::to_webcc(CompilerSession &session)
         ss << "    int _next_listener_id_" << signal.name << " = 1;\n";
         ss << "    coi::vector<int> _listener_ids_" << signal.name << ";\n";
         ss << "    coi::vector<" << callback_type << "> _listeners_" << signal.name << ";\n";
+        ss << "    int _listener_dispatch_depth_" << signal.name << " = 0;\n";
+        ss << "    bool _listener_needs_compact_" << signal.name << " = false;\n";
 
         ss << "    int _add_listener_" << signal.name << "(" << callback_type << " cb) {\n";
         ss << "        int id = _next_listener_id_" << signal.name << "++;\n";
@@ -628,17 +630,35 @@ std::string Component::to_webcc(CompilerSession &session)
         ss << "    void _remove_listener_" << signal.name << "(int id) {\n";
         ss << "        for (int i = 0; i < (int)_listener_ids_" << signal.name << ".size(); ++i) {\n";
         ss << "            if (_listener_ids_" << signal.name << "[i] == id) {\n";
-        ss << "                _listener_ids_" << signal.name << ".remove(i);\n";
-        ss << "                _listeners_" << signal.name << ".remove(i);\n";
+        ss << "                if (_listener_dispatch_depth_" << signal.name << " > 0) {\n";
+        ss << "                    _listener_ids_" << signal.name << "[i] = 0;\n";
+        ss << "                    _listeners_" << signal.name << "[i] = nullptr;\n";
+        ss << "                    _listener_needs_compact_" << signal.name << " = true;\n";
+        ss << "                } else {\n";
+        ss << "                    _listener_ids_" << signal.name << ".remove(i);\n";
+        ss << "                    _listeners_" << signal.name << ".remove(i);\n";
+        ss << "                }\n";
         ss << "                return;\n";
         ss << "            }\n";
         ss << "        }\n";
         ss << "    }\n";
 
         ss << "    void _emit_" << signal.name << "(" << param_decl << ") {\n";
-        ss << "        for (int i = 0; i < (int)_listeners_" << signal.name << ".size(); ++i) {\n";
-        ss << "            auto &cb = _listeners_" << signal.name << "[i];\n";
+        ss << "        _listener_dispatch_depth_" << signal.name << "++;\n";
+        ss << "        int _emit_count = (int)_listeners_" << signal.name << ".size();\n";
+        ss << "        for (int i = 0; i < _emit_count; ++i) {\n";
+        ss << "            auto cb = _listeners_" << signal.name << "[i];\n";
         ss << "            if(cb) cb(" << arg_list << ");\n";
+        ss << "        }\n";
+        ss << "        _listener_dispatch_depth_" << signal.name << "--;\n";
+        ss << "        if (_listener_dispatch_depth_" << signal.name << " == 0 && _listener_needs_compact_" << signal.name << ") {\n";
+        ss << "            for (int i = (int)_listener_ids_" << signal.name << ".size() - 1; i >= 0; --i) {\n";
+        ss << "                if (_listener_ids_" << signal.name << "[i] == 0) {\n";
+        ss << "                    _listener_ids_" << signal.name << ".remove(i);\n";
+        ss << "                    _listeners_" << signal.name << ".remove(i);\n";
+        ss << "                }\n";
+        ss << "            }\n";
+        ss << "            _listener_needs_compact_" << signal.name << " = false;\n";
         ss << "        }\n";
         ss << "    }\n";
     }
