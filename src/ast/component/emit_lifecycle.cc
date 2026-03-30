@@ -8,6 +8,18 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
                                       int element_count,
                                       const std::map<std::string, int> &component_members)
 {
+    auto emit_listen_unregistration = [&]() {
+        for (size_t i = 0; i < component.listen_entries.size(); ++i)
+        {
+            const auto &entry = component.listen_entries[i];
+            std::string target_expr = entry.target_is_reference ? ("(*" + entry.target_name + ")") : entry.target_name;
+            ss << "        if (_listen_reg_" << i << " != 0) {\n";
+            ss << "            " << target_expr << "._remove_listener_" << entry.signal_name << "(_listen_reg_" << i << ");\n";
+            ss << "            _listen_reg_" << i << " = 0;\n";
+            ss << "        }\n";
+        }
+    };
+
     // Destroy method
     ss << "    void _destroy() {\n";
 
@@ -171,6 +183,10 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
             ss << "        if (_route_" << i << ") { _route_" << i << "->_destroy(); delete _route_" << i << "; }\n";
         }
     }
+
+    // Unregister signal listeners bound via listen { ... }
+    emit_listen_unregistration();
+
     ss << "    }\n";
 
     // Remove view method - removes DOM elements but keeps component state intact

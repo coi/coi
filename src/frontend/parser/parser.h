@@ -78,6 +78,8 @@ class Parser{
         std::unique_ptr<ViewIfStatement> parse_view_if();  // Parse if/else in view
         std::unique_ptr<ASTNode> parse_view_for();  // Parse for loop in view
         std::unique_ptr<RouterDef> parse_router();  // Parse router block
+        SignalDef parse_signal(bool is_public);
+        void parse_listen_block(Component &comp);
         Component parse_component();
         void parse_app();
 

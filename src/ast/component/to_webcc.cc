@@ -542,6 +542,59 @@ std::string Component::to_webcc(CompilerSession &session)
         }
     }
 
+    // Signal listener lists and emit helpers
+    for (const auto &signal : signals)
+    {
+        std::string param_types;
+        std::string callback_type;
+        std::string param_decl;
+        std::string arg_list;
+        for (size_t i = 0; i < signal.params.size(); ++i)
+        {
+            const auto &param = signal.params[i];
+            if (i > 0)
+            {
+                param_types += ", ";
+                param_decl += ", ";
+                arg_list += ", ";
+            }
+            std::string converted = convert_type(resolve_component_type(param.type));
+            param_types += converted;
+            param_decl += converted + " " + param.name;
+            arg_list += param.name;
+        }
+
+        callback_type = "coi::function<void(" + param_types + ")>";
+
+        ss << "    int _next_listener_id_" << signal.name << " = 1;\n";
+        ss << "    coi::vector<int> _listener_ids_" << signal.name << ";\n";
+        ss << "    coi::vector<" << callback_type << "> _listeners_" << signal.name << ";\n";
+
+        ss << "    int _add_listener_" << signal.name << "(" << callback_type << " cb) {\n";
+        ss << "        int id = _next_listener_id_" << signal.name << "++;\n";
+        ss << "        _listener_ids_" << signal.name << ".push_back(id);\n";
+        ss << "        _listeners_" << signal.name << ".push_back(cb);\n";
+        ss << "        return id;\n";
+        ss << "    }\n";
+
+        ss << "    void _remove_listener_" << signal.name << "(int id) {\n";
+        ss << "        for (int i = 0; i < (int)_listener_ids_" << signal.name << ".size(); ++i) {\n";
+        ss << "            if (_listener_ids_" << signal.name << "[i] == id) {\n";
+        ss << "                _listener_ids_" << signal.name << ".remove(i);\n";
+        ss << "                _listeners_" << signal.name << ".remove(i);\n";
+        ss << "                return;\n";
+        ss << "            }\n";
+        ss << "        }\n";
+        ss << "    }\n";
+
+        ss << "    void _emit_" << signal.name << "(" << param_decl << ") {\n";
+        ss << "        for (int i = 0; i < (int)_listeners_" << signal.name << ".size(); ++i) {\n";
+        ss << "            auto &cb = _listeners_" << signal.name << "[i];\n";
+        ss << "            if(cb) cb(" << arg_list << ");\n";
+        ss << "        }\n";
+        ss << "    }\n";
+    }
+
     // Element handles
     if (element_count > 0)
     {
@@ -576,6 +629,12 @@ std::string Component::to_webcc(CompilerSession &session)
             const auto& route = router->routes[i];
             ss << "    " << qualified_name(route.module_name, route.component_name) << "* _route_" << i << " = nullptr;\n";
         }
+    }
+
+    // Listener registration tokens for listen { ... } bindings
+    for (size_t i = 0; i < listen_entries.size(); ++i)
+    {
+        ss << "    int _listen_reg_" << i << " = 0;\n";
     }
 
     // Build update entries map
@@ -1401,6 +1460,32 @@ std::string Component::to_webcc(CompilerSession &session)
         }
     };
 
+    auto emit_listen_registrations = [&]() {
+        for (size_t idx = 0; idx < listen_entries.size(); ++idx)
+        {
+            const auto &entry = listen_entries[idx];
+            std::string target_expr = entry.target_is_reference ? ("(*" + entry.target_name + ")") : entry.target_name;
+            std::string lambda_params;
+            std::string lambda_args;
+            for (size_t i = 0; i < entry.param_types.size(); ++i)
+            {
+                if (i > 0)
+                {
+                    lambda_params += ", ";
+                    lambda_args += ", ";
+                }
+                std::string arg_name = "_arg" + std::to_string(i);
+                lambda_params += convert_type(resolve_component_type(entry.param_types[i])) + " " + arg_name;
+                lambda_args += arg_name;
+            }
+
+            ss << "        if (_listen_reg_" << idx << " == 0) _listen_reg_" << idx << " = "
+                    << target_expr << "._add_listener_" << entry.signal_name
+               << "([this](" << lambda_params << ") { this->"
+               << entry.handler_method_name << "(" << lambda_args << "); });\n";
+        }
+    };
+
     // Event handlers
     for (auto &handler : event_handlers)
     {
@@ -1462,6 +1547,9 @@ std::string Component::to_webcc(CompilerSession &session)
     // Wire up nested component reactivity (e.g., Vector.x/y -> Ball._update_x/y)
     emit_nested_component_reactivity();
 
+    // Wire signal listeners declared in listen { ... }
+    emit_listen_registrations();
+
     if (has_mount)
         ss << "        _user_mount();\n";
     // Initialize router - get initial route from URL and render
@@ -1489,6 +1577,9 @@ std::string Component::to_webcc(CompilerSession &session)
 
     // Re-wire nested component reactivity after reallocation
     emit_nested_component_reactivity();
+
+    // Re-wire listen block signal handlers after reallocation
+    emit_listen_registrations();
 
     // Re-wire member dependency callbacks after reallocation
     emit_member_dependency_callbacks();

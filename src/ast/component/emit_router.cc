@@ -64,8 +64,26 @@ void emit_component_router_methods(std::stringstream &ss, const Component &compo
             {
                 if (auto *ident = dynamic_cast<Identifier *>(arg.value.get()))
                 {
-                    // Wrap method reference in a lambda
-                    ss << "[this]() { this->" << ident->name << "(); }";
+                    bool is_method_ref = false;
+                    for (const auto &method : component.methods)
+                    {
+                        if (method.name == ident->name)
+                        {
+                            is_method_ref = true;
+                            break;
+                        }
+                    }
+
+                    if (is_method_ref)
+                    {
+                        // Wrap method reference in a lambda
+                        ss << "[this]() { this->" << ident->name << "(); }";
+                    }
+                    else
+                    {
+                        // Reference to a variable - pass as pointer
+                        ss << "&(" << ident->name << ")";
+                    }
                 }
                 else
                 {
