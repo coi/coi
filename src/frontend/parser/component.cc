@@ -241,7 +241,16 @@ SignalDef Parser::parse_signal(bool is_public)
     expect(TokenType::SIGNAL, "Expected 'signal'");
 
     signal.name = current().value;
+    int signal_name_line = current().line;
     expect(TokenType::IDENTIFIER, "Expected signal name");
+
+    // Signal names should follow method-style lowerCase naming.
+    if (!signal.name.empty() && !std::islower(static_cast<unsigned char>(signal.name[0])))
+    {
+        ErrorHandler::compiler_error(
+            "Signal name '" + signal.name + "' must start with a lowercase letter",
+            signal_name_line);
+    }
 
     expect(TokenType::LPAREN, "Expected '(' after signal name");
     int param_index = 0;

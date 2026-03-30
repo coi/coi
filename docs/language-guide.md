@@ -14,6 +14,7 @@ Coi enforces naming conventions to distinguish between different constructs:
 | Modules | `UpperCase` | `module MyLib` | ✓ Yes |
 | Generic type parameters | `UpperCase` | `def first<T>(...)` | ✓ Yes |
 | Methods | `lowerCase` | `def handleClick()` | ✓ Yes |
+| Signals | `lowerCase` | `signal pulse(int sequence);` | ✓ Yes |
 | Variables | `lowerCase` | `mut int count` | Recommended |
 
 **Enforced conventions** will cause compile errors:
@@ -1141,13 +1142,6 @@ component Dashboard(mut Timer& timer) {
     }
 }
 ```
-
-Rules:
-- `target.signal => (typed params) { ... }` must match the signal signature exactly.
-- Multiple listeners can subscribe to the same signal.
-- Listeners are automatically unregistered when the listening component is destroyed.
-- Cross-module listening requires the target signal to be `pub`.
-
 ## Next Steps
 
 - [Components](components.md) — Component syntax, lifecycle, props
