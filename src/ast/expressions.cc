@@ -731,6 +731,12 @@ std::string FunctionCall::to_webcc() {
         method = name.substr(dot_pos + 1);
     }
 
+    std::string resolved_receiver = type_or_obj;
+    if (!resolved_receiver.empty() && g_ref_props.count(resolved_receiver))
+    {
+        resolved_receiver = "(*" + resolved_receiver + ")";
+    }
+
     // Try DefSchema lookup first (handles @intrinsic, @inline, @map)
     if (!type_or_obj.empty()) {
         // Check for static type call (e.g., System.random, Input.isKeyDown)
@@ -764,14 +770,14 @@ std::string FunctionCall::to_webcc() {
         // Use arg_count to find the correct overload
         if (auto* method_def = DefSchema::instance().lookup_method("string", method, args.size())) {
             if (method_def->mapping_type == MappingType::Inline) {
-                return expand_inline_template(method_def->mapping_value, type_or_obj, args);
+                return expand_inline_template(method_def->mapping_value, resolved_receiver, args);
             }
         }
 
         // Check array methods
         if (auto* method_def = DefSchema::instance().lookup_method("array", method, args.size())) {
             if (method_def->mapping_type == MappingType::Inline) {
-                return expand_inline_template(method_def->mapping_value, type_or_obj, args);
+                return expand_inline_template(method_def->mapping_value, resolved_receiver, args);
             }
         }
     }
@@ -796,19 +802,20 @@ std::string FunctionCall::to_webcc() {
 
     if (dot_pos != std::string::npos && dot_pos > 0 && dot_pos < name.length() - 1) {
         std::string obj = name.substr(0, dot_pos);
+        std::string lookup_obj = obj;
         std::string method_name = name.substr(dot_pos + 1);
 
         // Check if obj is a type name (static call) or instance
-        bool is_static_call = !obj.empty() && std::isupper(obj[0]);
+        bool is_static_call = !lookup_obj.empty() && std::isupper(lookup_obj[0]);
 
         if (is_static_call) {
             // Static call: Type.method() - look up directly
-            map_method = DefSchema::instance().lookup_method(obj, method_name);
+            map_method = DefSchema::instance().lookup_method(lookup_obj, method_name);
         } else {
             // Instance call: obj.method() - resolve using known symbol type only.
             // This avoids false-positive remapping based solely on method name
             // (e.g., auth.configure() incorrectly mapping to wgpu::configure).
-            std::string obj_type = ComponentTypeContext::instance().get_symbol_type(obj);
+            std::string obj_type = ComponentTypeContext::instance().get_symbol_type(lookup_obj);
             if (!obj_type.empty()) {
                 // Array and fixed-size array variables do not have @map instance methods.
                 if (obj_type.ends_with("[]")) {
@@ -829,10 +836,10 @@ std::string FunctionCall::to_webcc() {
                     if (map_method && !map_method->is_shared) {
                         if (map_method->mapping_type == MappingType::Inline) {
                             // Handle @inline methods for typed instance calls (e.g., socket.isConnected())
-                            return expand_inline_template(map_method->mapping_value, obj, args);
+                            return expand_inline_template(map_method->mapping_value, resolved_receiver, args);
                         } else if (map_method->mapping_type == MappingType::Map) {
                             pass_obj = true;
-                            obj_arg = obj;
+                            obj_arg = resolved_receiver;
                         } else {
                             map_method = nullptr;
                         }
@@ -953,6 +960,10 @@ std::string FunctionCall::to_webcc() {
     }
 
     std::string call_name = name;
+    if (!type_or_obj.empty())
+    {
+        call_name = resolved_receiver + "." + method;
+    }
     if (name.find('.') == std::string::npos &&
         name.find("::") == std::string::npos &&
         !name.empty() &&

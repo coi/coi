@@ -108,5 +108,13 @@ struct ForEachStatement : Statement {
     void collect_dependencies(std::set<std::string>& deps) override;
 };
 
+struct EmitStatement : Statement {
+    std::string signal_name;
+    std::vector<std::unique_ptr<Expression>> args;
+
+    std::string to_webcc() override;
+    void collect_dependencies(std::set<std::string>& deps) override;
+};
+
 // Recursively collect modified variables in statements
 void collect_mods_recursive(Statement* stmt, std::set<std::string>& mods);

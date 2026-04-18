@@ -1,0 +1,30 @@
+// Test: basic signal emission and listen block wiring
+component Timer {
+    pub signal elapsedChanged(int seconds);
+
+    mut int elapsed = 0;
+
+    tick(float dt) {
+        elapsed += 1;
+        emit elapsedChanged(elapsed);
+    }
+}
+
+component App {
+    mut Timer myTimer;
+    mut int lastTick = 0;
+
+    listen {
+        myTimer.elapsedChanged => (int s) {
+            lastTick = s;
+        }
+    }
+
+    view {
+        <div>{lastTick}</div>
+    }
+}
+
+app {
+    root = App;
+}

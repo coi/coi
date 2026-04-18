@@ -579,6 +579,28 @@ void ForEachStatement::collect_dependencies(std::set<std::string> &deps)
     body->collect_dependencies(deps);
 }
 
+std::string EmitStatement::to_webcc()
+{
+    std::string code = "_emit_" + signal_name + "(";
+    for (size_t i = 0; i < args.size(); ++i)
+    {
+        if (i > 0)
+            code += ", ";
+        code += args[i]->to_webcc();
+    }
+    code += ");";
+    return code;
+}
+
+void EmitStatement::collect_dependencies(std::set<std::string> &deps)
+{
+    for (auto &arg : args)
+    {
+        if (arg)
+            arg->collect_dependencies(deps);
+    }
+}
+
 void collect_mods_recursive(Statement *stmt, std::set<std::string> &mods)
 {
     if (auto assign = dynamic_cast<Assignment *>(stmt))

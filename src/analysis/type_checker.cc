@@ -1207,6 +1207,116 @@ void validate_types(const std::vector<Component> &components,
             scope[var->name] = type;
         }
 
+        // Validate listen bindings against target component signals.
+        for (const auto &listen : comp.listen_entries)
+        {
+            if (!scope.count(listen.target_name))
+            {
+                ErrorHandler::type_error(
+                    "Unknown listen target '" + listen.target_name + "' in component '" + comp.name + "'",
+                    listen.line);
+                exit(1);
+            }
+
+            std::string target_type = scope.at(listen.target_name);
+            std::string target_name = target_type;
+            std::string target_module;
+
+            size_t dcolon = target_name.find("::");
+            if (dcolon != std::string::npos)
+            {
+                target_module = target_name.substr(0, dcolon);
+                target_name = target_name.substr(dcolon + 2);
+            }
+
+            const Component *target_comp = nullptr;
+            if (!target_module.empty())
+            {
+                for (const auto &candidate : components)
+                {
+                    if (candidate.module_name == target_module && candidate.name == target_name)
+                    {
+                        target_comp = &candidate;
+                        break;
+                    }
+                }
+            }
+            if (!target_comp)
+            {
+                for (const auto &candidate : components)
+                {
+                    if (!comp.module_name.empty() && candidate.module_name == comp.module_name && candidate.name == target_name)
+                    {
+                        target_comp = &candidate;
+                        break;
+                    }
+                }
+            }
+            if (!target_comp && component_map.count(target_name))
+            {
+                target_comp = component_map.at(target_name);
+            }
+
+            if (!target_comp)
+            {
+                ErrorHandler::type_error(
+                    "Listen target '" + listen.target_name + "' is not a known component type",
+                    listen.line);
+                exit(1);
+            }
+
+            const SignalDef *signal = nullptr;
+            for (const auto &candidate : target_comp->signals)
+            {
+                if (candidate.name == listen.signal_name)
+                {
+                    signal = &candidate;
+                    break;
+                }
+            }
+
+            if (!signal)
+            {
+                ErrorHandler::type_error(
+                    "Component '" + target_comp->name + "' has no signal named '" + listen.signal_name + "'",
+                    listen.line);
+                exit(1);
+            }
+
+            if (comp.module_name != target_comp->module_name && !signal->is_public)
+            {
+                ErrorHandler::type_error(
+                    "Signal '" + listen.signal_name + "' on component '" + target_comp->name +
+                    "' is not public. Add 'pub signal " + listen.signal_name + "(...)' to listen from another module",
+                    listen.line);
+                exit(1);
+            }
+
+            if (listen.param_types.size() > signal->params.size())
+            {
+                ErrorHandler::type_error(
+                    "Listener for '" + listen.target_name + "." + listen.signal_name +
+                    "' accepts at most " + std::to_string(signal->params.size()) + " parameter(s) but got " +
+                    std::to_string(listen.param_types.size()),
+                    listen.line);
+                exit(1);
+            }
+
+            for (size_t i = 0; i < listen.param_types.size(); ++i)
+            {
+                std::string expected = normalize_type(signal->params[i].type);
+                std::string actual = normalize_type(listen.param_types[i]);
+                if (!is_compatible_type(actual, expected) || !is_compatible_type(expected, actual))
+                {
+                    ErrorHandler::type_error(
+                        "Listener parameter " + std::to_string(i + 1) + " for signal '" + listen.signal_name +
+                        "' must be '" + expected + "', got '" + actual + "'",
+                        listen.line);
+                    exit(1);
+                }
+            }
+        }
+
         for (const auto &method : comp.methods)
         {
             std::map<std::string, std::string> method_scope = scope;
@@ -1694,6 +1804,50 @@ void validate_types(const std::vector<Component> &components,
                     
                     // Validate the value type
                     infer_expression_type(member_assign->value.get(), current_scope);
+                }
+                else if (auto emit_stmt = dynamic_cast<EmitStatement *>(stmt.get()))
+                {
+                    const SignalDef *signal = nullptr;
+                    for (const auto &candidate : comp.signals)
+                    {
+                        if (candidate.name == emit_stmt->signal_name)
+                        {
+                            signal = &candidate;
+                            break;
+                        }
+                    }
+
+                    if (!signal)
+                    {
+                        ErrorHandler::type_error(
+                            "Unknown signal '" + emit_stmt->signal_name + "' in emit statement",
+                            emit_stmt->line);
+                        exit(1);
+                    }
+
+                    if (emit_stmt->args.size() != signal->params.size())
+                    {
+                        ErrorHandler::type_error(
+                            "Signal '" + signal->name + "' expects " + std::to_string(signal->params.size()) +
+                            " argument(s), got " + std::to_string(emit_stmt->args.size()),
+                            emit_stmt->line);
+                        exit(1);
+                    }
+
+                    for (size_t i = 0; i < emit_stmt->args.size(); ++i)
+                    {
+                        check_moved_use(emit_stmt->args[i].get(), emit_stmt->line);
+                        std::string actual = infer_expression_type(emit_stmt->args[i].get(), current_scope);
+                        std::string expected = normalize_type(signal->params[i].type);
+                        if (actual != "unknown" && !is_compatible_type(actual, expected))
+                        {
+                            ErrorHandler::type_error(
+                                "Signal '" + signal->name + "' argument " + std::to_string(i + 1) +
+                                " expects '" + expected + "' but got '" + actual + "'",
+                                emit_stmt->line);
+                            exit(1);
+                        }
+                    }
                 }
                 else if (auto expr_stmt = dynamic_cast<ExpressionStatement *>(stmt.get()))
                 {

@@ -90,6 +90,38 @@ std::unique_ptr<Statement> Parser::parse_statement()
         return ret;
     }
 
+    // Emit signal: emit SignalName(arg1, arg2);
+    if (current().type == TokenType::EMIT)
+    {
+        advance();
+
+        auto emit_stmt = std::make_unique<EmitStatement>();
+        emit_stmt->line = current().line;
+
+        if (!is_identifier_token())
+        {
+            throw std::runtime_error("Expected signal name after 'emit'");
+        }
+        emit_stmt->signal_name = current().value;
+        advance();
+
+        expect(TokenType::LPAREN, "Expected '(' after signal name in emit statement");
+        auto call_args = parse_call_args(TokenType::RPAREN);
+        expect(TokenType::RPAREN, "Expected ')' after emit arguments");
+
+        for (auto &arg : call_args)
+        {
+            if (!arg.name.empty() || arg.is_reference || arg.is_move)
+            {
+                throw std::runtime_error("Emit arguments must be positional values (no named, '&', or ':' arguments)");
+            }
+            emit_stmt->args.push_back(std::move(arg.value));
+        }
+
+        expect(TokenType::SEMICOLON, "Expected ';'");
+        return emit_stmt;
+    }
+
     // Variable declaration
     bool is_mutable = false;
     if (current().type == TokenType::MUT)

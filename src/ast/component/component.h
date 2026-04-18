@@ -24,6 +24,29 @@ struct RouterDef {
     int line = 0;
 };
 
+struct SignalParam {
+    std::string type;
+    std::string name;
+};
+
+struct SignalDef {
+    std::string name;
+    std::vector<SignalParam> params;
+    bool is_public = false;
+    int line = 0;
+};
+
+struct ListenEntry {
+    std::string target_name;         // Component instance being listened to
+    std::string signal_name;         // Signal name on target component
+    std::string handler_method_name; // Synthesized method generated from listen body
+    std::vector<std::string> param_types;
+    // True when the listen target is a reference param/state (compiled as pointer).
+    // Used by codegen to emit target->... instead of target.... for add/remove listener calls.
+    bool target_is_reference = false;
+    int line = 0;
+};
+
 struct Component : ASTNode {
     std::string name;
     std::string module_name;  // Module this component belongs to
@@ -35,6 +58,8 @@ struct Component : ASTNode {
     std::vector<std::unique_ptr<EnumDef>> enums;
     std::vector<std::unique_ptr<VarDeclaration>> state;
     std::vector<std::unique_ptr<ComponentParam>> params;
+    std::vector<SignalDef> signals;
+    std::vector<ListenEntry> listen_entries;
     std::vector<FunctionDef> methods;
     std::vector<std::unique_ptr<ASTNode>> render_roots;
     std::unique_ptr<RouterDef> router;  // Optional router block

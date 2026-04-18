@@ -232,6 +232,198 @@ std::unique_ptr<RouterDef> Parser::parse_router()
     return router;
 }
 
+SignalDef Parser::parse_signal(bool is_public)
+{
+    SignalDef signal;
+    signal.is_public = is_public;
+    signal.line = current().line;
+
+    expect(TokenType::SIGNAL, "Expected 'signal'");
+
+    signal.name = current().value;
+    int signal_name_line = current().line;
+    expect(TokenType::IDENTIFIER, "Expected signal name");
+
+    // Signal names should follow method-style lowerCase naming.
+    if (!signal.name.empty() && !std::islower(static_cast<unsigned char>(signal.name[0])))
+    {
+        ErrorHandler::compiler_error(
+            "Signal name '" + signal.name + "' must start with a lowercase letter",
+            signal_name_line);
+    }
+
+    expect(TokenType::LPAREN, "Expected '(' after signal name");
+    int param_index = 0;
+    while (current().type != TokenType::RPAREN && current().type != TokenType::END_OF_FILE)
+    {
+        SignalParam param;
+        param.type = current().value;
+
+        if (is_type_token())
+        {
+            advance();
+        }
+        else
+        {
+            throw std::runtime_error("Expected signal parameter type");
+        }
+
+        if (current().type == TokenType::LBRACKET)
+        {
+            advance();
+            param.type += parse_type_bracket_suffix();
+        }
+
+        if (is_identifier_token())
+        {
+            param.name = current().value;
+            advance();
+        }
+        else
+        {
+            param.name = "arg" + std::to_string(param_index);
+        }
+
+        signal.params.push_back(std::move(param));
+        param_index++;
+
+        if (current().type == TokenType::COMMA)
+        {
+            advance();
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    expect(TokenType::RPAREN, "Expected ')' after signal parameters");
+    expect(TokenType::SEMICOLON, "Expected ';' after signal declaration");
+    return signal;
+}
+
+void Parser::parse_listen_block(Component &comp)
+{
+    expect(TokenType::LISTEN, "Expected 'listen'");
+    expect(TokenType::LBRACE, "Expected '{' after listen");
+
+    while (current().type != TokenType::RBRACE && current().type != TokenType::END_OF_FILE)
+    {
+        ListenEntry entry;
+        entry.line = current().line;
+
+        if (current().type != TokenType::IDENTIFIER)
+        {
+            throw std::runtime_error("Expected component instance name in listen entry at line " + std::to_string(current().line));
+        }
+
+        entry.target_name = current().value;
+        advance();
+
+        for (const auto &param : comp.params)
+        {
+            if (param->name == entry.target_name && param->is_reference)
+            {
+                entry.target_is_reference = true;
+                break;
+            }
+        }
+        if (!entry.target_is_reference)
+        {
+            for (const auto &var : comp.state)
+            {
+                if (var->name == entry.target_name && var->is_reference)
+                {
+                    entry.target_is_reference = true;
+                    break;
+                }
+            }
+        }
+
+        expect(TokenType::DOT, "Expected '.' before signal name in listen entry");
+        entry.signal_name = current().value;
+        expect(TokenType::IDENTIFIER, "Expected signal name in listen entry");
+
+        expect(TokenType::ARROW, "Expected '=>' in listen entry");
+
+        expect(TokenType::LPAREN, "Expected '(' for listener parameters");
+        std::vector<FunctionDef::Param> listener_params;
+        while (current().type != TokenType::RPAREN && current().type != TokenType::END_OF_FILE)
+        {
+            bool is_mutable = false;
+            if (current().type == TokenType::MUT)
+            {
+                is_mutable = true;
+                advance();
+            }
+
+            std::string param_type = current().value;
+            if (is_type_token())
+            {
+                advance();
+            }
+            else
+            {
+                throw std::runtime_error("Expected listener parameter type at line " + std::to_string(current().line));
+            }
+
+            if (current().type == TokenType::LBRACKET)
+            {
+                advance();
+                param_type += parse_type_bracket_suffix();
+            }
+
+            std::string param_name = current().value;
+            if (is_identifier_token())
+            {
+                advance();
+            }
+            else
+            {
+                throw std::runtime_error("Expected listener parameter name at line " + std::to_string(current().line));
+            }
+
+            listener_params.push_back({param_type, param_name, is_mutable, false});
+            entry.param_types.push_back(param_type);
+
+            if (current().type == TokenType::COMMA)
+            {
+                advance();
+            }
+            else
+            {
+                break;
+            }
+        }
+        expect(TokenType::RPAREN, "Expected ')' after listener parameters");
+
+        std::string method_name = "_listen_" + std::to_string(comp.listen_entries.size());
+        entry.handler_method_name = method_name;
+
+        FunctionDef handler;
+        handler.name = method_name;
+        handler.return_type = "void";
+        handler.params = std::move(listener_params);
+
+        expect(TokenType::LBRACE, "Expected '{' to start listener body");
+        while (current().type != TokenType::RBRACE && current().type != TokenType::END_OF_FILE)
+        {
+            handler.body.push_back(parse_statement());
+        }
+        expect(TokenType::RBRACE, "Expected '}' after listener body");
+
+        comp.methods.push_back(std::move(handler));
+        comp.listen_entries.push_back(std::move(entry));
+
+        if (current().type == TokenType::SEMICOLON)
+        {
+            advance();
+        }
+    }
+
+    expect(TokenType::RBRACE, "Expected '}' after listen block");
+}
+
 void Parser::parse_app()
 {
     expect(TokenType::LBRACE, "Expected '{'");
@@ -1089,6 +1281,41 @@ Component Parser::parse_component()
                 throw std::runtime_error("Component '" + comp.name + "' already has a router block at line " + std::to_string(current().line));
             }
             comp.router = parse_router();
+        }
+        // Signal declaration
+        else if (current().type == TokenType::SIGNAL)
+        {
+            if (is_mutable)
+            {
+                throw std::runtime_error("Signal declarations cannot use 'mut' at line " + std::to_string(current().line));
+            }
+            if (is_shared)
+            {
+                throw std::runtime_error("Signal declarations cannot use 'shared' at line " + std::to_string(current().line));
+            }
+
+            SignalDef signal = parse_signal(is_public);
+
+            bool duplicate = false;
+            for (const auto &existing : comp.signals)
+            {
+                if (existing.name == signal.name)
+                {
+                    duplicate = true;
+                    break;
+                }
+            }
+            if (duplicate)
+            {
+                throw std::runtime_error("Duplicate signal '" + signal.name + "' in component '" + comp.name + "' at line " + std::to_string(signal.line));
+            }
+
+            comp.signals.push_back(std::move(signal));
+        }
+        // Listen block
+        else if (current().type == TokenType::LISTEN)
+        {
+            parse_listen_block(comp);
         }
         // View block
         else if (current().type == TokenType::VIEW)

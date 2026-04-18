@@ -180,6 +180,9 @@ Token Lexer::read_identifier(){
         {"router", TokenType::ROUTER},
         {"module", TokenType::MODULE},
         {"match", TokenType::MATCH},
+        {"signal", TokenType::SIGNAL},
+        {"listen", TokenType::LISTEN},
+        {"emit", TokenType::EMIT},
     };
 
     auto it = keywords.find(id);
