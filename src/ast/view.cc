@@ -536,7 +536,8 @@ void HTMLElement::generate_code(ViewCodegenContext& ctx)
     {
         if (dynamic_cast<HTMLElement *>(child.get()) || dynamic_cast<ComponentInstantiation *>(child.get()) ||
             dynamic_cast<ViewIfStatement *>(child.get()) || dynamic_cast<ViewForRangeStatement *>(child.get()) ||
-            dynamic_cast<ViewForEachStatement *>(child.get()) || dynamic_cast<ViewRawElement *>(child.get()))
+            dynamic_cast<ViewForEachStatement *>(child.get()) || dynamic_cast<ViewRawElement *>(child.get()) ||
+            dynamic_cast<RoutePlaceholder *>(child.get()))
             has_elements = true;
     }
 
