@@ -11,24 +11,11 @@
 A modern, component-based language for building reactive web apps.  
 **Type-safe. Fast. WASM-powered.**
 
-Components with native performance. Fine-grained reactivity, zero internal GC pauses, tiny bundles.
 
 </div>
 
 > [!NOTE]
 > **Coi is in early development.** Things change fast and I want your feedback. Not ready for production, but perfect for experimenting, especially if you want to influence where the language goes.
-
-
-## What You Can Build
-
-Coi is designed for building reactive, interactive web applications:
-
-- **Web Apps**: Dashboards, admin panels, SPAs with real-time updates
-- **Canvas Apps**: Drawing tools, image editors, animations, or games
-- **Computation-Heavy Apps**: Simulations, data processing, physics engines, where WASM shines
-- **Content Sites**: Blogs, documentation sites, landing pages with dynamic components
-
-Coi gives you composable components, fine-grained reactivity, type safety, and tiny bundle sizes.
 
 ## Why Coi?
 
@@ -181,32 +168,6 @@ Open `http://localhost:8000` in your browser.
 | `coi version` | Show the Coi compiler version |
 | `coi <file.coi> --out <dir>` | Compile a single file |
 
-### Project Structure
-
-```
-my-app/
-├── assets/
-│   └── images/
-├── src/
-│   ├── App.coi          # Entry point (required)
-│   ├── layout/
-│   │   ├── Footer.coi
-│   │   └── NavBar.coi
-│   ├── pages/
-│   │   ├── About.coi
-│   │   └── Home.coi
-│   └── ui/
-│       └── Button.coi
-├── styles/
-│   └── reset.css
-├── dist/                # Build output
-└── README.md
-```
-
-- **`src/App.coi`** — The compiler always looks for this as the entry point.
-- **`assets/`** — Automatically copied to `dist/assets/` on build.
-- **`styles/`** — CSS files here are bundled into `app.css`.
-
 ## Documentation
 
 - [Getting Started](docs/getting-started.md): Installation, first project, imports
@@ -224,12 +185,6 @@ my-app/
 Join the Coi community on Discord to get help, share projects, and discuss the language:
 
 **[Join Discord Server](https://discord.gg/KSpWx78wuR)** 💬
-
-## Editor Support
-
-Coi has syntax highlighting and language support for VS Code, Sublime Text, and Zed.
-
-See the [Editor Support & Tooling](docs/tooling.md) documentation for installation instructions and features.
 
 ## License
 
