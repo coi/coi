@@ -223,7 +223,7 @@ component App {
 └─────────────────────────────────────────────────────────┘
 ```
 
-### `init {}` — Pre-render Setup
+### `init {}` - Pre-render Setup
 
 Runs **before** the view is rendered. Use for state initialization:
 
@@ -240,7 +240,7 @@ component App {
 }
 ```
 
-### `mount {}` — Post-render Initialization
+### `mount {}` - Post-render Initialization
 
 Runs **after** the view is rendered. Use when you need DOM access:
 
@@ -261,7 +261,7 @@ component CanvasApp {
 }
 ```
 
-### `tick(float dt) {}` — Animation Loop
+### `tick(float dt) {}` - Animation Loop
 
 Called every frame. `dt` is delta time in seconds:
 
@@ -449,6 +449,6 @@ component NavBar {
 
 ## Next Steps
 
-- [View Syntax](view-syntax.md) — JSX-like templates, conditionals, loops
+- [View Syntax](view-syntax.md) - JSX-like templates, conditionals, loops
 - [Styling](styling.md) — Scoped and global CSS
 - [Platform APIs](api-reference.md) — Canvas, Storage, Audio, and more
