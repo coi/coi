@@ -240,14 +240,25 @@ Local storage for persisting data.
 | Method | Description |
 |--------|-------------|
 | `Storage.setItem(string key, string value)` | Store a key-value pair |
+| `Storage.getItem(string key)` | Read a value by key (returns `""` if the key is missing) |
 | `Storage.removeItem(string key)` | Remove item by key |
 | `Storage.clear()` | Clear all stored items |
+
+> **Note:** `getItem` returns an empty string (`""`) for a missing key, so use `.isEmpty()` to detect "not set".
 
 ### Example
 
 ```tsx
 component Settings {
     mut string theme = "light";
+
+    init {
+        // Restore the saved theme on startup (defaults to "light").
+        string saved = Storage.getItem("theme");
+        if (!saved.isEmpty()) {
+            theme = saved;
+        }
+    }
 
     def saveTheme() : void {
         Storage.setItem("theme", theme);
@@ -879,7 +890,7 @@ component Chat {
 | `Canvas`     | 2D drawing, paths, text, images, transformations |
 | `Image`      | Image loading for canvas rendering               |
 | `Audio`      | Audio playback, volume, looping, playback position |
-| `Storage`    | Local storage (setItem, removeItem, clear)       |
+| `Storage`    | Local storage (setItem, getItem, removeItem, clear) |
 | `System`     | Logging, page title, time, random, URL navigation |
 | `Input`      | Keyboard input, pointer lock                     |
 | `DOMElement` | Direct DOM manipulation                          |
