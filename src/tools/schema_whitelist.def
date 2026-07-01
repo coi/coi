@@ -108,6 +108,7 @@ reload
 open_url
 get_time
 get_date_now
+get_timezone_offset_ms
 get_pathname
 get_search
 get_query_param

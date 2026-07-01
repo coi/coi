@@ -349,7 +349,8 @@ Logging, page title, time, random numbers, and URL navigation.
 | `System.openUrl(string url)` | Open URL in new tab |
 | `System.navigate(string path)` | Navigate to route (client-side routing) |
 | `System.getTime()` | Get time in seconds (float64) |
-| `System.getDateNow()` | Get milliseconds since epoch (float64) |
+| `System.getDateNow()` | Get milliseconds since epoch, UTC (float64) |
+| `System.getTimezoneOffsetMs()` | Local timezone offset from UTC in milliseconds (float64; add to a UTC epoch ms to get local time) |
 | `System.getVisibilityState()` | Get document visibility state (`"visible"`, `"hidden"`, etc.) |
 | `System.isHidden()` | Check if document is hidden (`true` hidden, `false` visible) |
 | `System.random()` | Random float between 0.0 and 1.0 |
