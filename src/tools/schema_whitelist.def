@@ -87,6 +87,7 @@ exit_pointer_lock
 
 [storage]
 set_item
+get_item
 remove_item
 clear
 
