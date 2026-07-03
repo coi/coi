@@ -1,0 +1,41 @@
+// Regression scene: assigning state inside a match arm must re-render the view.
+// Covers both the literal-match and Json.parse variant forms.
+
+pod Ping { bool ok; }
+
+component App {
+  mut int step = 0;
+  mut string word = "start";
+  mut string parsed = "none";
+
+  def click() : void {
+    step += 1;
+    match (step) {
+      1 => { word = "one"; };
+      2 => { word = "two"; };
+      else => { word = "many"; };
+    };
+    match (Json.parse(Ping, `{"ok":true}`)) {
+      Success(Ping p, Meta m) => { parsed = p.ok ? "parsed" : "unparsed"; };
+      Error(string e) => { parsed = "error"; };
+    };
+  }
+
+  style {
+    html, body { margin: 0; padding: 0; background: #0f1117; color: #e8e8e8;
+      font-family: system-ui, sans-serif; }
+    .hit { width: 100vw; height: 100vh; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 12px; user-select: none; cursor: pointer; }
+    .word { font-size: 40px; }
+    .parsed { font-size: 24px; opacity: 0.85; }
+  }
+
+  view {
+    <div class="hit hit" onclick={click}>
+      <div class="word word">{word}</div>
+      <div class="parsed parsed">{parsed}</div>
+    </div>
+  }
+}
+
+app { root = App; }
