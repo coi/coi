@@ -123,6 +123,17 @@ std::vector<CallArg> Parser::parse_call_args(TokenType end_token)
             advance();
         }
 
+        // Named fields use '=' (or ':=' to move), not ':'. Reject `name: value`
+        // with a clear hint. '::' and ':=' are their own tokens, and the leading-':'
+        // move f(:value) is handled above, so none of those land here.
+        if (is_identifier_token() && peek().type == TokenType::COLON)
+        {
+            ErrorHandler::compiler_error(
+                "Named fields use '=', not ':' (write '" + current().value +
+                " = value', or '" + current().value + " := value' to move)",
+                current().line);
+        }
+
         // Check if this is a named argument: name = value or name := value
         bool is_named = false;
         if (is_identifier_token())

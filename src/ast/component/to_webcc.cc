@@ -1500,9 +1500,25 @@ std::string Component::to_webcc(CompilerSession &session)
         generate_method(method);
     }
 
+    // Only a component's pub mut members expose an onXChange hook. Pods are plain
+    // value structs with no hooks, so a fine-grained callback only fits when obj is
+    // a component and member is one of its pub mut members. Pod fields rely on the
+    // coarse per-object _update_<obj>() that mutations already trigger.
+    auto member_dep_is_reactive = [&](const MemberDependency &mem_dep) -> bool {
+        std::string obj_type = ComponentTypeContext::instance().get_symbol_type(mem_dep.object);
+        if (obj_type.empty())
+            return true; // unknown symbol: preserve prior behavior conservatively
+        auto it = session.component_info.find(resolve_component_type(obj_type));
+        if (it == session.component_info.end())
+            return false; // pod / plain data type: no onXChange hook exists on it
+        return it->second.pub_mut_members.count(mem_dep.member) > 0;
+    };
+
     auto emit_member_dependency_callbacks = [&]() {
         for (const auto &[mem_dep, methods] : member_dep_update_methods)
         {
+            if (!member_dep_is_reactive(mem_dep))
+                continue;
             std::string callback_name = make_callback_name(mem_dep.member);
             ss << "        " << mem_dep.object << "." << callback_name << " = [this]() {";
             for (const auto &method_name : methods)
@@ -1604,6 +1620,8 @@ std::string Component::to_webcc(CompilerSession &session)
     {
         for (const auto &mem_dep : region.member_dependencies)
         {
+            if (!member_dep_is_reactive(mem_dep))
+                continue;
             std::string callback_name = make_callback_name(mem_dep.member);
             ss << "        " << mem_dep.object << "." << callback_name << " = [this]() { _sync_if_" << region.if_id << "(); };\n";
         }
