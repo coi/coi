@@ -260,11 +260,17 @@ struct MatchExpr : Expression {
     std::unique_ptr<Expression> subject;
     std::vector<MatchArm> arms;
     int line = 0;
-    
+
     MatchExpr() = default;
     std::string to_webcc() override;
     void collect_dependencies(std::set<std::string>& deps) override;
     bool is_static() override;
+    std::vector<ASTNode*> get_child_nodes() override {
+        std::vector<ASTNode*> nodes;
+        nodes.push_back(subject.get());
+        for (auto& arm : arms) nodes.push_back(arm.body.get());
+        return nodes;
+    }
 };
 
 // Block expression for match arm bodies that contain statements
@@ -275,4 +281,9 @@ struct BlockExpr : Expression {
     std::string to_webcc() override;
     void collect_dependencies(std::set<std::string>& deps) override;
     bool is_static() override { return false; }
+    std::vector<ASTNode*> get_child_nodes() override {
+        std::vector<ASTNode*> nodes;
+        for (auto& s : statements) nodes.push_back(s.get());
+        return nodes;
+    }
 };
