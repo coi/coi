@@ -13,6 +13,7 @@ struct VarDeclaration : Statement {
     bool is_move = false;  // true if initialized with &expr (move semantics)
 
     std::string to_webcc() override;
+    std::vector<ASTNode*> get_child_nodes() override { return {initializer.get()}; }
 };
 
 // Component constructor parameter
@@ -27,6 +28,7 @@ struct ComponentParam : Statement {
     bool is_callback = false;
 
     std::string to_webcc() override;
+    std::vector<ASTNode*> get_child_nodes() override { return {default_value.get()}; }
 };
 
 struct Assignment : Statement {
@@ -37,6 +39,7 @@ struct Assignment : Statement {
 
     std::string to_webcc() override;
     void collect_dependencies(std::set<std::string>& deps) override;
+    std::vector<ASTNode*> get_child_nodes() override { return {value.get()}; }
 };
 
 struct IndexAssignment : Statement {
@@ -48,6 +51,7 @@ struct IndexAssignment : Statement {
 
     std::string to_webcc() override;
     void collect_dependencies(std::set<std::string>& deps) override;
+    std::vector<ASTNode*> get_child_nodes() override { return {array.get(), index.get(), value.get()}; }
 };
 
 struct MemberAssignment : Statement {
@@ -59,25 +63,33 @@ struct MemberAssignment : Statement {
 
     std::string to_webcc() override;
     void collect_dependencies(std::set<std::string>& deps) override;
+    std::vector<ASTNode*> get_child_nodes() override { return {object.get(), value.get()}; }
 };
 
 struct ReturnStatement : Statement {
     std::unique_ptr<Expression> value;
-    
+
     std::string to_webcc() override;
     void collect_dependencies(std::set<std::string>& deps) override;
+    std::vector<ASTNode*> get_child_nodes() override { return {value.get()}; }
 };
 
 struct ExpressionStatement : Statement {
     std::unique_ptr<Expression> expression;
     std::string to_webcc() override;
     void collect_dependencies(std::set<std::string>& deps) override;
+    std::vector<ASTNode*> get_child_nodes() override { return {expression.get()}; }
 };
 
 struct BlockStatement : Statement {
     std::vector<std::unique_ptr<Statement>> statements;
     std::string to_webcc() override;
     void collect_dependencies(std::set<std::string>& deps) override;
+    std::vector<ASTNode*> get_child_nodes() override {
+        std::vector<ASTNode*> nodes;
+        for (auto& s : statements) nodes.push_back(s.get());
+        return nodes;
+    }
 };
 
 struct IfStatement : Statement {
@@ -87,6 +99,7 @@ struct IfStatement : Statement {
 
     std::string to_webcc() override;
     void collect_dependencies(std::set<std::string>& deps) override;
+    std::vector<ASTNode*> get_child_nodes() override { return {condition.get(), then_branch.get(), else_branch.get()}; }
 };
 
 struct ForRangeStatement : Statement {
@@ -97,6 +110,7 @@ struct ForRangeStatement : Statement {
 
     std::string to_webcc() override;
     void collect_dependencies(std::set<std::string>& deps) override;
+    std::vector<ASTNode*> get_child_nodes() override { return {start.get(), end.get(), body.get()}; }
 };
 
 struct ForEachStatement : Statement {
@@ -106,6 +120,7 @@ struct ForEachStatement : Statement {
 
     std::string to_webcc() override;
     void collect_dependencies(std::set<std::string>& deps) override;
+    std::vector<ASTNode*> get_child_nodes() override { return {iterable.get(), body.get()}; }
 };
 
 struct EmitStatement : Statement {
@@ -114,7 +129,13 @@ struct EmitStatement : Statement {
 
     std::string to_webcc() override;
     void collect_dependencies(std::set<std::string>& deps) override;
+    std::vector<ASTNode*> get_child_nodes() override {
+        std::vector<ASTNode*> nodes;
+        for (auto& a : args) nodes.push_back(a.get());
+        return nodes;
+    }
 };
 
-// Recursively collect modified variables in statements
-void collect_mods_recursive(Statement* stmt, std::set<std::string>& mods);
+// Recursively collect the component fields a subtree mutates. Walks any node via
+// get_child_nodes(), so new node types are covered without editing this walk.
+void collect_mods_recursive(ASTNode* node, std::set<std::string>& mods);

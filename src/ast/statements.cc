@@ -601,21 +601,48 @@ void EmitStatement::collect_dependencies(std::set<std::string> &deps)
     }
 }
 
-// Collect fields mutated by an expression in statement position. Shared by
-// top-level expression statements and match-arm bodies.
-static void collect_mods_in_expr(Expression *expr, std::set<std::string> &mods)
+void collect_mods_recursive(ASTNode *node, std::set<std::string> &mods)
 {
-    if (!expr)
+    if (!node)
         return;
 
-    if (auto postfix = dynamic_cast<PostfixOp *>(expr))
+    // Does this node itself mutate a component field?
+    if (auto assign = dynamic_cast<Assignment *>(node))
+    {
+        mods.insert(assign->name);
+    }
+    else if (auto idxAssign = dynamic_cast<IndexAssignment *>(node))
+    {
+        if (auto id = dynamic_cast<Identifier *>(idxAssign->array.get()))
+        {
+            // Swapping components in a component array needs no DOM sync.
+            if (g_component_array_loops.find(id->name) == g_component_array_loops.end())
+            {
+                mods.insert(id->name);
+            }
+        }
+    }
+    else if (auto memberAssign = dynamic_cast<MemberAssignment *>(node))
+    {
+        // Track the root object being modified (walk out of the member chain).
+        Expression *obj = memberAssign->object.get();
+        while (auto member = dynamic_cast<MemberAccess *>(obj))
+        {
+            obj = member->object.get();
+        }
+        if (auto id = dynamic_cast<Identifier *>(obj))
+        {
+            mods.insert(id->name);
+        }
+    }
+    else if (auto postfix = dynamic_cast<PostfixOp *>(node))
     {
         if (auto id = dynamic_cast<Identifier *>(postfix->operand.get()))
         {
             mods.insert(id->name);
         }
     }
-    else if (auto unary = dynamic_cast<UnaryOp *>(expr))
+    else if (auto unary = dynamic_cast<UnaryOp *>(node))
     {
         if (unary->op == "++" || unary->op == "--")
         {
@@ -625,17 +652,16 @@ static void collect_mods_in_expr(Expression *expr, std::set<std::string> &mods)
             }
         }
     }
-    else if (auto call = dynamic_cast<FunctionCall *>(expr))
+    else if (auto call = dynamic_cast<FunctionCall *>(node))
     {
+        // A void-returning method (string.append, array.push, ...) mutates its
+        // receiver. We lack type info here, so probe every type that has it.
         size_t dot_pos = call->name.rfind('.');
         if (dot_pos != std::string::npos)
         {
             std::string method = call->name.substr(dot_pos + 1);
             std::string obj_expr = call->name.substr(0, dot_pos);
 
-            // Check if this is a mutating method (returns void) on ANY type
-            // This includes: string.append(), array.push(), etc.
-            // We need to check all possible types since we don't have type info here
             bool is_mutating = false;
             std::vector<std::string> types_to_check = {"string", "array", "int", "float", "bool"};
             for (const auto& type : types_to_check)
@@ -650,11 +676,8 @@ static void collect_mods_in_expr(Expression *expr, std::set<std::string> &mods)
 
             if (is_mutating)
             {
-                // For simple identifiers like "label.append()", track "label"
-                // For member access like "rows[i].label.append()", track the root variable
-                // We need to parse obj_expr to find the root identifier
-
-                // Find the root variable name (leftmost identifier before any . or [)
+                // Root variable = leftmost identifier before any '.' or '['
+                // (e.g. "rows[i].label.append()" -> "rows").
                 size_t first_dot = obj_expr.find('.');
                 size_t first_bracket = obj_expr.find('[');
                 size_t split_pos = std::string::npos;
@@ -672,93 +695,22 @@ static void collect_mods_in_expr(Expression *expr, std::set<std::string> &mods)
                     split_pos = first_bracket;
                 }
 
-                std::string root_var = (split_pos != std::string::npos)
-                    ? obj_expr.substr(0, split_pos)
-                    : obj_expr;
-                mods.insert(root_var);
+                mods.insert(split_pos != std::string::npos ? obj_expr.substr(0, split_pos) : obj_expr);
             }
         }
     }
-    else if (auto match = dynamic_cast<MatchExpr *>(expr))
-    {
-        // Descend into arm bodies so assignments inside a match mark fields dirty.
-        for (auto &arm : match->arms)
-        {
-            Expression *body = arm.body.get();
-            if (auto block = dynamic_cast<BlockExpr *>(body))
-            {
-                for (auto &s : block->statements)
-                {
-                    collect_mods_recursive(s.get(), mods);
-                }
-            }
-            else
-            {
-                collect_mods_in_expr(body, mods);
-            }
-        }
-    }
-}
 
-void collect_mods_recursive(Statement *stmt, std::set<std::string> &mods)
-{
-    if (auto assign = dynamic_cast<Assignment *>(stmt))
+    // Descend into every child uniformly. A new node type is covered as soon as
+    // it implements get_child_nodes(); this walk never needs to list them.
+    for (auto *child : node->get_child_nodes())
     {
-        mods.insert(assign->name);
+        collect_mods_recursive(child, mods);
     }
-    else if (auto idxAssign = dynamic_cast<IndexAssignment *>(stmt))
+
+    // After descending: if a foreach's item was mutated (e.g. task.status = ...),
+    // mark the iterable too so parent-level reactive updates run.
+    if (auto forEach = dynamic_cast<ForEachStatement *>(node))
     {
-        if (auto id = dynamic_cast<Identifier *>(idxAssign->array.get()))
-        {
-            // Don't mark component arrays as modified for index assignment
-            // Swapping components doesn't need DOM sync - they're already rendered
-            if (g_component_array_loops.find(id->name) == g_component_array_loops.end())
-            {
-                mods.insert(id->name);
-            }
-        }
-    }
-    else if (auto memberAssign = dynamic_cast<MemberAssignment *>(stmt))
-    {
-        // Track the root object being modified
-        Expression *obj = memberAssign->object.get();
-        while (auto member = dynamic_cast<MemberAccess *>(obj))
-        {
-            obj = member->object.get();
-        }
-        if (auto id = dynamic_cast<Identifier *>(obj))
-        {
-            mods.insert(id->name);
-        }
-    }
-    else if (auto exprStmt = dynamic_cast<ExpressionStatement *>(stmt))
-    {
-        collect_mods_in_expr(exprStmt->expression.get(), mods);
-    }
-    else if (auto block = dynamic_cast<BlockStatement *>(stmt))
-    {
-        for (auto &s : block->statements)
-        {
-            collect_mods_recursive(s.get(), mods);
-        }
-    }
-    else if (auto ifStmt = dynamic_cast<IfStatement *>(stmt))
-    {
-        collect_mods_recursive(ifStmt->then_branch.get(), mods);
-        if (ifStmt->else_branch)
-        {
-            collect_mods_recursive(ifStmt->else_branch.get(), mods);
-        }
-    }
-    else if (auto forRange = dynamic_cast<ForRangeStatement *>(stmt))
-    {
-        collect_mods_recursive(forRange->body.get(), mods);
-    }
-    else if (auto forEach = dynamic_cast<ForEachStatement *>(stmt))
-    {
-        collect_mods_recursive(forEach->body.get(), mods);
-        // If the loop item variable was modified (e.g., task.status = ...),
-        // treat the iterable as modified too so parent-level reactive updates run.
         if (mods.count(forEach->var_name))
         {
             if (auto id = dynamic_cast<Identifier *>(forEach->iterable.get()))

@@ -41,6 +41,12 @@ struct ASTNode {
     virtual std::string to_webcc() { return ""; }
     virtual void collect_dependencies(std::set<std::string>& deps) {}
     virtual void collect_member_dependencies(std::set<MemberDependency>& member_deps) {}
+
+    // Uniform child access for whole-AST traversals that span statements and
+    // expressions (e.g. reactive-mod collection). Override on any node with
+    // children so generic walks never need to enumerate node types by hand.
+    virtual std::vector<ASTNode*> get_child_nodes() { return {}; }
+
     int line = 0;
 };
 
@@ -50,7 +56,16 @@ struct Expression : ASTNode {
     
     // Returns child expressions for traversal. Override in subclasses with children.
     virtual std::vector<Expression*> get_children() { return {}; }
-    
+
+    // Bridge get_children() into the node-level traversal. Nodes with statement
+    // children (BlockExpr, MatchExpr) override get_child_nodes() directly.
+    std::vector<ASTNode*> get_child_nodes() override {
+        std::vector<ASTNode*> nodes;
+        for (auto* child : get_children())
+            if (child) nodes.push_back(child);
+        return nodes;
+    }
+
     // Default implementation: traverse all children
     void collect_dependencies(std::set<std::string>& deps) override {
         for (auto* child : get_children()) {
