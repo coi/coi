@@ -49,5 +49,9 @@ void print_help(const char* program_name);
 // Print version information
 void print_version();
 
+// Print the full LLM/AI context (llms-full.txt) to stdout, or just its
+// absolute path when path_only is set. Returns 0 on success, non-zero on error.
+int llms_command(bool path_only);
+
 // Get the directory where the coi executable is located
 std::filesystem::path get_executable_dir();

@@ -166,6 +166,7 @@ Open `http://localhost:8000` in your browser.
 | `coi self-upgrade` | Pull latest Coi source and rebuild compiler |
 | `coi list` | List installed packages |
 | `coi version` | Show the Coi compiler version |
+| `coi llms [--path]` | Print the full language context for AI assistants (`--path` prints the file path) |
 | `coi <file.coi> --out <dir>` | Compile a single file |
 
 ## Documentation
@@ -179,6 +180,21 @@ Open `http://localhost:8000` in your browser.
 - [Package Manager](docs/package-manager.md): Registry packages, lockfile workflow, add/install/update/remove
 - [Versioning](docs/versioning.md): Pond & Drop compatibility model and release philosophy
 - [Editor Support](docs/tooling.md): VS Code, Sublime Text, and Zed extensions
+
+## AI Assistants
+
+I know a lot of you build with AI these days. Coi is new and a little niche, so an assistant won't know it out of the box, it simply hasn't seen enough Coi yet. So I put together a full language and API reference you can drop straight into your assistant's context. It should be a big help, speed things up, and honestly make building with Coi a lot more fun.
+
+- **[llms-full.txt](llms-full.txt)**: the full context. Language reference, every platform API, complete examples, and a list of common mistakes to avoid.
+- **[llms.txt](llms.txt)**: a short index that links the docs and points to the full context.
+- **`coi llms`**: print the full context to your terminal. Use **`coi llms --path`** if you just want the file path.
+
+```bash
+coi llms > coi-context.txt   # hand this to your AI assistant
+coi llms --path              # prints the path to llms-full.txt
+```
+
+Using an AI agent with terminal access? It can find this on its own. `coi --help` lists `coi llms`, which points to the same context.
 
 ## Community
 

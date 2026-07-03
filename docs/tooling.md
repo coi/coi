@@ -37,6 +37,29 @@ See the repository for manual installation instructions.
 
 ---
 
+## AI Assistants & Agents
+
+Coi is new, so an AI assistant won't know it well out of the box. To help, Coi ships a complete,
+self-contained language and API reference you can load into an assistant's context.
+
+- **`llms-full.txt`** (repository root): the full context. Language reference, every platform
+  API with signatures, complete example programs, and a list of common mistakes to avoid.
+- **`llms.txt`** (repository root): a short index in the [llms.txt](https://llmstxt.org) format
+  that links the docs and points to the full context.
+
+### `coi llms`
+
+If the compiler is installed, any agent can fetch the context from the CLI:
+
+```bash
+coi llms            # print the full language context to stdout
+coi llms --path     # print the path to llms-full.txt
+coi llms > coi-context.txt   # save it to hand to an assistant
+```
+
+An agent with shell access can discover this on its own: `coi --help` lists `coi llms`, which
+resolves to the same `llms-full.txt` that sits next to the compiler.
+
 ## Contributing
 
 Don't see your editor? Contributions are welcome! Open a PR to add support for additional editors.

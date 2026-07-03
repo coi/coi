@@ -1,0 +1,985 @@
+# Coi Language: Full Guide for AI Assistants
+
+> Coi is a statically-typed, component-based language for building reactive web apps that
+> compile to WebAssembly. It looks JSX-like but it is NOT JavaScript or TypeScript: it has
+> static types, explicit ownership (copy / reference / move), no garbage collector, no
+> virtual DOM, and fine-grained reactivity. Source files use the `.coi` extension.
+
+This file is a complete, self-contained reference. An AI assistant that reads it should be
+able to scaffold new Coi projects, write correct components, use every platform API, build,
+and fix compile errors WITHOUT prior knowledge of Coi. Read the "Golden Rules" and "Common
+Mistakes" sections carefully: Coi resembles React/TSX on the surface, and the single biggest
+source of wrong code is falling back on JavaScript/TypeScript habits.
+
+Snapshot: compiler "Filling Pond 0" (rolling release; run `coi version` to see the current
+Pond/Drop). The language is in early development and evolves quickly. When unsure, prefer the
+patterns shown here and verify by compiling with `coi build`.
+
+---
+
+## 1. Golden Rules (read first)
+
+1. **Coi is not JS/TS.** No `let`/`const`/`var`, no `function`, no `null`/`undefined`, no
+   `import { x } from "y"`, no `.map()/.filter()` array callbacks, no promises/`async`/`await`,
+   no truthy/falsy coercion. Do not invent APIs that "feel like" JavaScript.
+2. **Variables are typed and declared as `Type name = value;`.** Mutability is opt-in with
+   `mut`. Without `mut` a variable/member is read-only after initialization.
+3. **Every value has a type and a default.** Numbers default to `0`, `string` to `""`,
+   `bool` to `false`, arrays to empty, pods to zero-valued fields, component members are
+   auto-constructed. There is no null.
+4. **Reactivity is automatic through assignment.** To update the UI, assign to a `mut` state
+   member (or mutate a pod field / array). The compiler generates surgical DOM updates. You
+   never touch the DOM directly (direct DOM manipulation was removed).
+5. **Ownership is explicit:** copy by default, borrow with `&` (reference), transfer with `:`
+   (move, `:=` in assignments). Some platform types (Canvas, Audio, etc.) cannot be copied.
+6. **Naming is enforced.** Components, pods, enums, modules, and generic type params start
+   Uppercase. Methods, signals, and variables start lowercase. Violations are compile errors.
+7. **Two brace worlds:** inside `view {}` embed expressions with single braces `{expr}`;
+   inside string/template literals interpolate with `${expr}`.
+8. **Construction differs by kind:** pods use braces `Pod{...}`, components use parens
+   `Component(...)`, enum values use `Enum::Value`. There is no `new`.
+9. **Statements end with `;`.** Return type comes after the parameter list: `def f() : int`.
+10. **Verify by compiling.** `coi build` (or `coi dev`) runs the full pipeline; a clean build
+    is the source of truth, not intuition.
+
+---
+
+## 2. Project Structure, CLI, and Build
+
+### Create and run
+```bash
+coi init my-app          # scaffold an app project
+coi init my-pkg --pkg    # scaffold a reusable package
+cd my-app
+coi dev                  # build + dev server at http://localhost:8000 (hot reload)
+coi dev --no-watch       # build once, serve, no watching
+coi build                # build to dist/
+```
+
+### Other CLI commands
+| Command | Description |
+|---------|-------------|
+| `coi build` | Compile `src/App.coi` to `dist/` (index.html, app.js, app.wasm, app.css) |
+| `coi add <pkg> [version]` | Add a registry package (e.g. `coi add @coi/supabase`) |
+| `coi install` | Install packages pinned in `coi.lock` |
+| `coi remove <pkg>` | Remove a package |
+| `coi upgrade [pkg]` | Upgrade one or all packages |
+| `coi list` | List installed packages |
+| `coi version` | Show compiler version (Pond/Drop) |
+| `coi self-upgrade` | Pull latest Coi source and rebuild the compiler |
+| `coi <file.coi> --out <dir>` | Compile a single file. Flags: `--cc-only`, `--keep-cc` |
+
+### App project layout (from `coi init`)
+```
+my-app/
+  assets/images/        # copied verbatim to dist/assets/ (reference as "assets/...")
+  src/
+    App.coi             # root; contains the app {} block
+    layout/  (NavBar.coi, Footer.coi)
+    pages/   (Home.coi, About.coi)
+    ui/      (Button.coi)
+  styles/reset.css      # every .css here is bundled (alphabetically) into app.css
+```
+
+### The `app {}` block (exactly once, usually in App.coi, at top level)
+```coi
+app {
+    root = App;                        // required: the root component
+    title = "My App";                  // optional: <title>
+    description = "For SEO";            // optional: <meta name="description">
+    lang = "en";                       // optional: <html lang>, default "en"
+}
+```
+
+### Package layout (from `coi init --pkg`)
+```
+my-pkg/
+  Mod.coi          # entry point; pub import re-exports
+  package.json     # registry metadata (name "scope/name", releases, compiler.pond/min-drop)
+  src/ui/Button.coi, src/api/Client.coi
+```
+```coi
+// Mod.coi
+module MyPkg;
+pub import "src/ui/Button.coi";
+pub import "src/api/Client.coi";
+```
+
+---
+
+## 3. Language Reference
+
+### Comments
+```coi
+// line comment
+/* block comment */
+```
+
+### Naming conventions (enforced -> compile error if violated)
+| Construct | Case | Example |
+|-----------|------|---------|
+| Component, Pod, Enum, Module, generic param `<T>` | Uppercase | `component Counter`, `pod User`, `enum Mode` |
+| Method, signal, variable | lowercase | `def handleClick()`, `signal tick(...)`, `mut int count` |
+
+Because `Name(...)` means component/type construction and `name(...)` means a function call,
+the case distinction removes all ambiguity in view syntax.
+
+### Variables and mutability
+```coi
+int x = 5;             // read-only after init
+mut int y = 0;         // mutable
+y = y + 1;             // ok
+// x = 2;              // ERROR: x is not mut
+```
+There is no `let`/`const`/`var`. Type is always written first.
+
+### Primitive types
+```coi
+// Signed ints: int8 int16 int32 int64 ; int == int32
+int   count = 42;
+int64 big   = 9000000000;
+// Unsigned: uint8 uint16 uint32 uint64
+uint8 byte  = 255;
+// Hex / binary literals
+int color = 0xFF00FF;
+int flags = 0b1010;
+// Floats: float32 float64 ; float == float64
+float ratio = 0.5;
+float32 f   = 3.14;
+// Other
+string name = "Coi";
+bool active = true;
+```
+
+### Type conversions
+```coi
+string s = "42";
+int n    = s.toInt();      // string -> int
+float f  = "3.14".toFloat();
+// enum <-> int is implicit (see Enums)
+```
+Integers/floats have no methods; use operators. Concatenate with `+`:
+`string msg = "count: " + count;` (numbers concatenate into strings with `+`).
+
+### Strings
+```coi
+string t = "Hello, World!";
+int len   = t.length();       // length (NOTE: arrays use .size())
+bool empty= t.isEmpty();
+int ch    = t.charAt(0);      // character CODE (int) at index
+string a  = t.subStr(7);      // from index to end
+string b  = t.subStr(0, 5);   // from index, given length -> "Hello"
+bool has  = t.contains("World");
+string tr = t.trim();         // also trimStart(), trimEnd()
+int i     = "42".toInt();
+float g   = "3.14".toFloat();
+// append mutates in place (requires mut):
+mut string acc = "a"; acc.append("b");   // acc == "ab"
+```
+
+**Interpolation** with `${expr}` works in BOTH regular and template strings:
+```coi
+string name = "Alice"; int age = 25;
+string g1 = "Hello, ${name}! You are ${age}.";
+string g2 = `Hello, ${name}!`;   // template string (backticks)
+string lit = "Use \${x} for a literal dollar-brace";  // \$ escapes
+```
+Regular strings `"..."` need escapes `\"`, `\n`, `\\`. Template strings `` `...` `` are
+multi-line and only escape `` \` ``. Template strings are ideal for JSON:
+```coi
+string json = `{"name": "${name}", "age": ${age}}`;
+```
+
+### Arrays
+```coi
+// Dynamic (size changes at runtime): T[]
+mut int[] scores = [10, 20, 30];
+string[] tags = ["web", "fast"];
+mut float[] prices = [];
+// Fixed-size (compile-time length): T[N]
+int[5] nums = [1, 2, 3, 4, 5];
+// Repeat initializer [value; count]
+int[] zeros = [0; 100];        // 100 zeros
+
+// Dynamic array methods (mutating ones require mut):
+int n   = scores.size();       // length  (canonical; .length() also compiles)
+bool e  = scores.isEmpty();
+scores.push(40);
+scores.pop();                  // remove last
+scores.remove(0);              // remove at index
+scores.clear();
+scores.sort();                 // ascending
+scores.reserve(64);
+int idx = scores.indexOf(20);  // -1 if absent
+bool c  = scores.contains(20);
+int first = scores[0];
+scores[0] = 99;                // requires mut
+
+// Fixed-size arrays: size(), isEmpty(), indexOf(), contains(), fill(v), sort(), indexing.
+```
+
+### Maps: `ValueType[KeyType]`
+```coi
+mut int[string] ages;          // string keys, int values
+ages["alice"] = 25;
+int a  = ages["alice"];
+int n  = ages.size();
+bool e = ages.empty();
+bool h = ages.contains("alice");
+ages.erase("bob");
+ages.clear();
+for string key in ages {       // iterates KEYS
+    System.log(key);
+    System.log(ages[key]);     // number logged via string context as needed
+}
+```
+
+### Enums
+```coi
+enum Status { Pending, Success, Error }   // global, or inside a component
+
+mut Status s = Status::Success;           // access value with ::
+if (s == Status::Error) { }
+int v = s;                                // enum -> int (implicit)
+s = 2;                                    // int -> enum (implicit)
+int count = Status.size();                // number of values (== 3)
+```
+**Shared enums** are readable from other components as `Component.Enum::Value`:
+```coi
+component Theme { shared enum Mode { Light, Dark } mut Mode current = Mode::Light; }
+component Settings { mut Theme.Mode t = Theme.Mode::Dark; }
+```
+
+### Pods (Plain Old Data: value structs)
+```coi
+pod User {                     // fields have NO mut/pub modifiers
+    string name;
+    int age;
+    string email;
+}
+pod Point { float x; float y; }
+pod Rect  { Point topLeft; Point bottomRight; }   // pods can nest pods
+
+// Generic pods:
+pod Result<T> { bool ok; T value; string error; }
+pod Pair<A, B> { A first; B second; }
+
+// Construction: BRACES. Positional or named:
+mut User u = User{"Alice", 25, "a@x.com"};
+u = User{name = "Bob", age = 30, email = "b@x.com"};   // named, any order
+// Move a value into a field with :=
+mut string em = "c@x.com";
+u = User{name = "C", age = 35, email := em};
+
+// Copy vs move:
+mut User u2 = u;      // copy (both valid)
+mut User u3 := u2;    // move (u2 now invalid)
+
+// Reference parameter:
+def bump(mut User& user) : void { user.age = user.age + 1; }
+bump(&u);
+
+// Arrays of pods:
+mut User[] users = [User{"A", 1, ""}, User{"B", 2, ""}];
+for user in users { System.log(user.name); }
+```
+Rules: pod fields cannot be `mut`/`pub`, and cannot hold no-copy types (Canvas, Audio,
+WebSocket, DOMElement, Image, etc.). Mutating any pod field marks the whole pod as changed,
+which drives reactivity.
+
+### Control flow
+```coi
+// if / else
+if (x > 10) { msg = "big"; } else { msg = "small"; }
+
+// ternary
+int max = x > y ? x : y;
+
+// match (expression or statement). Arms end with ';', the whole match ends with ';'.
+string label = match (status) {
+    Status::Pending => "Loading...";
+    Status::Success => "Done";
+    else => "Other";                       // 'else' is the default arm
+};
+// Block arms: use 'yield' when the match produces a value.
+string r = match (status) {
+    Status::Pending => { System.log("p"); yield "Loading..."; };
+    else => "Ready";
+};
+// As a statement (side effects only), yield is optional:
+match (status) {
+    Status::Error => { System.log("err"); };
+    else => { System.log("ok"); };
+};
+// Literal patterns and pod patterns with field binding:
+string t = match (code) { 200 => "OK"; 404 => "Not Found"; else => "?"; };
+string d = match (p) {
+    Point{x = 0.0, y = 0.0} => "Origin";
+    Point{x, y} => "at (${x}, ${y})";
+};
+
+// Loops
+for i in 0:10 { sum += i; }     // range [0, 10) -> 0..9 (end exclusive)
+for score in scores { total += score; }   // foreach over array
+for key in someMap { }          // foreach over map keys
+```
+
+### Operators
+```coi
++ - * / %                       // arithmetic (/ is integer division on ints)
+== != < > <= >=                 // comparison
+&& || !                         // logical
+& | ^ ~ << >>                   // bitwise; compound: &= |= ^= <<= >>=
+= += -= *= /= ++ --             // assignment
+:=                              // MOVE assignment (source becomes invalid)
+```
+
+### Reference and move semantics
+| Call form | Meaning | Original after call |
+|-----------|---------|---------------------|
+| `f(value)` | copy | valid, unchanged |
+| `f(&value)` | borrow (reference) | valid, may be modified |
+| `f(:value)` | move (transfer ownership) | invalid |
+
+```coi
+def inc(mut int& v) : void { v++; }
+mut int c = 0; inc(&c);          // c == 1
+
+def consume(string s) : void { System.log(s); }
+string m = "hi"; consume(:m);    // m invalid afterward
+```
+**No-copy types** (platform handles: `Canvas`, `CanvasContext2D`, `DOMElement`, `Image`,
+`Audio`, `WebSocket`, `FetchRequest`, `WebGLContext`, `WGPUContext`, ...) cannot be copied,
+only moved (`:=`) or referenced (`&`). Arrays of them cannot be copied either.
+
+### Functions
+```coi
+def add(int a, int b) : int { return a + b; }   // return type after ':'
+def greet(string n) : void { System.log("Hi " + n); }   // 'void' if no return
+pub def reset() : void { count = 0; }            // pub -> callable from outside
+
+// Generics (type params Uppercase):
+def first<T>(T[] items) : T { return items[0]; }
+def makePair<A, B>(A a, B b) : Pair<A, B> { return Pair<A, B>{a, b}; }
+```
+
+**Function references / callbacks.** Function-typed variables hold callables:
+```coi
+component EventManager {
+    mut def eventHandler(string) : void = &handleNoop;  // state fn var must be mut
+    def handleNoop(string msg) : void { }
+    pub def onEvent(def handler(string) : void) : void {
+        eventHandler = handler;    // handler is already a value: NO '&'
+    }
+    def run() : void { eventHandler = &handleNoop; }  // assigning a NAME needs '&'
+}
+```
+Rule: assigning a function NAME (a method symbol) needs `&`; assigning an existing
+function VALUE (a parameter/variable) does not.
+
+### Signals and listeners (component-to-component events)
+```coi
+component Timer {
+    pub signal tick(int seconds);       // pub if listeners live in other modules
+    mut int elapsed = 0;
+    def step() : void { elapsed += 1; emit tick(elapsed); }
+}
+component Dashboard(mut Timer& timer) { // receives the emitter by reference
+    mut int last = 0;
+    listen {
+        timer.tick => (int seconds) { last = seconds; }
+    }
+}
+```
+
+### Math library (all via `Math.`)
+```coi
+Math.PI  Math.HALF_PI  Math.TAU  Math.DEG2RAD  Math.RAD2DEG
+Math.abs(x)  Math.sqrt(x)
+Math.sin(x)  Math.cos(x)  Math.tan(x)          // radians
+Math.random()  Math.random(seed)               // [0.0, 1.0)
+Math.min(a,b)  Math.max(a,b)  Math.clamp(v,lo,hi)  Math.lerp(a,b,t)
+Math.floor(x)  Math.ceil(x)  Math.round(x)
+```
+
+---
+
+## 4. Components
+
+### Structure and reactivity
+```coi
+component Counter {
+    mut int count = 0;                 // reactive state
+    def increment() : void { count += 1; }   // assigning count re-renders {count}
+    style { button { padding: 8px 16px; } }
+    view {
+        <div>
+            <span>{count}</span>
+            <button onclick={increment}>+</button>
+        </div>
+    }
+}
+```
+
+### Mutability (`mut`) x Visibility (`pub`)
+| Declaration | Inside | Outside | Meaning |
+|-------------|--------|---------|---------|
+| `int x` | read | hidden | private constant |
+| `mut int x` | read/write | hidden | private mutable state |
+| `pub int x` | read | read | public constant |
+| `pub mut int x` | read/write | read | public state (read-only from outside) |
+| `def m() : void` | callable | hidden | private method |
+| `pub def m() : void` | callable | callable | public method |
+
+You can NEVER write another component's member from outside. To let a child change parent
+state, pass a reference parameter or a callback, or expose a public setter method.
+
+### Component parameters (constructor-style)
+```coi
+component Editor(
+    string label,          // value (copied by default; move at call site with :)
+    mut int& value,        // reference (two-way binding to parent state)
+    int step = 1,          // value with default
+    def onChange : void    // callback (no args); or def onX(int) : void
+) {
+    def bump() : void { value += step; onChange(); }
+    view { <button onclick={bump}>{label}</button> }
+}
+```
+Passing modes at the call site (in a view):
+| Syntax | Mode |
+|--------|------|
+| `prop={value}` | copy |
+| `&prop={value}` | reference (child can modify parent's value / callback) |
+| `:prop={value}` | move (ownership transferred to child) |
+
+### Lifecycle
+```
+init {}     runs BEFORE the view; no DOM yet; set up state
+view {}     declares the DOM
+mount {}    runs AFTER the view; DOM ready; do Canvas/measurements here
+tick(float dt) {}  runs every frame; dt is seconds; animations/physics
+```
+```coi
+component App {
+    mut int[] data;
+    init { data = [1, 2, 3]; }         // no DOM access here
+    mount { }                          // DOM is ready here
+    tick(float dt) { }                 // per-frame
+}
+```
+
+### Logic-only components (no view)
+```coi
+component Timer {
+    pub mut int elapsed = 0;
+    pub mut bool running = false;
+    tick(float dt) { if (running) { elapsed++; } }
+    pub def start() : void { running = true; }
+}
+```
+
+### Construction: pods vs components
+- Pod: `User{...}` (braces).
+- Component instance in code: `TodoItem(id, text, done)` (parens, positional args).
+- Component in a view: `<TodoItem id={1} text="hi" />` (element syntax).
+- A component declared as a member is auto-constructed and persists:
+```coi
+component App {
+    mut Editor editor;                 // persists across <if> toggles
+    mut bool show = false;
+    view {
+        <div>
+            <if show> <{editor} /> </if>   // render an existing member with <{member}/>
+        </div>
+    }
+}
+```
+Components rendered inside `<if>` branches are destroyed when the branch is hidden; declare
+them as members to preserve their state.
+
+---
+
+## 5. View Syntax
+
+### Elements and expressions
+```coi
+view {
+    <div class="container">
+        <h1>Hello, {name}!</h1>          // {expr} embeds an expression
+        <p>Double: {count * 2}</p>
+    </div>
+}
+```
+
+### Event handlers
+| Event | Handler signature | Payload |
+|-------|-------------------|---------|
+| `onclick` | `def h() : void` | none |
+| `oninput` | `def h(string value) : void` | current input value |
+| `onchange` | `def h(string value) : void` | value after blur |
+| `onkeydown` | `def h(int keycode) : void` | key code |
+```coi
+<button onclick={increment}>+</button>          // bare method (no args)
+<button onclick={toggle(task.id)}>x</button>    // call form passes specific args
+<input value={query} oninput={handleInput} />   // handleInput(string value)
+<input onkeydown={handleKey} />                  // handleKey(int keycode); Enter=13, Esc=27
+```
+
+### Element references: bind a DOM element to a handle with `&={var}`
+```coi
+component CanvasApp {
+    mut Canvas canvas;
+    mount { canvas.setSize(800, 600); }
+    view { <canvas &={canvas}></canvas> }
+}
+```
+
+### Conditionals (note the closing tag order)
+```coi
+<if showContent>
+    <p>Visible</p>
+</if>
+
+<if status == "active">
+    <span class="green">Active</span>
+<else>
+    <span class="red">Inactive</span>
+</else>
+</if>
+```
+
+### Lists
+```coi
+<for i in 0:count>                     // range loop
+    <div>Item {i}</div>
+</for>
+
+<for todo in todos key={todo.id}>      // ARRAY loops REQUIRE key={...}
+    <{todo} &onRemove={removeTodo} />  // render component item; bind extra props
+</for>
+```
+With a keyed loop: same key -> DOM reused, new key -> created, missing key -> destroyed,
+reorder -> nodes moved.
+
+### Child components and prop passing
+```coi
+<Header title="My App" />              // static string prop
+<Button label="Click" size={24} />     // copy props
+<Counter &count={score} />             // reference prop (two-way)
+<Consumer :data={text} />              // move prop
+<ListItem &onRemove={handleRemove} />  // callback by reference
+```
+
+### Special elements
+```coi
+<raw>{htmlString}</raw>    // inject trusted HTML (NO sanitization; never pass user input)
+<slot />                   // placeholder for children (composition)
+<route />                  // renders the component matching the current route (see Routing)
+```
+
+### Dynamic styles (interpolate with single braces in the view)
+```coi
+<div class="ball" style="left: {x}px; top: {y}px; background: {color};"></div>
+```
+
+---
+
+## 6. Styling
+
+- `style { ... }` inside a component is **scoped** to that component (auto `coi-scope`).
+- `style global { ... }` applies everywhere (use for resets, base typography, `:root` vars).
+- External CSS: every `.css` in the project-root `styles/` folder is bundled into `app.css`
+  (alphabetically). The folder is not copied to `dist/`, only the bundle.
+
+```coi
+component Card {
+    style global { * { box-sizing: border-box; } }
+    style {
+        .title { font-size: 18px; font-weight: bold; }
+        button:hover { opacity: 0.9; }
+        @media (max-width: 768px) { .title { font-size: 14px; } }
+    }
+    view { <div><h2 class="title">Hi</h2></div> }
+}
+```
+Standard CSS is supported: selectors, pseudo-classes, media queries, CSS variables
+(`var(--x)`), flexbox, grid.
+
+---
+
+## 7. Client-Side Routing
+
+Define routes in a `router {}` block inside the root component and render with `<route />`.
+```coi
+import "pages/Home.coi";
+import "pages/User.coi";
+import "pages/NotFound.coi";
+
+component App {
+    router {
+        "/" => Home;
+        "/about" => About;
+        "/users/:id" => User;          // dynamic segment -> component param of same name
+        "/" => Landing(&handleLogin);  // pass props/callbacks to a route
+        else => NotFound;              // catch-all (404)
+    }
+    view { <div><NavBar /><route /><Footer /></div> }
+}
+```
+Dynamic parameters bind a URL segment to a same-named component parameter, and the parameter
+type is the constraint (parsing failure means the route does not match, so a typed param
+doubles as validation). Params may be `string`, `int`, or `bool`:
+```coi
+component User(int id) {            // /users/42 -> id = 42 ; /users/abc does NOT match
+    init { loadUser(id); }
+    view { <h1>User #{id}</h1> }
+}
+```
+Multiple params work: `"/teams/:team/users/:id"`. Path params fill by name; any remaining
+component params are filled by the explicit arguments in the router, in order.
+
+Navigate programmatically with `System.navigate("/path")`. The router reads the initial URL
+on load (direct links work) and supports browser back/forward automatically.
+
+---
+
+## 8. Platform APIs
+
+All platform types are no-copy handles (move/reference only). Static/factory methods are
+called on the Type; instance methods on an instance.
+
+### Canvas + CanvasContext2D
+Setup: declare `mut Canvas canvas;`, bind `<canvas &={canvas}></canvas>` in the view, then
+in `mount {}` call `canvas.setSize(w, h)` and `ctx = canvas.getContext2d()`.
+```coi
+component Draw {
+    mut Canvas canvas;
+    mut CanvasContext2D ctx;
+    mount { canvas.setSize(800, 600); ctx = canvas.getContext2d(); }
+    tick(float dt) {
+        ctx.clearRect(0, 0, 800, 600);
+        ctx.setFillStyle(66, 133, 244);          // RGB 0-255 (also setFillStyleStr("#hex"))
+        ctx.beginPath();
+        ctx.arc(100, 100, 20, 0, 6.28318);
+        ctx.fill();
+    }
+    view { <canvas &={canvas}></canvas> }
+}
+```
+Context methods: `fillRect strokeRect clearRect`; paths `beginPath closePath moveTo lineTo
+arc arcTo bezierCurveTo quadraticCurveTo rect ellipse fill stroke clip`; styles
+`setFillStyle(r,g,b) setFillStyleStr(css) setStrokeStyle setStrokeStyleStr setLineWidth
+setLineCap setLineJoin setGlobalAlpha setShadow`; text `setFont setTextAlign setTextBaseline
+fillText strokeText measureTextWidth`; images `drawImage drawImageScaled drawImageFull`;
+transforms `save restore translate rotate scale setTransform resetTransform`. Canvas also has
+`getContextWebgl()`, `getContextWebgpu()`, `setSize()`.
+
+### Image
+```coi
+Image photo = Image.load("assets/photo.png");   // static loader
+ctx.drawImage(photo, 0, 0);
+```
+
+### Storage (localStorage)
+```coi
+Storage.setItem("theme", "dark");
+string v = Storage.getItem("theme");     // returns "" if the key is missing
+if (!v.isEmpty()) { theme = v; }         // use .isEmpty() to detect "not set"
+Storage.removeItem("theme");
+Storage.clear();
+```
+
+### Audio
+```coi
+mut Audio music;
+mount { music = Audio.load("assets/song.mp3"); music.setVolume(0.8); }
+// play() pause() setVolume(0.0..1.0) setLoop(1|0) getCurrentTime() getDuration()
+```
+
+### System
+```coi
+System.log(msg)  System.warn(msg)  System.error(msg)
+System.setTitle(t)  System.reload()  System.openUrl(url)  System.navigate(path)
+System.getTime()            // seconds (float64, high precision)
+System.getDateNow()         // ms since epoch, UTC (float64)
+System.getTimezoneOffsetMs()// local offset from UTC in ms; add to a UTC epoch ms for local
+System.getVisibilityState() // "visible" / "hidden" / ...
+System.isHidden()           // bool
+System.random()  System.random(seed)   // [0.0, 1.0)
+```
+Note: use `System.log(...)`. There is no bare `print(...)`.
+
+### Input (keyboard)
+```coi
+if (Input.isKeyDown(37)) x -= speed * dt;   // 37/38/39/40 = Left/Up/Right/Down
+// Space=32 Enter=13 Escape=27 ; W/A/S/D = 87/65/83/68
+// Input.isKeyUp(code), Input.exitPointerLock()
+```
+
+### DOMElement (reference handle for browser APIs)
+```coi
+mut DOMElement el;
+def full() : void { el.requestFullscreen(); }   // also requestPointerLock(), scrollToTop()
+view { <video &={el} src="v.mp4"></video> }
+```
+
+### FetchRequest (HTTP; callback-based, no promises)
+```coi
+def onOk(string data) : void { result = data; }
+def onErr(string error) : void { result = "Error: " + error; }
+def load() : void {
+    FetchRequest.get("https://api.example.com/data", &onSuccess = onOk, &onError = onErr);
+}
+// FetchRequest.post(url, body, headers="", &onSuccess=..., &onError=...)
+// FetchRequest.patch(url, body, headers="", &onSuccess=..., &onError=...)
+// headers is a JSON object string, e.g. "{\"Content-Type\":\"application/json\"}"
+// onSuccess: def h(string data) : void ; onError: def h(string error) : void
+```
+
+### WebSocket
+```coi
+mut WebSocket ws;
+def onMsg(string m) : void { messages.push(m); }
+def onOpen() : void { connected = true; ws.send("hi"); }
+mount { ws = WebSocket.connect("wss://host", &onMessage = onMsg, &onOpen = onOpen); }
+// send(msg) close() isConnected() ; callbacks onMessage(string), onOpen, onClose, onError
+```
+
+### Json (type-safe parsing against a pod schema)
+```coi
+pod User { string name; int age; string email; }
+
+def handle(string data) : void {
+    match (Json.parse(User, data)) {
+        Success(User u, Meta meta) => {
+            user = u;
+            if (meta.has(User.name)) { System.log("name present"); }
+        };
+        Error(string msg) => { System.log("parse error: " + msg); };
+    };
+}
+// Arrays: match (Json.parse(User[], json)) { Success(User[] data, UserMeta[] metas) => ...; Error(string m) => ...; };
+// Serialize: string s = Json.stringify(user);
+```
+`Json.parse(...)` must be consumed by `match` with `Success(...)`/`Error(...)`. Each pod gets
+an auto-generated Meta type; `meta.has(Type.field)` reports whether a field was present
+(JSON `null` counts as absent). Template strings make inline JSON clean.
+
+### Other
+`WebGL` (`getContextWebgl()`), `WGPU` (`getContextWebgpu()`) contexts are available for
+advanced rendering.
+
+---
+
+## 9. Modules, Imports, Visibility, Packages
+
+```coi
+// Every file may declare its module (Uppercase). No declaration -> default module.
+module TurboUI;
+pub component Button { ... }     // pub -> visible to other modules
+
+// Imports are explicit and relative; no transitive imports.
+import "ui/Button.coi";          // local, relative to this file
+import "@coi/supabase";          // package -> .coi/pkgs/coi-lang/supabase/Mod.coi
+import "@acme/utils/Button.coi"; // package -> .coi/pkgs/acme/utils/Button.coi
+```
+Rules:
+- Import every file you use directly. If A imports B and B imports C, A cannot use C unless A
+  also imports C.
+- Same module: use a component by bare name (`<Button />`). Different module: qualify with
+  `Module::Name` (`<TurboUI::Button />`).
+- `pub import "path";` re-exports (used in a package's `Mod.coi`).
+- Package imports start with `@scope/name` and resolve under `.coi/pkgs/`. Commit `coi.lock`.
+
+---
+
+## 10. Complete Example Programs (copy-paste ready)
+
+### 10.1 Counter with a reusable Button child
+```coi
+// src/ui/Button.coi
+component Button(string label = "Button", string type = "primary", def onclick : void) {
+    style {
+        button { border: none; border-radius: 8px; padding: 10px 20px; cursor: pointer; }
+        .primary { background: #9477ff; color: #fff; }
+        .secondary { background: #eee; color: #333; }
+    }
+    view { <button class={type} onclick={onclick}>{label}</button> }
+}
+
+// src/App.coi
+import "ui/Button.coi";
+component App {
+    mut int count = 0;
+    def inc() : void { count++; }
+    def dec() : void { count--; }
+    style { .box { display: flex; gap: 12px; align-items: center; padding: 40px; } }
+    view {
+        <div class="box">
+            <Button label="-" type="secondary" &onclick={dec} />
+            <span>{count}</span>
+            <Button label="+" type="primary" &onclick={inc} />
+        </div>
+    }
+}
+app { root = App; title = "Counter"; }
+```
+
+### 10.2 Todo list (state, pods vs components, keyed loop, callbacks)
+```coi
+component TodoItem(pub int id, pub string text, pub mut bool done, def onRemove(int) : void) {
+    def toggle() : void { done = !done; }
+    view {
+        <div class="item">
+            <if done>
+                <span class="done">{text}</span>
+                <button onclick={onRemove(id)}>x</button>
+            <else>
+                <div class="box" onclick={toggle}></div>
+                <span>{text}</span>
+                <button onclick={onRemove(id)}>x</button>
+            </else>
+            </if>
+        </div>
+    }
+}
+
+component TodoList {
+    mut TodoItem[] todos;
+    mut int nextId = 0;
+    init {
+        todos.push(TodoItem(nextId++, "Learn Coi", true));
+        todos.push(TodoItem(nextId++, "Build something", false));
+    }
+    def add() : void { todos.push(TodoItem(nextId++, "New task", false)); }
+    def removeTodo(int id) : void {
+        mut TodoItem[] kept;
+        for todo in todos { if (todo.id != id) { kept.push(todo); } }
+        todos = kept;                       // reassign -> reactive update
+    }
+    view {
+        <div>
+            <button onclick={add}>+ Add</button>
+            <for todo in todos key={todo.id}>
+                <{todo} &onRemove={removeTodo} />
+            </for>
+        </div>
+    }
+}
+app { root = TodoList; title = "Todos"; }
+```
+
+### 10.3 Fetch + JSON parse
+```coi
+pod Post { int id; string title; }
+component Feed {
+    mut Post[] posts = [];
+    mut string status = "Ready";
+    def onData(string data) : void {
+        match (Json.parse(Post[], data)) {
+            Success(Post[] parsed, PostMeta[] metas) => { posts = parsed; status = "Loaded"; };
+            Error(string e) => { status = "Parse error: " + e; };
+        };
+    }
+    def onErr(string e) : void { status = "Fetch error: " + e; }
+    def load() : void {
+        status = "Loading...";
+        FetchRequest.get("https://api.example.com/posts", &onSuccess = onData, &onError = onErr);
+    }
+    view {
+        <div>
+            <button onclick={load}>Load</button>
+            <p>{status}</p>
+            <for post in posts key={post.id}><div>{post.title}</div></for>
+        </div>
+    }
+}
+app { root = Feed; }
+```
+
+### 10.4 Canvas animation with a per-frame tick
+```coi
+component Bouncer {
+    mut Canvas canvas;
+    mut CanvasContext2D ctx;
+    mut float x = 100.0; mut float y = 100.0;
+    mut float dx = 3.0;  mut float dy = 2.0;
+    mount { canvas.setSize(800, 600); ctx = canvas.getContext2d(); }
+    tick(float dt) {
+        ctx.clearRect(0, 0, 800, 600);
+        ctx.setFillStyle(66, 133, 244);
+        ctx.beginPath(); ctx.arc(x, y, 20, 0, 6.28318); ctx.fill();
+        x += dx; y += dy;
+        if (x < 20 || x > 780) dx = -dx;
+        if (y < 20 || y > 580) dy = -dy;
+    }
+    view { <canvas &={canvas}></canvas> }
+}
+app { root = Bouncer; }
+```
+
+---
+
+## 11. Common Mistakes (do NOT do these)
+
+- Using `let`/`const`/`var`/`function`. Use `Type name = ...;` and `def name(...) : Ret`.
+- Omitting the return type. Always write `: void` (or the real type) after the params.
+- Using `null`/`undefined`. There is none. Use defaults ("", 0, false) and `.isEmpty()`;
+  `Storage.getItem` returns `""` when missing.
+- Constructing with `new`, or mixing braces/parens: pods use `Pod{...}`, components use
+  `Component(...)` (code) or `<Component ... />` (view).
+- Enum access with a dot: it is `Enum::Value` (cross-component shared enum: `Comp.Enum::Value`).
+- Interpolation mix-ups: in the `view`, expressions use single braces `{expr}`; in string
+  literals use `${expr}`.
+- `.length` on an array. Use `.size()` (strings use `.length()`; maps use `.size()`).
+- Forgetting `key={...}` on an array `<for>` loop (required).
+- Wrong `<if>` closing order. It is `<if c> ... <else> ... </else> </if>`.
+- Forgetting the trailing `;` after a `match` statement, or forgetting `yield` in a block arm
+  that must produce a value.
+- Mutating without `mut`, or trying to write a child's member from the parent. Pass a
+  reference (`&`) parameter, a callback, or call a public setter.
+- Passing a callback/reference without `&` in the view (`&onclick={fn}`, `&count={state}`),
+  or assigning a function NAME without `&` (`handler = &fn;`).
+- Copying a no-copy platform type (Canvas/Audio/WebSocket/...). Move (`:=`) or reference
+  (`&`) it; never store it in a pod.
+- Trying to manipulate the DOM directly, use JS `document`, or `addEventListener`. Declare UI
+  in `view {}`, bind events with `on*={...}`, and drive updates by assigning state.
+- Ranges: `for i in 0:n` excludes `n` (it is `[0, n)`).
+- Using promises/`async`/`await` or `.then()`. Fetch/WebSocket/JSON use callbacks and
+  `match`.
+- Importing something without an explicit `import` for that exact file (no transitive
+  imports), or using another module's component without the `Module::` prefix.
+
+---
+
+## 12. Pre-finish Checklist (for the AI)
+
+Before returning code, confirm:
+- [ ] Every variable/member that is reassigned is declared `mut`.
+- [ ] Every `def` has a return type; `void` when nothing is returned.
+- [ ] Types/components/enums are Uppercase; methods/variables/signals are lowercase.
+- [ ] Pods use `{}`, components use `()` / `<...>`, enums use `::`.
+- [ ] View expressions use `{}`; string interpolation uses `${}`.
+- [ ] Array `<for>` loops have `key={...}`.
+- [ ] Reference/callback props are passed with `&`; moves with `:`.
+- [ ] No `null`, `let/const/var`, `new`, promises, or direct DOM access.
+- [ ] Imports are explicit and paths are correct; cross-module uses `Module::Name`.
+- [ ] There is exactly one `app { root = ...; }` block (in the root file).
+- [ ] Prefer to verify with `coi build` (or `coi dev`) and fix any reported errors.
+
+---
+
+## 13. Resources
+
+- Repository: https://github.com/io-eric/coi
+- Docs (Markdown): `docs/getting-started.md`, `docs/language-guide.md`, `docs/components.md`,
+  `docs/view-syntax.md`, `docs/styling.md`, `docs/api-reference.md`,
+  `docs/package-manager.md`, `docs/versioning.md`, `docs/tooling.md`
+- Package registry: https://github.com/coi-lang/registry
+- Editor support: VS Code ("Coi" extension), Sublime Text, Zed
+- Community: Discord (link in the repository README)
+
+Versioning model: "Pond & Drop". The Pond is the language contract (increments only on
+breaking changes; currently Filling Pond 0). The Drop is the additive progress counter within
+a Pond. Run `coi version` to see the current values.

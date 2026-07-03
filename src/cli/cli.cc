@@ -649,6 +649,36 @@ void print_version()
     std::cout << std::endl;
 }
 
+int llms_command(bool path_only)
+{
+    // The full AI/LLM context lives next to the compiler, alongside defs/ and templates/.
+    fs::path exe_dir = get_executable_dir();
+    if (exe_dir.empty())
+    {
+        ErrorHandler::cli_error("could not determine executable directory");
+        return 1;
+    }
+
+    fs::path llms_path = exe_dir / "llms-full.txt";
+
+    if (path_only)
+    {
+        std::cout << llms_path.string() << std::endl;
+        return 0;
+    }
+
+    std::ifstream file(llms_path, std::ios::binary);
+    if (!file)
+    {
+        ErrorHandler::cli_error("could not read " + llms_path.string(),
+                                "Rebuild or reinstall Coi so llms-full.txt sits next to the compiler.");
+        return 1;
+    }
+
+    std::cout << file.rdbuf();
+    return 0;
+}
+
 void print_help(const char *program_name)
 {
     std::cout << std::endl;
@@ -667,6 +697,7 @@ void print_help(const char *program_name)
     std::cout << "    " << CYAN << program_name << " self-upgrade" << RESET << "              Pull and rebuild Coi" << std::endl;
     std::cout << "    " << CYAN << program_name << " list" << RESET << "                     List installed packages" << std::endl;
     std::cout << "    " << CYAN << program_name << " version" << RESET << "                  Show version" << std::endl;
+    std::cout << "    " << CYAN << program_name << " llms" << RESET << " [--path]            Full Coi language context for AI agents (--path: file path)" << std::endl;
     std::cout << "    " << CYAN << program_name << RESET << " <file.coi> [options]    Compile a .coi file" << std::endl;
     std::cout << std::endl;
     std::cout << "  " << BOLD << "Options:" << RESET << std::endl;
@@ -682,5 +713,6 @@ void print_help(const char *program_name)
     std::cout << "    " << DIM << "$" << RESET << " coi add supabase" << std::endl;
     std::cout << "    " << DIM << "$" << RESET << " coi add @google/package" << std::endl;
     std::cout << "    " << DIM << "$" << RESET << " coi self-upgrade" << std::endl;
+    std::cout << "    " << DIM << "$" << RESET << " coi llms > coi-context.txt   " << DIM << "# full language context for AI assistants" << RESET << std::endl;
     std::cout << std::endl;
 }
