@@ -7,12 +7,29 @@
 #include <cstdint>
 #include <sstream>
 
+// A dynamic segment captured from a route path, e.g. ":id" in "/users/:id".
+struct RouteParam {
+    std::string name;   // segment name without the ':' (e.g. "id"); binds to the
+                        // target component's param of the same name
+    std::string type;   // that param's declared type (string/int/bool), resolved
+                        // by the type checker; drives runtime parsing
+};
+
+// One slot in the target component's constructor, in declaration order. The type
+// checker computes this so codegen can fill each param from the right source.
+struct RouteCtorSlot {
+    bool is_path_param = false;  // true  -> value comes from a captured URL segment
+    int index = 0;               // index into path_params (if path) or args (if explicit)
+};
+
 // Route entry for router block
 struct RouteEntry {
-    std::string path;                              // e.g., "/", "/dashboard", "/pricing" (empty for else route)
+    std::string path;                              // e.g., "/", "/users/:id" (empty for else route)
     std::string component_name;                    // e.g., "Landing", "Dashboard"
     std::string module_name;                       // Module of the target component (filled by type checker)
-    std::vector<CallArg> args;                     // Optional component arguments (same as component construction)
+    std::vector<CallArg> args;                     // Explicit component arguments (same as component construction)
+    std::vector<RouteParam> path_params;           // ':' segments in path order (names from parser, types from type checker)
+    std::vector<RouteCtorSlot> ctor_order;         // How to fill the component constructor (built by type checker)
     bool is_default = false;                       // True for 'else' route (catch-all)
     int line = 0;
 };

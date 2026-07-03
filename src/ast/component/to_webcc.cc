@@ -1620,18 +1620,11 @@ std::string Component::to_webcc(CompilerSession &session)
 
     if (has_mount)
         ss << "        _user_mount();\n";
-    // Initialize router - get initial route from URL and render
+    // Initialize router - render the component matching the initial URL.
+    // _sync_route() matches statics, dynamic params, and the catch-all itself.
     if (router)
     {
         ss << "        _current_route = webcc::system::get_pathname();\n";
-        // Default to first route if pathname doesn't match any defined routes
-        ss << "        bool _route_matched = false;\n";
-        for (size_t i = 0; i < router->routes.size(); ++i)
-        {
-            const auto& route = router->routes[i];
-            ss << "        if (_current_route == \"" << route.path << "\") _route_matched = true;\n";
-        }
-        ss << "        if (!_route_matched) _current_route = \"" << (router->routes.empty() ? "/" : router->routes[0].path) << "\";\n";
         ss << "        _sync_route();\n";
     }
     ss << "    }\n";

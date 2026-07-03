@@ -1,0 +1,44 @@
+// Dynamic route params: navigating to /users/:id renders the routed component
+// with the parsed int param, and a non-numeric id falls through to `else`.
+component Home {
+    view { <div class="page home">Home</div> }
+}
+
+component NotFound {
+    view { <div class="page nf">Not Found</div> }
+}
+
+component User(int id) {
+    view { <div class="page usr">User <span class="uid">{id}</span></div> }
+}
+
+component App {
+    def goUser() : void { System.navigate("/users/42"); }
+    def goBad() : void { System.navigate("/users/abc"); }
+    def goHome() : void { System.navigate("/"); }
+
+    router {
+        "/" => Home;
+        "/users/:id" => User;
+        else => NotFound;
+    }
+
+    style {
+        html, body { margin: 0; padding: 0; font-family: system-ui, sans-serif; }
+        button { margin: 6px; padding: 10px 16px; font-size: 15px; cursor: pointer; }
+        .page { font-size: 28px; padding: 20px; }
+    }
+
+    view {
+        <div>
+            <div class="nav">
+                <button class="to-user" onclick={goUser}>User 42</button>
+                <button class="to-bad" onclick={goBad}>Bad</button>
+                <button class="to-home" onclick={goHome}>Home</button>
+            </div>
+            <route />
+        </div>
+    }
+}
+
+app { root = App; }
