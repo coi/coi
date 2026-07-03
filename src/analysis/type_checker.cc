@@ -1066,7 +1066,84 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
     return "unknown";
 }
 
-void validate_types(const std::vector<Component> &components, 
+// True if `raw_type` can name a variant-pattern binding: a primitive, pod, enum,
+// component, handle, the bare `Meta` placeholder, or a `<Pod>Meta` struct for a
+// known pod. Any of these may also carry a trailing `[]`.
+static bool is_known_variant_binding_type(const std::string &raw_type)
+{
+    std::string base = raw_type;
+    if (base.size() > 2 && base.substr(base.size() - 2) == "[]")
+        base = base.substr(0, base.size() - 2);
+
+    // Qualified names (Mod::Type) are registered with '_' separators.
+    auto to_underscore = [](std::string t) {
+        size_t pos;
+        while ((pos = t.find("::")) != std::string::npos)
+            t.replace(pos, 2, "_");
+        return t;
+    };
+    auto is_pod = [&](const std::string &t) {
+        return g_data_type_fields.count(t) > 0 ||
+               g_data_type_fields.count(to_underscore(t)) > 0;
+    };
+
+    static const std::set<std::string> primitives = {
+        "string", "int", "int32", "float", "float32", "float64", "double", "bool", "void", "char"};
+    if (primitives.count(base))
+        return true;
+
+    // Scalar meta bindings are written with the bare placeholder `Meta`.
+    if (base == "Meta")
+        return true;
+
+    if (is_pod(base))
+        return true;
+    if (g_enum_types.count(base) || g_enum_types.count(to_underscore(base)))
+        return true;
+    if (DefSchema::instance().is_handle(base))
+        return true;
+
+    // Per-pod meta struct: `<Pod>Meta` is valid only when `<Pod>` is a known pod.
+    if (base.size() > 4 && base.substr(base.size() - 4) == "Meta")
+    {
+        if (is_pod(base.substr(0, base.size() - 4)))
+            return true;
+    }
+
+    return false;
+}
+
+// Walk an AST subtree and reject variant patterns that bind to an unknown type.
+static void validate_variant_binding_types(ASTNode *node)
+{
+    if (!node)
+        return;
+
+    if (auto *match = dynamic_cast<MatchExpr *>(node))
+    {
+        for (const auto &arm : match->arms)
+        {
+            if (arm.pattern.kind != MatchPattern::Kind::Variant)
+                continue;
+            for (const auto &binding : arm.pattern.variant_bindings)
+            {
+                if (!is_known_variant_binding_type(binding.type))
+                {
+                    ErrorHandler::type_error(
+                        "Unknown type '" + binding.type + "' for binding '" + binding.name +
+                            "' in '" + arm.pattern.type_name + "(...)' match pattern",
+                        arm.line);
+                    exit(1);
+                }
+            }
+        }
+    }
+
+    for (auto *child : node->get_child_nodes())
+        validate_variant_binding_types(child);
+}
+
+void validate_types(const std::vector<Component> &components,
                     const std::vector<std::unique_ptr<EnumDef>> &global_enums,
                     const std::vector<std::unique_ptr<DataDef>> &global_data)
 {
@@ -1156,6 +1233,17 @@ void validate_types(const std::vector<Component> &components,
                 g_data_type_field_types[comp.module_name + "_" + comp.name + "_" + d->name] = field_types;
             }
         }
+    }
+
+    // Now that every pod/enum type is registered, check that variant match
+    // patterns bind to real types (method bodies and reactive view content).
+    for (const auto &comp : components)
+    {
+        for (const auto &method : comp.methods)
+            for (const auto &stmt : method.body)
+                validate_variant_binding_types(stmt.get());
+        for (const auto &root : comp.render_roots)
+            validate_variant_binding_types(root.get());
     }
 
     for (const auto &comp : components)
