@@ -167,6 +167,19 @@ int main(int argc, char **argv)
         return update_all_packages();
     }
 
+    // Print the full AI/LLM context (llms-full.txt), or its path with --path.
+    // Lets AI assistants and agents load the complete Coi language + API reference.
+    if (first_arg == "llms")
+    {
+        bool path_only = false;
+        for (int i = 2; i < argc; ++i)
+        {
+            if (std::string(argv[i]) == "--path")
+                path_only = true;
+        }
+        return llms_command(path_only);
+    }
+
     // From here on, we're doing actual compilation - load DefSchema
     load_def_schema();
 

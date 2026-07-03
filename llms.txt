@@ -1,0 +1,29 @@
+# Coi
+
+> Coi is a statically-typed, component-based language for building reactive web apps that
+> compile to WebAssembly. It looks JSX-like but is NOT JavaScript or TypeScript: it has static
+> types, explicit ownership (copy / reference / move), no garbage collector, no virtual DOM,
+> and fine-grained reactivity. Source files use the `.coi` extension.
+
+For AI assistants and agents: the complete, self-contained language and API reference is in
+[llms-full.txt](llms-full.txt). If the Coi compiler is installed, run `coi llms` to print that
+full context to stdout, or `coi llms --path` to print its file path. Load it before writing or
+fixing Coi code so you use correct Coi syntax instead of JavaScript/TypeScript idioms.
+
+## Docs
+
+- [Getting Started](docs/getting-started.md): install, first project, CLI, imports
+- [Language Guide](docs/language-guide.md): types, pods, enums, control flow, operators, functions, signals
+- [Components](docs/components.md): state, lifecycle, params, references, routing
+- [View Syntax](docs/view-syntax.md): JSX-like templates, `<if>`/`<for>`, events, element refs
+- [Styling](docs/styling.md): scoped and global CSS
+- [Platform APIs](docs/api-reference.md): Canvas, Storage, Audio, Fetch, WebSocket, JSON, Input
+- [Package Manager](docs/package-manager.md): registry packages, lockfile workflow
+- [Versioning](docs/versioning.md): Pond & Drop compatibility model
+- [Editor & AI Tooling](docs/tooling.md): VS Code, Sublime, Zed, and AI assistant support
+
+## Full context
+
+- [llms-full.txt](llms-full.txt): everything above distilled into one self-contained file
+  (language reference, all APIs, complete compilable examples, and a common-mistakes checklist),
+  sized for pasting into an AI assistant's context. Also available via `coi llms`.
