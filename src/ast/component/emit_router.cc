@@ -7,21 +7,6 @@ void emit_component_router_methods(std::stringstream &ss, const Component &compo
         return;
     }
 
-    // Find default route index (if any)
-    int default_route_idx = -1;
-    std::string fallback_path = "/";
-    for (size_t i = 0; i < component.router->routes.size(); ++i)
-    {
-        if (component.router->routes[i].is_default)
-        {
-            default_route_idx = static_cast<int>(i);
-        }
-        else if (fallback_path == "/" || i == 0)
-        {
-            fallback_path = component.router->routes[i].path;
-        }
-    }
-
     // navigate() method - changes route and updates browser URL
     ss << "    void navigate(const coi::string& route) {\n";
     ss << "        if (_current_route == route) return;\n";
@@ -39,7 +24,7 @@ void emit_component_router_methods(std::stringstream &ss, const Component &compo
     ss << "        _sync_route();\n";
     ss << "    }\n";
 
-    // _sync_route() method - destroys old component and creates new one
+    // _sync_route() method - destroys old component and creates the matching one
     ss << "    void _sync_route() {\n";
     // First destroy any existing route component
     for (size_t i = 0; i < component.router->routes.size(); ++i)
@@ -47,19 +32,23 @@ void emit_component_router_methods(std::stringstream &ss, const Component &compo
         ss << "        if (_route_" << i << ") { _route_" << i << "->_destroy(); delete _route_" << i << "; _route_" << i << " = nullptr; }\n";
     }
 
-    // Helper lambda to generate component creation code
-    auto emit_route_creation = [&](size_t i, const RouteEntry &route)
+    // Emit the target component's constructor arguments, filling each param from
+    // either a captured path param (_rp_<i>_<k>) or an explicit route argument.
+    auto emit_ctor_args = [&](size_t i, const RouteEntry &route)
     {
-        ss << "            _route_" << i << " = new " << qualified_name(route.module_name, route.component_name) << "{";
-        // Pass arguments - same handling as component construction
-        // Reference args (&) that are identifiers are callbacks and need lambda wrapping
-        for (size_t j = 0; j < route.args.size(); ++j)
+        for (size_t s = 0; s < route.ctor_order.size(); ++s)
         {
-            if (j > 0)
+            if (s > 0)
                 ss << ", ";
-            const auto &arg = route.args[j];
+            const auto &slot = route.ctor_order[s];
+            if (slot.is_path_param)
+            {
+                ss << "_rp_" << i << "_" << slot.index;
+                continue;
+            }
 
-            // Check if this is a callback (reference to a method identifier)
+            // Explicit argument - same handling as component construction.
+            const auto &arg = route.args[slot.index];
             if (arg.is_reference)
             {
                 if (auto *ident = dynamic_cast<Identifier *>(arg.value.get()))
@@ -73,71 +62,108 @@ void emit_component_router_methods(std::stringstream &ss, const Component &compo
                             break;
                         }
                     }
-
                     if (is_method_ref)
-                    {
-                        // Wrap method reference in a lambda
                         ss << "[this]() { this->" << ident->name << "(); }";
-                    }
                     else
-                    {
-                        // Reference to a variable - pass as pointer
                         ss << "&(" << ident->name << ")";
-                    }
                 }
                 else
                 {
-                    // Reference to a variable - pass as pointer
                     ss << "&(" << arg.value->to_webcc() << ")";
                 }
             }
             else if (arg.is_move)
             {
-                // Move semantics
                 ss << "std::move(" << arg.value->to_webcc() << ")";
             }
             else
             {
-                // Regular value copy
                 ss << arg.value->to_webcc();
             }
         }
-        ss << "};\n";
-        ss << "            _route_" << i << "->view(_route_parent);\n";
-        // Move the routed component's root element before the anchor
-        ss << "            webcc::dom::insert_before(_route_parent, _route_" << i << "->_get_root_element(), _route_anchor);\n";
-        ss << "            webcc::flush();\n";
     };
 
-    // Create the component for matching route and insert before anchor
-    bool first = true;
+    // Emit creation, mounting, and early-return for a matched route.
+    auto emit_route_mount = [&](size_t i, const RouteEntry &route, const std::string &indent)
+    {
+        ss << indent << "_route_" << i << " = new " << qualified_name(route.module_name, route.component_name) << "{";
+        emit_ctor_args(i, route);
+        ss << "};\n";
+        ss << indent << "_route_" << i << "->view(_route_parent);\n";
+        ss << indent << "webcc::dom::insert_before(_route_parent, _route_" << i << "->_get_root_element(), _route_anchor);\n";
+        ss << indent << "webcc::flush();\n";
+        ss << indent << "return;\n";
+    };
+
+    // Try each non-default route in order; the first match renders and returns.
     for (size_t i = 0; i < component.router->routes.size(); ++i)
     {
         const auto &route = component.router->routes[i];
         if (route.is_default)
-            continue; // Handle default route at the end
+            continue;
 
-        ss << "        " << (first ? "if" : "else if") << " (_current_route == \"" << route.path << "\") {\n";
-        emit_route_creation(i, route);
-        ss << "        }\n";
-        first = false;
-    }
-
-    // Generate else route (default) if present
-    if (default_route_idx >= 0)
-    {
-        const auto &route = component.router->routes[default_route_idx];
-        if (first)
+        if (route.path_params.empty())
         {
-            // Only have default route
-            ss << "        {\n";
+            // Static route: exact path comparison.
+            ss << "        if (_current_route == \"" << route.path << "\") {\n";
+            emit_route_mount(i, route, "            ");
+            ss << "        }\n";
         }
         else
         {
-            ss << "        else {\n";
+            // Dynamic route: structural match, then parse each param to its type.
+            // A parse failure (e.g. "abc" for an int) leaves the route unmatched.
+            size_t k = route.path_params.size();
+            ss << "        {\n";
+            ss << "            coi::string _rc_" << i << "[" << k << "];\n";
+            ss << "            if (__coi_route::match(\"" << route.path << "\", " << route.path.size() << ", _current_route, _rc_" << i << ")) {\n";
+            ss << "                bool _ok_" << i << " = true;\n";
+            for (size_t p = 0; p < route.path_params.size(); ++p)
+            {
+                const std::string &t = route.path_params[p].type;
+                std::string lhs = "_rp_" + std::to_string(i) + "_" + std::to_string(p);
+                std::string src = "_rc_" + std::to_string(i) + "[" + std::to_string(p) + "]";
+                if (t == "int")
+                    ss << "                int " << lhs << " = __coi_route::to_int(" << src << ", _ok_" << i << ");\n";
+                else if (t == "bool")
+                    ss << "                bool " << lhs << " = __coi_route::to_bool(" << src << ", _ok_" << i << ");\n";
+                else
+                    ss << "                coi::string " << lhs << " = " << src << ";\n";
+            }
+            ss << "                if (_ok_" << i << ") {\n";
+            emit_route_mount(i, route, "                    ");
+            ss << "                }\n";
+            ss << "            }\n";
+            ss << "        }\n";
         }
-        emit_route_creation(default_route_idx, route);
-        ss << "        }\n";
+    }
+
+    // Catch-all: the 'else' route if defined, otherwise the first static route so
+    // the app always renders something for an unmatched path.
+    int default_idx = -1;
+    for (size_t i = 0; i < component.router->routes.size(); ++i)
+    {
+        if (component.router->routes[i].is_default)
+        {
+            default_idx = static_cast<int>(i);
+            break;
+        }
+    }
+    if (default_idx >= 0)
+    {
+        emit_route_mount(static_cast<size_t>(default_idx), component.router->routes[default_idx], "        ");
+    }
+    else
+    {
+        for (size_t i = 0; i < component.router->routes.size(); ++i)
+        {
+            const auto &route = component.router->routes[i];
+            if (!route.is_default && route.path_params.empty())
+            {
+                emit_route_mount(i, route, "        ");
+                break;
+            }
+        }
     }
 
     ss << "    }\n";

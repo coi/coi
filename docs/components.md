@@ -405,6 +405,67 @@ component App {
 }
 ```
 
+### Dynamic Route Parameters
+
+Capture part of the URL with a `:name` segment. The value is passed to the routed
+component as a parameter **of the same name**, which the component reads like any
+other prop:
+
+```tsx
+import "pages/User.coi";
+import "pages/NotFound.coi";
+
+component App {
+    router {
+        "/users/:id" => User;
+        else => NotFound;
+    }
+
+    view {
+        <div><route /></div>
+    }
+}
+```
+
+```tsx
+// pages/User.coi
+component User(int id) {
+    init { loadUser(id); }
+
+    view {
+        <h1>User #{id}</h1>
+    }
+}
+```
+
+Visiting `/users/42` renders `User` with `id = 42`.
+
+**The parameter's type is the constraint.** The router parses each segment to the
+component parameter's declared type. Route parameters may be `string`, `int`, or
+`bool`:
+
+- `component User(int id)`: `/users/42` matches with `id = 42`; `/users/abc`
+  does **not** match (it falls through to the next route, then `else`).
+- `component User(string id)`: `/users/abc` matches with `id = "abc"`.
+
+Because a segment that fails to parse simply doesn't match, a typed parameter
+doubles as validation: the component never receives an invalid value.
+
+**Mixing parameters and explicit arguments.** Path parameters fill the
+component's parameters by name; any remaining parameters are filled by the
+arguments passed in the router, in order:
+
+```tsx
+component User(int id, def onClose : void) { ... }
+
+router {
+    "/users/:id" => User(&handleClose);   // id from the URL, onClose passed explicitly
+}
+```
+
+Multiple parameters are supported, e.g. `"/teams/:team/users/:id"` binds both
+`team` and `id`.
+
 ### Programmatic Navigation
 
 Use `System.navigate(path)` to navigate programmatically:
@@ -431,6 +492,7 @@ component NavBar {
 ### How It Works
 
 - Routes are defined in the `router {}` block with `"path" => Component;` syntax
+- Dynamic segments (`"/users/:id"`) capture part of the URL into the component's same-named `string`/`int`/`bool` parameter
 - Use `else => Component;` as a catch-all for unmatched routes (404 page)
 - The `<route />` element renders the component matching the current URL
 - `System.navigate(path)` changes the URL and updates the view
@@ -446,6 +508,7 @@ component NavBar {
 | Render route | `<route />` | Placeholder for current route's component |
 | Navigate | `System.navigate("/path")` | Programmatically change route |
 | With props | `"/" => Page(&callback);` | Pass props to route component |
+| Dynamic param | `"/users/:id" => User;` | Capture a URL segment into `User`'s same-named param |
 
 ## Next Steps
 

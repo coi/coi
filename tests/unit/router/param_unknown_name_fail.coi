@@ -1,0 +1,23 @@
+// Test: a ':param' with no matching component parameter is a compile error.
+// The route captures ':userid' but User only declares 'id'.
+component User(int id) {
+    view {
+        <div>User {id}</div>
+    }
+}
+
+component App {
+    router {
+        "/users/:userid" => User;
+    }
+
+    view {
+        <div>
+            <route />
+        </div>
+    }
+}
+
+app {
+    root = App;
+}

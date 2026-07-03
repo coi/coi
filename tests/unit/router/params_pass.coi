@@ -1,0 +1,41 @@
+// Test: dynamic route parameter bound by name, mixed with an explicit arg
+component Home {
+    view {
+        <div>Home</div>
+    }
+}
+
+component NotFound {
+    view {
+        <div>404</div>
+    }
+}
+
+component User(int id, def onBack : void) {
+    view {
+        <div>
+            <span>User {id}</span>
+            <button onclick={onBack}>Back</button>
+        </div>
+    }
+}
+
+component App {
+    def back() : void {}
+
+    router {
+        "/" => Home;
+        "/users/:id" => User(&back);
+        else => NotFound;
+    }
+
+    view {
+        <div>
+            <route />
+        </div>
+    }
+}
+
+app {
+    root = App;
+}

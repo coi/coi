@@ -1,0 +1,36 @@
+// Test: string and bool route parameters, and multiple params in one path
+component Post(string slug) {
+    view {
+        <div>Post {slug}</div>
+    }
+}
+
+component Flag(bool on) {
+    view {
+        <div>Flag {on}</div>
+    }
+}
+
+component Member(string team, int id) {
+    view {
+        <div>{team} #{id}</div>
+    }
+}
+
+component App {
+    router {
+        "/posts/:slug" => Post;
+        "/flags/:on" => Flag;
+        "/teams/:team/members/:id" => Member;
+    }
+
+    view {
+        <div>
+            <route />
+        </div>
+    }
+}
+
+app {
+    root = App;
+}

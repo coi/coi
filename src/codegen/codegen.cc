@@ -52,6 +52,54 @@ void generate_cpp_code(
     out << "}\n";
     out << "}\n";
 
+    // Client-side route matcher + param parsers (only if a router block is used)
+    bool any_router = false;
+    for (const auto &comp : all_components)
+    {
+        if (comp.router) { any_router = true; break; }
+    }
+    if (any_router)
+    {
+        out << "namespace __coi_route {\n";
+        out << "// Match `path` against `pattern`, capturing each ':' segment into caps[] in order.\n";
+        out << "// Literal segments must match exactly and the segment counts must agree.\n";
+        out << "inline bool match(const char* pp, uint32_t pl, const coi::string& path, coi::string* caps) {\n";
+        out << "    const char* sp = path.data(); uint32_t sl = path.length();\n";
+        out << "    uint32_t pi = 0, si = 0; int cap = 0;\n";
+        out << "    while (true) {\n";
+        out << "        while (pi < pl && pp[pi] == '/') pi++;\n";
+        out << "        while (si < sl && sp[si] == '/') si++;\n";
+        out << "        bool pend = pi >= pl, send = si >= sl;\n";
+        out << "        if (pend || send) return pend && send;\n";
+        out << "        uint32_t ps = pi; while (pi < pl && pp[pi] != '/') pi++;\n";
+        out << "        uint32_t ss = si; while (si < sl && sp[si] != '/') si++;\n";
+        out << "        uint32_t plen = pi - ps, slen = si - ss;\n";
+        out << "        if (plen > 0 && pp[ps] == ':') { caps[cap++] = coi::string(sp + ss, slen); }\n";
+        out << "        else {\n";
+        out << "            if (plen != slen) return false;\n";
+        out << "            for (uint32_t k = 0; k < plen; k++) if (pp[ps + k] != sp[ss + k]) return false;\n";
+        out << "        }\n";
+        out << "    }\n";
+        out << "}\n";
+        out << "// Parsers leave `ok` untouched on success and set it false on failure, so a\n";
+        out << "// route's params can share one `ok` flag (any failure => the route doesn't match).\n";
+        out << "inline coi::string to_string(const coi::string& s, bool&) { return s; }\n";
+        out << "inline int to_int(const coi::string& s, bool& ok) {\n";
+        out << "    const char* d = s.data(); uint32_t n = s.length();\n";
+        out << "    if (n == 0) { ok = false; return 0; }\n";
+        out << "    uint32_t i = 0; bool neg = (d[0] == '-'); if (neg) { i = 1; if (n == 1) { ok = false; return 0; } }\n";
+        out << "    long v = 0;\n";
+        out << "    for (; i < n; i++) { char c = d[i]; if (c < '0' || c > '9') { ok = false; return 0; } v = v * 10 + (c - '0'); }\n";
+        out << "    return (int)(neg ? -v : v);\n";
+        out << "}\n";
+        out << "inline bool to_bool(const coi::string& s, bool& ok) {\n";
+        out << "    if (s == \"true\") return true;\n";
+        out << "    if (s == \"false\") return false;\n";
+        out << "    ok = false; return false;\n";
+        out << "}\n";
+        out << "}\n\n";
+    }
+
     // Sort components topologically so dependencies come first
     auto sorted_components = topological_sort_components(all_components);
 

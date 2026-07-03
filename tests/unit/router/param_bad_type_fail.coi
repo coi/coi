@@ -1,0 +1,23 @@
+// Test: a route parameter must be string, int, or bool. Binding ':amount' to a
+// float parameter is a compile error.
+component Payment(float amount) {
+    view {
+        <div>Pay {amount}</div>
+    }
+}
+
+component App {
+    router {
+        "/pay/:amount" => Payment;
+    }
+
+    view {
+        <div>
+            <route />
+        </div>
+    }
+}
+
+app {
+    root = App;
+}

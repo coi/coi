@@ -189,6 +189,29 @@ std::unique_ptr<RouterDef> Parser::parse_router()
                 throw std::runtime_error("Expected route path string or 'else' at line " + std::to_string(current().line));
             }
             entry.path = current().value;
+
+            // Extract dynamic ':' segments (e.g. "/users/:id" -> param "id").
+            // Names are bound to the target component by the type checker.
+            size_t seg_start = 0;
+            while (seg_start <= entry.path.size())
+            {
+                size_t slash = entry.path.find('/', seg_start);
+                size_t seg_end = (slash == std::string::npos) ? entry.path.size() : slash;
+                if (seg_end > seg_start && entry.path[seg_start] == ':')
+                {
+                    std::string name = entry.path.substr(seg_start + 1, seg_end - seg_start - 1);
+                    if (name.empty())
+                    {
+                        throw std::runtime_error("Empty route parameter name in path '" + entry.path + "' at line " + std::to_string(current().line));
+                    }
+                    RouteParam param;
+                    param.name = name;
+                    entry.path_params.push_back(std::move(param));
+                }
+                if (slash == std::string::npos) break;
+                seg_start = slash + 1;
+            }
+
             advance();
         }
 

@@ -160,6 +160,96 @@ static std::string validate_component_args(
     return "";  // Success
 }
 
+// Validate a route against its target component: bind each ':' path segment to a
+// same-named component param (must be a URL-representable primitive), fill the
+// remaining params from the explicit args, and record the constructor fill order
+// on the route for codegen. Returns an error message, or "" on success.
+static std::string validate_route(
+    RouteEntry &route,
+    const std::vector<std::unique_ptr<ComponentParam>> &params,
+    const std::string &component_name,
+    int line)
+{
+    const std::string context = "Route '" + route.path + "'";
+
+    std::map<std::string, int> path_param_idx;
+    for (size_t i = 0; i < route.path_params.size(); ++i)
+        path_param_idx[route.path_params[i].name] = static_cast<int>(i);
+
+    std::set<std::string> matched_path_params;
+    route.ctor_order.clear();
+    int explicit_idx = 0;
+
+    for (const auto &param : params)
+    {
+        auto it = path_param_idx.find(param->name);
+        if (it != path_param_idx.end())
+        {
+            // Supplied by the URL. Restrict to types a URL segment can represent,
+            // and store the category codegen parses to (int aliases to int32, etc.).
+            std::string canonical = normalize_type(param->type);
+            std::string category;
+            if (canonical == "string")
+                category = "string";
+            else if (canonical == "bool")
+                category = "bool";
+            else if (canonical == "int32")
+                category = "int";
+            else
+            {
+                return context + ": route parameter ':" + param->name + "' binds to parameter '" +
+                    param->name + "' of type '" + param->type + "', but route parameters must be " +
+                    "string, int, or bool at line " + std::to_string(line);
+            }
+            route.path_params[it->second].type = category;
+            route.ctor_order.push_back({true, it->second});
+            matched_path_params.insert(param->name);
+        }
+        else
+        {
+            // Supplied by an explicit argument, in declaration order.
+            if (explicit_idx >= static_cast<int>(route.args.size()))
+            {
+                return context + " does not supply a value for parameter '" + param->name +
+                    "' of component '" + component_name + "' (not a route parameter, and no argument given) at line " +
+                    std::to_string(line);
+            }
+            const auto &arg = route.args[explicit_idx];
+            std::string arg_name = "argument";
+            if (auto *id = dynamic_cast<Identifier *>(arg.value.get()))
+                arg_name = id->name;
+            if (param->is_callback && !arg.is_reference)
+                return context + ": callback parameter '" + param->name + "' requires '&' prefix. Use '&" +
+                    arg_name + "' at line " + std::to_string(line);
+            if (param->is_reference && !arg.is_reference)
+                return context + ": parameter '" + param->name + "' is a reference and requires '&' prefix. Use '&" +
+                    arg_name + "' at line " + std::to_string(line);
+            route.ctor_order.push_back({false, explicit_idx});
+            explicit_idx++;
+        }
+    }
+
+    // Every ':' segment must resolve to a component param.
+    for (const auto &pp : route.path_params)
+    {
+        if (!matched_path_params.count(pp.name))
+        {
+            return context + ": path parameter ':" + pp.name + "' has no matching parameter named '" +
+                pp.name + "' in component '" + component_name + "' at line " + std::to_string(line);
+        }
+    }
+
+    // No leftover explicit args.
+    if (explicit_idx != static_cast<int>(route.args.size()))
+    {
+        return context + " passes " + std::to_string(route.args.size()) + " argument(s) to component '" +
+            component_name + "' but only " + std::to_string(explicit_idx) +
+            " non-route parameter(s) remain at line " + std::to_string(line);
+    }
+
+    return "";
+}
+
 // Check if a type is a known enum type
 static bool is_enum_type(const std::string &t) {
     // Check direct match
@@ -2555,12 +2645,12 @@ void validate_view_hierarchy(const std::vector<Component> &components,
                     }
                 }
 
-                // Use shared validation for route arguments
-                std::string error = validate_component_args(
-                    route.args,
+                // Validate path params + explicit args, and record how to fill
+                // the target component's constructor for codegen.
+                std::string error = validate_route(
+                    route,
                     target_comp->params,
                     route.component_name,
-                    "Route '" + route.path + "'",
                     route.line
                 );
                 if (!error.empty())
