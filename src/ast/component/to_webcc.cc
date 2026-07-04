@@ -1033,6 +1033,10 @@ std::string Component::to_webcc(CompilerSession &session)
     for (const auto &region : loop_regions)
     {
         ss << "    void _sync_loop_" << region.loop_id << "() {\n";
+        // Skip syncing while the loop's region is unmounted: its parent handle is
+        // invalid (never rendered, or reset on teardown), so there is nowhere to
+        // insert. The loop is rendered in full when its region is (re)mounted.
+        ss << "        if (!_loop_" << region.loop_id << "_parent.is_valid()) return;\n";
 
         if (region.is_keyed)
         {
@@ -1171,6 +1175,7 @@ std::string Component::to_webcc(CompilerSession &session)
         std::string anchor_var = "_loop_" + std::to_string(region.loop_id) + "_anchor";
 
         ss << "    void _sync_loop_" << region.loop_id << "_item(int _idx) {\n";
+        ss << "        if (!" << parent_var << ".is_valid()) return;\n";
         ss << "        if (_idx < 0 || _idx >= (int)" << region.iterable_expr << ".size()) return;\n";
         ss << "        webcc::handle _ref = " << anchor_var << ";\n";
         ss << "        if (_idx < (int)" << elements_vec << ".size()) {\n";
@@ -1307,6 +1312,10 @@ std::string Component::to_webcc(CompilerSession &session)
                         ss << "            }\n";
                         ss << "            _loop_" << loop_id << "_count = 0;\n";
                     }
+                    // Mark the loop unmounted so a later _sync_loop() (fired by an
+                    // array change while the region is hidden) cleanly no-ops
+                    // instead of inserting against a detached parent/anchor.
+                    ss << "            _loop_" << loop_id << "_parent = webcc::DOMElement();\n";
                     break;
                 }
             }
@@ -1378,6 +1387,10 @@ std::string Component::to_webcc(CompilerSession &session)
                         ss << "            }\n";
                         ss << "            _loop_" << loop_id << "_count = 0;\n";
                     }
+                    // Mark the loop unmounted so a later _sync_loop() (fired by an
+                    // array change while the region is hidden) cleanly no-ops
+                    // instead of inserting against a detached parent/anchor.
+                    ss << "            _loop_" << loop_id << "_parent = webcc::DOMElement();\n";
                     break;
                 }
             }
