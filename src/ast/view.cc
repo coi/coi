@@ -700,8 +700,6 @@ void ViewIfStatement::generate_code(ViewCodegenContext& ctx)
     // Simple static if for nested loops
     if (ctx.in_loop || !ctx.if_regions || !ctx.if_counter)
     {
-        int loop_id_before = ctx.loop_counter ? *ctx.loop_counter : 0;
-
         ctx.ss << "        if (" << strip_outer_parens(condition->to_webcc()) << ") {\n";
         for (auto &child : then_children)
         {
@@ -716,15 +714,6 @@ void ViewIfStatement::generate_code(ViewCodegenContext& ctx)
             }
         }
         ctx.ss << "        }\n";
-
-        if (ctx.loop_counter && ctx.loop_regions)
-        {
-            int loop_id_after = *ctx.loop_counter;
-            for (int lid = loop_id_before; lid < loop_id_after; lid++)
-            {
-                ctx.ss << "        _loop_" << lid << "_parent = " << ctx.parent << ";\n";
-            }
-        }
         return;
     }
 
@@ -866,14 +855,6 @@ void ViewIfStatement::generate_code(ViewCodegenContext& ctx)
     ctx.ss << "        }\n";
     // Append anchor after the conditional content
     ctx.ss << "        webcc::dom::append_child(" << ctx.parent << ", _if_" << my_if_id << "_anchor);\n";
-
-    if (ctx.loop_counter && ctx.loop_regions)
-    {
-        for (int lid = loop_id_before; lid < loop_id_after_else; lid++)
-        {
-            ctx.ss << "        _loop_" << lid << "_parent = " << ctx.parent << ";\n";
-        }
-    }
 
     ctx.if_regions->push_back(region);
 }
