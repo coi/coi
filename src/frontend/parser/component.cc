@@ -477,6 +477,11 @@ void Parser::parse_app()
             app_config.lang = current().value;
             expect(TokenType::STRING_LITERAL, "Expected string");
         }
+        else if (key == "base")
+        {
+            app_config.base = current().value;
+            expect(TokenType::STRING_LITERAL, "Expected string");
+        }
         else if (key == "routes")
         {
             expect(TokenType::LBRACE, "Expected '{'");

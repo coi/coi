@@ -234,6 +234,7 @@ app {
     title = "My App";                              // Page title (<title> tag)
     description = "A description for SEO";         // Meta description
     lang = "en";                                   // HTML lang attribute (default: "en")
+    base = "/";                                     // Deploy base path (default: "/")
 }
 ```
 
@@ -243,8 +244,20 @@ app {
 | `title` | String | No | Sets the page `<title>` tag |
 | `description` | String | No | Sets `<meta name="description">` for SEO |
 | `lang` | String | No | Sets the `<html lang="">` attribute (default: `"en"`) |
+| `base` | String | No | Deploy base path, emitted as `<base href="">` (default: `"/"`) |
 
 **Note:** If you have a `styles/` folder at the project root (next to `src/`), all `.css` files in it are automatically bundled into `app.css`.
+
+**Deploying under a subpath:** Assets (`app.js`, `app.css`) and client-side routes resolve against the `base` path. When your site is served from a subpath rather than the domain root, for example a GitHub project page at `https://user.github.io/repo/`, set `base` to that subpath so assets load correctly:
+
+```tsx
+app {
+    root = App;
+    base = "/repo/";   // matches https://user.github.io/repo/
+}
+```
+
+Leave `base` as `"/"` (the default) for root deploys and local development.
 
 For client-side routing, use the `router {}` block inside your root component. See [Components](components.md#client-side-routing) for details.
 

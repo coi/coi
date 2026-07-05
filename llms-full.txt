@@ -88,8 +88,12 @@ app {
     title = "My App";                  // optional: <title>
     description = "For SEO";            // optional: <meta name="description">
     lang = "en";                       // optional: <html lang>, default "en"
+    base = "/";                        // optional: deploy base path, <base href>, default "/"
 }
 ```
+`base` sets the `<base href>` all assets and routes resolve against. Use the domain
+root `"/"` (default) for root deploys and local dev; set a subpath like `"/repo/"`
+when serving from one, e.g. a GitHub project page at `https://user.github.io/repo/`.
 
 ### Package layout (from `coi init --pkg`)
 ```

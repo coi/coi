@@ -520,12 +520,13 @@ int main(int argc, char **argv)
                 {
                     std::string lang = final_app_config.lang.empty() ? "en" : final_app_config.lang;
                     std::string title = final_app_config.title.empty() ? "Coi App" : final_app_config.title;
+                    std::string base = final_app_config.base.empty() ? "/" : final_app_config.base;
 
                     tmpl_out << "<!DOCTYPE html>\n";
                     tmpl_out << "<html lang=\"" << lang << "\">\n";
                     tmpl_out << "<head>\n";
-                    // Root-relative asset resolution so app.js/css load from nested routes (e.g. /servers/0)
-                    tmpl_out << "    <base href=\"/\">\n";
+                    // Resolve assets/routes against the deploy base (see `base` in app{}).
+                    tmpl_out << "    <base href=\"" << base << "\">\n";
                     tmpl_out << "    <meta charset=\"utf-8\">\n";
                     tmpl_out << "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, viewport-fit=cover\">\n";
                     tmpl_out << "    <title>" << title << "</title>\n";
