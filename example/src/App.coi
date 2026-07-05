@@ -53,4 +53,5 @@ app {
     title = "Coi - WebAssembly for the Modern Web";
     description = "A component-based language for high-performance web apps. Fast. Minimal. Type-safe.";
     lang = "en";
+    base = "/coi/";
 }

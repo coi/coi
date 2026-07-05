@@ -93,6 +93,9 @@ struct AppConfig {
     std::string title;
     std::string description;
     std::string lang = "en";
+    // Deploy base, emitted as <base href>. Set to a subpath (e.g. "/coi/") for
+    // subpath deploys like GitHub project pages.
+    std::string base = "/";
 };
 
 using EventMasks = std::map<std::string, uint64_t>;
