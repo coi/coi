@@ -671,7 +671,7 @@ std::string Component::to_webcc(CompilerSession &session)
 
     // Event handler bitmasks
     EventMasks masks = compute_event_masks(event_handlers);
-    emit_event_mask_constants(ss, masks);
+    emit_event_mask_constants(ss, masks, element_count);
 
     // Child component members
     emit_component_members(ss, component_members);
