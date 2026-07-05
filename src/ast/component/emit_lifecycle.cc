@@ -356,7 +356,24 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
         }
     }
 
-    bool needs_tick = has_user_tick || has_child_with_tick;
+    // Router-mounted pages are dynamic children too: if any route target has a
+    // tick, this component must forward tick to the active route. Only one
+    // _route_N is non-null at a time (see _sync_route), so the guarded forward
+    // below hits exactly the mounted page.
+    bool has_route_with_tick = false;
+    if (component.router)
+    {
+        for (auto const &route : component.router->routes)
+        {
+            if (session.components_with_tick.count(route.component_name))
+            {
+                has_route_with_tick = true;
+                break;
+            }
+        }
+    }
+
+    bool needs_tick = has_user_tick || has_child_with_tick || has_route_with_tick;
     if (needs_tick)
     {
         session.components_with_tick.insert(component.name);
@@ -377,6 +394,19 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
                 for (int i = 0; i < count; ++i)
                 {
                     ss << "        " << comp_name << "_" << i << ".tick(dt);\n";
+                }
+            }
+        }
+
+        // Forward tick to the currently-mounted route page. Route pages are heap
+        // pointers, so guard on non-null (inactive routes are nullptr).
+        if (component.router)
+        {
+            for (size_t i = 0; i < component.router->routes.size(); ++i)
+            {
+                if (session.components_with_tick.count(component.router->routes[i].component_name))
+                {
+                    ss << "        if (_route_" << i << ") _route_" << i << "->tick(dt);\n";
                 }
             }
         }
