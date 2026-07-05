@@ -25,17 +25,34 @@ const EventSpec *find_event_spec(const std::string &event_type)
 
 bool has_event_mask(const EventMasks &masks, const std::string &event_type)
 {
-    return get_event_mask(masks, event_type) != 0;
+    auto it = masks.find(event_type);
+    if (it == masks.end())
+    {
+        return false;
+    }
+    for (uint64_t word : it->second)
+    {
+        if (word != 0)
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
-uint64_t get_event_mask(const EventMasks &masks, const std::string &event_type)
+bool event_mask_test(const EventMasks &masks, const std::string &event_type, int element_id)
 {
     auto it = masks.find(event_type);
     if (it == masks.end())
     {
-        return 0;
+        return false;
     }
-    return it->second;
+    size_t word = static_cast<size_t>(element_id) >> 6;
+    if (word >= it->second.size())
+    {
+        return false;
+    }
+    return (it->second[word] & (1ULL << (element_id & 63))) != 0;
 }
 
 std::string get_event_mask_name(const std::string &event_type)
@@ -48,14 +65,17 @@ EventMasks compute_event_masks(const std::vector<EventHandler> &handlers)
     EventMasks masks;
     for (const auto &handler : handlers)
     {
-        if (handler.element_id < 64)
+        if (!find_event_spec(handler.event_type))
         {
-            uint64_t bit = 1ULL << handler.element_id;
-            if (find_event_spec(handler.event_type))
-            {
-                masks[handler.event_type] |= bit;
-            }
+            continue;
         }
+        EventMask &mask = masks[handler.event_type];
+        size_t word = static_cast<size_t>(handler.element_id) >> 6;
+        if (word >= mask.size())
+        {
+            mask.resize(word + 1, 0);
+        }
+        mask[word] |= 1ULL << (handler.element_id & 63);
     }
     return masks;
 }
@@ -73,16 +93,29 @@ std::set<int> get_elements_for_event(const std::vector<EventHandler> &handlers, 
     return elements;
 }
 
-void emit_event_mask_constants(std::stringstream &ss, const EventMasks &masks)
+void emit_event_mask_constants(std::stringstream &ss, const EventMasks &masks, int element_count)
 {
+    // Every mask is padded to cover all elements so runtime loops can index
+    // `mask[i >> 6]` for any i < element_count without going out of bounds.
+    size_t words = (element_count <= 0) ? 1 : ((static_cast<size_t>(element_count) + 63) >> 6);
     for (const auto &spec : get_event_specs())
     {
-        uint64_t mask = get_event_mask(masks, spec.type);
-        if (mask == 0)
+        if (!has_event_mask(masks, spec.type))
         {
             continue;
         }
-        ss << "    static constexpr uint64_t " << get_event_mask_name(spec.type) << " = 0x" << std::hex << mask << std::dec << "ULL;\n";
+        EventMask mask = masks.at(spec.type);
+        mask.resize(words, 0);
+        ss << "    static constexpr uint64_t " << get_event_mask_name(spec.type) << "[" << words << "] = {";
+        for (size_t w = 0; w < mask.size(); ++w)
+        {
+            if (w > 0)
+            {
+                ss << ", ";
+            }
+            ss << "0x" << std::hex << mask[w] << std::dec << "ULL";
+        }
+        ss << "};\n";
     }
 }
 
@@ -111,7 +144,7 @@ void emit_event_registration(std::stringstream &ss,
                              const std::string &call_suffix)
 {
     ss << "        for (int i = 0; i < " << element_count << "; i++) if ((" << mask_name
-       << " & (1ULL << i)) && el[i].is_valid()) " << dispatcher_name << ".set(el[i], [this, i](" << lambda_params << ") {\n";
+       << "[i >> 6] & (1ULL << (i & 63))) && el[i].is_valid()) " << dispatcher_name << ".set(el[i], [this, i](" << lambda_params << ") {\n";
     ss << "            switch(i) {\n";
     emit_handler_switch_cases(ss, handlers, event_type, call_suffix);
     ss << "            }\n";

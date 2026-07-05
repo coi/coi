@@ -36,8 +36,7 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
     auto emit_remove_handlers_for_element = [&](int el_id, const std::string &indent, const std::string &condition = "") {
         for (const auto &spec : get_event_specs())
         {
-            uint64_t mask = get_event_mask(masks, spec.type);
-            if (mask == 0 || (mask & (1ULL << el_id)) == 0)
+            if (!event_mask_test(masks, spec.type, el_id))
             {
                 continue;
             }
@@ -58,7 +57,7 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
                 continue;
             }
             ss << indent << "for (int i = 0; i < " << element_count << "; i++) if ("
-               << get_event_mask_name(spec.type) << " & (1ULL << i)) " << spec.dispatcher_name << ".remove(el[i]);\n";
+               << get_event_mask_name(spec.type) << "[i >> 6] & (1ULL << (i & 63))) " << spec.dispatcher_name << ".remove(el[i]);\n";
         }
     };
 

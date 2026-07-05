@@ -98,7 +98,10 @@ struct AppConfig {
     std::string base = "/";
 };
 
-using EventMasks = std::map<std::string, uint64_t>;
+// Per-event bitmask over element ids, stored as 64-bit words (word el>>6,
+// bit el&63) so a component may have more than 64 elements.
+using EventMask = std::vector<uint64_t>;
+using EventMasks = std::map<std::string, EventMask>;
 
 // Centralized metadata for supported DOM events used by code generation.
 struct EventSpec
@@ -114,7 +117,7 @@ struct EventSpec
 const std::vector<EventSpec> &get_event_specs();
 const EventSpec *find_event_spec(const std::string &event_type);
 bool has_event_mask(const EventMasks &masks, const std::string &event_type);
-uint64_t get_event_mask(const EventMasks &masks, const std::string &event_type);
+bool event_mask_test(const EventMasks &masks, const std::string &event_type, int element_id);
 std::string get_event_mask_name(const std::string &event_type);
 
 void emit_component_router_methods(std::stringstream &ss, const Component &component);
@@ -129,7 +132,7 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
 
 EventMasks compute_event_masks(const std::vector<EventHandler> &handlers);
 std::set<int> get_elements_for_event(const std::vector<EventHandler> &handlers, const std::string &event_type);
-void emit_event_mask_constants(std::stringstream &ss, const EventMasks &masks);
+void emit_event_mask_constants(std::stringstream &ss, const EventMasks &masks, int element_count);
 void emit_event_registration(std::stringstream &ss,
                              int element_count,
                              const std::vector<EventHandler> &handlers,
