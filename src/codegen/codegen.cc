@@ -50,6 +50,29 @@ void generate_cpp_code(
     out << "inline float cos(float x) { return webcc::cos(x); }\n";
     out << "inline float tan(float x) { return webcc::tan(x); }\n";
     out << "}\n";
+    out << "// Cast helpers backing the builtin toInt/toFloat/toString methods.\n";
+    out << "// Overloaded so one inline template stays valid for any receiver type.\n";
+    out << "inline int to_int(const string& s) { return s.to_int(); }\n";
+    out << "inline int to_int(double v) { return (int)v; }\n";
+    out << "inline int to_int(float v) { return (int)v; }\n";
+    out << "inline int to_int(int v) { return v; }\n";
+    out << "inline int to_int(unsigned int v) { return (int)v; }\n";
+    out << "inline int to_int(long v) { return (int)v; }\n";
+    out << "inline int to_int(unsigned long v) { return (int)v; }\n";
+    out << "inline int to_int(long long v) { return (int)v; }\n";
+    out << "inline int to_int(unsigned long long v) { return (int)v; }\n";
+    out << "inline double to_float(const string& s) { return s.to_float(); }\n";
+    out << "inline double to_float(double v) { return v; }\n";
+    out << "inline double to_float(float v) { return (double)v; }\n";
+    out << "inline double to_float(int v) { return (double)v; }\n";
+    out << "inline double to_float(unsigned int v) { return (double)v; }\n";
+    out << "inline double to_float(long v) { return (double)v; }\n";
+    out << "inline double to_float(unsigned long v) { return (double)v; }\n";
+    out << "inline double to_float(long long v) { return (double)v; }\n";
+    out << "inline double to_float(unsigned long long v) { return (double)v; }\n";
+    out << "inline string to_string(const string& s) { return s; }\n";
+    out << "inline string to_string(bool v) { return string(v ? \"true\" : \"false\"); }\n";
+    out << "template<typename T> inline string to_string(T v) { webcc::formatter<32> f; f << v; return string(f.c_str()); }\n";
     out << "}\n";
 
     // Client-side route matcher + param parsers (only if a router block is used)

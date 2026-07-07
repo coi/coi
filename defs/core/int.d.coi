@@ -1,57 +1,93 @@
 // Coi Built-in Integer Types
 // Explicit bit-width signed and unsigned integers
+//
+// Methods live on the concrete width types (int32 etc.) because
+// method lookup resolves aliases first (int -> int32).
+// Casts inline to coi:: overloads defined in the codegen prelude.
 
 // int is an alias for int32 (default integer type)
 @builtin
 @alias("int32")
 type int {
-    // No methods currently - use operators (+, -, *, /, %)
+    // Methods are defined on int32 (aliases resolve before method lookup)
 }
 
 // 8-bit signed integer (-128 to 127)
 @builtin
 type int8 {
-    // No methods currently - use operators (+, -, *, /, %)
+    @inline("coi::to_float(${this})")
+    def toFloat(): float
+
+    @inline("coi::to_string(${this})")
+    def toString(): string
 }
 
 // 16-bit signed integer (-32,768 to 32,767)
 @builtin
 type int16 {
-    // No methods currently - use operators (+, -, *, /, %)
+    @inline("coi::to_float(${this})")
+    def toFloat(): float
+
+    @inline("coi::to_string(${this})")
+    def toString(): string
 }
 
 // 32-bit signed integer (-2,147,483,648 to 2,147,483,647)
 @builtin
 type int32 {
-    // No methods currently - use operators (+, -, *, /, %)
+    @inline("coi::to_float(${this})")
+    def toFloat(): float
+
+    @inline("coi::to_string(${this})")
+    def toString(): string
 }
 
 // 64-bit signed integer
 @builtin
 type int64 {
-    // No methods currently - use operators (+, -, *, /, %)
+    @inline("coi::to_float(${this})")
+    def toFloat(): float
+
+    @inline("coi::to_string(${this})")
+    def toString(): string
 }
 
 // 8-bit unsigned integer (0 to 255)
 @builtin
 type uint8 {
-    // No methods currently - use operators (+, -, *, /, %)
+    @inline("coi::to_float(${this})")
+    def toFloat(): float
+
+    @inline("coi::to_string(${this})")
+    def toString(): string
 }
 
 // 16-bit unsigned integer (0 to 65,535)
 @builtin
 type uint16 {
-    // No methods currently - use operators (+, -, *, /, %)
+    @inline("coi::to_float(${this})")
+    def toFloat(): float
+
+    @inline("coi::to_string(${this})")
+    def toString(): string
 }
 
 // 32-bit unsigned integer (0 to 4,294,967,295)
 @builtin
 type uint32 {
-    // No methods currently - use operators (+, -, *, /, %)
+    @inline("coi::to_float(${this})")
+    def toFloat(): float
+
+    @inline("coi::to_string(${this})")
+    def toString(): string
 }
 
 // 64-bit unsigned integer
 @builtin
 type uint64 {
-    // No methods currently - use operators (+, -, *, /, %)
+    @inline("coi::to_float(${this})")
+    def toFloat(): float
+
+    @inline("coi::to_string(${this})")
+    def toString(): string
 }

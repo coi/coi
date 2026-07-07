@@ -1,21 +1,33 @@
 // Coi Built-in Floating Point Types
 // Explicit bit-width floating point numbers
+//
+// Methods live on the concrete width types (float32/float64) because
+// method lookup resolves aliases first (float -> float64).
+// Casts inline to coi:: overloads defined in the codegen prelude.
 
 // float is an alias for float64 (default float type)
 @builtin
 @alias("float64")
 type float {
-    // No methods currently - use operators (+, -, *, /)
+    // Methods are defined on float64 (aliases resolve before method lookup)
 }
 
 // 32-bit floating point (single precision)
 @builtin
 type float32 {
-    // No methods currently - use operators (+, -, *, /)
+    @inline("coi::to_int(${this})")
+    def toInt(): int
+
+    @inline("coi::to_string(${this})")
+    def toString(): string
 }
 
 // 64-bit floating point (double precision)
 @builtin
 type float64 {
-    // No methods currently - use operators (+, -, *, /)
+    @inline("coi::to_int(${this})")
+    def toInt(): int
+
+    @inline("coi::to_string(${this})")
+    def toString(): string
 }

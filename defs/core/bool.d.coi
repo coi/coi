@@ -3,5 +3,10 @@
 
 @builtin
 type bool {
-    // No methods - use operators (&&, ||, !)
+    // Casts inline to coi:: overloads defined in the codegen prelude
+    @inline("coi::to_int(${this})")
+    def toInt(): int
+
+    @inline("coi::to_string(${this})")
+    def toString(): string
 }

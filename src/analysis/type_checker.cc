@@ -883,6 +883,14 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                     }
                 }
             }
+
+            // Use DefSchema for other builtin-type instance methods
+            // (e.g. float.toInt(), int.toString(), bool.toString())
+            if (auto* method_def = DefSchema::instance().lookup_method(normalize_type(obj_type), method_name, func->args.size())) {
+                if (method_def->mapping_type == MappingType::Inline && !method_def->is_shared) {
+                    return method_def->return_type.empty() ? "void" : normalize_type(method_def->return_type);
+                }
+            }
         }
 
         std::string snake_method = DefSchema::to_snake_case(method_name);
