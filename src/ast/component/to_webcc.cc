@@ -769,6 +769,12 @@ std::string Component::to_webcc(CompilerSession &session)
         } else if (binding.type == "html") {
             // Raw HTML injection via <raw> element
             dom_call = "webcc::dom::set_inner_html(" + el_var + ", ";
+        } else if (binding.type == "textnode") {
+            // A bare interpolation that sits next to sibling elements is created as
+            // a real DOM Text node (create_text_node), not an element. Text nodes
+            // have no settable innerText, so set_inner_text is a silent no-op and
+            // the value freezes at its initial render. Update via nodeValue.
+            dom_call = "webcc::dom::set_node_value(" + el_var + ", ";
         } else {
             dom_call = "webcc::dom::set_inner_text(" + el_var + ", ";
         }
