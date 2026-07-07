@@ -20,6 +20,28 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
         }
     };
 
+    // WebSocket callbacks are registered in global dispatchers keyed by the
+    // socket handle and captured with [this]. When a component is destroyed
+    // (e.g. a routed page swapped out by _sync_route), those entries must be
+    // removed, or a later async message/open/close/error event dispatches into
+    // freed memory (use-after-free). Owned (non-reference) WebSocket members are
+    // torn down here; any component with a WebSocket member always has the
+    // websocket feature enabled, so the g_ws_* dispatchers are guaranteed to
+    // exist.
+    auto emit_websocket_teardown = [&]() {
+        for (const auto &var : component.state)
+        {
+            if (!var || var->type != "WebSocket" || var->is_reference)
+                continue;
+            const std::string &name = var->name;
+            ss << "        if (" << name << ".is_valid()) { webcc::websocket::close(" << name << "); }\n";
+            ss << "        g_ws_message_dispatcher.remove(" << name << ");\n";
+            ss << "        g_ws_open_dispatcher.remove(" << name << ");\n";
+            ss << "        g_ws_close_dispatcher.remove(" << name << ");\n";
+            ss << "        g_ws_error_dispatcher.remove(" << name << ");\n";
+        }
+    };
+
     // Destroy method
     ss << "    void _destroy() {\n";
 
@@ -185,6 +207,10 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
 
     // Unregister signal listeners bound via listen { ... }
     emit_listen_unregistration();
+
+    // Tear down owned WebSocket callbacks so no async event fires into freed
+    // memory after this component is deleted.
+    emit_websocket_teardown();
 
     ss << "    }\n";
 
