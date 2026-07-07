@@ -10,7 +10,8 @@ component NumericCasts {
 
         string s = "123";
         int parsed = s.toInt();
-        float parsedFloat = "4.5".toFloat();
+        s = "4.5";
+        float parsedFloat = s.toFloat();
 
         bool flag = true;
         int flagAsInt = flag.toInt();
