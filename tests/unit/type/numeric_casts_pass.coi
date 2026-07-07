@@ -1,0 +1,41 @@
+component NumericCasts {
+    mut string result = "";
+
+    def convert() : void {
+        float f = 3.9;
+        int truncated = f.toInt();
+
+        int i = 42;
+        float widened = i.toFloat();
+
+        string s = "123";
+        int parsed = s.toInt();
+        float parsedFloat = "4.5".toFloat();
+
+        bool flag = true;
+        int flagAsInt = flag.toInt();
+
+        // toString casts feed back into string context
+        result = truncated.toString() + " " + widened.toString() + " "
+            + parsed.toString() + " " + parsedFloat.toString() + " "
+            + flag.toString() + " " + flagAsInt.toString();
+
+        // Chained cast through a member expression
+        int roundTrip = i.toFloat().toInt();
+        result = result + " " + roundTrip.toString();
+    }
+
+    style {
+        .container { padding: 20px; }
+    }
+
+    view {
+        <div class="container" onclick={convert}>
+            <p>{result}</p>
+        </div>
+    }
+}
+
+app {
+    root = NumericCasts;
+}
