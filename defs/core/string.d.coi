@@ -31,11 +31,14 @@ type string {
     @inline("${this}.trim_end()")
     def trimEnd(): string
 
-    @inline("${this}.to_int()")
+    @inline("coi::to_int(${this})")
     def toInt(): int
 
-    @inline("${this}.to_float()")
+    @inline("coi::to_float(${this})")
     def toFloat(): float
+
+    @inline("coi::to_string(${this})")
+    def toString(): string
 
     @inline("${this} += ${0}")
     def append(string suffix): void
