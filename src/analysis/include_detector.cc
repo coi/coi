@@ -13,7 +13,8 @@ static std::map<std::string, std::string> build_type_to_header()
     {
         // Get the namespace for this type (from @map annotations)
         std::string ns = schema.get_namespace_for_type(type_name);
-        if (ns.empty())
+        // coi:: helpers live in the generated prelude, not a webcc header
+        if (ns.empty() || ns == "coi")
             continue;
 
         // Map namespace to header (special cases for inline types)
@@ -34,7 +35,7 @@ static std::map<std::string, std::string> build_type_to_header()
             if (!method.return_type.empty() && schema.lookup_type(method.return_type))
             {
                 std::string return_ns = schema.get_namespace_for_type(method.return_type);
-                if (!return_ns.empty())
+                if (!return_ns.empty() && return_ns != "coi")
                 {
                     result[method.return_type] = return_ns;
                 }
@@ -45,7 +46,7 @@ static std::map<std::string, std::string> build_type_to_header()
                 if (schema.lookup_type(param.type))
                 {
                     std::string param_ns = schema.get_namespace_for_type(param.type);
-                    if (!param_ns.empty())
+                    if (!param_ns.empty() && param_ns != "coi")
                     {
                         result[param.type] = param_ns;
                     }
