@@ -1233,6 +1233,10 @@ std::string Component::to_webcc(CompilerSession &session)
     for (const auto &region : if_regions)
     {
         ss << "    void _sync_if_" << region.if_id << "() {\n";
+        // Not rendered yet (e.g. state mutated through a pub method before the
+        // first view()): nothing to sync; view() renders the live condition
+        // inline. Mirrors the _loop_N_parent guard in loop syncs.
+        ss << "        if (!_if_" << region.if_id << "_parent.is_valid()) return;\n";
         ss << "        bool new_state = " << region.condition_code << ";\n";
         ss << "        if (new_state == _if_" << region.if_id << "_state) return;\n";
         ss << "        _if_" << region.if_id << "_state = new_state;\n";
