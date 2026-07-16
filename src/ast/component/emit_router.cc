@@ -7,13 +7,20 @@ void emit_component_router_methods(std::stringstream &ss, const Component &compo
         return;
     }
 
-    // navigate() method - changes route and updates browser URL
+    // navigate() method - changes route and updates browser URL.
+    // The actual route swap is DEFERRED to _apply_route() (called from
+    // update_wrapper at a safe point): navigate() is typically invoked from a
+    // method of the route component that is about to be destroyed, and a
+    // synchronous _sync_route() would delete that component while its method
+    // is still on the stack. The generated epilogue (_update_*/_sync_if_*)
+    // would then run on freed memory — use-after-free, DOM handle garbage,
+    // and eventually OOB crashes (timing/data dependent).
     ss << "    void navigate(const coi::string& route) {\n";
     ss << "        if (_current_route == route) return;\n";
     ss << "        _current_route = route;\n";
     ss << "        webcc::system::push_state(route);\n";
     ss << "        webcc::dom::scroll_to_top();\n";
-    ss << "        _sync_route();\n";
+    ss << "        _route_dirty = true;\n";
     ss << "    }\n";
 
     // _handle_popstate() method - called when browser back/forward buttons are clicked
@@ -21,6 +28,15 @@ void emit_component_router_methods(std::stringstream &ss, const Component &compo
     ss << "        if (_current_route == path) return;\n";
     ss << "        _current_route = path;\n";
     // For popstate, we don't need to validate - _sync_route will handle fallback via else
+    ss << "        _route_dirty = true;\n";
+    ss << "    }\n";
+
+    // _apply_route() - performs a pending route swap. Called from
+    // update_wrapper after all events/ticks have been dispatched, so no
+    // route component method is on the stack when components are destroyed.
+    ss << "    void _apply_route() {\n";
+    ss << "        if (!_route_dirty) return;\n";
+    ss << "        _route_dirty = false;\n";
     ss << "        _sync_route();\n";
     ss << "    }\n";
 

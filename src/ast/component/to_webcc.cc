@@ -703,6 +703,7 @@ std::string Component::to_webcc(CompilerSession &session)
     if (router)
     {
         ss << "    coi::string _current_route;\n";
+        ss << "    bool _route_dirty = false;\n";
         ss << "    webcc::handle _route_parent;\n";
         ss << "    webcc::handle _route_anchor;\n";
         // Generate component pointers for each route
