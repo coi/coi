@@ -239,6 +239,14 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
     // skip_dom_removal: if true, only unregisters handlers (caller will bulk-clear DOM)
     ss << "    void _remove_view(bool skip_dom_removal = false) {\n";
 
+    // Never rendered (e.g. a member component inside a region whose condition
+    // was never true): nothing to remove, no handlers to unregister, and the
+    // el/anchor handles are still invalid, so removing would warn JS-side.
+    if (root_if_id >= 0 && !if_regions.empty())
+        ss << "        if (!_if_" << root_if_id << "_anchor.is_valid()) return;\n";
+    else if (element_count > 0)
+        ss << "        if (!el[0].is_valid()) return;\n";
+
     // If we have if/else at root level, handle both branches
     if (root_if_id >= 0 && !if_regions.empty())
     {
