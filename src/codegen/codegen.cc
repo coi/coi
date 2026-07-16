@@ -414,6 +414,13 @@ void generate_cpp_code(
     {
         out << "    if (app) app->tick(dt);\n";
     }
+    if (features.router)
+    {
+        // Apply any route change requested during event dispatch or tick.
+        // Deferring the swap here guarantees no route component method is on
+        // the stack when its component gets destroyed (see emit_router.cc).
+        out << "    if (app) app->_apply_route();\n";
+    }
     out << "    webcc::flush();\n";
     out << "}\n\n";
 
