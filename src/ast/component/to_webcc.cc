@@ -20,6 +20,8 @@ static std::string make_callback_name(const std::string &var_name)
 // Transform append_child calls to insert_before for anchor-based regions
 // Transforms: webcc::dom::append_child(parent_var, el[N]);
 // To:         webcc::dom::insert_before(parent_var, el[N], anchor_var);
+// Also rewrites child component renders (which append their roots internally)
+// to the anchor-aware form: X.view(parent_var); -> X.view(parent_var, anchor_var);
 static std::string transform_to_insert_before(const std::string &code, const std::string &parent_var, const std::string &anchor_var)
 {
     std::string result;
@@ -46,6 +48,18 @@ static std::string transform_to_insert_before(const std::string &code, const std
     }
 
     result += code.substr(last_pos);
+
+    // Child components attach their own roots inside view(); pass the anchor
+    // through so they keep their position too (an invalid anchor appends).
+    std::string view_pattern = ".view(" + parent_var + ");";
+    std::string view_replacement = ".view(" + parent_var + ", " + anchor_var + ");";
+    size_t vpos = 0;
+    while ((vpos = result.find(view_pattern, vpos)) != std::string::npos)
+    {
+        result.replace(vpos, view_pattern.length(), view_replacement);
+        vpos += view_replacement.length();
+    }
+
     return result;
 }
 
@@ -1610,8 +1624,11 @@ std::string Component::to_webcc(CompilerSession &session)
         ss << "    }\n";
     }
 
-    // View method
-    ss << "    void view(webcc::handle parent = webcc::dom::get_body()) {\n";
+    // View method. _before is an optional anchor: when valid, the component's
+    // roots are inserted before it instead of appended, so components created
+    // inside anchor-based regions (<if>/<for> re-syncs) keep their position.
+    // An invalid handle appends (see dom INSERT_BEFORE: insertBefore(el, ref || null)).
+    ss << "    void view(webcc::handle parent = webcc::dom::get_body(), webcc::handle _before = webcc::handle()) {\n";
     ss << "        g_view_depth++;\n";
 
     bool has_init = false;
@@ -1627,7 +1644,10 @@ std::string Component::to_webcc(CompilerSession &session)
         ss << "        _user_init();\n";
     if (!render_roots.empty())
     {
-        ss << ss_render.str();
+        // Attach roots (and root-level child components) relative to _before.
+        // Only top-level attaches use the literal "parent" var, so nested
+        // append_child(el[N], ...) calls are untouched.
+        ss << transform_to_insert_before(ss_render.str(), "parent", "_before");
     }
     // End view - flushes only at outermost level, then register event handlers
     ss << "        if (--g_view_depth == 0) webcc::flush();\n";

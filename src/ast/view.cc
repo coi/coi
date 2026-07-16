@@ -44,6 +44,8 @@ static std::string build_forward_args(size_t count)
 // Helper to transform append_child calls to insert_before for anchor-based if regions
 // Transforms: webcc::dom::append_child(_if_X_parent, el[N]);
 // To:         webcc::dom::insert_before(_if_X_parent, el[N], _if_X_anchor);
+// Also rewrites child component renders (which append their roots internally)
+// to the anchor-aware form: X.view(_if_X_parent); -> X.view(_if_X_parent, _if_X_anchor);
 static std::string transform_to_insert_before(const std::string& code, const std::string& if_parent, const std::string& if_anchor) {
     std::string result;
     std::string search_pattern = "webcc::dom::append_child(" + if_parent + ", ";
@@ -71,9 +73,20 @@ static std::string transform_to_insert_before(const std::string& code, const std
         
         last_pos = end_pos + 2; // Skip past ");"
     }
-    
+
     // Copy remaining content
     result += code.substr(last_pos);
+
+    // Child components attach their own roots inside view(); pass the anchor
+    // through so they keep their position too (an invalid anchor appends).
+    std::string view_pattern = ".view(" + if_parent + ");";
+    std::string view_replacement = ".view(" + if_parent + ", " + if_anchor + ");";
+    size_t vpos = 0;
+    while ((vpos = result.find(view_pattern, vpos)) != std::string::npos) {
+        result.replace(vpos, view_pattern.length(), view_replacement);
+        vpos += view_replacement.length();
+    }
+
     return result;
 }
 
