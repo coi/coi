@@ -6,4 +6,5 @@ input_zindex_click|tests/integration/web/scenes/input_zindex_click.coi|web
 input_clip_click|tests/integration/web/scenes/input_clip_click.coi|web
 match_arm_reactivity_click|tests/integration/web/scenes/match_arm_reactivity_click.coi|web
 router_params_click|tests/integration/web/scenes/router_params_click.coi|web
+member_tick_click|tests/integration/web/scenes/member_tick_click.coi|web
 
