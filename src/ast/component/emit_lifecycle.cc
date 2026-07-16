@@ -1,5 +1,25 @@
 #include "component.h"
 
+// Resolve a component reference as it appears at a use site (a view child key
+// like "Button" or "TurboUI_Button", a state type like "Store" or
+// "Turbo::Store", a route target) to the canonical qualified component name
+// used as the key of session.component_info and session.components_with_tick.
+// Returns "" if the name does not refer to a component (e.g. a pod type).
+static std::string resolve_component_qname(const CompilerSession &session,
+                                           const std::string &module_name,
+                                           std::string name)
+{
+    size_t dcolon = name.find("::");
+    if (dcolon != std::string::npos)
+        name = name.substr(0, dcolon) + "_" + name.substr(dcolon + 2);
+    if (session.component_info.count(name))
+        return name;
+    std::string same_module = qualified_name(module_name, name);
+    if (session.component_info.count(same_module))
+        return same_module;
+    return "";
+}
+
 void emit_component_lifecycle_methods(std::stringstream &ss,
                                       CompilerSession &session,
                                       const Component &component,
@@ -372,14 +392,40 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
                 user_tick_has_args = true;
         }
 
+    // Whether a component reference at a use site resolves to a component that
+    // emitted a tick method. Topological sort guarantees children (view,
+    // state-member, and route dependencies alike) are emitted before their
+    // parents, so components_with_tick is complete for every name checked here.
+    auto ticks = [&](const std::string &name) {
+        std::string qname = resolve_component_qname(session, component.module_name, name);
+        return !qname.empty() && session.components_with_tick.count(qname) > 0;
+    };
+
     bool has_child_with_tick = false;
     for (auto const &[comp_name, count] : component_members)
     {
-        if (session.components_with_tick.count(comp_name))
+        if (ticks(comp_name))
         {
             has_child_with_tick = true;
             break;
         }
+    }
+
+    // Component-typed state members (e.g. a logic-only Store, or a member
+    // mounted via <{name}/>) never appear in component_members, which only
+    // covers components instantiated directly in the view, so collect them
+    // here or they would never receive tick. Reference members are skipped:
+    // the component that owns them forwards tick to them.
+    std::vector<const VarDeclaration *> tickable_state_members;
+    for (const auto &var : component.state)
+    {
+        if (var->is_reference)
+            continue;
+        std::string base_type = var->type;
+        if (base_type.ends_with("[]"))
+            base_type = base_type.substr(0, base_type.size() - 2);
+        if (ticks(base_type))
+            tickable_state_members.push_back(var.get());
     }
 
     // Router-mounted pages are dynamic children too: if any route target has a
@@ -391,7 +437,7 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
     {
         for (auto const &route : component.router->routes)
         {
-            if (session.components_with_tick.count(route.component_name))
+            if (ticks(qualified_name(route.module_name, route.component_name)))
             {
                 has_route_with_tick = true;
                 break;
@@ -399,10 +445,11 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
         }
     }
 
-    bool needs_tick = has_user_tick || has_child_with_tick || has_route_with_tick;
+    bool needs_tick = has_user_tick || has_child_with_tick || has_route_with_tick ||
+                      !tickable_state_members.empty();
     if (needs_tick)
     {
-        session.components_with_tick.insert(component.name);
+        session.components_with_tick.insert(qualified_name(component.module_name, component.name));
         ss << "    void tick(double dt) {\n";
 
         if (has_user_tick)
@@ -415,7 +462,7 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
 
         for (auto const &[comp_name, count] : component_members)
         {
-            if (session.components_with_tick.count(comp_name))
+            if (ticks(comp_name))
             {
                 for (int i = 0; i < count; ++i)
                 {
@@ -424,13 +471,22 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
             }
         }
 
+        for (const auto *var : tickable_state_members)
+        {
+            if (var->type.ends_with("[]"))
+                ss << "        for (auto &_c : " << var->name << ") _c.tick(dt);\n";
+            else
+                ss << "        " << var->name << ".tick(dt);\n";
+        }
+
         // Forward tick to the currently-mounted route page. Route pages are heap
         // pointers, so guard on non-null (inactive routes are nullptr).
         if (component.router)
         {
             for (size_t i = 0; i < component.router->routes.size(); ++i)
             {
-                if (session.components_with_tick.count(component.router->routes[i].component_name))
+                const auto &route = component.router->routes[i];
+                if (ticks(qualified_name(route.module_name, route.component_name)))
                 {
                     ss << "        if (_route_" << i << ") _route_" << i << "->tick(dt);\n";
                 }

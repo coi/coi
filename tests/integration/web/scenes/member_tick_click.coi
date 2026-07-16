@@ -1,0 +1,36 @@
+// Regression scene: a logic-only component held as a state member must
+// receive tick even though it never appears in the view. App itself has no
+// tick, so the generated App.tick exists purely to forward to the member.
+
+component FrameStore {
+    pub mut int frames = 0;
+
+    tick(float dt) {
+        frames++;
+    }
+}
+
+component App {
+    mut FrameStore store;
+    mut int sampled = -1;
+
+    def sample() : void {
+        sampled = store.frames;
+    }
+
+    style {
+        html, body { margin: 0; padding: 0; background: #0f1117; color: #e8e8e8;
+            font-family: system-ui, sans-serif; }
+        .hit { width: 100vw; height: 100vh; display: flex; align-items: center;
+            justify-content: center; user-select: none; cursor: pointer; }
+        .sampled { font-size: 40px; }
+    }
+
+    view {
+        <div class="hit hit" onclick={sample}>
+            <div class="sampled sampled">{sampled}</div>
+        </div>
+    }
+}
+
+app { root = App; }

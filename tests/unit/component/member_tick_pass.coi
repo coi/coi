@@ -1,0 +1,26 @@
+// Test: a logic-only component held as a state member gets tick forwarded
+// even though it never appears in the view
+component FrameStore {
+    pub mut int frames = 0;
+
+    tick(float dt) {
+        frames++;
+    }
+}
+
+component MemberTickPass {
+    mut FrameStore store;
+    mut int sampled = 0;
+
+    def sample() : void {
+        sampled = store.frames;
+    }
+
+    view {
+        <button onclick={sample}>{sampled}</button>
+    }
+}
+
+app {
+    root = MemberTickPass;
+}
