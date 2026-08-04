@@ -208,12 +208,13 @@ static std::string generate_ws_dispatcher(const std::string& event_type,
         }
     } else if (event_type == "onOpen") {
         return "g_ws_open_dispatcher.set(" + ws_obj + ", [this]() { this->" + callback + "(); })";
-    } else if (event_type == "onClose") {
-        std::string invalidate = ws_member.empty() ? "" : " this->" + ws_member + " = webcc::WebSocket(-1);";
-        return "g_ws_close_dispatcher.set(" + ws_obj + ", [this]() { this->" + callback + "();" + invalidate + " })";
-    } else if (event_type == "onError") {
-        std::string invalidate = ws_member.empty() ? "" : " this->" + ws_member + " = webcc::WebSocket(-1);";
-        return "g_ws_error_dispatcher.set(" + ws_obj + ", [this]() { this->" + callback + "();" + invalidate + " })";
+    } else if (event_type == "onClose" || event_type == "onError") {
+        // invalidate first so the callback sees a dead socket; guard so a stale
+        // close from a replaced socket can't clobber the new handle
+        std::string capture = ws_member.empty() ? "[this]" : "[this, " + ws_obj + "]";
+        std::string invalidate = ws_member.empty() ? "" : " if (this->" + ws_member + " == " + ws_obj + ") this->" + ws_member + " = webcc::WebSocket(-1);";
+        std::string dispatcher = event_type == "onClose" ? "g_ws_close_dispatcher" : "g_ws_error_dispatcher";
+        return dispatcher + ".set(" + ws_obj + ", " + capture + "() {" + invalidate + " this->" + callback + "(); })";
     }
     return "";
 }
