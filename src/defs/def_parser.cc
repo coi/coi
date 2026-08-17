@@ -2,6 +2,7 @@
 
 #include "def_parser.h"
 #include "../cli/error.h"
+#include <cstdint>
 #include <fstream>
 #include <sstream>
 #include <filesystem>

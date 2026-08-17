@@ -1,4 +1,5 @@
 #include "component.h"
+#include <cstdint>
 
 const std::vector<EventSpec> &get_event_specs()
 {

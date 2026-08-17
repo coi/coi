@@ -3,6 +3,7 @@
 // =============================================================================
 
 #include "json_codegen.h"
+#include <cstdint>
 #include <sstream>
 #include <cctype>
 

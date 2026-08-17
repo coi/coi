@@ -1,6 +1,7 @@
 #include "cli.h"
 #include "error.h"
 #include "version.h"
+#include <cstdint>
 #include <iostream>
 #include <fstream>
 #include <sstream>
