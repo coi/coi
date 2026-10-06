@@ -48,9 +48,12 @@ fi
 # Ensure git submodules are up to date (deps/webcc)
 if [ -d ".git" ] && [ -f ".gitmodules" ]; then
     if [ -d "deps/webcc/.git" ] || grep -q "submodule.*webcc" .gitmodules; then
-        # Check if submodule is out of sync
+        # Check if submodule is out of sync. A submodule that is checked out on a
+        # branch is being developed locally, so leave it alone instead of
+        # resetting it to the recorded commit.
         GIT_SUBMODULE_STATUS=$(git submodule status -- deps/webcc 2>/dev/null || echo "")
-        if echo "$GIT_SUBMODULE_STATUS" | grep -q '^[-+]'; then
+        if echo "$GIT_SUBMODULE_STATUS" | grep -q '^-' || \
+           { echo "$GIT_SUBMODULE_STATUS" | grep -q '^+' && ! git -C deps/webcc symbolic-ref -q HEAD >/dev/null; }; then
             echo "[Coi] Updating git submodules (deps/webcc)..."
             git submodule update --init --recursive deps/webcc
         fi
