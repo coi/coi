@@ -89,6 +89,20 @@ struct IfRegion {
     std::vector<std::string> else_member_refs;  // Member component references in else branch
 };
 
+// Deferred handles for one generated snippet, reserved in a single call when
+// the snippet runs. Each snippet gets its own name so pasting one snippet
+// into another never redeclares the variable.
+struct HandleBlock {
+    std::string name;
+    int count = 0;
+
+    HandleBlock();
+    // Expression for the next handle in this block
+    std::string next();
+    // Snippet code with the reservation prepended (if any handles were used)
+    std::string wrap(const std::string& code) const;
+};
+
 // Context for view code generation - bundles common parameters
 struct ViewCodegenContext {
     std::stringstream& ss;
@@ -105,20 +119,25 @@ struct ViewCodegenContext {
     std::vector<IfRegion>* if_regions = nullptr;
     int* if_counter = nullptr;
     std::string loop_var_name;
+    HandleBlock* handles = nullptr;  // block of the snippet that ss belongs to
 
     // Create a child context with a new parent element
     ViewCodegenContext with_parent(const std::string& new_parent) const {
         return ViewCodegenContext{ss, new_parent, counter, event_handlers, bindings,
             component_counters, method_names, parent_component_name, in_loop,
-            loop_regions, loop_counter, if_regions, if_counter, loop_var_name};
+            loop_regions, loop_counter, if_regions, if_counter, loop_var_name, handles};
     }
 
-    // Create a context for loop iteration (in_loop = true, clear region pointers)
-    ViewCodegenContext for_loop(const std::string& new_parent, const std::string& var_name) const {
-        return ViewCodegenContext{ss, new_parent, counter, event_handlers, bindings,
+    // Create a context for loop iteration (in_loop = true, clear region pointers).
+    // The body runs once per iteration, so it writes to its own snippet.
+    ViewCodegenContext for_loop(std::stringstream& body_ss, HandleBlock& body_handles,
+                                const std::string& new_parent, const std::string& var_name) const {
+        return ViewCodegenContext{body_ss, new_parent, counter, event_handlers, bindings,
             component_counters, method_names, parent_component_name, true,
-            nullptr, nullptr, nullptr, nullptr, var_name};
+            nullptr, nullptr, nullptr, nullptr, var_name, &body_handles};
     }
+
+    std::string next_handle() { return handles->next(); }
 };
 
 struct ComponentInstantiation : ASTNode {

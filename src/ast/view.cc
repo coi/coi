@@ -8,6 +8,22 @@
 // Global set of components with scoped CSS (populated in main.cc before code generation)
 std::set<std::string> g_components_with_scoped_css;
 
+static int g_handle_block_counter = 0;
+
+HandleBlock::HandleBlock() : name("_hb" + std::to_string(g_handle_block_counter++)) {}
+
+std::string HandleBlock::next()
+{
+    int k = count++;
+    return k == 0 ? name : name + " + " + std::to_string(k);
+}
+
+std::string HandleBlock::wrap(const std::string& code) const
+{
+    if (count == 0) return code;
+    return "        int32_t " + name + " = webcc::reserve_deferred_handles(" + std::to_string(count) + ");\n" + code;
+}
+
 // Helper to map Coi types to C++ types for lambda params
 static std::string coi_type_to_cpp(const std::string& type) {
     if (type == "int" || type == "int32") return "int32_t";
@@ -449,7 +465,7 @@ static void generate_view_child(ASTNode *child, ViewCodegenContext& ctx)
     {
         // Route placeholder - create anchor comment for inserting routed components
         ctx.ss << "        _route_parent = " << ctx.parent << ";\n";
-        ctx.ss << "        _route_anchor = webcc::DOMElement(webcc::next_deferred_handle());\n";
+        ctx.ss << "        _route_anchor = webcc::DOMElement(" << ctx.next_handle() << ");\n";
         ctx.ss << "        webcc::dom::create_comment_deferred(_route_anchor, \"coi-route\");\n";
         ctx.ss << "        webcc::dom::append_child(" << ctx.parent << ", _route_anchor);\n";
     }
@@ -459,9 +475,9 @@ static void generate_view_child(ASTNode *child, ViewCodegenContext& ctx)
         int text_id = ctx.counter++;
         std::string text_var = ctx.in_loop ? "_el_" + std::to_string(text_id) : "el[" + std::to_string(text_id) + "]";
         if (ctx.in_loop) {
-            ctx.ss << "        webcc::handle " << text_var << " = webcc::handle(webcc::next_deferred_handle());\n";
+            ctx.ss << "        webcc::handle " << text_var << " = webcc::handle(" << ctx.next_handle() << ");\n";
         } else {
-            ctx.ss << "        " << text_var << " = webcc::DOMElement(webcc::next_deferred_handle());\n";
+            ctx.ss << "        " << text_var << " = webcc::DOMElement(" << ctx.next_handle() << ");\n";
         }
         ctx.ss << "        webcc::dom::create_text_node_deferred(" << text_var << ", " << textNode->to_webcc() << ");\n";
         ctx.ss << "        webcc::dom::append_child(" << ctx.parent << ", " << text_var << ");\n";
@@ -472,9 +488,9 @@ static void generate_view_child(ASTNode *child, ViewCodegenContext& ctx)
         int text_id = ctx.counter++;
         std::string text_var = ctx.in_loop ? "_el_" + std::to_string(text_id) : "el[" + std::to_string(text_id) + "]";
         if (ctx.in_loop) {
-            ctx.ss << "        webcc::handle " << text_var << " = webcc::handle(webcc::next_deferred_handle());\n";
+            ctx.ss << "        webcc::handle " << text_var << " = webcc::handle(" << ctx.next_handle() << ");\n";
         } else {
-            ctx.ss << "        " << text_var << " = webcc::DOMElement(webcc::next_deferred_handle());\n";
+            ctx.ss << "        " << text_var << " = webcc::DOMElement(" << ctx.next_handle() << ");\n";
         }
         
         std::string code = expr->to_webcc();
@@ -514,7 +530,7 @@ void HTMLElement::generate_code(ViewCodegenContext& ctx)
     {
         // In loops, use local variable but still deferred creation
         var = "_el_" + std::to_string(my_id);
-        ctx.ss << "        webcc::handle " << var << " = webcc::handle(webcc::next_deferred_handle());\n";
+        ctx.ss << "        webcc::handle " << var << " = webcc::handle(" << ctx.next_handle() << ");\n";
         if (has_scoped_css) {
             ctx.ss << "        webcc::dom::create_element_deferred_scoped(" << var << ", \"" << tag << "\", \"" << ctx.parent_component_name << "\");\n";
         } else {
@@ -525,7 +541,7 @@ void HTMLElement::generate_code(ViewCodegenContext& ctx)
     {
         // Outside loops, store in el[] array with deferred creation
         var = "el[" + std::to_string(my_id) + "]";
-        ctx.ss << "        " << var << " = webcc::DOMElement(webcc::next_deferred_handle());\n";
+        ctx.ss << "        " << var << " = webcc::DOMElement(" << ctx.next_handle() << ");\n";
         if (has_scoped_css) {
             ctx.ss << "        webcc::dom::create_element_deferred_scoped(" << var << ", \"" << tag << "\", \"" << ctx.parent_component_name << "\");\n";
         } else {
@@ -845,14 +861,16 @@ void ViewIfStatement::generate_code(ViewCodegenContext& ctx)
     std::map<std::string, int> comp_counters_before_then = ctx.component_counters;
 
     std::stringstream then_ss;
+    HandleBlock then_handles;
     std::vector<Binding> then_bindings;
     ViewCodegenContext then_ctx{then_ss, if_parent, ctx.counter, ctx.event_handlers, then_bindings,
         ctx.component_counters, ctx.method_names, ctx.parent_component_name, false,
-        ctx.loop_regions, ctx.loop_counter, ctx.if_regions, ctx.if_counter, ctx.loop_var_name};
+        ctx.loop_regions, ctx.loop_counter, ctx.if_regions, ctx.if_counter, ctx.loop_var_name, &then_handles};
     for (auto &child : then_children)
     {
         generate_view_child(child.get(), then_ctx);
     }
+    std::string then_code = then_handles.wrap(then_ss.str());
     int counter_after_then = ctx.counter;
     int loop_id_after_then = ctx.loop_counter ? *ctx.loop_counter : 0;
     int if_id_after_then = *ctx.if_counter;
@@ -883,7 +901,7 @@ void ViewIfStatement::generate_code(ViewCodegenContext& ctx)
         collect_member_refs(child.get(), region.then_member_refs);
     }
 
-    region.then_creation_code = then_ss.str();
+    region.then_creation_code = then_code;
 
     int counter_before_else = ctx.counter;
     int loop_id_before_else = ctx.loop_counter ? *ctx.loop_counter : 0;
@@ -891,10 +909,11 @@ void ViewIfStatement::generate_code(ViewCodegenContext& ctx)
     std::map<std::string, int> comp_counters_before_else = ctx.component_counters;
 
     std::stringstream else_ss;
+    HandleBlock else_handles;
     std::vector<Binding> else_bindings;
     ViewCodegenContext else_ctx{else_ss, if_parent, ctx.counter, ctx.event_handlers, else_bindings,
         ctx.component_counters, ctx.method_names, ctx.parent_component_name, false,
-        ctx.loop_regions, ctx.loop_counter, ctx.if_regions, ctx.if_counter, ctx.loop_var_name};
+        ctx.loop_regions, ctx.loop_counter, ctx.if_regions, ctx.if_counter, ctx.loop_var_name, &else_handles};
     if (!else_children.empty())
     {
         for (auto &child : else_children)
@@ -902,6 +921,7 @@ void ViewIfStatement::generate_code(ViewCodegenContext& ctx)
             generate_view_child(child.get(), else_ctx);
         }
     }
+    std::string else_code = else_handles.wrap(else_ss.str());
     int counter_after_else = ctx.counter;
     int loop_id_after_else = ctx.loop_counter ? *ctx.loop_counter : 0;
     int if_id_after_else = *ctx.if_counter;
@@ -934,8 +954,8 @@ void ViewIfStatement::generate_code(ViewCodegenContext& ctx)
 
     // Transform creation code to use insert_before with anchor for _sync operations
     std::string if_anchor = "_if_" + std::to_string(my_if_id) + "_anchor";
-    region.then_creation_code = transform_to_insert_before(then_ss.str(), if_parent, if_anchor);
-    region.else_creation_code = transform_to_insert_before(else_ss.str(), if_parent, if_anchor);
+    region.then_creation_code = transform_to_insert_before(then_code, if_parent, if_anchor);
+    region.else_creation_code = transform_to_insert_before(else_code, if_parent, if_anchor);
 
     // Nested regions run first, so the first region to claim a binding is the
     // innermost one; outer regions only extend the chain.
@@ -955,15 +975,15 @@ void ViewIfStatement::generate_code(ViewCodegenContext& ctx)
     // Create anchor comment and append to parent
     ctx.ss << "        _if_" << my_if_id << "_parent = " << ctx.parent << ";\n";
     // Use deferred creation for comment anchors
-    ctx.ss << "        _if_" << my_if_id << "_anchor = webcc::DOMElement(webcc::next_deferred_handle());\n";
+    ctx.ss << "        _if_" << my_if_id << "_anchor = webcc::DOMElement(" << ctx.next_handle() << ");\n";
     ctx.ss << "        webcc::dom::create_comment_deferred(_if_" << my_if_id << "_anchor, \"coi-⚓\");\n";
     ctx.ss << "        if (" << strip_outer_parens(region.condition_code) << ") {\n";
     ctx.ss << "        _if_" << my_if_id << "_state = true;\n";
     // Use original append_child for initial render (before anchor is in DOM)
-    ctx.ss << then_ss.str();
+    ctx.ss << then_code;
     ctx.ss << "        } else {\n";
     ctx.ss << "        _if_" << my_if_id << "_state = false;\n";
-    ctx.ss << else_ss.str();
+    ctx.ss << else_code;
     ctx.ss << "        }\n";
     // Append anchor after the conditional content
     ctx.ss << "        webcc::dom::append_child(" << ctx.parent << ", _if_" << my_if_id << "_anchor);\n";
@@ -991,7 +1011,7 @@ void ViewRawElement::generate_code(ViewCodegenContext& ctx)
     if (ctx.in_loop)
     {
         var = "_el_" + std::to_string(my_id);
-        ctx.ss << "        webcc::handle " << var << " = webcc::handle(webcc::next_deferred_handle());\n";
+        ctx.ss << "        webcc::handle " << var << " = webcc::handle(" << ctx.next_handle() << ");\n";
         if (has_scoped_css) {
             ctx.ss << "        webcc::dom::create_element_deferred_scoped(" << var << ", \"span\", \"" << ctx.parent_component_name << "\");\n";
         } else {
@@ -1001,7 +1021,7 @@ void ViewRawElement::generate_code(ViewCodegenContext& ctx)
     else
     {
         var = "el[" + std::to_string(my_id) + "]";
-        ctx.ss << "        " << var << " = webcc::DOMElement(webcc::next_deferred_handle());\n";
+        ctx.ss << "        " << var << " = webcc::DOMElement(" << ctx.next_handle() << ");\n";
         if (has_scoped_css) {
             ctx.ss << "        webcc::dom::create_element_deferred_scoped(" << var << ", \"span\", \"" << ctx.parent_component_name << "\");\n";
         } else {
@@ -1116,11 +1136,14 @@ void ViewForRangeStatement::generate_code(ViewCodegenContext& ctx)
     {
         ctx.ss << "        for (int " << var_name << " = " << start->to_webcc() << "; "
            << var_name << " < " << end->to_webcc() << "; " << var_name << "++) {\n";
+        std::stringstream body_ss;
+        HandleBlock body_handles;
         for (auto &child : children)
         {
-            auto loop_ctx = ctx.for_loop(ctx.parent, var_name);
+            auto loop_ctx = ctx.for_loop(body_ss, body_handles, ctx.parent, var_name);
             generate_view_child(child.get(), loop_ctx);
         }
+        ctx.ss << body_handles.wrap(body_ss.str());
         ctx.ss << "        }\n";
         return;
     }
@@ -1170,18 +1193,19 @@ void ViewForRangeStatement::generate_code(ViewCodegenContext& ctx)
 
     std::string loop_parent_var = "_loop_" + std::to_string(my_loop_id) + "_parent";
     std::stringstream item_ss;
+    HandleBlock item_handles;
     int temp_counter = ctx.counter;
     std::map<std::string, int> temp_comp_counters = ctx.component_counters;
     int root_element_id = temp_counter;
 
     ViewCodegenContext item_ctx{item_ss, loop_parent_var, temp_counter, ctx.event_handlers, ctx.bindings,
         temp_comp_counters, ctx.method_names, ctx.parent_component_name, true,
-        nullptr, nullptr, nullptr, nullptr, var_name};
+        nullptr, nullptr, nullptr, nullptr, var_name, &item_handles};
     for (auto &child : children)
     {
         generate_view_child(child.get(), item_ctx);
     }
-    region.item_creation_code = item_ss.str();
+    region.item_creation_code = item_handles.wrap(item_ss.str());
 
     if (region.is_html_loop && loop_html_element)
     {
@@ -1202,7 +1226,7 @@ void ViewForRangeStatement::generate_code(ViewCodegenContext& ctx)
 
     ctx.ss << "        _loop_" << my_loop_id << "_parent = " << ctx.parent << ";\n";
     // Create anchor element to maintain DOM position during re-syncs
-    ctx.ss << "        _loop_" << my_loop_id << "_anchor = webcc::handle(webcc::next_deferred_handle());\n";
+    ctx.ss << "        _loop_" << my_loop_id << "_anchor = webcc::handle(" << ctx.next_handle() << ");\n";
     ctx.ss << "        webcc::dom::create_text_node_deferred(_loop_" << my_loop_id << "_anchor, \"\");\n";
     ctx.ss << "        webcc::dom::append_child(" << ctx.parent << ", _loop_" << my_loop_id << "_anchor);\n";
     ctx.ss << "        _sync_loop_" << my_loop_id << "();\n";
@@ -1223,11 +1247,14 @@ void ViewForEachStatement::generate_code(ViewCodegenContext& ctx)
     if (ctx.in_loop || !key_expr || !ctx.loop_regions || !ctx.loop_counter)
     {
         ctx.ss << "        for (auto& " << var_name << " : " << iterable->to_webcc() << ") {\n";
+        std::stringstream body_ss;
+        HandleBlock body_handles;
         for (auto &child : children)
         {
-            auto loop_ctx = ctx.for_loop(ctx.parent, var_name);
+            auto loop_ctx = ctx.for_loop(body_ss, body_handles, ctx.parent, var_name);
             generate_view_child(child.get(), loop_ctx);
         }
+        ctx.ss << body_handles.wrap(body_ss.str());
         ctx.ss << "        }\n";
         return;
     }
@@ -1283,18 +1310,19 @@ void ViewForEachStatement::generate_code(ViewCodegenContext& ctx)
 
     std::string loop_parent_var = "_loop_" + std::to_string(my_loop_id) + "_parent";
     std::stringstream item_ss;
+    HandleBlock item_handles;
     int temp_counter = ctx.counter;
     std::map<std::string, int> temp_comp_counters = ctx.component_counters;
     int root_element_id = temp_counter;
 
     ViewCodegenContext item_ctx{item_ss, loop_parent_var, temp_counter, ctx.event_handlers, ctx.bindings,
         temp_comp_counters, ctx.method_names, ctx.parent_component_name, true,
-        nullptr, nullptr, nullptr, nullptr, var_name};
+        nullptr, nullptr, nullptr, nullptr, var_name, &item_handles};
     for (auto &child : children)
     {
         generate_view_child(child.get(), item_ctx);
     }
-    region.item_creation_code = item_ss.str();
+    region.item_creation_code = item_handles.wrap(item_ss.str());
 
     if (region.is_html_loop && loop_html_element)
     {
@@ -1315,7 +1343,7 @@ void ViewForEachStatement::generate_code(ViewCodegenContext& ctx)
 
     ctx.ss << "        _loop_" << my_loop_id << "_parent = " << ctx.parent << ";\n";
     // Create anchor element to maintain DOM position during re-syncs
-    ctx.ss << "        _loop_" << my_loop_id << "_anchor = webcc::handle(webcc::next_deferred_handle());\n";
+    ctx.ss << "        _loop_" << my_loop_id << "_anchor = webcc::handle(" << ctx.next_handle() << ");\n";
     ctx.ss << "        webcc::dom::create_text_node_deferred(_loop_" << my_loop_id << "_anchor, \"\");\n";
     ctx.ss << "        webcc::dom::append_child(" << ctx.parent << ", _loop_" << my_loop_id << "_anchor);\n";
     ctx.ss << "        _sync_loop_" << my_loop_id << "();\n";

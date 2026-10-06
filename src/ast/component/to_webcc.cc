@@ -357,8 +357,9 @@ std::string Component::to_webcc(CompilerSession &session)
 
     std::string qname = qualified_name(module_name, name);
     std::stringstream ss_render;
+    HandleBlock render_handles;
     ViewCodegenContext view_ctx{ss_render, "parent", element_count, event_handlers, bindings,
-        component_counters, method_names, qname, false, &loop_regions, &loop_counter, &if_regions, &if_counter, ""};
+        component_counters, method_names, qname, false, &loop_regions, &loop_counter, &if_regions, &if_counter, "", &render_handles};
     for (auto &root : render_roots)
     {
         if (auto el = dynamic_cast<HTMLElement *>(root.get()))
@@ -385,7 +386,7 @@ std::string Component::to_webcc(CompilerSession &session)
         {
             // Route placeholder - create anchor comment for inserting routed components
             ss_render << "        _route_parent = parent;\n";
-            ss_render << "        _route_anchor = webcc::DOMElement(webcc::next_deferred_handle());\n";
+            ss_render << "        _route_anchor = webcc::DOMElement(" << render_handles.next() << ");\n";
             ss_render << "        webcc::dom::create_comment_deferred(_route_anchor, \"coi-route\");\n";
             ss_render << "        webcc::dom::append_child(parent, _route_anchor);\n";
         }
@@ -1672,7 +1673,7 @@ std::string Component::to_webcc(CompilerSession &session)
         // Attach roots (and root-level child components) relative to _before.
         // Only top-level attaches use the literal "parent" var, so nested
         // append_child(el[N], ...) calls are untouched.
-        ss << transform_to_insert_before(ss_render.str(), "parent", "_before");
+        ss << transform_to_insert_before(render_handles.wrap(ss_render.str()), "parent", "_before");
     }
     // End view - flushes only at outermost level, then register event handlers
     ss << "        if (--g_view_depth == 0) webcc::flush();\n";
