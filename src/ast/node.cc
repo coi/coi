@@ -91,12 +91,19 @@ std::string convert_type(const std::string& type) {
     
     // Handle Module::ComponentName type syntax - convert to Module_ComponentName
     // This handles cross-module component types used in variable declarations
-    // Skip webcc:: types - those should stay as-is
     size_t dcolon_pos = type.find("::");
     if (dcolon_pos != std::string::npos) {
         std::string prefix = type.substr(0, dcolon_pos);
-        // Only convert if it's not a webcc type (webcc uses C++ namespace syntax)
-        if (prefix != "webcc") {
+        // A prefix that isn't a plain identifier means the :: sits inside something
+        // else, like the signature in webcc::function<void(coi::string)>. Runtime
+        // namespaces stay as they are, which also keeps this idempotent for types
+        // convert_type produced itself.
+        bool is_ident = !prefix.empty() &&
+                        (std::isalpha(static_cast<unsigned char>(prefix[0])) || prefix[0] == '_') &&
+                        std::all_of(prefix.begin(), prefix.end(), [](unsigned char c) {
+                            return std::isalnum(c) || c == '_';
+                        });
+        if (is_ident && prefix != "webcc" && prefix != "coi" && prefix != "std") {
             std::string name = type.substr(dcolon_pos + 2);
             return prefix + "_" + name;
         }
