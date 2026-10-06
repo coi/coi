@@ -4,6 +4,7 @@
 //
 // Format:
 //   [namespace]
+//   [Type]                     - @intrinsic/@inline definitions for one handle type only (uppercase = type)
 //   function_name              - Regular webcc function (auto-generates @map)
 //   // comment                 - Preserved comment (emitted before next @intrinsic/@inline)
 //   @intrinsic("x") def ...    - Raw intrinsic definition (emitted as-is)
@@ -16,7 +17,6 @@ scroll_to_top
 
 [canvas]
 create_canvas
-get_context_2d
 get_context_webgl
 get_context_webgpu
 set_size
@@ -137,6 +137,11 @@ get_uniform_location
 uniform_1f
 vertex_attrib_pointer
 draw_arrays
+
+[Canvas]
+// 2D context. lowLatency: the canvas may reach the screen without waiting for the page (less pen lag), opaque: no transparency, a bit faster
+@inline("webcc::canvas::get_context_2d(${this})") def getContext2d(): CanvasContext2D
+@inline("webcc::canvas::get_context_2d(${this}, (${0} ? webcc::canvas::CONTEXT_LOW_LATENCY : 0) | (${1} ? webcc::canvas::CONTEXT_OPAQUE : 0))") def getContext2d(bool lowLatency, bool opaque): CanvasContext2D
 
 [websocket]
 send

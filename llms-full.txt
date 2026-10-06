@@ -678,6 +678,7 @@ called on the Type; instance methods on an instance.
 ### Canvas + CanvasContext2D
 Setup: declare `mut Canvas canvas;`, bind `<canvas &={canvas}></canvas>` in the view, then
 in `mount {}` call `canvas.setSize(w, h)` and `ctx = canvas.getContext2d()`.
+For drawing apps, `canvas.getContext2d(true, true)` gives a low-latency, opaque context.
 ```coi
 component Draw {
     mut Canvas canvas;

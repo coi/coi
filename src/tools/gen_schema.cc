@@ -97,6 +97,11 @@ bool load_whitelist(const std::string &path)
                 // Add the intrinsic definition itself
                 INTRINSIC_DEFS[current_ns].push_back(line);
             }
+            else if (std::isupper((unsigned char)current_ns[0]))
+            {
+                std::cerr << "[Coi] Error: [" << current_ns << "] is a type section, it only takes @intrinsic/@inline lines: " << line << std::endl;
+                return false;
+            }
             else
             {
                 // Regular function name
@@ -536,9 +541,12 @@ int main()
             {
                 handle_ns = ns_it->second;
             }
-            if (!handle_ns.empty() && INTRINSIC_DEFS.count(handle_ns))
+            // [namespace] applies to every handle type of the namespace, [Type] only to that type
+            for (const std::string &key : {handle_ns, handle_type})
             {
-                for (const auto &def : INTRINSIC_DEFS[handle_ns])
+                if (key.empty() || !INTRINSIC_DEFS.count(key))
+                    continue;
+                for (const auto &def : INTRINSIC_DEFS[key])
                 {
                     out << "    " << def << "\n";
                     // Add blank line after @intrinsic/@inline definitions (not after comments)

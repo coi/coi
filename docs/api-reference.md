@@ -67,6 +67,7 @@ mut Audio[] backup := sounds;  // sounds is now invalid
 |--------|-------------|
 | `Canvas.createCanvas(dom_id, width, height)` | Create a new canvas element |
 | `canvas.getContext2d()` | Get 2D rendering context |
+| `canvas.getContext2d(lowLatency, opaque)` | Same, with options: `lowLatency` lets the canvas reach the screen without waiting for the page (less pen lag), `opaque` drops transparency (a bit faster). Only the first call per canvas decides |
 | `canvas.getContextWebgl()` | Get WebGL rendering context |
 | `canvas.getContextWebgpu()` | Get WebGPU rendering context |
 | `canvas.setSize(width, height)` | Set canvas dimensions |

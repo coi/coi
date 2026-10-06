@@ -264,7 +264,7 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
         std::string url = args[0].value->to_webcc();
         std::string ws_member = g_ws_assignment_target;  // Capture the assignment target for invalidation
         std::string code = "[&]() {\n";
-        code += "            auto _ws = webcc::websocket::connect(" + url + ", \"\");\n";
+        code += "            auto _ws = webcc::websocket::connect(" + url + ");\n";
         
         // Process callback arguments - support both positional and named
         // Positional order: onMessage, onOpen, onClose, onError
