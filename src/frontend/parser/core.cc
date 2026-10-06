@@ -233,13 +233,14 @@ void Parser::parse_file()
             is_public = true;
             advance();
             
-            // pub must be followed by component, enum, pod, or import
+            // pub must be followed by component, enum, pod, def, or import
             if (current().type != TokenType::COMPONENT && 
                 current().type != TokenType::ENUM && 
                 current().type != TokenType::POD &&
+                current().type != TokenType::DEF &&
                 current().type != TokenType::IMPORT)
             {
-                ErrorHandler::compiler_error("'pub' can only be used with component, enum, pod, or import declarations", current().line);
+                ErrorHandler::compiler_error("'pub' can only be used with component, enum, pod, def, or import declarations", current().line);
             }
         }
 
@@ -273,6 +274,14 @@ void Parser::parse_file()
             data_def->module_name = module_name;
             global_data.push_back(std::move(data_def));
         }
+        else if (current().type == TokenType::DEF)
+        {
+            int func_line = current().line;
+            auto func = std::make_unique<FunctionDef>(parse_function_def(is_public));
+            func->module_name = module_name;
+            func->line = func_line;
+            global_functions.push_back(std::move(func));
+        }
         else if (current().type == TokenType::IDENTIFIER && current().value == "app")
         {
             advance();
@@ -280,7 +289,9 @@ void Parser::parse_file()
         }
         else
         {
-            advance();
+            std::string tok = current().value.empty() ? std::to_string((int)current().type) : current().value;
+            ErrorHandler::compiler_error("Unexpected '" + tok +
+                "' at top level (expected component, pod, enum, def, import or app)", current().line);
         }
     }
 

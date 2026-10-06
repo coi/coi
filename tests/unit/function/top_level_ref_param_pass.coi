@@ -1,0 +1,30 @@
+// Test: top-level function mutating a pod through a reference param - should pass
+pod Vec2 { float x; float y; }
+
+def scale(mut Vec2& v, float k) : void {
+    v.x = v.x * k;
+    v.y = v.y * k;
+}
+
+def norm(Vec2& v) : float {
+    return Math.sqrt(v.x * v.x + v.y * v.y);
+}
+
+component App {
+    mut Vec2 pos = Vec2{3.0, 4.0};
+
+    def grow() : void {
+        scale(&pos, 2.0);
+    }
+
+    view {
+        <div>
+            <p>{pos.x}, {pos.y} ({norm(&pos)})</p>
+            <button onclick={grow}>Grow</button>
+        </div>
+    }
+}
+
+app {
+    root = App;
+}

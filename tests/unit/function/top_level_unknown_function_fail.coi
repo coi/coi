@@ -1,0 +1,14 @@
+// Test: top-level function calling a function that doesn't exist - should fail
+def twice(int n) : int {
+    return helper(n) * 2;
+}
+
+component App {
+    view {
+        <div>{twice(2)}</div>
+    }
+}
+
+app {
+    root = App;
+}

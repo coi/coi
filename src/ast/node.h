@@ -199,8 +199,7 @@ struct ComponentTypeContext {
     
     // Check if a type is component-local and return prefixed name if so
     std::string resolve(const std::string& type) const {
-        if (component_name.empty()) return type;
-        if (local_data_types.count(type) || local_enum_types.count(type)) {
+        if (!component_name.empty() && (local_data_types.count(type) || local_enum_types.count(type))) {
             return component_name + "_" + type;
         }
         std::string module_scoped = module_name.empty() ? type : (module_name + "_" + type);
@@ -213,6 +212,33 @@ struct ComponentTypeContext {
     bool is_local(const std::string& type) const {
         return local_data_types.count(type) || local_enum_types.count(type);
     }
+};
+
+// Top-level functions known to codegen: module -> function name -> info
+struct FreeFunctionInfo {
+    bool is_public = false;
+    std::vector<bool> mut_ref_params;  // Per param: `mut T&` (caller's `&x` is modified)
+};
+
+struct FreeFunctionRegistry {
+    std::map<std::string, std::map<std::string, FreeFunctionInfo>> functions;
+
+    static FreeFunctionRegistry& instance() {
+        static FreeFunctionRegistry reg;
+        return reg;
+    }
+
+    const FreeFunctionInfo* find(const std::string& module, const std::string& name) const {
+        auto it = functions.find(module);
+        if (it == functions.end()) return nullptr;
+        auto fn = it->second.find(name);
+        return fn != it->second.end() ? &fn->second : nullptr;
+    }
+
+    // C++ name for a call to `name` ("fn" or "Module::fn") from the current
+    // ComponentTypeContext, or "" if it isn't a top-level function. Component
+    // methods and function-typed locals/params shadow top-level functions.
+    std::string resolve_call(const std::string& name) const;
 };
 
 // Type conversion utility

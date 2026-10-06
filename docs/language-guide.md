@@ -13,7 +13,7 @@ Coi enforces naming conventions to distinguish between different constructs:
 | Enums | `UpperCase` | `enum Mode` | ✓ Yes |
 | Modules | `UpperCase` | `module MyLib` | ✓ Yes |
 | Generic type parameters | `UpperCase` | `def first<T>(...)` | ✓ Yes |
-| Methods | `lowerCase` | `def handleClick()` | ✓ Yes |
+| Methods and functions | `lowerCase` | `def handleClick()` | ✓ Yes |
 | Signals | `lowerCase` | `signal pulse(int sequence);` | ✓ Yes |
 | Variables | `lowerCase` | `mut int count` | Recommended |
 
@@ -80,6 +80,7 @@ import "@acme/utils/Button.coi";       // resolves to .coi/pkgs/acme/utils/Butto
 3. **Accessing Components:**
    - **Same Module:** Access components directly by name (e.g., `<Button />`).
    - **Different Module:** Access via module prefix (e.g., `<TurboUI::Button />`).
+4. **Calling Functions:** `pub` top-level functions from another module are called with the same prefix (e.g., `TurboUI::clamp(x, 0, 10)`). See [Top-Level Functions](#top-level-functions).
 
 ### Re-exporting with `pub import`
 
@@ -1005,6 +1006,78 @@ pub def reset() : void {
     count = 0;
 }
 ```
+
+### Top-Level Functions
+
+Functions can also be declared at the top level of a file, outside any component. They take the same parameters as methods (references, function-typed params, generics) and are called by name from components and from other top-level functions:
+
+```tsx
+pod Vec2 { float x; float y; }
+
+def len2(Vec2 v) : float {
+    return square(v.x) + square(v.y);
+}
+
+def square(float n) : float {   // order in the file doesn't matter
+    return n * n;
+}
+
+def scale(mut Vec2& v, float k) : void {
+    v.x = v.x * k;
+    v.y = v.y * k;
+}
+
+component App {
+    mut Vec2 pos = Vec2{3.0, 4.0};
+    mut float size = 0.0;
+
+    def grow() : void {
+        scale(&pos, 2.0);   // pos is modified, so the view updates
+        size = len2(pos);
+    }
+
+    view {
+        <button onclick={grow}>{size}</button>
+    }
+}
+```
+
+A top-level function only sees its parameters and its own locals. It has no component state, no `emit`, and no lifecycle; referencing any other name is a compile error. To work on component data, pass it in (by `&` reference if the function should modify it).
+
+**Visibility** follows the module rules, like pods and components: a top-level function is module-internal by default, and `pub def` makes it available to other modules. From another module, import the file and call it with the module prefix:
+
+```tsx
+// Geometry.coi
+module Geometry;
+
+pub pod Point { float x; float y; }
+
+pub def dist2(Point a, Point b) : float {
+    return sq(a.x - b.x) + sq(a.y - b.y);
+}
+
+def sq(float v) : float {   // internal to Geometry
+    return v * v;
+}
+```
+
+```tsx
+// App.coi
+import "Geometry.coi";
+
+component App {
+    mut float d = 0.0;
+
+    init {
+        Geometry::Point a = Geometry::Point(0.0, 0.0);
+        Geometry::Point b = Geometry::Point(3.0, 4.0);
+        d = Geometry::dist2(a, b);   // ✓ pub
+        // Geometry::sq(2.0);        // ✗ Error: 'sq' is not public
+    }
+}
+```
+
+**Name lookup:** inside a component, the component's own method wins over a top-level function with the same name. Rename one of them if you need both.
 
 ### Generic Functions
 

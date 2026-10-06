@@ -86,6 +86,7 @@ class Parser{
         SignalDef parse_signal(bool is_public);
         void parse_listen_block(Component &comp);
         Component parse_component();
+        FunctionDef parse_function_def(bool is_public);  // Assumes current token is DEF
         void parse_app();
 
     public:
@@ -93,6 +94,7 @@ class Parser{
         std::vector<Component> components;
         std::vector<std::unique_ptr<DataDef>> global_data;    // Data types declared outside components
         std::vector<std::unique_ptr<EnumDef>> global_enums;  // Enums declared outside components
+        std::vector<std::unique_ptr<FunctionDef>> global_functions;  // Top-level def functions
         std::vector<ImportDecl> imports;  // Import declarations (path + pub status)
         AppConfig app_config;
         Parser(const std::vector<Token>& toks);

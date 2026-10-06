@@ -1,0 +1,20 @@
+// Test: wrong number of arguments to a top-level function - should fail
+def add(int a, int b) : int {
+    return a + b;
+}
+
+component App {
+    mut int total = 0;
+
+    init {
+        total = add(1);
+    }
+
+    view {
+        <div>{total}</div>
+    }
+}
+
+app {
+    root = App;
+}

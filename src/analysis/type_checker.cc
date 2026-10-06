@@ -498,6 +498,194 @@ bool is_compatible_type(const std::string &source, const std::string &target)
     return false;
 }
 
+// Top-level functions and the lookup context for calls to them. The context is
+// the module/file/component whose code is being checked.
+static std::vector<const FunctionDef *> g_free_functions;
+static const std::map<std::string, std::set<std::string>> *g_file_imports = nullptr;
+static std::string g_ctx_module;
+static std::string g_ctx_file;
+static const Component *g_ctx_component = nullptr;
+
+static const FunctionDef *find_free_function(const std::string &module, const std::string &name)
+{
+    for (const auto *fn : g_free_functions)
+    {
+        if (fn->module_name == module && fn->name == name)
+            return fn;
+    }
+    return nullptr;
+}
+
+// Same rule as components: same file, same named module, or directly imported
+static bool is_free_function_accessible(const FunctionDef *fn)
+{
+    if (fn->source_file == g_ctx_file)
+        return true;
+    if (!fn->module_name.empty() && fn->module_name == g_ctx_module)
+        return true;
+    if (!g_file_imports || g_file_imports->empty())
+        return true;
+    auto it = g_file_imports->find(g_ctx_file);
+    return it != g_file_imports->end() && it->second.count(fn->source_file) > 0;
+}
+
+// Resolve a call name ("fn" or "Module::fn") to a top-level function. Returns
+// nullptr when the name isn't one (or is shadowed by a component method or a
+// function-typed variable); reports visibility errors.
+static const FunctionDef *resolve_free_function(const std::string &name,
+                                                const std::map<std::string, std::string> &scope,
+                                                int line)
+{
+    if (name.empty() || name.find('.') != std::string::npos)
+        return nullptr;
+
+    size_t dcolon = name.find("::");
+    if (dcolon != std::string::npos)
+    {
+        std::string module = name.substr(0, dcolon);
+        std::string fn_name = name.substr(dcolon + 2);
+        const FunctionDef *fn = find_free_function(module, fn_name);
+        if (!fn)
+        {
+            ErrorHandler::type_error("Unknown function '" + name + "'", line);
+            exit(1);
+        }
+        if (module != g_ctx_module && !fn->is_public)
+        {
+            ErrorHandler::type_error(
+                "Function '" + fn_name + "' in module '" + module +
+                "' is not public. Add 'pub' keyword to make it importable: pub def " + fn_name, line);
+            exit(1);
+        }
+        if (!is_free_function_accessible(fn))
+        {
+            ErrorHandler::type_error("Function '" + name + "' is not directly imported", line);
+            exit(1);
+        }
+        return fn;
+    }
+
+    if (!std::islower(static_cast<unsigned char>(name[0])) || scope.count(name))
+        return nullptr;
+
+    // The component's own method wins
+    if (g_ctx_component)
+    {
+        for (const auto &m : g_ctx_component->methods)
+        {
+            if (m.name == name)
+                return nullptr;
+        }
+    }
+
+    if (const FunctionDef *fn = find_free_function(g_ctx_module, name))
+    {
+        if (!is_free_function_accessible(fn))
+        {
+            ErrorHandler::type_error("Function '" + name + "' is not directly imported", line);
+            exit(1);
+        }
+        return fn;
+    }
+
+    for (const auto *fn : g_free_functions)
+    {
+        if (fn->name == name && !fn->module_name.empty())
+        {
+            ErrorHandler::type_error(
+                "Function '" + name + "' is from module '" + fn->module_name + "'. Use '" +
+                fn->module_name + "::" + name + "'", line);
+            exit(1);
+        }
+    }
+    return nullptr;
+}
+
+static bool mentions_type_param(const std::string &type, const std::vector<std::string> &type_params)
+{
+    if (type_params.empty())
+        return false;
+    std::string word;
+    for (size_t i = 0; i <= type.size(); ++i)
+    {
+        char c = i < type.size() ? type[i] : ' ';
+        if (std::isalnum(static_cast<unsigned char>(c)) || c == '_')
+        {
+            word += c;
+            continue;
+        }
+        if (std::find(type_params.begin(), type_params.end(), word) != type_params.end())
+            return true;
+        word.clear();
+    }
+    return false;
+}
+
+// "Geo::Vec2" and "Vec2" name the same pod
+static std::string strip_module_prefix(const std::string &type)
+{
+    size_t dcolon = type.find("::");
+    return dcolon == std::string::npos ? type : type.substr(dcolon + 2);
+}
+
+// Check a call against a top-level function's signature; returns its result type
+static std::string check_free_function_call(const FunctionDef *fn, FunctionCall *call,
+                                            const std::map<std::string, std::string> &scope)
+{
+    if (call->args.size() != fn->params.size())
+    {
+        ErrorHandler::type_error(
+            "Function '" + fn->name + "' expects " + std::to_string(fn->params.size()) +
+            " argument(s) but got " + std::to_string(call->args.size()), call->line);
+        exit(1);
+    }
+
+    for (size_t i = 0; i < call->args.size(); ++i)
+    {
+        const auto &arg = call->args[i];
+        const auto &param = fn->params[i];
+        bool is_function_param = is_function_value_type(param.type);
+        bool arg_is_ref = arg.is_reference || dynamic_cast<ReferenceExpression *>(arg.value.get());
+        bool arg_is_move = arg.is_move || dynamic_cast<MoveExpression *>(arg.value.get());
+
+        if (arg_is_ref && !param.is_reference && !is_function_param)
+        {
+            ErrorHandler::type_error(
+                "Argument " + std::to_string(i + 1) + " of '" + fn->name +
+                "' is passed by reference (&) but parameter '" + param.name +
+                "' is not a reference type. Remove '&' or change parameter to '" + param.type + "&'",
+                call->line);
+            exit(1);
+        }
+        if (arg_is_move && param.is_reference)
+        {
+            ErrorHandler::type_error(
+                "Argument " + std::to_string(i + 1) + " of '" + fn->name +
+                "' is passed by move (:) but parameter '" + param.name +
+                "' is a reference. Use '&' for reference or remove ':'",
+                call->line);
+            exit(1);
+        }
+
+        std::string actual = infer_expression_type(arg.value.get(), scope);
+        if (is_function_param || mentions_type_param(param.type, fn->type_params))
+            continue;
+        std::string expected = normalize_type(param.type);
+        if (actual != "unknown" &&
+            !is_compatible_type(strip_module_prefix(actual), strip_module_prefix(expected)))
+        {
+            ErrorHandler::type_error(
+                "Argument " + std::to_string(i + 1) + " of '" + fn->name + "' expects '" + expected +
+                "' but got '" + actual + "'", call->line);
+            exit(1);
+        }
+    }
+
+    if (mentions_type_param(fn->return_type, fn->type_params))
+        return "unknown";
+    return fn->return_type.empty() ? "void" : normalize_type(fn->return_type);
+}
+
 std::string infer_expression_type(Expression *expr, const std::map<std::string, std::string> &scope)
 {
     if (dynamic_cast<IntLiteral *>(expr))
@@ -763,6 +951,11 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
 
     if (auto func = dynamic_cast<FunctionCall *>(expr))
     {
+        if (const FunctionDef *free_fn = resolve_free_function(func->name, scope, func->line))
+        {
+            return check_free_function_call(free_fn, func, scope);
+        }
+
         std::string full_name = func->name;
         std::string obj_name;
         std::string method_name = full_name;
@@ -1153,10 +1346,901 @@ static void validate_variant_binding_types(ASTNode *node)
         validate_variant_binding_types(child);
 }
 
+// Type-check one function body. `comp` is the owning component, or nullptr for
+// a top-level function (no state, signals or sibling methods).
+static void check_function_body(const FunctionDef &method, const Component *comp,
+                                std::map<std::string, std::string> method_scope,
+                                std::set<std::string> mutable_vars,
+                                const std::set<std::string> &component_names,
+                                const std::map<std::string, const Component *> &component_map)
+{
+    // Get expected return type for this method
+    std::string expected_return = method.return_type.empty() ? "void" : normalize_type(method.return_type);
+
+    // Track variables that have been moved from (can no longer be used)
+    std::set<std::string> moved_vars;
+    
+    // Helper to extract variable name from expression (for move tracking)
+    auto get_var_name = [](Expression* expr) -> std::string {
+        if (auto id = dynamic_cast<Identifier*>(expr)) {
+            return id->name;
+        }
+        return "";
+    };
+    
+    // Helper to check if an expression uses a moved variable, and track moves from :expr
+    std::function<void(Expression*, int)> check_moved_use;
+    check_moved_use = [&](Expression* expr, int line) {
+        if (!expr) return;
+        
+        if (auto id = dynamic_cast<Identifier*>(expr)) {
+            if (moved_vars.count(id->name)) {
+                ErrorHandler::type_error(
+                    "Use of moved variable '" + id->name + "'. Variable was moved and can no longer be used.",
+                    line);
+                exit(1);
+            }
+        }
+        else if (auto move_expr = dynamic_cast<MoveExpression*>(expr)) {
+            // First check if the operand uses moved vars
+            check_moved_use(move_expr->operand.get(), line);
+            // Then mark the variable as moved
+            std::string var = get_var_name(move_expr->operand.get());
+            if (!var.empty()) {
+                moved_vars.insert(var);
+            }
+        }
+        else if (auto ref_expr = dynamic_cast<ReferenceExpression*>(expr)) {
+            check_moved_use(ref_expr->operand.get(), line);
+        }
+        else if (auto bin = dynamic_cast<BinaryOp*>(expr)) {
+            check_moved_use(bin->left.get(), line);
+            check_moved_use(bin->right.get(), line);
+        }
+        else if (auto call = dynamic_cast<FunctionCall*>(expr)) {
+            // Find if this is a component method call
+            const FunctionDef* target_method = nullptr;
+            if (comp) {
+                for (const auto& m : comp->methods) {
+                    if (m.name == call->name) {
+                        target_method = &m;
+                        break;
+                    }
+                }
+            } else {
+                target_method = resolve_free_function(call->name, method_scope, line);
+            }
+            
+            // Validate arguments and check for moved variables
+            for (size_t i = 0; i < call->args.size(); ++i) {
+                auto& arg = call->args[i];
+                
+                // Check if argument uses moved variables
+                check_moved_use(arg.value.get(), line);
+                
+                // If arg.is_move is set (from :value syntax in CallArg), mark the variable as moved
+                if (arg.is_move) {
+                    std::string var = get_var_name(arg.value.get());
+                    if (!var.empty()) {
+                        moved_vars.insert(var);
+                    }
+                }
+                
+                // If we found the method, validate &/: usage
+                if (target_method && i < target_method->params.size()) {
+                    bool param_is_ref = target_method->params[i].is_reference;
+                    
+                    // Check for &arg (reference expression) - either via CallArg.is_reference or ReferenceExpression
+                    bool arg_is_ref = arg.is_reference || dynamic_cast<ReferenceExpression*>(arg.value.get());
+                    bool arg_is_move = arg.is_move || dynamic_cast<MoveExpression*>(arg.value.get());
+                    
+                    if (arg_is_ref && !param_is_ref) {
+                        ErrorHandler::type_error(
+                            "Argument " + std::to_string(i + 1) + " of '" + call->name +
+                            "' is passed by reference (&) but parameter '" + target_method->params[i].name +
+                            "' is not a reference type. Remove '&' or change parameter to '" +
+                            target_method->params[i].type + "&'",
+                            line);
+                        exit(1);
+                    }
+                    // Check for :arg (move expression)
+                    else if (arg_is_move && param_is_ref) {
+                        ErrorHandler::type_error(
+                            "Argument " + std::to_string(i + 1) + " of '" + call->name +
+                            "' is passed by move (:) but parameter '" + target_method->params[i].name +
+                            "' is a reference. Use '&' for reference or remove ':'",
+                            line);
+                        exit(1);
+                    }
+                }
+            }
+        }
+        else if (auto member = dynamic_cast<MemberAccess*>(expr)) {
+            check_moved_use(member->object.get(), line);
+        }
+        else if (auto idx = dynamic_cast<IndexAccess*>(expr)) {
+            check_moved_use(idx->array.get(), line);
+            check_moved_use(idx->index.get(), line);
+        }
+        else if (auto unary = dynamic_cast<UnaryOp*>(expr)) {
+            check_moved_use(unary->operand.get(), line);
+        }
+        else if (auto ternary = dynamic_cast<TernaryOp*>(expr)) {
+            check_moved_use(ternary->condition.get(), line);
+            check_moved_use(ternary->true_expr.get(), line);
+            check_moved_use(ternary->false_expr.get(), line);
+        }
+        else if (auto match = dynamic_cast<MatchExpr*>(expr)) {
+            check_moved_use(match->subject.get(), line);
+            for (const auto& arm : match->arms) {
+                for (const auto& field : arm.pattern.fields) {
+                    if (field.value) check_moved_use(field.value.get(), line);
+                }
+                check_moved_use(arm.body.get(), line);
+            }
+        }
+        else if (auto postfix = dynamic_cast<PostfixOp*>(expr)) {
+            check_moved_use(postfix->operand.get(), line);
+        }
+        else if (auto arr = dynamic_cast<ArrayLiteral*>(expr)) {
+            for (auto& elem : arr->elements) check_moved_use(elem.get(), line);
+        }
+    };
+
+    std::function<void(const std::unique_ptr<Statement> &, std::map<std::string, std::string> &)> check_stmt;
+    check_stmt = [&](const std::unique_ptr<Statement> &stmt, std::map<std::string, std::string> &current_scope)
+    {
+        if (auto block = dynamic_cast<BlockStatement *>(stmt.get()))
+        {
+            for (const auto &s : block->statements)
+                check_stmt(s, current_scope);
+        }
+        else if (auto decl = dynamic_cast<VarDeclaration *>(stmt.get()))
+        {
+            std::string type = normalize_type(decl->type);
+            
+            if (decl->initializer)
+            {
+                if (is_function_value_type(type))
+                {
+                    if (auto id = dynamic_cast<Identifier *>(decl->initializer.get()))
+                    {
+                        auto it = current_scope.find(id->name);
+                        bool source_is_function_value =
+                            (it != current_scope.end()) && is_function_value_type(normalize_type(it->second));
+
+                        if (!source_is_function_value)
+                        {
+                            ErrorHandler::type_error(
+                                "Function variable '" + decl->name + "' must use '&" + id->name +
+                                "' when assigning a function name.",
+                                decl->line);
+                            exit(1);
+                        }
+                    }
+                }
+
+                // Check initializer for use of moved variables
+                check_moved_use(decl->initializer.get(), decl->line);
+                
+                // If this is a move (:=), mark the source variable as moved
+                if (decl->is_move)
+                {
+                    std::string moved_var = get_var_name(decl->initializer.get());
+                    if (!moved_var.empty()) {
+                        moved_vars.insert(moved_var);
+                    }
+                }
+                
+                // Error: cannot create a reference to a moved value (Type& name := expr)
+                if (decl->is_reference && decl->is_move)
+                {
+                    ErrorHandler::type_error(
+                        "Cannot create reference to moved value. Use either 'Type& " + decl->name +
+                        " = expr' (reference) or 'Type " + decl->name + " := expr' (move), not both.",
+                        decl->line);
+                    exit(1);
+                }
+                
+                // Error: cannot copy a nocopy type (must use := or &)
+                // Only applies when copying from another variable, not from function returns
+                if (!decl->is_move && !decl->is_reference && DefSchema::instance().is_nocopy(type)
+                    && dynamic_cast<Identifier*>(decl->initializer.get()))
+                {
+                    ErrorHandler::type_error(
+                        "Cannot copy '" + type + "' - it is a nocopy type. Use '" + decl->name +
+                        " := :source' (move) or '" + decl->name + " = &source' (reference) instead.",
+                        decl->line);
+                    exit(1);
+                }
+                
+                std::string init = infer_expression_type(decl->initializer.get(), current_scope);
+                if (init != "unknown" && !is_compatible_type(init, type))
+                {
+                    ErrorHandler::type_error(
+                        "Variable '" + decl->name + "' expects '" + type + "' but got '" + init + "'",
+                        decl->line);
+                    exit(1);
+                }
+            }
+            current_scope[decl->name] = type;
+            // Track mutability for const-correctness checks
+            if (decl->is_mutable) {
+                mutable_vars.insert(decl->name);
+            }
+        }
+        else if (auto assign = dynamic_cast<Assignment *>(stmt.get()))
+        {
+            // Check if the target variable itself was moved
+            if (moved_vars.count(assign->name)) {
+                ErrorHandler::type_error(
+                    "Assignment to moved variable '" + assign->name + "'. Variable was moved and can no longer be used.",
+                    assign->line);
+                exit(1);
+            }
+            
+            std::string var_type = current_scope.count(assign->name) ? current_scope.at(assign->name) : "unknown";
+
+            if (is_function_value_type(normalize_type(var_type)))
+            {
+                if (auto id = dynamic_cast<Identifier *>(assign->value.get()))
+                {
+                    auto it = current_scope.find(id->name);
+                    bool source_is_function_value =
+                        (it != current_scope.end()) && is_function_value_type(normalize_type(it->second));
+
+                    if (!source_is_function_value)
+                    {
+                        ErrorHandler::type_error(
+                            "Function variable '" + assign->name + "' must use '&" + id->name +
+                            "' when assigning a function name.",
+                            assign->line);
+                        exit(1);
+                    }
+                }
+            }
+            
+            // Check value for use of moved variables
+            check_moved_use(assign->value.get(), assign->line);
+            
+            // If this is a move (:=), mark the source variable as moved
+            if (assign->is_move)
+            {
+                std::string moved_var = get_var_name(assign->value.get());
+                if (!moved_var.empty()) {
+                    moved_vars.insert(moved_var);
+                }
+            }
+            
+            // Error: cannot copy a nocopy type (must use :=)
+            // Only applies when copying from another variable, not from function returns
+            if (!assign->is_move && DefSchema::instance().is_nocopy(var_type)
+                && dynamic_cast<Identifier*>(assign->value.get()))
+            {
+                ErrorHandler::type_error(
+                    "Cannot copy '" + var_type + "' - it is a nocopy type. Use '" + assign->name +
+                    " := :source' (move) instead.",
+                    assign->line);
+                exit(1);
+            }
+            
+            std::string val_type = infer_expression_type(assign->value.get(), current_scope);
+
+            // Store the target type for code generation (needed for handle casts)
+            assign->target_type = var_type;
+
+            if (var_type != "unknown" && val_type != "unknown")
+            {
+                if (!is_compatible_type(val_type, var_type))
+                {
+                    ErrorHandler::type_error(
+                        "Assigning '" + val_type + "' to '" + assign->name + "' of type '" + var_type + "'",
+                        assign->line);
+                    exit(1);
+                }
+            }
+        }
+        else if (auto if_stmt = dynamic_cast<IfStatement *>(stmt.get()))
+        {
+            // Check condition for use of moved variables
+            check_moved_use(if_stmt->condition.get(), if_stmt->line);
+            
+            check_stmt(if_stmt->then_branch, current_scope);
+            if (if_stmt->else_branch)
+                check_stmt(if_stmt->else_branch, current_scope);
+        }
+        else if (auto for_range = dynamic_cast<ForRangeStatement *>(stmt.get()))
+        {
+            // Check range expressions for use of moved variables
+            check_moved_use(for_range->start.get(), for_range->line);
+            check_moved_use(for_range->end.get(), for_range->line);
+            
+            // Validate range expressions
+            infer_expression_type(for_range->start.get(), current_scope);
+            infer_expression_type(for_range->end.get(), current_scope);
+            // Create new scope with loop variable
+            std::map<std::string, std::string> loop_scope = current_scope;
+            loop_scope[for_range->var_name] = "int32";
+            check_stmt(for_range->body, loop_scope);
+        }
+        else if (auto for_each = dynamic_cast<ForEachStatement *>(stmt.get()))
+        {
+            // Check iterable for use of moved variables
+            check_moved_use(for_each->iterable.get(), for_each->line);
+            
+            // Validate iterable and infer element type
+            std::string iterable_type = infer_expression_type(for_each->iterable.get(), current_scope);
+            std::map<std::string, std::string> loop_scope = current_scope;
+            
+            // Check if it's a map type - loop var is the key type
+            auto [map_value_type, map_key_type] = extract_map_types(iterable_type);
+            if (!map_value_type.empty())
+            {
+                loop_scope[for_each->var_name] = normalize_type(map_key_type);
+            }
+            else if (iterable_type.ends_with("[]"))
+            {
+                loop_scope[for_each->var_name] = iterable_type.substr(0, iterable_type.length() - 2);
+            }
+            else
+            {
+                loop_scope[for_each->var_name] = "unknown";
+            }
+            check_stmt(for_each->body, loop_scope);
+        }
+        else if (auto idx_assign = dynamic_cast<IndexAssignment *>(stmt.get()))
+        {
+            // Check array, index, and value for use of moved variables
+            check_moved_use(idx_assign->array.get(), idx_assign->line);
+            check_moved_use(idx_assign->index.get(), idx_assign->line);
+            check_moved_use(idx_assign->value.get(), idx_assign->line);
+            
+            // If this is a move (:=), mark the source variable as moved
+            if (idx_assign->is_move)
+            {
+                std::string moved_var = get_var_name(idx_assign->value.get());
+                if (!moved_var.empty()) {
+                    moved_vars.insert(moved_var);
+                }
+            }
+            
+            // Type check index assignment: arr[i] = value or map[key] = value
+            std::string array_type = infer_expression_type(idx_assign->array.get(), current_scope);
+            std::string element_type = "unknown";
+            std::string expected_key_type = "";
+            bool is_map = false;
+            
+            // Check if it's a map type first
+            auto [map_value_type, map_key_type] = extract_map_types(array_type);
+            if (!map_value_type.empty())
+            {
+                element_type = normalize_type(map_value_type);
+                expected_key_type = normalize_type(map_key_type);
+                is_map = true;
+            }
+            // Extract element type from array type
+            else if (array_type.ends_with("[]"))
+            {
+                element_type = array_type.substr(0, array_type.length() - 2);
+            }
+            else if (array_type.back() == ']')
+            {
+                // Fixed-size array like int32[10]
+                size_t bracket_pos = array_type.find('[');
+                if (bracket_pos != std::string::npos)
+                {
+                    element_type = array_type.substr(0, bracket_pos);
+                }
+            }
+            
+            std::string value_type = infer_expression_type(idx_assign->value.get(), current_scope);
+            
+            if (element_type != "unknown" && !is_compatible_type(element_type, value_type))
+            {
+                ErrorHandler::type_error(
+                    "Cannot assign '" + value_type + "' to " + (is_map ? "map" : "array") + " element of type '" + element_type + "'",
+                    idx_assign->line);
+                exit(1);
+            }
+            
+            // Validate index/key type
+            std::string index_type = infer_expression_type(idx_assign->index.get(), current_scope);
+            if (is_map)
+            {
+                // Map key type must match
+                if (!is_compatible_type(expected_key_type, index_type) && index_type != "unknown")
+                {
+                    ErrorHandler::type_error(
+                        "Map key must be '" + expected_key_type + "', got '" + index_type + "'",
+                        idx_assign->line);
+                    exit(1);
+                }
+            }
+            else if (index_type != "int32" && index_type != "float64" && index_type != "float32" && index_type != "unknown")
+            {
+                ErrorHandler::type_error("Array index must be numeric, got '" + index_type + "'", idx_assign->line);
+                exit(1);
+            }
+        }
+        else if (auto member_assign = dynamic_cast<MemberAssignment *>(stmt.get()))
+        {
+            // Check object and value for use of moved variables
+            check_moved_use(member_assign->object.get(), member_assign->line);
+            check_moved_use(member_assign->value.get(), member_assign->line);
+            
+            // If this is a move (:=), mark the source variable as moved
+            if (member_assign->is_move)
+            {
+                std::string moved_var = get_var_name(member_assign->value.get());
+                if (!moved_var.empty()) {
+                    moved_vars.insert(moved_var);
+                }
+            }
+            
+            // Type check member assignment: obj.member = value
+            // Check if we're trying to assign to a child component's member (not allowed)
+            // This includes both direct access (comp.member) and indexed access (arr[i].member)
+            
+            // Get the immediate object being accessed (before the final .member)
+            Expression* immediate_obj = member_assign->object.get();
+            
+            // Infer the type of the immediate object
+            std::string obj_type = infer_expression_type(immediate_obj, current_scope);
+            
+            // Check if the object is a component type
+            if (component_names.count(obj_type)) {
+                // Build a descriptive error message
+                std::string access_desc;
+                if (auto id = dynamic_cast<Identifier*>(immediate_obj)) {
+                    access_desc = id->name;
+                } else if (auto idx = dynamic_cast<IndexAccess*>(immediate_obj)) {
+                    if (auto arr_id = dynamic_cast<Identifier*>(idx->array.get())) {
+                        access_desc = arr_id->name + "[...]";
+                    } else {
+                        access_desc = "array element";
+                    }
+                } else if (auto ma = dynamic_cast<MemberAccess*>(immediate_obj)) {
+                    access_desc = "nested member";
+                } else {
+                    access_desc = "expression";
+                }
+                
+                ErrorHandler::type_error(
+                    "Cannot assign to member '" + member_assign->member + "' of component '" + obj_type +
+                    "' (via " + access_desc + "). Component state can only be modified from within the "
+                    "component itself. Use a public method like 'set" +
+                    std::string(1, (char)std::toupper(member_assign->member[0])) +
+                    member_assign->member.substr(1) + "()' instead.",
+                    member_assign->line);
+                exit(1);
+            }
+            
+            // Validate the value type
+            infer_expression_type(member_assign->value.get(), current_scope);
+        }
+        else if (auto emit_stmt = dynamic_cast<EmitStatement *>(stmt.get()))
+        {
+            if (!comp)
+            {
+                ErrorHandler::type_error("'emit' is only allowed inside a component", emit_stmt->line);
+                exit(1);
+            }
+
+            const SignalDef *signal = nullptr;
+            for (const auto &candidate : comp->signals)
+            {
+                if (candidate.name == emit_stmt->signal_name)
+                {
+                    signal = &candidate;
+                    break;
+                }
+            }
+
+            if (!signal)
+            {
+                ErrorHandler::type_error(
+                    "Unknown signal '" + emit_stmt->signal_name + "' in emit statement",
+                    emit_stmt->line);
+                exit(1);
+            }
+
+            if (emit_stmt->args.size() != signal->params.size())
+            {
+                ErrorHandler::type_error(
+                    "Signal '" + signal->name + "' expects " + std::to_string(signal->params.size()) +
+                    " argument(s), got " + std::to_string(emit_stmt->args.size()),
+                    emit_stmt->line);
+                exit(1);
+            }
+
+            for (size_t i = 0; i < emit_stmt->args.size(); ++i)
+            {
+                check_moved_use(emit_stmt->args[i].get(), emit_stmt->line);
+                std::string actual = infer_expression_type(emit_stmt->args[i].get(), current_scope);
+                std::string expected = normalize_type(signal->params[i].type);
+                if (actual != "unknown" && !is_compatible_type(actual, expected))
+                {
+                    ErrorHandler::type_error(
+                        "Signal '" + signal->name + "' argument " + std::to_string(i + 1) +
+                        " expects '" + expected + "' but got '" + actual + "'",
+                        emit_stmt->line);
+                    exit(1);
+                }
+            }
+        }
+        else if (auto expr_stmt = dynamic_cast<ExpressionStatement *>(stmt.get()))
+        {
+            // Check expression for use of moved variables
+            check_moved_use(expr_stmt->expression.get(), expr_stmt->line);
+
+            // Enforce mutability for increment/decrement on local variables
+            if (auto postfix = dynamic_cast<PostfixOp *>(expr_stmt->expression.get()))
+            {
+                if ((postfix->op == "++" || postfix->op == "--") &&
+                    dynamic_cast<Identifier *>(postfix->operand.get()))
+                {
+                    auto *id = dynamic_cast<Identifier *>(postfix->operand.get());
+                    if (id && !mutable_vars.count(id->name))
+                    {
+                        ErrorHandler::type_error(
+                            "Cannot modify immutable variable '" + id->name + "'. Declare it as 'mut' to use " + postfix->op,
+                            expr_stmt->line);
+                        exit(1);
+                    }
+                }
+            }
+            else if (auto unary = dynamic_cast<UnaryOp *>(expr_stmt->expression.get()))
+            {
+                if ((unary->op == "++" || unary->op == "--") &&
+                    dynamic_cast<Identifier *>(unary->operand.get()))
+                {
+                    auto *id = dynamic_cast<Identifier *>(unary->operand.get());
+                    if (id && !mutable_vars.count(id->name))
+                    {
+                        ErrorHandler::type_error(
+                            "Cannot modify immutable variable '" + id->name + "'. Declare it as 'mut' to use " + unary->op,
+                            expr_stmt->line);
+                        exit(1);
+                    }
+                }
+            }
+            
+            // Check for calling mutating methods on const component variables
+            if (auto call = dynamic_cast<FunctionCall *>(expr_stmt->expression.get()))
+            {
+                size_t dot_pos = call->name.rfind('.');
+                if (dot_pos != std::string::npos)
+                {
+                    std::string obj_name = call->name.substr(0, dot_pos);
+                    std::string method_name = call->name.substr(dot_pos + 1);
+                    
+                    // Check if obj_name is a local variable (in scope)
+                    if (current_scope.count(obj_name))
+                    {
+                        std::string obj_type = current_scope.at(obj_name);
+                        
+                        // Check if it's a component type and the variable is not mutable
+                        if (component_map.count(obj_type) && !mutable_vars.count(obj_name))
+                        {
+                            // Check if the method is mutating (modifies state)
+                            const Component* target_comp = component_map.at(obj_type);
+                            for (const auto& m : target_comp->methods)
+                            {
+                                if (m.name == method_name)
+                                {
+                                    // Check if this method modifies any state
+                                    std::set<std::string> modified_vars;
+                                    m.collect_modifications(modified_vars);
+                                    
+                                    if (!modified_vars.empty())
+                                    {
+                                        ErrorHandler::type_error(
+                                            "Cannot call mutating method '" + method_name +
+                                            "' on const component variable '" + obj_name +
+                                            "'. Declare as 'mut " + obj_type + " " + obj_name +
+                                            "' to allow mutation.",
+                                            expr_stmt->line);
+                                        exit(1);
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Validate expression type
+            infer_expression_type(expr_stmt->expression.get(), current_scope);
+        }
+        else if (auto ret_stmt = dynamic_cast<ReturnStatement *>(stmt.get()))
+        {
+            // Validate return type matches method's declared return type
+            if (ret_stmt->value)
+            {
+                // Check return value for use of moved variables
+                check_moved_use(ret_stmt->value.get(), ret_stmt->line);
+
+                // Has a return value
+                if (expected_return == "void")
+                {
+                    ErrorHandler::type_error(
+                        "Cannot return a value from void function '" + method.name + "'",
+                        ret_stmt->line);
+                    exit(1);
+                }
+                std::string actual_return = infer_expression_type(ret_stmt->value.get(), current_scope);
+                if (actual_return != "unknown" && !is_compatible_type(actual_return, expected_return))
+                {
+                    ErrorHandler::type_error(
+                        "Function '" + method.name + "' expects return type '" + expected_return +
+                        "' but got '" + actual_return + "'",
+                        ret_stmt->line);
+                    exit(1);
+                }
+            }
+            else
+            {
+                // No return value (bare 'return;')
+                if (expected_return != "void")
+                {
+                    ErrorHandler::type_error(
+                        "Function '" + method.name + "' must return a value of type '" + expected_return + "'",
+                        ret_stmt->line);
+                    exit(1);
+                }
+            }
+        }
+    };
+
+    for (const auto &stmt : method.body)
+    {
+        check_stmt(stmt, method_scope);
+    }
+}
+
+// Leading identifier of an expression string ("items[i].name" -> "items")
+static std::string leading_identifier(const std::string &text)
+{
+    size_t k = 0;
+    while (k < text.size() && (std::isalnum(static_cast<unsigned char>(text[k])) || text[k] == '_'))
+        k++;
+    return text.substr(0, k);
+}
+
+// Variable at the root of `a.b[i].c`
+static std::string root_identifier(Expression *expr)
+{
+    while (expr)
+    {
+        if (auto *id = dynamic_cast<Identifier *>(expr))
+            return id->name;
+        if (auto *member = dynamic_cast<MemberAccess *>(expr))
+            expr = member->object.get();
+        else if (auto *idx = dynamic_cast<IndexAccess *>(expr))
+            expr = idx->array.get();
+        else
+            break;
+    }
+    return "";
+}
+
+// A top-level function sees only its params and locals: reject any other name.
+// Also rejects assignments to non-mut params/locals and 'emit'.
+static void check_free_function_names(const FunctionDef &fn, const std::set<std::string> &component_names)
+{
+    using Scope = std::map<std::string, bool>;  // name -> is mutable
+    const std::map<std::string, std::string> no_scope;
+
+    auto is_known_type = [&](const std::string &name) {
+        return is_enum_type(name) || is_data_type(name) || component_names.count(name) ||
+               DefSchema::instance().lookup_type(name) != nullptr || DefSchema::instance().is_handle(name) ||
+               std::find(fn.type_params.begin(), fn.type_params.end(), name) != fn.type_params.end();
+    };
+
+    auto check_name = [&](const std::string &name, const Scope &scope, int line) {
+        if (name.empty() || scope.count(name))
+            return;
+        if (std::isupper(static_cast<unsigned char>(name[0])) ? is_known_type(name)
+                                                                : resolve_free_function(name, no_scope, line) != nullptr)
+            return;
+        ErrorHandler::type_error("Unknown identifier '" + name + "' in function '" + fn.name + "'", line);
+        exit(1);
+    };
+
+    auto check_mutable = [&](const std::string &name, const Scope &scope, int line) {
+        auto it = scope.find(name);
+        if (it != scope.end() && !it->second)
+        {
+            ErrorHandler::type_error(
+                "Cannot modify immutable variable '" + name + "'. Declare it as 'mut' to modify it", line);
+            exit(1);
+        }
+    };
+
+    std::function<void(Statement *, Scope &)> check_stmt;
+    std::function<void(Expression *, const Scope &, int)> check_expr;
+
+    check_expr = [&](Expression *expr, const Scope &scope, int line) {
+        if (!expr)
+            return;
+        if (expr->line > 0)
+            line = expr->line;
+
+        if (auto *id = dynamic_cast<Identifier *>(expr))
+        {
+            check_name(id->name, scope, line);
+        }
+        else if (auto *call = dynamic_cast<FunctionCall *>(expr))
+        {
+            if (call->line > 0)
+                line = call->line;
+            if (call->name.find('.') != std::string::npos)
+            {
+                // obj.method(): the receiver must be in scope (types are checked by inference)
+                std::string base = leading_identifier(call->name);
+                if (!base.empty() && std::islower(static_cast<unsigned char>(base[0])))
+                    check_name(base, scope, line);
+            }
+            else if (!scope.count(call->name))
+            {
+                const FunctionDef *target = resolve_free_function(call->name, no_scope, line);
+                if (!target)
+                {
+                    ErrorHandler::type_error("Unknown function '" + call->name + "' in function '" + fn.name + "'", line);
+                    exit(1);
+                }
+                // `&x` into a `mut T&` param modifies x
+                for (size_t i = 0; i < call->args.size() && i < target->params.size(); ++i)
+                {
+                    const auto &param = target->params[i];
+                    if (call->args[i].is_reference && param.is_mutable && param.is_reference)
+                        check_mutable(root_identifier(call->args[i].value.get()), scope, line);
+                }
+            }
+            for (auto &arg : call->args)
+                check_expr(arg.value.get(), scope, line);
+        }
+        else if (auto *str = dynamic_cast<StringLiteral *>(expr))
+        {
+            // `{a.b}` yields "a" and "b"; only the leading name of each part is a variable
+            for (const auto &part : str->parse())
+            {
+                if (!part.is_expr)
+                    continue;
+                std::string text = part.content;
+                size_t start = text.find_first_not_of(" \t");
+                if (start == std::string::npos)
+                    continue;
+                std::string base = leading_identifier(text.substr(start));
+                if (!base.empty() && !std::isdigit(static_cast<unsigned char>(base[0])))
+                    check_name(base, scope, line);
+            }
+        }
+        else if (auto *match = dynamic_cast<MatchExpr *>(expr))
+        {
+            if (match->line > 0)
+                line = match->line;
+            check_expr(match->subject.get(), scope, line);
+            for (auto &arm : match->arms)
+            {
+                Scope arm_scope = scope;
+                for (auto &field : arm.pattern.fields)
+                {
+                    if (field.value)
+                        check_expr(field.value.get(), scope, arm.line);
+                    else
+                        arm_scope[field.name] = false;
+                }
+                for (const auto &binding : arm.pattern.variant_bindings)
+                    arm_scope[binding.name] = false;
+                check_expr(arm.body.get(), arm_scope, arm.line);
+            }
+        }
+        else if (auto *block = dynamic_cast<BlockExpr *>(expr))
+        {
+            Scope inner = scope;
+            for (auto &s : block->statements)
+                check_stmt(s.get(), inner);
+        }
+        else
+        {
+            for (auto *child : expr->get_children())
+                check_expr(child, scope, line);
+        }
+    };
+
+    check_stmt = [&](Statement *stmt, Scope &scope) {
+        if (!stmt)
+            return;
+        int line = stmt->line;
+
+        if (auto *decl = dynamic_cast<VarDeclaration *>(stmt))
+        {
+            check_expr(decl->initializer.get(), scope, line);
+            scope[decl->name] = decl->is_mutable;
+        }
+        else if (auto *assign = dynamic_cast<Assignment *>(stmt))
+        {
+            check_name(assign->name, scope, line);
+            check_mutable(assign->name, scope, line);
+            check_expr(assign->value.get(), scope, line);
+        }
+        else if (auto *idx_assign = dynamic_cast<IndexAssignment *>(stmt))
+        {
+            check_expr(idx_assign->array.get(), scope, line);
+            check_mutable(root_identifier(idx_assign->array.get()), scope, line);
+            check_expr(idx_assign->index.get(), scope, line);
+            check_expr(idx_assign->value.get(), scope, line);
+        }
+        else if (auto *member_assign = dynamic_cast<MemberAssignment *>(stmt))
+        {
+            check_expr(member_assign->object.get(), scope, line);
+            check_mutable(root_identifier(member_assign->object.get()), scope, line);
+            check_expr(member_assign->value.get(), scope, line);
+        }
+        else if (auto *block = dynamic_cast<BlockStatement *>(stmt))
+        {
+            Scope inner = scope;
+            for (auto &s : block->statements)
+                check_stmt(s.get(), inner);
+        }
+        else if (dynamic_cast<EmitStatement *>(stmt))
+        {
+            ErrorHandler::type_error("'emit' is only allowed inside a component (function '" + fn.name + "')", line);
+            exit(1);
+        }
+        else if (auto *for_range = dynamic_cast<ForRangeStatement *>(stmt))
+        {
+            check_expr(for_range->start.get(), scope, line);
+            check_expr(for_range->end.get(), scope, line);
+            Scope inner = scope;
+            inner[for_range->var_name] = false;
+            check_stmt(for_range->body.get(), inner);
+        }
+        else if (auto *for_each = dynamic_cast<ForEachStatement *>(stmt))
+        {
+            check_expr(for_each->iterable.get(), scope, line);
+            Scope inner = scope;
+            inner[for_each->var_name] = false;
+            check_stmt(for_each->body.get(), inner);
+        }
+        else
+        {
+            // if, return, expression statements
+            for (auto *child : stmt->get_child_nodes())
+            {
+                if (auto *child_expr = dynamic_cast<Expression *>(child))
+                {
+                    check_expr(child_expr, scope, line);
+                }
+                else if (auto *child_stmt = dynamic_cast<Statement *>(child))
+                {
+                    Scope inner = scope;
+                    check_stmt(child_stmt, inner);
+                }
+            }
+        }
+    };
+
+    Scope scope;
+    for (const auto &param : fn.params)
+        scope[param.name] = param.is_mutable;
+    for (const auto &stmt : fn.body)
+        check_stmt(stmt.get(), scope);
+}
+
 void validate_types(const std::vector<Component> &components,
                     const std::vector<std::unique_ptr<EnumDef>> &global_enums,
-                    const std::vector<std::unique_ptr<DataDef>> &global_data)
+                    const std::vector<std::unique_ptr<DataDef>> &global_data,
+                    const std::vector<std::unique_ptr<FunctionDef>> &global_functions,
+                    const std::map<std::string, std::set<std::string>> &file_imports)
 {
+    g_free_functions.clear();
+    for (const auto &fn : global_functions)
+        g_free_functions.push_back(fn.get());
+    g_file_imports = &file_imports;
+
     std::set<std::string> component_names;
     std::map<std::string, const Component*> component_map;
     for (const auto &c : components) {
@@ -1258,6 +2342,10 @@ void validate_types(const std::vector<Component> &components,
 
     for (const auto &comp : components)
     {
+        g_ctx_module = comp.module_name;
+        g_ctx_file = comp.source_file;
+        g_ctx_component = &comp;
+
         std::map<std::string, std::string> scope;
 
         // Validate data type fields - they cannot contain no-copy types
@@ -1533,641 +2621,36 @@ void validate_types(const std::vector<Component> &components,
                 }
             }
 
-            // Get expected return type for this method
-            std::string expected_return = method.return_type.empty() ? "void" : normalize_type(method.return_type);
-
-            // Track variables that have been moved from (can no longer be used)
-            std::set<std::string> moved_vars;
-            
-            // Helper to extract variable name from expression (for move tracking)
-            auto get_var_name = [](Expression* expr) -> std::string {
-                if (auto id = dynamic_cast<Identifier*>(expr)) {
-                    return id->name;
-                }
-                return "";
-            };
-            
-            // Helper to check if an expression uses a moved variable, and track moves from :expr
-            std::function<void(Expression*, int)> check_moved_use;
-            check_moved_use = [&](Expression* expr, int line) {
-                if (!expr) return;
-                
-                if (auto id = dynamic_cast<Identifier*>(expr)) {
-                    if (moved_vars.count(id->name)) {
-                        ErrorHandler::type_error(
-                            "Use of moved variable '" + id->name + "'. Variable was moved and can no longer be used.",
-                            line);
-                        exit(1);
-                    }
-                }
-                else if (auto move_expr = dynamic_cast<MoveExpression*>(expr)) {
-                    // First check if the operand uses moved vars
-                    check_moved_use(move_expr->operand.get(), line);
-                    // Then mark the variable as moved
-                    std::string var = get_var_name(move_expr->operand.get());
-                    if (!var.empty()) {
-                        moved_vars.insert(var);
-                    }
-                }
-                else if (auto ref_expr = dynamic_cast<ReferenceExpression*>(expr)) {
-                    check_moved_use(ref_expr->operand.get(), line);
-                }
-                else if (auto bin = dynamic_cast<BinaryOp*>(expr)) {
-                    check_moved_use(bin->left.get(), line);
-                    check_moved_use(bin->right.get(), line);
-                }
-                else if (auto call = dynamic_cast<FunctionCall*>(expr)) {
-                    // Find if this is a component method call
-                    const FunctionDef* target_method = nullptr;
-                    for (const auto& m : comp.methods) {
-                        if (m.name == call->name) {
-                            target_method = &m;
-                            break;
-                        }
-                    }
-                    
-                    // Validate arguments and check for moved variables
-                    for (size_t i = 0; i < call->args.size(); ++i) {
-                        auto& arg = call->args[i];
-                        
-                        // Check if argument uses moved variables
-                        check_moved_use(arg.value.get(), line);
-                        
-                        // If arg.is_move is set (from :value syntax in CallArg), mark the variable as moved
-                        if (arg.is_move) {
-                            std::string var = get_var_name(arg.value.get());
-                            if (!var.empty()) {
-                                moved_vars.insert(var);
-                            }
-                        }
-                        
-                        // If we found the method, validate &/: usage
-                        if (target_method && i < target_method->params.size()) {
-                            bool param_is_ref = target_method->params[i].is_reference;
-                            
-                            // Check for &arg (reference expression) - either via CallArg.is_reference or ReferenceExpression
-                            bool arg_is_ref = arg.is_reference || dynamic_cast<ReferenceExpression*>(arg.value.get());
-                            bool arg_is_move = arg.is_move || dynamic_cast<MoveExpression*>(arg.value.get());
-                            
-                            if (arg_is_ref && !param_is_ref) {
-                                ErrorHandler::type_error(
-                                    "Argument " + std::to_string(i + 1) + " of '" + call->name +
-                                    "' is passed by reference (&) but parameter '" + target_method->params[i].name +
-                                    "' is not a reference type. Remove '&' or change parameter to '" +
-                                    target_method->params[i].type + "&'",
-                                    line);
-                                exit(1);
-                            }
-                            // Check for :arg (move expression)
-                            else if (arg_is_move && param_is_ref) {
-                                ErrorHandler::type_error(
-                                    "Argument " + std::to_string(i + 1) + " of '" + call->name +
-                                    "' is passed by move (:) but parameter '" + target_method->params[i].name +
-                                    "' is a reference. Use '&' for reference or remove ':'",
-                                    line);
-                                exit(1);
-                            }
-                        }
-                    }
-                }
-                else if (auto member = dynamic_cast<MemberAccess*>(expr)) {
-                    check_moved_use(member->object.get(), line);
-                }
-                else if (auto idx = dynamic_cast<IndexAccess*>(expr)) {
-                    check_moved_use(idx->array.get(), line);
-                    check_moved_use(idx->index.get(), line);
-                }
-                else if (auto unary = dynamic_cast<UnaryOp*>(expr)) {
-                    check_moved_use(unary->operand.get(), line);
-                }
-                else if (auto ternary = dynamic_cast<TernaryOp*>(expr)) {
-                    check_moved_use(ternary->condition.get(), line);
-                    check_moved_use(ternary->true_expr.get(), line);
-                    check_moved_use(ternary->false_expr.get(), line);
-                }
-                else if (auto match = dynamic_cast<MatchExpr*>(expr)) {
-                    check_moved_use(match->subject.get(), line);
-                    for (const auto& arm : match->arms) {
-                        for (const auto& field : arm.pattern.fields) {
-                            if (field.value) check_moved_use(field.value.get(), line);
-                        }
-                        check_moved_use(arm.body.get(), line);
-                    }
-                }
-                else if (auto postfix = dynamic_cast<PostfixOp*>(expr)) {
-                    check_moved_use(postfix->operand.get(), line);
-                }
-                else if (auto arr = dynamic_cast<ArrayLiteral*>(expr)) {
-                    for (auto& elem : arr->elements) check_moved_use(elem.get(), line);
-                }
-            };
-
-            std::function<void(const std::unique_ptr<Statement> &, std::map<std::string, std::string> &)> check_stmt;
-            check_stmt = [&](const std::unique_ptr<Statement> &stmt, std::map<std::string, std::string> &current_scope)
-            {
-                if (auto block = dynamic_cast<BlockStatement *>(stmt.get()))
-                {
-                    for (const auto &s : block->statements)
-                        check_stmt(s, current_scope);
-                }
-                else if (auto decl = dynamic_cast<VarDeclaration *>(stmt.get()))
-                {
-                    std::string type = normalize_type(decl->type);
-                    
-                    if (decl->initializer)
-                    {
-                        if (is_function_value_type(type))
-                        {
-                            if (auto id = dynamic_cast<Identifier *>(decl->initializer.get()))
-                            {
-                                auto it = current_scope.find(id->name);
-                                bool source_is_function_value =
-                                    (it != current_scope.end()) && is_function_value_type(normalize_type(it->second));
-
-                                if (!source_is_function_value)
-                                {
-                                    ErrorHandler::type_error(
-                                        "Function variable '" + decl->name + "' must use '&" + id->name +
-                                        "' when assigning a function name.",
-                                        decl->line);
-                                    exit(1);
-                                }
-                            }
-                        }
-
-                        // Check initializer for use of moved variables
-                        check_moved_use(decl->initializer.get(), decl->line);
-                        
-                        // If this is a move (:=), mark the source variable as moved
-                        if (decl->is_move)
-                        {
-                            std::string moved_var = get_var_name(decl->initializer.get());
-                            if (!moved_var.empty()) {
-                                moved_vars.insert(moved_var);
-                            }
-                        }
-                        
-                        // Error: cannot create a reference to a moved value (Type& name := expr)
-                        if (decl->is_reference && decl->is_move)
-                        {
-                            ErrorHandler::type_error(
-                                "Cannot create reference to moved value. Use either 'Type& " + decl->name +
-                                " = expr' (reference) or 'Type " + decl->name + " := expr' (move), not both.",
-                                decl->line);
-                            exit(1);
-                        }
-                        
-                        // Error: cannot copy a nocopy type (must use := or &)
-                        // Only applies when copying from another variable, not from function returns
-                        if (!decl->is_move && !decl->is_reference && DefSchema::instance().is_nocopy(type)
-                            && dynamic_cast<Identifier*>(decl->initializer.get()))
-                        {
-                            ErrorHandler::type_error(
-                                "Cannot copy '" + type + "' - it is a nocopy type. Use '" + decl->name +
-                                " := :source' (move) or '" + decl->name + " = &source' (reference) instead.",
-                                decl->line);
-                            exit(1);
-                        }
-                        
-                        std::string init = infer_expression_type(decl->initializer.get(), current_scope);
-                        if (init != "unknown" && !is_compatible_type(init, type))
-                        {
-                            ErrorHandler::type_error(
-                                "Variable '" + decl->name + "' expects '" + type + "' but got '" + init + "'",
-                                decl->line);
-                            exit(1);
-                        }
-                    }
-                    current_scope[decl->name] = type;
-                    // Track mutability for const-correctness checks
-                    if (decl->is_mutable) {
-                        mutable_vars.insert(decl->name);
-                    }
-                }
-                else if (auto assign = dynamic_cast<Assignment *>(stmt.get()))
-                {
-                    // Check if the target variable itself was moved
-                    if (moved_vars.count(assign->name)) {
-                        ErrorHandler::type_error(
-                            "Assignment to moved variable '" + assign->name + "'. Variable was moved and can no longer be used.",
-                            assign->line);
-                        exit(1);
-                    }
-                    
-                    std::string var_type = current_scope.count(assign->name) ? current_scope.at(assign->name) : "unknown";
-
-                    if (is_function_value_type(normalize_type(var_type)))
-                    {
-                        if (auto id = dynamic_cast<Identifier *>(assign->value.get()))
-                        {
-                            auto it = current_scope.find(id->name);
-                            bool source_is_function_value =
-                                (it != current_scope.end()) && is_function_value_type(normalize_type(it->second));
-
-                            if (!source_is_function_value)
-                            {
-                                ErrorHandler::type_error(
-                                    "Function variable '" + assign->name + "' must use '&" + id->name +
-                                    "' when assigning a function name.",
-                                    assign->line);
-                                exit(1);
-                            }
-                        }
-                    }
-                    
-                    // Check value for use of moved variables
-                    check_moved_use(assign->value.get(), assign->line);
-                    
-                    // If this is a move (:=), mark the source variable as moved
-                    if (assign->is_move)
-                    {
-                        std::string moved_var = get_var_name(assign->value.get());
-                        if (!moved_var.empty()) {
-                            moved_vars.insert(moved_var);
-                        }
-                    }
-                    
-                    // Error: cannot copy a nocopy type (must use :=)
-                    // Only applies when copying from another variable, not from function returns
-                    if (!assign->is_move && DefSchema::instance().is_nocopy(var_type)
-                        && dynamic_cast<Identifier*>(assign->value.get()))
-                    {
-                        ErrorHandler::type_error(
-                            "Cannot copy '" + var_type + "' - it is a nocopy type. Use '" + assign->name +
-                            " := :source' (move) instead.",
-                            assign->line);
-                        exit(1);
-                    }
-                    
-                    std::string val_type = infer_expression_type(assign->value.get(), current_scope);
-
-                    // Store the target type for code generation (needed for handle casts)
-                    assign->target_type = var_type;
-
-                    if (var_type != "unknown" && val_type != "unknown")
-                    {
-                        if (!is_compatible_type(val_type, var_type))
-                        {
-                            ErrorHandler::type_error(
-                                "Assigning '" + val_type + "' to '" + assign->name + "' of type '" + var_type + "'",
-                                assign->line);
-                            exit(1);
-                        }
-                    }
-                }
-                else if (auto if_stmt = dynamic_cast<IfStatement *>(stmt.get()))
-                {
-                    // Check condition for use of moved variables
-                    check_moved_use(if_stmt->condition.get(), if_stmt->line);
-                    
-                    check_stmt(if_stmt->then_branch, current_scope);
-                    if (if_stmt->else_branch)
-                        check_stmt(if_stmt->else_branch, current_scope);
-                }
-                else if (auto for_range = dynamic_cast<ForRangeStatement *>(stmt.get()))
-                {
-                    // Check range expressions for use of moved variables
-                    check_moved_use(for_range->start.get(), for_range->line);
-                    check_moved_use(for_range->end.get(), for_range->line);
-                    
-                    // Validate range expressions
-                    infer_expression_type(for_range->start.get(), current_scope);
-                    infer_expression_type(for_range->end.get(), current_scope);
-                    // Create new scope with loop variable
-                    std::map<std::string, std::string> loop_scope = current_scope;
-                    loop_scope[for_range->var_name] = "int32";
-                    check_stmt(for_range->body, loop_scope);
-                }
-                else if (auto for_each = dynamic_cast<ForEachStatement *>(stmt.get()))
-                {
-                    // Check iterable for use of moved variables
-                    check_moved_use(for_each->iterable.get(), for_each->line);
-                    
-                    // Validate iterable and infer element type
-                    std::string iterable_type = infer_expression_type(for_each->iterable.get(), current_scope);
-                    std::map<std::string, std::string> loop_scope = current_scope;
-                    
-                    // Check if it's a map type - loop var is the key type
-                    auto [map_value_type, map_key_type] = extract_map_types(iterable_type);
-                    if (!map_value_type.empty())
-                    {
-                        loop_scope[for_each->var_name] = normalize_type(map_key_type);
-                    }
-                    else if (iterable_type.ends_with("[]"))
-                    {
-                        loop_scope[for_each->var_name] = iterable_type.substr(0, iterable_type.length() - 2);
-                    }
-                    else
-                    {
-                        loop_scope[for_each->var_name] = "unknown";
-                    }
-                    check_stmt(for_each->body, loop_scope);
-                }
-                else if (auto idx_assign = dynamic_cast<IndexAssignment *>(stmt.get()))
-                {
-                    // Check array, index, and value for use of moved variables
-                    check_moved_use(idx_assign->array.get(), idx_assign->line);
-                    check_moved_use(idx_assign->index.get(), idx_assign->line);
-                    check_moved_use(idx_assign->value.get(), idx_assign->line);
-                    
-                    // If this is a move (:=), mark the source variable as moved
-                    if (idx_assign->is_move)
-                    {
-                        std::string moved_var = get_var_name(idx_assign->value.get());
-                        if (!moved_var.empty()) {
-                            moved_vars.insert(moved_var);
-                        }
-                    }
-                    
-                    // Type check index assignment: arr[i] = value or map[key] = value
-                    std::string array_type = infer_expression_type(idx_assign->array.get(), current_scope);
-                    std::string element_type = "unknown";
-                    std::string expected_key_type = "";
-                    bool is_map = false;
-                    
-                    // Check if it's a map type first
-                    auto [map_value_type, map_key_type] = extract_map_types(array_type);
-                    if (!map_value_type.empty())
-                    {
-                        element_type = normalize_type(map_value_type);
-                        expected_key_type = normalize_type(map_key_type);
-                        is_map = true;
-                    }
-                    // Extract element type from array type
-                    else if (array_type.ends_with("[]"))
-                    {
-                        element_type = array_type.substr(0, array_type.length() - 2);
-                    }
-                    else if (array_type.back() == ']')
-                    {
-                        // Fixed-size array like int32[10]
-                        size_t bracket_pos = array_type.find('[');
-                        if (bracket_pos != std::string::npos)
-                        {
-                            element_type = array_type.substr(0, bracket_pos);
-                        }
-                    }
-                    
-                    std::string value_type = infer_expression_type(idx_assign->value.get(), current_scope);
-                    
-                    if (element_type != "unknown" && !is_compatible_type(element_type, value_type))
-                    {
-                        ErrorHandler::type_error(
-                            "Cannot assign '" + value_type + "' to " + (is_map ? "map" : "array") + " element of type '" + element_type + "'",
-                            idx_assign->line);
-                        exit(1);
-                    }
-                    
-                    // Validate index/key type
-                    std::string index_type = infer_expression_type(idx_assign->index.get(), current_scope);
-                    if (is_map)
-                    {
-                        // Map key type must match
-                        if (!is_compatible_type(expected_key_type, index_type) && index_type != "unknown")
-                        {
-                            ErrorHandler::type_error(
-                                "Map key must be '" + expected_key_type + "', got '" + index_type + "'",
-                                idx_assign->line);
-                            exit(1);
-                        }
-                    }
-                    else if (index_type != "int32" && index_type != "float64" && index_type != "float32" && index_type != "unknown")
-                    {
-                        ErrorHandler::type_error("Array index must be numeric, got '" + index_type + "'", idx_assign->line);
-                        exit(1);
-                    }
-                }
-                else if (auto member_assign = dynamic_cast<MemberAssignment *>(stmt.get()))
-                {
-                    // Check object and value for use of moved variables
-                    check_moved_use(member_assign->object.get(), member_assign->line);
-                    check_moved_use(member_assign->value.get(), member_assign->line);
-                    
-                    // If this is a move (:=), mark the source variable as moved
-                    if (member_assign->is_move)
-                    {
-                        std::string moved_var = get_var_name(member_assign->value.get());
-                        if (!moved_var.empty()) {
-                            moved_vars.insert(moved_var);
-                        }
-                    }
-                    
-                    // Type check member assignment: obj.member = value
-                    // Check if we're trying to assign to a child component's member (not allowed)
-                    // This includes both direct access (comp.member) and indexed access (arr[i].member)
-                    
-                    // Get the immediate object being accessed (before the final .member)
-                    Expression* immediate_obj = member_assign->object.get();
-                    
-                    // Infer the type of the immediate object
-                    std::string obj_type = infer_expression_type(immediate_obj, current_scope);
-                    
-                    // Check if the object is a component type
-                    if (component_names.count(obj_type)) {
-                        // Build a descriptive error message
-                        std::string access_desc;
-                        if (auto id = dynamic_cast<Identifier*>(immediate_obj)) {
-                            access_desc = id->name;
-                        } else if (auto idx = dynamic_cast<IndexAccess*>(immediate_obj)) {
-                            if (auto arr_id = dynamic_cast<Identifier*>(idx->array.get())) {
-                                access_desc = arr_id->name + "[...]";
-                            } else {
-                                access_desc = "array element";
-                            }
-                        } else if (auto ma = dynamic_cast<MemberAccess*>(immediate_obj)) {
-                            access_desc = "nested member";
-                        } else {
-                            access_desc = "expression";
-                        }
-                        
-                        ErrorHandler::type_error(
-                            "Cannot assign to member '" + member_assign->member + "' of component '" + obj_type +
-                            "' (via " + access_desc + "). Component state can only be modified from within the "
-                            "component itself. Use a public method like 'set" +
-                            std::string(1, (char)std::toupper(member_assign->member[0])) +
-                            member_assign->member.substr(1) + "()' instead.",
-                            member_assign->line);
-                        exit(1);
-                    }
-                    
-                    // Validate the value type
-                    infer_expression_type(member_assign->value.get(), current_scope);
-                }
-                else if (auto emit_stmt = dynamic_cast<EmitStatement *>(stmt.get()))
-                {
-                    const SignalDef *signal = nullptr;
-                    for (const auto &candidate : comp.signals)
-                    {
-                        if (candidate.name == emit_stmt->signal_name)
-                        {
-                            signal = &candidate;
-                            break;
-                        }
-                    }
-
-                    if (!signal)
-                    {
-                        ErrorHandler::type_error(
-                            "Unknown signal '" + emit_stmt->signal_name + "' in emit statement",
-                            emit_stmt->line);
-                        exit(1);
-                    }
-
-                    if (emit_stmt->args.size() != signal->params.size())
-                    {
-                        ErrorHandler::type_error(
-                            "Signal '" + signal->name + "' expects " + std::to_string(signal->params.size()) +
-                            " argument(s), got " + std::to_string(emit_stmt->args.size()),
-                            emit_stmt->line);
-                        exit(1);
-                    }
-
-                    for (size_t i = 0; i < emit_stmt->args.size(); ++i)
-                    {
-                        check_moved_use(emit_stmt->args[i].get(), emit_stmt->line);
-                        std::string actual = infer_expression_type(emit_stmt->args[i].get(), current_scope);
-                        std::string expected = normalize_type(signal->params[i].type);
-                        if (actual != "unknown" && !is_compatible_type(actual, expected))
-                        {
-                            ErrorHandler::type_error(
-                                "Signal '" + signal->name + "' argument " + std::to_string(i + 1) +
-                                " expects '" + expected + "' but got '" + actual + "'",
-                                emit_stmt->line);
-                            exit(1);
-                        }
-                    }
-                }
-                else if (auto expr_stmt = dynamic_cast<ExpressionStatement *>(stmt.get()))
-                {
-                    // Check expression for use of moved variables
-                    check_moved_use(expr_stmt->expression.get(), expr_stmt->line);
-
-                    // Enforce mutability for increment/decrement on local variables
-                    if (auto postfix = dynamic_cast<PostfixOp *>(expr_stmt->expression.get()))
-                    {
-                        if ((postfix->op == "++" || postfix->op == "--") &&
-                            dynamic_cast<Identifier *>(postfix->operand.get()))
-                        {
-                            auto *id = dynamic_cast<Identifier *>(postfix->operand.get());
-                            if (id && !mutable_vars.count(id->name))
-                            {
-                                ErrorHandler::type_error(
-                                    "Cannot modify immutable variable '" + id->name + "'. Declare it as 'mut' to use " + postfix->op,
-                                    expr_stmt->line);
-                                exit(1);
-                            }
-                        }
-                    }
-                    else if (auto unary = dynamic_cast<UnaryOp *>(expr_stmt->expression.get()))
-                    {
-                        if ((unary->op == "++" || unary->op == "--") &&
-                            dynamic_cast<Identifier *>(unary->operand.get()))
-                        {
-                            auto *id = dynamic_cast<Identifier *>(unary->operand.get());
-                            if (id && !mutable_vars.count(id->name))
-                            {
-                                ErrorHandler::type_error(
-                                    "Cannot modify immutable variable '" + id->name + "'. Declare it as 'mut' to use " + unary->op,
-                                    expr_stmt->line);
-                                exit(1);
-                            }
-                        }
-                    }
-                    
-                    // Check for calling mutating methods on const component variables
-                    if (auto call = dynamic_cast<FunctionCall *>(expr_stmt->expression.get()))
-                    {
-                        size_t dot_pos = call->name.rfind('.');
-                        if (dot_pos != std::string::npos)
-                        {
-                            std::string obj_name = call->name.substr(0, dot_pos);
-                            std::string method_name = call->name.substr(dot_pos + 1);
-                            
-                            // Check if obj_name is a local variable (in scope)
-                            if (current_scope.count(obj_name))
-                            {
-                                std::string obj_type = current_scope.at(obj_name);
-                                
-                                // Check if it's a component type and the variable is not mutable
-                                if (component_map.count(obj_type) && !mutable_vars.count(obj_name))
-                                {
-                                    // Check if the method is mutating (modifies state)
-                                    const Component* target_comp = component_map.at(obj_type);
-                                    for (const auto& m : target_comp->methods)
-                                    {
-                                        if (m.name == method_name)
-                                        {
-                                            // Check if this method modifies any state
-                                            std::set<std::string> modified_vars;
-                                            m.collect_modifications(modified_vars);
-                                            
-                                            if (!modified_vars.empty())
-                                            {
-                                                ErrorHandler::type_error(
-                                                    "Cannot call mutating method '" + method_name +
-                                                    "' on const component variable '" + obj_name +
-                                                    "'. Declare as 'mut " + obj_type + " " + obj_name +
-                                                    "' to allow mutation.",
-                                                    expr_stmt->line);
-                                                exit(1);
-                                            }
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Validate expression type
-                    infer_expression_type(expr_stmt->expression.get(), current_scope);
-                }
-                else if (auto ret_stmt = dynamic_cast<ReturnStatement *>(stmt.get()))
-                {
-                    // Validate return type matches method's declared return type
-                    if (ret_stmt->value)
-                    {
-                        // Check return value for use of moved variables
-                        check_moved_use(ret_stmt->value.get(), ret_stmt->line);
-
-                        // Has a return value
-                        if (expected_return == "void")
-                        {
-                            ErrorHandler::type_error(
-                                "Cannot return a value from void function '" + method.name + "'",
-                                ret_stmt->line);
-                            exit(1);
-                        }
-                        std::string actual_return = infer_expression_type(ret_stmt->value.get(), current_scope);
-                        if (actual_return != "unknown" && !is_compatible_type(actual_return, expected_return))
-                        {
-                            ErrorHandler::type_error(
-                                "Function '" + method.name + "' expects return type '" + expected_return +
-                                "' but got '" + actual_return + "'",
-                                ret_stmt->line);
-                            exit(1);
-                        }
-                    }
-                    else
-                    {
-                        // No return value (bare 'return;')
-                        if (expected_return != "void")
-                        {
-                            ErrorHandler::type_error(
-                                "Function '" + method.name + "' must return a value of type '" + expected_return + "'",
-                                ret_stmt->line);
-                            exit(1);
-                        }
-                    }
-                }
-            };
-
-            for (const auto &stmt : method.body)
-            {
-                check_stmt(stmt, method_scope);
-            }
+            check_function_body(method, &comp, method_scope, mutable_vars, component_names, component_map);
         }
     }
+
+    // Top-level functions: params and locals only
+    for (const auto &fn : global_functions)
+    {
+        g_ctx_module = fn->module_name;
+        g_ctx_file = fn->source_file;
+        g_ctx_component = nullptr;
+
+        for (const auto &stmt : fn->body)
+            validate_variant_binding_types(stmt.get());
+        check_free_function_names(*fn, component_names);
+
+        std::map<std::string, std::string> fn_scope;
+        std::set<std::string> mutable_vars;
+        for (const auto &param : fn->params)
+        {
+            fn_scope[param.name] = normalize_type(param.type);
+            if (param.is_mutable)
+                mutable_vars.insert(param.name);
+        }
+        check_function_body(*fn, nullptr, fn_scope, mutable_vars, component_names, component_map);
+    }
+
+    g_ctx_module.clear();
+    g_ctx_file.clear();
+    g_ctx_component = nullptr;
+    g_file_imports = nullptr;
 }
 
 void validate_mutability(const std::vector<Component> &components)

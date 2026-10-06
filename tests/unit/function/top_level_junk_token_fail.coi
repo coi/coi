@@ -1,0 +1,15 @@
+// Test: unknown tokens at top level are an error, not silently skipped - should fail
+struct Point {
+    int x;
+    int y;
+}
+
+component App {
+    view {
+        <div>Test</div>
+    }
+}
+
+app {
+    root = App;
+}

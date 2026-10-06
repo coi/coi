@@ -1,5 +1,5 @@
 // Test: compound member assignment (+=, -=, etc.)
-struct Counter {
+pod Counter {
     int value;
 }
 

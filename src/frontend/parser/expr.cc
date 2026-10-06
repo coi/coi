@@ -343,6 +343,8 @@ std::unique_ptr<Expression> Parser::parse_primary()
         int identifier_line = current().line;
         advance();
 
+        std::unique_ptr<Expression> expr;
+
         // Check for namespaced access: Module::Value or Module::Type(...)
         if (current().type == TokenType::DOUBLE_COLON)
         {
@@ -363,16 +365,32 @@ std::unique_ptr<Expression> Parser::parse_primary()
                 return comp_expr;
             }
             
-            // Otherwise treat as enum access
-            return std::make_unique<EnumAccess>(name, value_name);
+            // Namespaced top-level function call: Module::fn(...)
+            if (current().type == TokenType::LPAREN && std::islower(value_name[0]))
+            {
+                advance(); // consume '('
+                auto call = std::make_unique<FunctionCall>(name + "::" + value_name);
+                call->line = identifier_line;
+                call->args = parse_call_args(TokenType::RPAREN);
+                expect(TokenType::RPAREN, "Expected ')'");
+                expr = std::move(call);
+            }
+            else
+            {
+                // Otherwise treat as enum access
+                return std::make_unique<EnumAccess>(name, value_name);
+            }
         }
-
-        std::unique_ptr<Expression> expr = std::make_unique<Identifier>(name);
+        else
+        {
+            expr = std::make_unique<Identifier>(name);
+        }
 
         while (true)
         {
             // Data literal initialization: TypeName{val1, val2, ...} or TypeName{name = val, ...}
-            if (current().type == TokenType::LBRACE && std::isupper(name[0]) && allow_brace_init)
+            if (current().type == TokenType::LBRACE && std::isupper(name[0]) && allow_brace_init &&
+                dynamic_cast<Identifier *>(expr.get()))
             {
                 advance();
                 auto parsed_args = parse_call_args(TokenType::RBRACE);

@@ -1,0 +1,27 @@
+// Test: generic top-level functions - should pass
+def first<T>(T[]& items) : T {
+    return items[0];
+}
+
+def pick<T>(bool cond, T a, T b) : T {
+    return cond ? a : b;
+}
+
+component App {
+    mut int[] nums = [7, 8, 9];
+    mut int head = 0;
+    mut string label = "";
+
+    init {
+        head = first(&nums);
+        label = pick(true, "yes", "no");
+    }
+
+    view {
+        <div>{head} {label}</div>
+    }
+}
+
+app {
+    root = App;
+}

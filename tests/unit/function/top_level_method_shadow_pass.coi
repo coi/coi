@@ -1,0 +1,26 @@
+// Test: a component method wins over a top-level function with the same name - should pass
+// If pick() resolved to the top-level function this would fail (wrong arg count and type).
+def pick(string a, string b) : string {
+    return a;
+}
+
+component App {
+    mut int value = 0;
+
+    def pick() : int {
+        return 42;
+    }
+
+    init {
+        int v = pick();
+        value = v;
+    }
+
+    view {
+        <div>{value} {pick()}</div>
+    }
+}
+
+app {
+    root = App;
+}

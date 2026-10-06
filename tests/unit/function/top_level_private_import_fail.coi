@@ -1,0 +1,18 @@
+// Test: calling a non-pub top-level function from another module - should fail
+import "modules/Geometry.coi";
+
+component App {
+    mut float d = 0.0;
+
+    init {
+        d = Geometry::sq(3.0);
+    }
+
+    view {
+        <div>{d}</div>
+    }
+}
+
+app {
+    root = App;
+}

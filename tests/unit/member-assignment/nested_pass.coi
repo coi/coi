@@ -1,9 +1,9 @@
 // Test: nested/chained member assignment
-struct Inner {
+pod Inner {
     int value;
 }
 
-struct Outer {
+pod Outer {
     Inner inner;
 }
 

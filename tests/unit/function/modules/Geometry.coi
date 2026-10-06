@@ -1,0 +1,12 @@
+// Helper module for the top_level_*import tests (not a test itself)
+module Geometry;
+
+pub pod Point { float x; float y; }
+
+pub def dist2(Point a, Point b) : float {
+    return sq(a.x - b.x) + sq(a.y - b.y);
+}
+
+def sq(float v) : float {
+    return v * v;
+}

@@ -135,6 +135,15 @@ static std::string transform_embedded_expression(const std::string& expr) {
     }
     if (depth != 0) return expr;  // Unbalanced parens
     close_paren--;  // Point to the actual close paren
+
+    // Top-level function call: name(args) or Module::name(args)
+    std::string callee = expr.substr(0, paren_pos);
+    size_t callee_start = callee.find_first_not_of(" \t");
+    size_t callee_end = callee.find_last_not_of(" \t");
+    if (callee_start != std::string::npos) {
+        std::string free_fn = FreeFunctionRegistry::instance().resolve_call(callee.substr(callee_start, callee_end - callee_start + 1));
+        if (!free_fn.empty()) return free_fn + expr.substr(paren_pos);
+    }
     
     // Find the dot before the method name
     size_t dot_pos = expr.rfind('.', paren_pos);
@@ -748,6 +757,16 @@ std::string FunctionCall::to_webcc() {
         {
             resolved_receiver = "(*" + resolved_receiver.substr(0, k) + ")" + resolved_receiver.substr(k);
         }
+        // Same for a receiver that starts with a top-level function call (`fmt(x).length()`)
+        size_t paren = resolved_receiver.find('(');
+        if (paren != std::string::npos && paren > 0)
+        {
+            std::string free_fn = FreeFunctionRegistry::instance().resolve_call(resolved_receiver.substr(0, paren));
+            if (!free_fn.empty())
+            {
+                resolved_receiver = free_fn + resolved_receiver.substr(paren);
+            }
+        }
     }
 
     // Try DefSchema lookup first (handles @intrinsic, @inline, @map)
@@ -973,11 +992,17 @@ std::string FunctionCall::to_webcc() {
     }
 
     std::string call_name = name;
-    if (!type_or_obj.empty())
+    std::string free_fn = FreeFunctionRegistry::instance().resolve_call(name);
+    if (!free_fn.empty())
+    {
+        call_name = free_fn;
+    }
+    else if (!type_or_obj.empty())
     {
         call_name = resolved_receiver + "." + method;
     }
-    if (name.find('.') == std::string::npos &&
+    if (free_fn.empty() &&
+        name.find('.') == std::string::npos &&
         name.find("::") == std::string::npos &&
         !name.empty() &&
         std::isupper(name[0])) {
@@ -1135,6 +1160,8 @@ std::string ReferenceExpression::to_webcc() {
             result += "); }";
             return result;
         }
+        std::string free_fn = FreeFunctionRegistry::instance().resolve_call(method_name);
+        if (!free_fn.empty()) return free_fn;
     }
     return operand->to_webcc();  // References are handled at call sites
 }

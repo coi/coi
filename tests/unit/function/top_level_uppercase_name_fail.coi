@@ -1,0 +1,14 @@
+// Test: top-level function names must start lowercase - should fail
+def Add(int a, int b) : int {
+    return a + b;
+}
+
+component App {
+    view {
+        <div>Test</div>
+    }
+}
+
+app {
+    root = App;
+}

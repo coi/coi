@@ -1,5 +1,5 @@
 // Test: basic member assignment
-struct Point {
+pod Point {
     int x;
     int y;
 }

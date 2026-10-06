@@ -392,7 +392,8 @@ std::string ExpressionStatement::to_webcc()
                     }
                 }
                 
-                if (is_mutating)
+                // Top-level functions have no component to update
+                if (is_mutating && !ComponentTypeContext::instance().component_name.empty())
                 {
                     // Generate: field mutation + component update call
                     std::string result = call->to_webcc() + ";\n";
@@ -663,6 +664,32 @@ void collect_mods_recursive(ASTNode *node, std::set<std::string> &mods)
     }
     else if (auto call = dynamic_cast<FunctionCall *>(node))
     {
+        // `&x` passed to a top-level function's `mut T&` param modifies x
+        if (call->name.find('.') == std::string::npos)
+        {
+            size_t dcolon = call->name.find("::");
+            std::string fn_name = dcolon == std::string::npos ? call->name : call->name.substr(dcolon + 2);
+            for (const auto &[module, fns] : FreeFunctionRegistry::instance().functions)
+            {
+                if (dcolon != std::string::npos && module != call->name.substr(0, dcolon)) continue;
+                auto it = fns.find(fn_name);
+                if (it == fns.end()) continue;
+                for (size_t i = 0; i < call->args.size() && i < it->second.mut_ref_params.size(); ++i)
+                {
+                    const auto &arg = call->args[i];
+                    if (!it->second.mut_ref_params[i] || !arg.is_reference) continue;
+                    Expression *root = arg.value.get();
+                    while (true)
+                    {
+                        if (auto member = dynamic_cast<MemberAccess *>(root)) root = member->object.get();
+                        else if (auto idx = dynamic_cast<IndexAccess *>(root)) root = idx->array.get();
+                        else break;
+                    }
+                    if (auto id = dynamic_cast<Identifier *>(root)) mods.insert(id->name);
+                }
+            }
+        }
+
         // A void-returning method (string.append, array.push, ...) mutates its
         // receiver. We lack type info here, so probe every type that has it.
         size_t dot_pos = call->name.rfind('.');

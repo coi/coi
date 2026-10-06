@@ -1,0 +1,21 @@
+// Test: top-level function result assigned to the wrong type - should fail
+def half(float v) : float {
+    return v / 2.0;
+}
+
+component App {
+    mut string label = "";
+
+    init {
+        string s = half(3.0);
+        label = s;
+    }
+
+    view {
+        <div>{label}</div>
+    }
+}
+
+app {
+    root = App;
+}

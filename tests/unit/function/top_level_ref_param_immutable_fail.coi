@@ -1,0 +1,22 @@
+// Test: passing immutable state to a mut reference param - should fail
+pod Vec2 { float x; float y; }
+
+def scale(mut Vec2& v, float k) : void {
+    v.x = v.x * k;
+}
+
+component App {
+    Vec2 pos = Vec2{3.0, 4.0};
+
+    def grow() : void {
+        scale(&pos, 2.0);
+    }
+
+    view {
+        <button onclick={grow}>{pos.x}</button>
+    }
+}
+
+app {
+    root = App;
+}

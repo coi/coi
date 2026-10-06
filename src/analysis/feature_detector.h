@@ -4,9 +4,11 @@
 #include <string>
 #include <set>
 #include <vector>
+#include <memory>
 
 // Forward declarations
 struct Component;
+struct FunctionDef;
 
 // Feature flags detected from code analysis
 struct FeatureFlags
@@ -26,7 +28,8 @@ struct FeatureFlags
 
 // Detect which features are actually used by analyzing components
 FeatureFlags detect_features(const std::vector<Component> &components,
-                              const std::set<std::string> &headers);
+                              const std::set<std::string> &headers,
+                              const std::vector<std::unique_ptr<FunctionDef>> &functions = {});
 
 // Emit global declarations for enabled features
 void emit_feature_globals(std::ostream &out, const FeatureFlags &f);

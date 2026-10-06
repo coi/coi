@@ -47,7 +47,8 @@ static void scan_view_for_events(ASTNode *node, FeatureFlags &flags)
 
 // Detect which features are actually used by analyzing components
 FeatureFlags detect_features(const std::vector<Component> &components,
-                              const std::set<std::string> &headers)
+                              const std::set<std::string> &headers,
+                              const std::vector<std::unique_ptr<FunctionDef>> &functions)
 {
     FeatureFlags flags;
     flags.websocket = headers.count("websocket") > 0;
@@ -194,6 +195,13 @@ FeatureFlags detect_features(const std::vector<Component> &components,
             {
                 scan_stmt(stmt.get());
             }
+        }
+    }
+    for (const auto &func : functions)
+    {
+        for (const auto &stmt : func->body)
+        {
+            scan_stmt(stmt.get());
         }
     }
 

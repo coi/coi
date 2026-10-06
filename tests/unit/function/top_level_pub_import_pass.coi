@@ -1,0 +1,20 @@
+// Test: pub top-level function used from another module - should pass
+import "modules/Geometry.coi";
+
+component App {
+    mut float d = 0.0;
+
+    init {
+        Geometry::Point a = Geometry::Point(0.0, 0.0);
+        Geometry::Point b = Geometry::Point(3.0, 4.0);
+        d = Geometry::dist2(a, b);
+    }
+
+    view {
+        <div>{d}</div>
+    }
+}
+
+app {
+    root = App;
+}

@@ -1,0 +1,19 @@
+// Test: calling another module's function without the Module:: prefix - should fail
+import "modules/Geometry.coi";
+
+component App {
+    mut float d = 0.0;
+
+    init {
+        Geometry::Point a = Geometry::Point(0.0, 0.0);
+        d = dist2(a, a);
+    }
+
+    view {
+        <div>{d}</div>
+    }
+}
+
+app {
+    root = App;
+}

@@ -1,0 +1,16 @@
+// Test: top-level functions have no signals to emit - should fail
+def notify(int n) : void {
+    emit changed(n);
+}
+
+component App {
+    signal changed(int value);
+
+    view {
+        <div>Test</div>
+    }
+}
+
+app {
+    root = App;
+}

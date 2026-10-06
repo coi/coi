@@ -1,5 +1,6 @@
 #include "codegen.h"
 #include "ast/ast.h"
+#include "ast/codegen_state.h"
 #include "../analysis/feature_detector.h"
 #include "../analysis/dependency_resolver.h"
 #include "json_codegen.h"
@@ -10,6 +11,7 @@ void generate_cpp_code(
     std::vector<Component> &all_components,
     const std::vector<std::unique_ptr<DataDef>> &all_global_data,
     const std::vector<std::unique_ptr<EnumDef>> &all_global_enums,
+    const std::vector<std::unique_ptr<FunctionDef>> &all_global_functions,
     const AppConfig &final_app_config,
     const std::set<std::string> &required_headers,
     const FeatureFlags &features)
@@ -361,10 +363,41 @@ void generate_cpp_code(
     out << "void g_app_navigate(const coi::string& route);\n";
     out << "coi::string g_app_get_route();\n\n";
 
+    // Top-level functions are generated with no component active
+    auto enter_function_scope = [&](const FunctionDef &func)
+    {
+        ComponentTypeContext::instance().clear();
+        ComponentTypeContext::instance().set_module_scope(func.module_name, session.data_type_names);
+        g_ref_props.clear();
+    };
+
+    // Declarations first so functions can call each other in any order. Generic
+    // functions are templates, so their full definitions go here too.
+    for (const auto &func : all_global_functions)
+    {
+        enter_function_scope(*func);
+        out << (func->type_params.empty() ? func->free_declaration() : func->free_definition());
+    }
+    ComponentTypeContext::instance().clear();
+    if (!all_global_functions.empty())
+    {
+        out << "\n";
+    }
+
     for (auto *comp : sorted_components)
     {
         out << comp->to_webcc(session);
     }
+
+    // Non-generic definitions after components, so they can use component types
+    for (const auto &func : all_global_functions)
+    {
+        if (!func->type_params.empty()) continue;
+        enter_function_scope(*func);
+        out << func->free_definition() << "\n";
+    }
+    ComponentTypeContext::instance().clear();
+    g_ref_props.clear();
 
     if (final_app_config.root_component.empty())
     {

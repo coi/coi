@@ -1,0 +1,16 @@
+// Test: top-level function referencing a name that isn't a param or local - should fail
+def addCount(int n) : int {
+    return n + count;
+}
+
+component App {
+    mut int count = 1;
+
+    view {
+        <div>{addCount(2)}</div>
+    }
+}
+
+app {
+    root = App;
+}

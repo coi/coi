@@ -1,33 +1,39 @@
 #include "definitions.h"
 #include "node.h"
 
-std::string FunctionDef::to_webcc(const std::string& injected_code) {
-    ComponentTypeContext::instance().begin_method_scope();
-
+// template<...> header plus "Ret name(params)"; registers params in the method scope
+static std::string function_signature(const FunctionDef& fn, const std::string& emitted_name) {
     std::string result;
-    
+
     // Generate template declaration for generic functions
-    if (!type_params.empty()) {
+    if (!fn.type_params.empty()) {
         result += "template<";
-        for (size_t i = 0; i < type_params.size(); ++i) {
+        for (size_t i = 0; i < fn.type_params.size(); ++i) {
             if (i > 0) result += ", ";
-            result += "typename " + type_params[i];
+            result += "typename " + fn.type_params[i];
         }
         result += ">\n";
     }
-    
-    result += convert_type(return_type) + " " + name + "(";
-    
-    for(size_t i = 0; i < params.size(); i++){
-        if(i > 0) result += ", ";
-        result += (params[i].is_mutable ? "" : "const ") + convert_type(params[i].type);
-        if(params[i].is_reference) result += "&";
-        result += " " + params[i].name;
 
-        ComponentTypeContext::instance().set_method_symbol_type(params[i].name, params[i].type);
+    result += convert_type(fn.return_type) + " " + emitted_name + "(";
+
+    for(size_t i = 0; i < fn.params.size(); i++){
+        if(i > 0) result += ", ";
+        result += (fn.params[i].is_mutable ? "" : "const ") + convert_type(fn.params[i].type);
+        if(fn.params[i].is_reference) result += "&";
+        result += " " + fn.params[i].name;
+
+        ComponentTypeContext::instance().set_method_symbol_type(fn.params[i].name, fn.params[i].type);
     }
-    
-    result += ") {\n";
+
+    result += ")";
+    return result;
+}
+
+std::string FunctionDef::to_webcc(const std::string& injected_code) {
+    ComponentTypeContext::instance().begin_method_scope();
+
+    std::string result = function_signature(*this, name) + " {\n";
     for(auto& stmt : body){
         result += "    " + stmt->to_webcc() + "\n";
     }
@@ -40,9 +46,40 @@ std::string FunctionDef::to_webcc(const std::string& injected_code) {
     return result;
 }
 
+std::string FunctionDef::free_declaration() {
+    ComponentTypeContext::instance().begin_method_scope();
+    std::string result = function_signature(*this, qualified_name(module_name, name)) + ";\n";
+    ComponentTypeContext::instance().end_method_scope();
+    return result;
+}
+
+std::string FunctionDef::free_definition() {
+    ComponentTypeContext::instance().begin_method_scope();
+    std::string result = function_signature(*this, qualified_name(module_name, name)) + " {\n";
+    for(auto& stmt : body){
+        result += "    " + stmt->to_webcc() + "\n";
+    }
+    result += "}\n";
+    ComponentTypeContext::instance().end_method_scope();
+    return result;
+}
+
 void FunctionDef::collect_modifications(std::set<std::string>& mods) const {
     for(const auto& stmt : body) {
         collect_mods_recursive(stmt.get(), mods);
+    }
+}
+
+void register_free_functions(const std::vector<std::unique_ptr<FunctionDef>>& functions) {
+    auto& reg = FreeFunctionRegistry::instance().functions;
+    reg.clear();
+    for (const auto& fn : functions) {
+        FreeFunctionInfo info;
+        info.is_public = fn->is_public;
+        for (const auto& param : fn->params) {
+            info.mut_ref_params.push_back(param.is_mutable && param.is_reference);
+        }
+        reg[fn->module_name][fn->name] = info;
     }
 }
 

@@ -1,0 +1,24 @@
+// Test: top-level function calling one defined later in the file - should pass
+def sumOfSquares(int a, int b) : int {
+    return square(a) + square(b);
+}
+
+def square(int n) : int {
+    return n * n;
+}
+
+component App {
+    mut int total = 0;
+
+    init {
+        total = sumOfSquares(3, 4);
+    }
+
+    view {
+        <div>{total}</div>
+    }
+}
+
+app {
+    root = App;
+}

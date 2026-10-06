@@ -1,5 +1,6 @@
 #include "node.h"
 #include "../defs/def_parser.h"
+#include "../cli/error.h"
 #include <cctype>
 #include <algorithm>
 
@@ -143,4 +144,25 @@ std::string convert_type(const std::string& type) {
         return "webcc::" + type;
     }
     return type;
+}
+
+std::string FreeFunctionRegistry::resolve_call(const std::string& name) const {
+    if (functions.empty() || name.empty() || name.find('.') != std::string::npos) return "";
+    const auto& ctx = ComponentTypeContext::instance();
+    size_t dcolon = name.find("::");
+    if (dcolon != std::string::npos) {
+        std::string module = name.substr(0, dcolon);
+        std::string fn = name.substr(dcolon + 2);
+        const FreeFunctionInfo* info = find(module, fn);
+        if (!info) return "";
+        if (module != ctx.module_name && !info->is_public) {
+            ErrorHandler::compiler_error("Function '" + fn + "' in module '" + module +
+                "' is not public. Add 'pub' to make it importable: pub def " + fn);
+        }
+        return qualified_name(module, fn);
+    }
+    if (!std::islower(static_cast<unsigned char>(name[0]))) return "";
+    if (ctx.has_method(name) || !ctx.get_symbol_type(name).empty()) return "";
+    if (!find(ctx.module_name, name)) return "";
+    return qualified_name(ctx.module_name, name);
 }

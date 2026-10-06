@@ -245,6 +245,7 @@ int main(int argc, char **argv)
     std::vector<Component> all_components;
     std::vector<std::unique_ptr<DataDef>> all_global_data;
     std::vector<std::unique_ptr<EnumDef>> all_global_enums;
+    std::vector<std::unique_ptr<FunctionDef>> all_global_functions;
     AppConfig final_app_config;
     std::set<std::string> processed_files;
     std::queue<std::string> file_queue;
@@ -320,6 +321,21 @@ int main(int argc, char **argv)
             {
                 data_def->source_file = current_file_path;
                 all_global_data.push_back(std::move(data_def));
+            }
+
+            // Collect top-level functions (same name allowed in different modules)
+            for (auto &func : parser.global_functions)
+            {
+                for (const auto &existing : all_global_functions)
+                {
+                    if (existing->name == func->name && existing->module_name == func->module_name)
+                    {
+                        std::cerr << colors::RED << "Error:" << colors::RESET << " Function '" << func->name << "' is defined multiple times (found in " << current_file_path << " at line " << func->line << ")" << std::endl;
+                        return 1;
+                    }
+                }
+                func->source_file = current_file_path;
+                all_global_functions.push_back(std::move(func));
             }
 
             if (!parser.app_config.root_component.empty())
@@ -431,10 +447,12 @@ int main(int argc, char **argv)
 
         std::cerr << "All files processed. Total components: " << all_components.size() << std::endl;
 
+        register_free_functions(all_global_functions);
+
         validate_view_hierarchy(all_components, file_imports);
         validate_type_imports(all_components, all_global_enums, all_global_data, file_imports);
         validate_mutability(all_components);
-        validate_types(all_components, all_global_enums, all_global_data);
+        validate_types(all_components, all_global_enums, all_global_data, all_global_functions, file_imports);
 
         // Determine output filename
         fs::path input_path(input_file);
@@ -490,11 +508,11 @@ int main(int argc, char **argv)
         }
 
         // Code generation - automatically detect required headers and features
-        std::set<std::string> required_headers = get_required_headers(all_components);
-        FeatureFlags features = detect_features(all_components, required_headers);
+        std::set<std::string> required_headers = get_required_headers(all_components, all_global_functions);
+        FeatureFlags features = detect_features(all_components, required_headers, all_global_functions);
 
         // Generate C++ code
-        generate_cpp_code(out, all_components, all_global_data, all_global_enums,
+        generate_cpp_code(out, all_components, all_global_data, all_global_enums, all_global_functions,
                           final_app_config, required_headers, features);
 
         out.close();

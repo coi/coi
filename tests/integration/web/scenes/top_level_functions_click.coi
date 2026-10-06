@@ -1,0 +1,63 @@
+// Regression scene: top-level functions called from a component. Covers a
+// forward call between free functions, a generic, a `mut Pod&` param that must
+// trigger the view update, and a component method shadowing a free function.
+
+pod Vec2 { int x; int y; }
+
+def len2(Vec2 v) : int {
+    return square(v.x) + square(v.y);
+}
+
+def square(int n) : int {
+    return n * n;
+}
+
+def scale(mut Vec2& v, int k) : void {
+    v.x = v.x * k;
+    v.y = v.y * k;
+}
+
+def pick<T>(bool cond, T a, T b) : T {
+    return cond ? a : b;
+}
+
+def label() : string {
+    return "free";
+}
+
+component App {
+    mut Vec2 pos = Vec2{3, 4};
+    mut int size = 0;
+    mut string who = "";
+
+    def label() : string {
+        return "method";
+    }
+
+    init {
+        size = pick(true, len2(pos), 0);
+        who = label();
+    }
+
+    def grow() : void {
+        scale(&pos, 2);
+        size = len2(pos);
+    }
+
+    style {
+        html, body { margin: 0; padding: 0; background: #0f1117; color: #e8e8e8;
+            font-family: system-ui, sans-serif; }
+        .hit { width: 100vw; height: 100vh; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; user-select: none; cursor: pointer; }
+    }
+
+    view {
+        <div class="hit" onclick={grow}>
+            <div class="size">{size}</div>
+            <div class="pos">{pos.x},{pos.y}</div>
+            <div class="who">{who}</div>
+        </div>
+    }
+}
+
+app { root = App; }

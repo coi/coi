@@ -1,0 +1,22 @@
+// Test: top-level function called from a component - should pass
+pod Vec2 { float x; float y; }
+
+def len2(Vec2 v) : float {
+    return v.x * v.x + v.y * v.y;
+}
+
+component App {
+    mut float l;
+
+    init {
+        l = len2(Vec2{3.0, 4.0});
+    }
+
+    view {
+        <div>{l} {len2(Vec2{1.0, 1.0})}</div>
+    }
+}
+
+app {
+    root = App;
+}

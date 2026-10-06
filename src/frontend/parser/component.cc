@@ -957,217 +957,7 @@ Component Parser::parse_component()
         // Function definition (with optional pub prefix)
         else if (current().type == TokenType::DEF)
         {
-            advance();
-            FunctionDef func;
-            func.is_public = is_public;
-            func.name = current().value;
-            int func_line = current().line;
-            expect(TokenType::IDENTIFIER, "Expected function name");
-
-            // Method names must start with lowercase (to distinguish from component/type construction)
-            if (!func.name.empty() && std::isupper(func.name[0]))
-            {
-                ErrorHandler::compiler_error("Method name '" + func.name + "' must start with a lowercase letter", func_line);
-            }
-
-            // Parse generic type parameters: def first<T>(...) : T
-            if (current().type == TokenType::LT)
-            {
-                advance(); // skip '<'
-                while (current().type != TokenType::GT && current().type != TokenType::END_OF_FILE)
-                {
-                    std::string type_param = current().value;
-                    expect(TokenType::IDENTIFIER, "Expected type parameter name");
-                    
-                    // Type parameter names must start with uppercase
-                    if (!type_param.empty() && !std::isupper(type_param[0]))
-                    {
-                        ErrorHandler::compiler_error("Type parameter '" + type_param + "' must start with an uppercase letter", current().line);
-                    }
-                    
-                    func.type_params.push_back(type_param);
-                    
-                    if (current().type == TokenType::COMMA)
-                    {
-                        advance();
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
-                expect(TokenType::GT, "Expected '>' after type parameters");
-            }
-
-            expect(TokenType::LPAREN, "Expected '('");
-
-            // Parse parameters
-            while (current().type != TokenType::RPAREN)
-            {
-                bool is_mutable_param = false;
-                if (current().type == TokenType::MUT)
-                {
-                    is_mutable_param = true;
-                    advance();
-                }
-
-                std::string paramType;
-                std::string paramName;
-                bool parsed_function_param = false;
-
-                if (current().type == TokenType::DEF)
-                {
-                    // Function-typed method parameter
-                    // Supported syntax:
-                    //   def handler(type1, type2) : ret
-                    parsed_function_param = true;
-                    advance(); // consume 'def'
-
-                    std::vector<std::string> callback_params;
-
-                    if (is_identifier_token() && peek().type == TokenType::LPAREN)
-                    {
-                        paramName = current().value;
-                        advance();
-                    }
-                    else
-                    {
-                        throw std::runtime_error("Expected function parameter name after 'def'");
-                    }
-
-                    expect(TokenType::LPAREN, "Expected '(' in function parameter type");
-                    while (current().type != TokenType::RPAREN && current().type != TokenType::END_OF_FILE)
-                    {
-                        std::string callback_param_type = current().value;
-                        if (current().type == TokenType::INT || current().type == TokenType::FLOAT ||
-                            current().type == TokenType::FLOAT32 || current().type == TokenType::STRING ||
-                            current().type == TokenType::BOOL || current().type == TokenType::IDENTIFIER ||
-                            current().type == TokenType::VOID)
-                        {
-                            advance();
-                        }
-                        else
-                        {
-                            throw std::runtime_error("Expected parameter type in function parameter");
-                        }
-
-                        if (current().type == TokenType::LBRACKET)
-                        {
-                            advance();
-                            callback_param_type += parse_type_bracket_suffix();
-                        }
-
-                        // Optional parameter name in callback signature
-                        if (is_identifier_token())
-                        {
-                            advance();
-                        }
-
-                        callback_params.push_back(callback_param_type);
-
-                        if (current().type == TokenType::COMMA)
-                        {
-                            advance();
-                        }
-                        else
-                        {
-                            break;
-                        }
-                    }
-                    expect(TokenType::RPAREN, "Expected ')' in function parameter type");
-                    expect(TokenType::COLON, "Expected ':' for function parameter return type");
-
-                    std::string retType = current().value;
-                    if (is_type_token())
-                    {
-                        advance();
-                    }
-                    else
-                    {
-                        throw std::runtime_error("Expected return type in function parameter");
-                    }
-
-                    std::string params_str;
-                    for (size_t i = 0; i < callback_params.size(); ++i)
-                    {
-                        if (i > 0)
-                            params_str += ", ";
-                        params_str += convert_type(callback_params[i]);
-                    }
-                    paramType = "webcc::function<" + convert_type(retType) + "(" + params_str + ")>";
-                }
-                else
-                {
-                    paramType = current().value;
-                    if (current().type == TokenType::INT || current().type == TokenType::FLOAT ||
-                        current().type == TokenType::FLOAT32 ||
-                        current().type == TokenType::STRING || current().type == TokenType::BOOL ||
-                        current().type == TokenType::IDENTIFIER)
-                    {
-                        advance();
-                        // Check for array/map type: Type[] or Type[N] or Type[KeyType]
-                        if (current().type == TokenType::LBRACKET)
-                        {
-                            advance();
-                            paramType += parse_type_bracket_suffix();
-                        }
-                    }
-                    else
-                    {
-                        throw std::runtime_error("Expected parameter type");
-                    }
-
-                    bool is_reference = false;
-                    if (current().type == TokenType::AMPERSAND)
-                    {
-                        is_reference = true;
-                        advance();
-                    }
-
-                    paramName = current().value;
-                    if (is_identifier_token())
-                    {
-                        advance();
-                    }
-                    else
-                    {
-                        throw std::runtime_error("Expected parameter name at line " + std::to_string(current().line));
-                    }
-
-                    func.params.push_back({paramType, paramName, is_mutable_param, is_reference});
-                }
-
-                if (parsed_function_param)
-                {
-                    // Function parameters are not reference parameters in syntax today
-                    func.params.push_back({paramType, paramName, is_mutable_param, false});
-                }
-
-                if (current().type == TokenType::COMMA)
-                {
-                    advance();
-                }
-            }
-
-            expect(TokenType::RPAREN, "Expected ')'");
-            if (current().type == TokenType::LBRACE)
-            {
-                throw std::runtime_error("Missing return type for function '" + func.name + "'. Expected ':' followed by return type at line " + std::to_string(current().line));
-            }
-            expect(TokenType::COLON, "Expected ':' for return type");
-
-            // Single return type
-            func.return_type = current().value;
-            advance();
-            expect(TokenType::LBRACE, "Expected '{'");
-
-            while (current().type != TokenType::RBRACE)
-            {
-                func.body.push_back(parse_statement());
-            }
-
-            expect(TokenType::RBRACE, "Expected '}'");
-            comp.methods.push_back(std::move(func));
+            comp.methods.push_back(parse_function_def(is_public));
         }
         // Init block
         else if (current().type == TokenType::INIT)
@@ -1362,5 +1152,230 @@ Component Parser::parse_component()
         }
     }
 
+    expect(TokenType::RBRACE, "Expected '}' to close component '" + comp.name + "'");
     return comp;
+}
+
+// Parse `def name<T>(params) : Ret { body }` starting at 'def'.
+// Shared by component methods and top-level functions.
+FunctionDef Parser::parse_function_def(bool is_public)
+{
+    advance();
+    FunctionDef func;
+    func.is_public = is_public;
+    func.name = current().value;
+    int func_line = current().line;
+    expect(TokenType::IDENTIFIER, "Expected function name");
+
+    // Method names must start with lowercase (to distinguish from component/type construction)
+    if (!func.name.empty() && std::isupper(func.name[0]))
+    {
+        ErrorHandler::compiler_error("Method name '" + func.name + "' must start with a lowercase letter", func_line);
+    }
+
+    // Parse generic type parameters: def first<T>(...) : T
+    if (current().type == TokenType::LT)
+    {
+        advance(); // skip '<'
+        while (current().type != TokenType::GT && current().type != TokenType::END_OF_FILE)
+        {
+            std::string type_param = current().value;
+            expect(TokenType::IDENTIFIER, "Expected type parameter name");
+            
+            // Type parameter names must start with uppercase
+            if (!type_param.empty() && !std::isupper(type_param[0]))
+            {
+                ErrorHandler::compiler_error("Type parameter '" + type_param + "' must start with an uppercase letter", current().line);
+            }
+            
+            func.type_params.push_back(type_param);
+            
+            if (current().type == TokenType::COMMA)
+            {
+                advance();
+            }
+            else
+            {
+                break;
+            }
+        }
+        expect(TokenType::GT, "Expected '>' after type parameters");
+    }
+
+    expect(TokenType::LPAREN, "Expected '('");
+
+    // Parse parameters
+    while (current().type != TokenType::RPAREN)
+    {
+        bool is_mutable_param = false;
+        if (current().type == TokenType::MUT)
+        {
+            is_mutable_param = true;
+            advance();
+        }
+
+        std::string paramType;
+        std::string paramName;
+        bool parsed_function_param = false;
+
+        if (current().type == TokenType::DEF)
+        {
+            // Function-typed method parameter
+            // Supported syntax:
+            //   def handler(type1, type2) : ret
+            parsed_function_param = true;
+            advance(); // consume 'def'
+
+            std::vector<std::string> callback_params;
+
+            if (is_identifier_token() && peek().type == TokenType::LPAREN)
+            {
+                paramName = current().value;
+                advance();
+            }
+            else
+            {
+                throw std::runtime_error("Expected function parameter name after 'def'");
+            }
+
+            expect(TokenType::LPAREN, "Expected '(' in function parameter type");
+            while (current().type != TokenType::RPAREN && current().type != TokenType::END_OF_FILE)
+            {
+                std::string callback_param_type = current().value;
+                if (current().type == TokenType::INT || current().type == TokenType::FLOAT ||
+                    current().type == TokenType::FLOAT32 || current().type == TokenType::STRING ||
+                    current().type == TokenType::BOOL || current().type == TokenType::IDENTIFIER ||
+                    current().type == TokenType::VOID)
+                {
+                    advance();
+                }
+                else
+                {
+                    throw std::runtime_error("Expected parameter type in function parameter");
+                }
+
+                if (current().type == TokenType::LBRACKET)
+                {
+                    advance();
+                    callback_param_type += parse_type_bracket_suffix();
+                }
+
+                // Optional parameter name in callback signature
+                if (is_identifier_token())
+                {
+                    advance();
+                }
+
+                callback_params.push_back(callback_param_type);
+
+                if (current().type == TokenType::COMMA)
+                {
+                    advance();
+                }
+                else
+                {
+                    break;
+                }
+            }
+            expect(TokenType::RPAREN, "Expected ')' in function parameter type");
+            expect(TokenType::COLON, "Expected ':' for function parameter return type");
+
+            std::string retType = current().value;
+            if (is_type_token())
+            {
+                advance();
+            }
+            else
+            {
+                throw std::runtime_error("Expected return type in function parameter");
+            }
+
+            std::string params_str;
+            for (size_t i = 0; i < callback_params.size(); ++i)
+            {
+                if (i > 0)
+                    params_str += ", ";
+                params_str += convert_type(callback_params[i]);
+            }
+            paramType = "webcc::function<" + convert_type(retType) + "(" + params_str + ")>";
+        }
+        else
+        {
+            paramType = current().value;
+            if (current().type == TokenType::INT || current().type == TokenType::FLOAT ||
+                current().type == TokenType::FLOAT32 ||
+                current().type == TokenType::STRING || current().type == TokenType::BOOL ||
+                current().type == TokenType::IDENTIFIER)
+            {
+                advance();
+                // Cross-module type: Module::Type
+                if (current().type == TokenType::DOUBLE_COLON)
+                {
+                    advance();
+                    paramType += "::" + current().value;
+                    expect(TokenType::IDENTIFIER, "Expected type name after '::'");
+                }
+                // Check for array/map type: Type[] or Type[N] or Type[KeyType]
+                if (current().type == TokenType::LBRACKET)
+                {
+                    advance();
+                    paramType += parse_type_bracket_suffix();
+                }
+            }
+            else
+            {
+                throw std::runtime_error("Expected parameter type");
+            }
+
+            bool is_reference = false;
+            if (current().type == TokenType::AMPERSAND)
+            {
+                is_reference = true;
+                advance();
+            }
+
+            paramName = current().value;
+            if (is_identifier_token())
+            {
+                advance();
+            }
+            else
+            {
+                throw std::runtime_error("Expected parameter name at line " + std::to_string(current().line));
+            }
+
+            func.params.push_back({paramType, paramName, is_mutable_param, is_reference});
+        }
+
+        if (parsed_function_param)
+        {
+            // Function parameters are not reference parameters in syntax today
+            func.params.push_back({paramType, paramName, is_mutable_param, false});
+        }
+
+        if (current().type == TokenType::COMMA)
+        {
+            advance();
+        }
+    }
+
+    expect(TokenType::RPAREN, "Expected ')'");
+    if (current().type == TokenType::LBRACE)
+    {
+        throw std::runtime_error("Missing return type for function '" + func.name + "'. Expected ':' followed by return type at line " + std::to_string(current().line));
+    }
+    expect(TokenType::COLON, "Expected ':' for return type");
+
+    // Single return type
+    func.return_type = current().value;
+    advance();
+    expect(TokenType::LBRACE, "Expected '{'");
+
+    while (current().type != TokenType::RBRACE)
+    {
+        func.body.push_back(parse_statement());
+    }
+
+    expect(TokenType::RBRACE, "Expected '}'");
+    return func;
 }

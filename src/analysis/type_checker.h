@@ -21,9 +21,12 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
 // - Parameter and state variable initialization
 // - Method body statements
 // - Return types
+// - Top-level function bodies and calls to them
 void validate_types(const std::vector<Component> &components, 
                     const std::vector<std::unique_ptr<EnumDef>> &global_enums = {},
-                    const std::vector<std::unique_ptr<DataDef>> &global_data = {});
+                    const std::vector<std::unique_ptr<DataDef>> &global_data = {},
+                    const std::vector<std::unique_ptr<FunctionDef>> &global_functions = {},
+                    const std::map<std::string, std::set<std::string>> &file_imports = {});
 
 // Validate mutability constraints:
 // - Only mutable variables can be modified

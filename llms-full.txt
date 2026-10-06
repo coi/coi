@@ -33,7 +33,8 @@ patterns shown here and verify by compiling with `coi build`.
 5. **Ownership is explicit:** copy by default, borrow with `&` (reference), transfer with `:`
    (move, `:=` in assignments). Some platform types (Canvas, Audio, etc.) cannot be copied.
 6. **Naming is enforced.** Components, pods, enums, modules, and generic type params start
-   Uppercase. Methods, signals, and variables start lowercase. Violations are compile errors.
+   Uppercase. Methods, functions, signals, and variables start lowercase. Violations are
+   compile errors.
 7. **Two brace worlds:** inside `view {}` embed expressions with single braces `{expr}`;
    inside string/template literals interpolate with `${expr}`.
 8. **Construction differs by kind:** pods use braces `Pod{...}`, components use parens
@@ -123,7 +124,7 @@ pub import "src/api/Client.coi";
 | Construct | Case | Example |
 |-----------|------|---------|
 | Component, Pod, Enum, Module, generic param `<T>` | Uppercase | `component Counter`, `pod User`, `enum Mode` |
-| Method, signal, variable | lowercase | `def handleClick()`, `signal tick(...)`, `mut int count` |
+| Method, function, signal, variable | lowercase | `def handleClick()`, `signal tick(...)`, `mut int count` |
 
 Because `Name(...)` means component/type construction and `name(...)` means a function call,
 the case distinction removes all ambiguity in view syntax.
@@ -366,6 +367,27 @@ pub def reset() : void { count = 0; }            // pub -> callable from outside
 def first<T>(T[] items) : T { return items[0]; }
 def makePair<A, B>(A a, B b) : Pair<A, B> { return Pair<A, B>{a, b}; }
 ```
+
+**Top-level functions.** `def` also works at file level, outside any component. Same
+parameter syntax as methods; declaration order does not matter.
+```coi
+pod Vec2 { float x; float y; }
+def len2(Vec2 v) : float { return v.x * v.x + v.y * v.y; }
+def scale(mut Vec2& v, float k) : void { v.x = v.x * k; v.y = v.y * k; }
+
+component App {
+    mut Vec2 pos = Vec2{3.0, 4.0};
+    mut float size = 0.0;
+    def grow() : void { scale(&pos, 2.0); size = len2(pos); }  // &pos -> view updates
+}
+```
+Rules:
+- A top-level function sees only its params and locals: no component state, no `emit`, no
+  lifecycle. Pass data in (by `&` if it should be modified).
+- Module-internal by default; `pub def` exports it. From another module, import the file and
+  call `Module::fn(...)` (e.g. `Geometry::dist2(a, b)`).
+- Inside a component, the component's own method wins over a top-level function with the
+  same name.
 
 **Function references / callbacks.** Function-typed variables hold callables:
 ```coi
@@ -792,7 +814,8 @@ Rules:
 - Import every file you use directly. If A imports B and B imports C, A cannot use C unless A
   also imports C.
 - Same module: use a component by bare name (`<Button />`). Different module: qualify with
-  `Module::Name` (`<TurboUI::Button />`).
+  `Module::Name` (`<TurboUI::Button />`). `pub` top-level functions work the same way:
+  `fn(...)` in the same module, `Module::fn(...)` from another.
 - `pub import "path";` re-exports (used in a package's `Mod.coi`).
 - Package imports start with `@scope/name` and resolve under `.coi/pkgs/`. Commit `coi.lock`.
 
@@ -928,6 +951,9 @@ app { root = Bouncer; }
 ## 11. Common Mistakes (do NOT do these)
 
 - Using `let`/`const`/`var`/`function`. Use `Type name = ...;` and `def name(...) : Ret`.
+- Writing anything other than `module`, `import`, `component`, `pod`, `enum`, `def`, or
+  `app` at the top level of a file. Anything else is a compile error.
+- Reading component state from a top-level function. It only sees its params and locals.
 - Omitting the return type. Always write `: void` (or the real type) after the params.
 - Using `null`/`undefined`. There is none. Use defaults ("", 0, false) and `.isEmpty()`;
   `Storage.getItem` returns `""` when missing.

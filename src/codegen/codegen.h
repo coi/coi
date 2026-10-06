@@ -9,6 +9,7 @@
 struct Component;
 struct DataDef;
 struct EnumDef;
+struct FunctionDef;
 struct AppConfig;
 struct FeatureFlags;
 struct CompilerSession;
@@ -19,6 +20,7 @@ void generate_cpp_code(
     std::vector<Component> &all_components,
     const std::vector<std::unique_ptr<DataDef>> &all_global_data,
     const std::vector<std::unique_ptr<EnumDef>> &all_global_enums,
+    const std::vector<std::unique_ptr<FunctionDef>> &all_global_functions,
     const AppConfig &final_app_config,
     const std::set<std::string> &required_headers,
     const FeatureFlags &features);

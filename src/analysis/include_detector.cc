@@ -176,6 +176,20 @@ static void collect_types_from_stmt(Statement *stmt, std::set<std::string> &type
     }
 }
 
+// Collect types from a function's parameters, return type, and body
+static void collect_used_types(const FunctionDef &func, std::set<std::string> &types)
+{
+    types.insert(get_base_type(func.return_type));
+    for (const auto &param : func.params)
+    {
+        types.insert(get_base_type(param.type));
+    }
+    for (const auto &stmt : func.body)
+    {
+        collect_types_from_stmt(stmt.get(), types);
+    }
+}
+
 // Collect all types used in a component (including method bodies)
 static void collect_used_types(const Component &comp, std::set<std::string> &types)
 {
@@ -193,21 +207,13 @@ static void collect_used_types(const Component &comp, std::set<std::string> &typ
     // Collect from method parameters, return types, and bodies
     for (const auto &method : comp.methods)
     {
-        types.insert(get_base_type(method.return_type));
-        for (const auto &param : method.params)
-        {
-            types.insert(get_base_type(param.type));
-        }
-        // Scan method body for type usage
-        for (const auto &stmt : method.body)
-        {
-            collect_types_from_stmt(stmt.get(), types);
-        }
+        collect_used_types(method, types);
     }
 }
 
 // Determine which headers are needed based on used types
-std::set<std::string> get_required_headers(const std::vector<Component> &components)
+std::set<std::string> get_required_headers(const std::vector<Component> &components,
+                                           const std::vector<std::unique_ptr<FunctionDef>> &functions)
 {
     static auto type_to_header = build_type_to_header();
 
@@ -215,6 +221,10 @@ std::set<std::string> get_required_headers(const std::vector<Component> &compone
     for (const auto &comp : components)
     {
         collect_used_types(comp, used_types);
+    }
+    for (const auto &func : functions)
+    {
+        collect_used_types(*func, used_types);
     }
 
     std::set<std::string> headers;

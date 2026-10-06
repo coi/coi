@@ -9,3 +9,4 @@ router_params_click|tests/integration/web/scenes/router_params_click.coi|web
 member_tick_click|tests/integration/web/scenes/member_tick_click.coi|web
 
 nested_if_order_tick|tests/integration/web/scenes/nested_if_order_tick.coi|web
+top_level_functions_click|tests/integration/web/scenes/top_level_functions_click.coi|web
