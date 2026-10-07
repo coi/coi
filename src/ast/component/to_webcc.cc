@@ -1428,6 +1428,27 @@ std::string Component::to_webcc(CompilerSession &session)
     {
         collect_child_updates(root.get(), child_updates, update_counters);
     }
+    // members built in code: mut Child child = Child(&doc, ...)
+    struct MemberRef { std::string member, param, var; };
+    std::vector<MemberRef> member_refs;
+    for (const auto &var : state)
+    {
+        auto *ctor = dynamic_cast<ComponentConstruction *>(var->initializer.get());
+        if (!ctor)
+            continue;
+        auto it = session.component_info.find(resolve_component_qname(session, module_name, ctor->component_name));
+        if (it == session.component_info.end())
+            continue;
+        for (size_t i = 0; i < ctor->args.size() && i < it->second.param_names.size(); i++)
+        {
+            auto *id = dynamic_cast<Identifier *>(ctor->args[i].value.get());
+            const std::string &param = it->second.param_names[i];
+            if (!ctor->args[i].is_reference || !id || !it->second.ref_params.count(param))
+                continue;
+            member_refs.push_back({var->name, param, id->name});
+            child_updates[id->name].push_back("        " + var->name + "._update_" + param + "();\n");
+        }
+    }
 
     // Helper lambda for method generation
     auto generate_method = [&](FunctionDef &method)
@@ -1551,6 +1572,21 @@ std::string Component::to_webcc(CompilerSession &session)
         }
     };
 
+    auto emit_constructed_member_refs = [&]() {
+        for (const auto &ref : member_refs)
+        {
+            ss << "        " << ref.member << "." << make_callback_name(ref.param) << " = [this]() {";
+            if (generated_updaters.count(ref.var))
+                ss << " _update_" << ref.var << "();";
+            for (int if_id : var_to_if_ids[ref.var])
+                ss << " _sync_if_" << if_id << "();";
+            if (!g_component_array_loops.count(ref.var) && !g_array_loops.count(ref.var))
+                for (int loop_id : var_to_loop_ids[ref.var])
+                    ss << " _sync_loop_" << loop_id << "();";
+            ss << " };\n";
+        }
+    };
+
     auto emit_listen_registrations = [&]() {
         for (size_t idx = 0; idx < listen_entries.size(); ++idx)
         {
@@ -1646,6 +1682,7 @@ std::string Component::to_webcc(CompilerSession &session)
 
     // Wire up nested component reactivity (e.g., Vector.x/y -> Ball._update_x/y)
     emit_nested_component_reactivity();
+    emit_constructed_member_refs();
 
     // Wire signal listeners declared in listen { ... }
     emit_listen_registrations();
@@ -1670,6 +1707,7 @@ std::string Component::to_webcc(CompilerSession &session)
 
     // Re-wire nested component reactivity after reallocation
     emit_nested_component_reactivity();
+    emit_constructed_member_refs();
 
     // Re-wire listen block signal handlers after reallocation
     emit_listen_registrations();

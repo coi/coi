@@ -1,0 +1,32 @@
+// a member built with &doc in code: parent and child changes show on both sides
+pod Pt { float x; }
+pod Doc { string title; Pt[] pts; }
+
+component Child(mut Doc& doc, def onChanged : void) {
+    def add() : void { doc.pts.push(Pt{x = 1.0}); onChanged(); }
+    view {
+        <div>
+            <p class="count">{doc.pts.size()}</p>
+            <p class="title">{doc.title}</p>
+            <button class="add" onclick={add}>add</button>
+        </div>
+    }
+}
+
+component App {
+    mut Doc doc = Doc{title = "a", pts = []};
+    mut Child child = Child(&doc, &changed);
+    mut int saves = 0;
+    def changed() : void { saves++; }
+    def swap() : void { doc = Doc{title = "b", pts = [Pt{x = 1.0}, Pt{x = 2.0}]}; }
+    def pushFromParent() : void { doc.pts.push(Pt{x = 3.0}); }
+    view {
+        <div>
+            <button class="swap" onclick={swap}>swap</button>
+            <button class="push" onclick={pushFromParent}>push</button>
+            <{child} />
+            <p class="saves">{saves}</p>
+        </div>
+    }
+}
+app { root = App; }

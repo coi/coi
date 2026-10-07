@@ -309,6 +309,9 @@ void generate_cpp_code(
             {
                 info.pub_mut_members.insert(param->name);
             }
+            info.param_names.push_back(param->name);
+            if (param->is_reference)
+                info.ref_params.insert(param->name);
         }
         session.component_info[qualified_name(comp->module_name, comp->name)] = info;
     }

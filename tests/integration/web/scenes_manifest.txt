@@ -21,3 +21,4 @@ loop_updates|tests/integration/web/scenes/loop_updates.coi|web
 template_values|tests/integration/web/scenes/template_values.coi|web
 websocket_hidden|tests/integration/web/scenes/websocket_hidden.coi|web
 data_roundtrip|tests/integration/web/scenes/data_roundtrip.coi|web
+member_ref_reactive|tests/integration/web/scenes/member_ref_reactive.coi|web

@@ -15,6 +15,8 @@ struct Statement;
 // Info about a component's pub mut members (for parent-child reactivity wiring)
 struct ComponentMemberInfo {
     std::set<std::string> pub_mut_members;  // Names of pub mut params (e.g., "x", "y" for Vector)
+    std::vector<std::string> param_names;   // in declaration order, for Child(&doc, ...) in code
+    std::set<std::string> ref_params;
 };
 
 // Cross-component state that persists across all components in one compilation
