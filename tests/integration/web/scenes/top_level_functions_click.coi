@@ -1,6 +1,4 @@
-// Regression scene: top-level functions called from a component. Covers a
-// forward call between free functions, a generic, a `mut Pod&` param that must
-// trigger the view update, and a component method shadowing a free function.
+// top-level functions called from a component
 
 pod Vec2 { int x; int y; }
 

@@ -1,4 +1,4 @@
-// Test: a local without mut can't be assigned or compound-assigned (it's const in C++)
+// Test: assign to non-mut local
 component LocalAssignFail {
     mut int[] xs;
     mut int out = 0;

@@ -1,0 +1,10 @@
+// Test: push onto an array field of a pod
+pod Bag { string name; int[] xs; }
+
+component App {
+    mut Bag bag = Bag{name = "b", xs = []};
+    def add() : void { bag.xs.push(1); }
+    view { <button onclick={add}>{bag.xs.size()}</button> }
+}
+
+app { root = App; }

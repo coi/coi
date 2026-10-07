@@ -1,4 +1,4 @@
-// Test: an event attribute handler must be a method of the component
+// Test: event handler not a method
 component EventAttrNotMethodFail {
     mut int count = 0;
     view { <canvas onpointerdown={count}></canvas> }

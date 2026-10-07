@@ -324,7 +324,7 @@ int main(int argc, char **argv)
                 all_global_data.push_back(std::move(data_def));
             }
 
-            // Collect top-level functions (same name allowed in different modules)
+            // top-level functions, same name ok across modules
             for (auto &func : parser.global_functions)
             {
                 for (const auto &existing : all_global_functions)
@@ -450,9 +450,7 @@ int main(int argc, char **argv)
 
         register_free_functions(all_global_functions);
 
-        // Platform enums from the web defs (PointerPhase, ReadyState...) are Coi enums in
-        // every program. Their values are in the same order as webcc's enum class, so the
-        // two convert by cast where a value crosses into or out of webcc.
+        // platform enums are Coi enums in every program
         for (const auto &[type_name, type_def] : DefSchema::instance().types())
         {
             if (type_def.enum_cpp.empty())
@@ -472,7 +470,7 @@ int main(int argc, char **argv)
             platform->is_public = true;
             all_global_enums.push_back(std::move(platform));
         }
-        // Event pods (PointerEvent...) likewise: a handler can take an event as one value
+        // event pods too
         for (const auto &[type_name, type_def] : DefSchema::instance().types())
         {
             if (!type_def.is_pod)

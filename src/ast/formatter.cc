@@ -69,9 +69,17 @@ std::string generate_formatter_block_from_string_literal(StringLiteral* strLit,
     auto parts = strLit->parse();
     for (auto& p : parts) {
         if (p.is_expr) {
-            code += "_fmt << (" + p.content + "); ";
+            code += "_fmt << (" + coi_embedded_expression(p.content) + "); ";
         } else {
-            code += "_fmt << \"" + p.content + "\"; ";
+            std::string escaped;
+            for (char c : p.content) {
+                if (c == '"') escaped += "\\\"";
+                else if (c == '\\') escaped += "\\\\";
+                else if (c == '\n') escaped += "\\n";
+                else if (c == '\t') escaped += "\\t";
+                else escaped += c;
+            }
+            code += "_fmt << \"" + escaped + "\"; ";
         }
     }
     code += callback_prefix + "_fmt.c_str()" + callback_suffix + "; }";

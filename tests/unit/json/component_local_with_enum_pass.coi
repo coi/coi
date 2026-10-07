@@ -16,7 +16,7 @@ component MixedTypes {
     mut Status status = Status::Pending;
     mut Response response;
 
-    def handleSuccess(Response r, Meta meta) : void {
+    def handleSuccess(Response r, ResponseMeta meta) : void {
         response = r;
         if (meta.has(Response.code) && r.code == 200) {
             status = Status::Success;

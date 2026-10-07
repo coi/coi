@@ -22,13 +22,12 @@ struct FunctionDef {
     std::vector<std::unique_ptr<Statement>> body;
 
     std::string to_webcc(const std::string& injected_code = "");
-    // Top-level functions: emitted under qualified_name(module_name, name)
     std::string free_declaration();
     std::string free_definition();
     void collect_modifications(std::set<std::string>& mods) const;
 };
 
-// Fill FreeFunctionRegistry; call before validation and codegen
+// call before validation and codegen
 void register_free_functions(const std::vector<std::unique_ptr<FunctionDef>>& functions);
 
 struct DataField {
@@ -48,6 +47,8 @@ struct DataDef : ASTNode {
 };
 
 // Enum definition: enum Mode { Idle, Running, Paused }
+std::string emit_coi_enum(const std::string &cpp_name, const std::vector<std::string> &values);
+
 struct EnumDef : ASTNode {
     std::string name;
     std::string module_name;  // Module this enum belongs to

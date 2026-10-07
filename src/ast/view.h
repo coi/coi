@@ -89,9 +89,7 @@ struct IfRegion {
     std::vector<std::string> else_member_refs;  // Member component references in else branch
 };
 
-// Deferred handles for one generated snippet, reserved in a single call when
-// the snippet runs. Each snippet gets its own name so pasting one snippet
-// into another never redeclares the variable.
+// handles for one snippet, reserved in one call
 struct HandleBlock {
     std::string name;
     int count = 0;
@@ -128,8 +126,7 @@ struct ViewCodegenContext {
             loop_regions, loop_counter, if_regions, if_counter, loop_var_name, handles};
     }
 
-    // Create a context for loop iteration (in_loop = true, clear region pointers).
-    // The body runs once per iteration, so it writes to its own snippet.
+    // loop body context, writes to its own snippet
     ViewCodegenContext for_loop(std::stringstream& body_ss, HandleBlock& body_handles,
                                 const std::string& new_parent, const std::string& var_name) const {
         return ViewCodegenContext{body_ss, new_parent, counter, event_handlers, bindings,

@@ -1,4 +1,4 @@
-// Test: callbacks by position, headers left out (default), and a handler without parameters
+// Test: positional callbacks
 component FetchPositionalPass {
     mut string result = "";
     mut bool failed = false;

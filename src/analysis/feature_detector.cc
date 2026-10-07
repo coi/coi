@@ -266,7 +266,7 @@ void emit_feature_event_handlers(std::ostream &out, const FeatureFlags &f)
     // Runtime features
     if (f.keyboard)
     {
-        // Input.onKeyDown(&h) handlers, when used, run from here too (see emit_event_dispatch)
+        // Input.onKeyDown(&h) handlers too
         std::string down_handlers = g_used_events.count("input::KEY_DOWN") ? " coi_events<webcc::input::KeyDownEvent>.dispatch_all(*evt);" : "";
         std::string up_handlers = g_used_events.count("input::KEY_UP") ? " coi_events<webcc::input::KeyUpEvent>.dispatch_all(*evt);" : "";
         out << "        } else if (e.opcode == webcc::input::KeyDownEvent::OPCODE) {\n";

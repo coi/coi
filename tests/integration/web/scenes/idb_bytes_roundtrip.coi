@@ -1,5 +1,4 @@
-// IndexedDB from Coi: bytes go in as uint8[], come back through a Blob, keys list,
-// a missing key reports found = 0. Each step writes into the view.
+// idb bytes roundtrip through a Blob
 component IdbBytesRoundtrip {
     mut Database db;
     mut string opened = "-";

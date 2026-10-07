@@ -1,4 +1,4 @@
-// The pod's x and y are relative to the canvas, and the other fields line up.
+// pod fields line up, x/y relative to the canvas
 
 export async function run({ page, expect }) {
   await page.locator(".surface").click({ position: { x: 50, y: 40 } });

@@ -1,0 +1,18 @@
+// Test: pop() on an array rendered by <for>
+component PopBoundPass {
+    mut string[] items = ["a", "b", "c"];
+    mut int[] nums = [1, 2, 3];
+
+    def drop() : void {
+        items.pop();
+        nums.pop();
+    }
+
+    view {
+        <div onclick={drop}>
+            <for item in items key={item}><span>{item}</span></for>
+            <for n in nums key={n}><b>{n}</b></for>
+        </div>
+    }
+}
+app { root = PopBoundPass; }

@@ -1,4 +1,4 @@
-// Test: a misspelled event attribute is an error, not a string attribute
+// Test: unknown event attribute
 component EventAttrUnknownFail {
     def down() : void {}
     view { <canvas onpointerdwn={down}></canvas> }

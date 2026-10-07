@@ -10,7 +10,7 @@ component SizeTest {
     view {
         <div class="test-container">
             <h1>Game Settings</h1>
-            <p>Total Difficulty Options: {Difficulty.size}</p>
+            <p>Total Difficulty Options: {Difficulty.size()}</p>
         </div>
     }
 }

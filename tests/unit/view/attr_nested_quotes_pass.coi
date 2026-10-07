@@ -1,0 +1,7 @@
+// Test: escaped quotes and ${x} in a quoted attribute
+component App {
+    mut int n = 1;
+    view { <p title="say \"hi\" ${n}">x</p> }
+}
+
+app { root = App; }

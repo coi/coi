@@ -613,7 +613,7 @@ reorder -> nodes moved.
 
 ### Dynamic styles (interpolate with single braces in the view)
 ```coi
-<div class="ball" style="left: {x}px; top: {y}px; background: {color};"></div>
+<div class="ball" style="left: ${x}px; top: ${y}px; background: ${color};"></div>
 ```
 
 ---

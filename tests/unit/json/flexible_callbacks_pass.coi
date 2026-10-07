@@ -8,7 +8,7 @@ component FlexibleCallbackTest {
     mut string status = "Not started";
     mut User user;
 
-    def handleSuccess(User u, Meta meta) : void {
+    def handleSuccess(User u, UserMeta meta) : void {
         user = u;
         status = "Got user: ${u.name}";
     }

@@ -1,5 +1,4 @@
-// Test: user methods and array calls that share names with whitelisted platform
-// functions (blob size/read/take/free, idb get/put/keys/remove/close) stay the user's
+// Test: user names shadow platform functions
 pod Shelf { string name; string[] books; }
 
 component Store {

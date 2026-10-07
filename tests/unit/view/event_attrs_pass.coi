@@ -1,5 +1,4 @@
-// Test: webcc event attributes in views: pod, fields and no-param handlers, a call
-// expression, pointerflags, inside an if region and a for loop
+// Test: view event attributes
 component EventAttrsPass {
     mut float x = 0.0;
     mut int moves = 0;

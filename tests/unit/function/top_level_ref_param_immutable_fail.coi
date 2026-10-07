@@ -1,4 +1,4 @@
-// Test: passing immutable state to a mut reference param - should fail
+// Test: immutable state to mut ref param
 pod Vec2 { float x; float y; }
 
 def scale(mut Vec2& v, float k) : void {

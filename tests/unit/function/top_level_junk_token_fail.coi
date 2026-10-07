@@ -1,4 +1,4 @@
-// Test: unknown tokens at top level are an error, not silently skipped - should fail
+// Test: junk token at top level
 struct Point {
     int x;
     int y;

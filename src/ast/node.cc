@@ -95,10 +95,7 @@ std::string convert_type(const std::string& type) {
     size_t dcolon_pos = type.find("::");
     if (dcolon_pos != std::string::npos) {
         std::string prefix = type.substr(0, dcolon_pos);
-        // A prefix that isn't a plain identifier means the :: sits inside something
-        // else, like the signature in webcc::function<void(coi::string)>. Runtime
-        // namespaces stay as they are, which also keeps this idempotent for types
-        // convert_type produced itself.
+        // :: inside something else, e.g. webcc::function<...>
         bool is_ident = !prefix.empty() &&
                         (std::isalpha(static_cast<unsigned char>(prefix[0])) || prefix[0] == '_') &&
                         std::all_of(prefix.begin(), prefix.end(), [](unsigned char c) {

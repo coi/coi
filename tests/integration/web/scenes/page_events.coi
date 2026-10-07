@@ -1,5 +1,4 @@
-// Page-wide events from Coi: paste text, key presses (two components both listening, one
-// of them removed later), visibility, and copying from a click.
+// page-wide events: paste, keys, visibility, copy
 component KeyCounter {
     pub mut int count = 0;
     def onKey(KeyDownEvent k) : void { count++; }

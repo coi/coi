@@ -1,7 +1,7 @@
 #include "definitions.h"
 #include "node.h"
 
-// template<...> header plus "Ret name(params)"; registers params in the method scope
+// template header + signature, registers params in scope
 static std::string function_signature(const FunctionDef& fn, const std::string& emitted_name) {
     std::string result;
 
@@ -104,31 +104,25 @@ std::string DataDef::to_webcc() {
     return ss.str();
 }
 
-std::string EnumDef::to_webcc() {
-    std::stringstream ss;
+// struct around a plain enum so it converts to/from int
+std::string emit_coi_enum(const std::string &cpp_name, const std::vector<std::string> &values)
+{
     size_t total_values = values.size() + 1; // Including _COUNT
-
-    // Explicitly select the smallest possible type for ALL sizes
-    ss << "enum struct " << qualified_name(module_name, name) << " : ";
-    
-    if (total_values <= 256) {
-        ss << "uint8_t";
-    } else if (total_values <= 65536) {
-        ss << "uint16_t";
-    } else {
-        ss << "uint32_t"; // Fallback for massive enums
-    }
-    
-    ss << " {\n";
-
-    // Generate entries
-    for (const auto& val : values) {
-        ss << "    " << val << ",\n";
-    }
-
-    // Add _COUNT and close
-    ss << "    _COUNT\n";
+    const char *base = total_values <= 256 ? "uint8_t" : total_values <= 65536 ? "uint16_t" : "uint32_t";
+    std::stringstream ss;
+    ss << "struct " << cpp_name << " {\n";
+    ss << "    enum _V : " << base << " {";
+    for (const auto &val : values)
+        ss << " " << val << ",";
+    ss << " _COUNT };\n";
+    ss << "    _V v;\n";
+    ss << "    constexpr " << cpp_name << "(_V x = (_V)0) : v(x) {}\n";
+    ss << "    constexpr " << cpp_name << "(int x) : v((_V)x) {}\n";
+    ss << "    constexpr operator int() const { return v; }\n";
     ss << "};\n";
-    
     return ss.str();
+}
+
+std::string EnumDef::to_webcc() {
+    return emit_coi_enum(qualified_name(module_name, name), values);
 }

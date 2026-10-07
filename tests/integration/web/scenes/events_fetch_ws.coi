@@ -1,7 +1,4 @@
-// Schema-driven event callbacks in a real browser: fetch success and error,
-// callbacks bound after creation, handlers with fewer parameters than the
-// event, and a WebSocket that fails: error first, then close (close must still
-// arrive after an error).
+// fetch and websocket callbacks, ws error then close
 component EventsFetchWs {
     mut WebSocket ws;
     mut string fetched = "-";

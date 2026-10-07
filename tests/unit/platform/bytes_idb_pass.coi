@@ -1,5 +1,4 @@
-// Test: uint8[] crosses into webcc (put, Blob.create, sendBinary-like params) and
-// back (Blob.read/take, binary message fields); idb results arrive on the request
+// Test: uint8[] in and out of webcc
 component BytesIdbPass {
     mut Database db;
     mut WebSocket ws;

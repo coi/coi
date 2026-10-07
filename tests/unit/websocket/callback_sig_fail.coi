@@ -1,4 +1,4 @@
-// Test: a handler's parameter type must match the event field (MESSAGE carries a string)
+// Test: wrong handler param type
 component CallbackSigFail {
     mut WebSocket ws;
     def onMsg(int m) : void {}

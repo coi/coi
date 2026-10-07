@@ -3,7 +3,8 @@
 #include "node.h"
 
 struct MethodDef;
-// `this->callback(...)` for a webcc event held in `evt`; see expressions.cc
+std::string coi_embedded_expression(const std::string& expr);
+// this->callback(...) for a webcc event in evt
 std::string generate_event_call(const MethodDef& event_method, const std::string& handle_type,
                                 const std::string& callback, const std::string& evt);
 
@@ -265,6 +266,8 @@ struct MatchExpr : Expression {
     std::unique_ptr<Expression> subject;
     std::vector<MatchArm> arms;
     int line = 0;
+    // set by the type checker, arms can deduce to different C++ types
+    std::string result_type;
 
     MatchExpr() = default;
     std::string to_webcc() override;

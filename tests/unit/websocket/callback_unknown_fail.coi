@@ -1,4 +1,4 @@
-// Test: a named callback must be an event of the returned handle
+// Test: unknown callback name
 component CallbackUnknownFail {
     mut WebSocket ws;
     def done() : void {}

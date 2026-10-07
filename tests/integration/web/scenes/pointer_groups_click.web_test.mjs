@@ -1,5 +1,4 @@
-// A click on the canvas reaches onPointer with phase Down then Up, type Mouse and
-// the primary button set: the enum and flags values survive the trip through webcc.
+// click gives Down then Up, Mouse, primary button
 
 export async function run({ page, expect }) {
   await page.locator(".surface").click({ position: { x: 50, y: 40 } });

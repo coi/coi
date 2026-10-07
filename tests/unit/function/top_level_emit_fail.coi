@@ -1,4 +1,4 @@
-// Test: top-level functions have no signals to emit - should fail
+// Test: emit in a top-level function
 def notify(int n) : void {
     emit changed(n);
 }

@@ -1,5 +1,4 @@
-// A pointer handler that takes the event as one PointerEvent pod: position relative to
-// the canvas, phase, type and buttons all arrive in the right fields.
+// pointer handler taking a PointerEvent pod
 component PointerPodClick {
     mut Canvas surface;
     mut string down = "-";

@@ -1191,7 +1191,6 @@ Component Parser::parse_component()
 }
 
 // Parse `def name<T>(params) : Ret { body }` starting at 'def'.
-// Shared by component methods and top-level functions.
 FunctionDef Parser::parse_function_def(bool is_public)
 {
     advance();

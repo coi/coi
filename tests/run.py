@@ -22,6 +22,7 @@ def main():
 
     # Unit Tests
     p_unit = subparsers.add_parser("unit", help="Run unit tests")
+    p_unit.add_argument("--fast", action="store_true", help="Only generate C++, skip building _pass tests to WASM")
 
     # Gallery
     p_gallery = subparsers.add_parser("gallery", help="Run web visual gallery")
@@ -58,7 +59,7 @@ def main():
 
     if args.command == "unit":
         runner = UnitRunner(PROJECT_ROOT)
-        runner.run(SCRIPT_DIR)
+        runner.run(SCRIPT_DIR, fast=args.fast)
         
     elif args.command == "integration":
         runner = IntegrationRunner(PROJECT_ROOT)

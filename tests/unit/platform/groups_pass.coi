@@ -1,5 +1,4 @@
-// Test: platform enums are Coi enums, flags combine with |, both cross into webcc
-// (params, returns, event fields) with casts the compiler adds
+// Test: platform enums and flags
 component GroupsPass {
     mut Canvas surface;
     mut WebSocket ws;

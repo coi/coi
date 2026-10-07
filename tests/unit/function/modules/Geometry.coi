@@ -1,4 +1,4 @@
-// Helper module for the top_level_*import tests (not a test itself)
+// helper module for the import tests
 module Geometry;
 
 pub pod Point { float x; float y; }

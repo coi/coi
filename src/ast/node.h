@@ -217,7 +217,7 @@ struct ComponentTypeContext {
 // Top-level functions known to codegen: module -> function name -> info
 struct FreeFunctionInfo {
     bool is_public = false;
-    std::vector<bool> mut_ref_params;  // Per param: `mut T&` (caller's `&x` is modified)
+    std::vector<bool> mut_ref_params;  // per param: mut T&
 };
 
 struct FreeFunctionRegistry {
@@ -235,9 +235,7 @@ struct FreeFunctionRegistry {
         return fn != it->second.end() ? &fn->second : nullptr;
     }
 
-    // C++ name for a call to `name` ("fn" or "Module::fn") from the current
-    // ComponentTypeContext, or "" if it isn't a top-level function. Component
-    // methods and function-typed locals/params shadow top-level functions.
+    // C++ name for a top-level call, "" if not one
     std::string resolve_call(const std::string& name) const;
 };
 

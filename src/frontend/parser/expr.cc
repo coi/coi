@@ -365,6 +365,16 @@ std::unique_ptr<Expression> Parser::parse_primary()
                 return comp_expr;
             }
             
+            // Module::Pod{...}
+            if (current().type == TokenType::LBRACE && std::isupper(value_name[0]) && allow_brace_init)
+            {
+                advance();
+                auto data_expr = std::make_unique<ComponentConstruction>(name + "::" + value_name);
+                data_expr->args = parse_call_args(TokenType::RBRACE);
+                expect(TokenType::RBRACE, "Expected '}'");
+                return data_expr;
+            }
+
             // Namespaced top-level function call: Module::fn(...)
             if (current().type == TokenType::LPAREN && std::islower(value_name[0]))
             {

@@ -1,4 +1,4 @@
-// Test: a string method that doesn't exist is a type error, not a C++ build error
+// Test: unknown string method
 component StringMissingMethodFail {
     mut string s = "a-b";
     def f() : void { s = s.replace("-", "+"); }

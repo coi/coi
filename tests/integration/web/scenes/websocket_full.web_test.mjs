@@ -1,5 +1,4 @@
-// A tiny RFC 6455 server (node has no built-in one): picks the "chat" subprotocol, echoes
-// text and binary frames, and closes with 4001 "bye" when asked.
+// minimal websocket server: "chat" subprotocol, echo, close 4001 "bye"
 import http from "node:http";
 import crypto from "node:crypto";
 

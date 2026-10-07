@@ -1,4 +1,4 @@
-// Test: top-level function calling a function that doesn't exist - should fail
+// Test: unknown function
 def twice(int n) : int {
     return helper(n) * 2;
 }

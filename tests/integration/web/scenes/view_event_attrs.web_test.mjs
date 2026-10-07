@@ -1,4 +1,4 @@
-// Event attributes work on real input and survive an if region being re-created.
+// event attributes survive the if region being re-created
 
 export async function run({ page, expect }) {
   const box = await page.locator(".surface").boundingBox();
@@ -13,9 +13,9 @@ export async function run({ page, expect }) {
 
   await page.locator(".field").click();
   await expect.textContains(page.locator(".focus"), "focused");
-  await page.locator(".flip").click();      // focus leaves the input, and the region goes away
+  await page.locator(".flip").click();      // blur, region removed
   await expect.textContains(page.locator(".focus"), "blurred");
-  await page.locator(".flip").click();      // and comes back with a new element
+  await page.locator(".flip").click();      // region back
   await page.locator(".toggled").click();
   await page.waitForFunction(() => document.querySelector(".hits")?.textContent === "1");
 

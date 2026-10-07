@@ -1,4 +1,4 @@
-// Test: pub top-level function used from another module - should pass
+// Test: pub function from another module
 import "modules/Geometry.coi";
 
 component App {

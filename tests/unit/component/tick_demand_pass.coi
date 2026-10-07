@@ -1,5 +1,4 @@
-// Test: app { tick = demand; } runs tick only on requested frames.
-// A fade keeps requesting frames while it runs and stops when it is done.
+// Test: tick = demand
 component TickDemandPass {
     mut float alpha = 1.0;
     mut bool fading = false;

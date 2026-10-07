@@ -670,7 +670,7 @@ For arrays:
 
 ```tsx
 int len = match (Json.parse(User[], jsonArray)) {
-    Success(User[] data, UserMeta[] metas) => data.length();
+    Success(User[] data, UserMeta[] metas) => data.size();
     Error(string message) => 0;
 };
 ```

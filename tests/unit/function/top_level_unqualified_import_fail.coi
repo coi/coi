@@ -1,4 +1,4 @@
-// Test: calling another module's function without the Module:: prefix - should fail
+// Test: missing Module:: prefix
 import "modules/Geometry.coi";
 
 component App {

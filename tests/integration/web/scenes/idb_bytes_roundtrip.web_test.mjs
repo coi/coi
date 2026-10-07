@@ -1,4 +1,4 @@
-// Bytes stored from Coi come back intact through IndexedDB and a Blob.
+// bytes survive idb and a Blob
 
 export async function run({ page, expect }) {
   await expect.textContains(page.locator(".blob"), "3");

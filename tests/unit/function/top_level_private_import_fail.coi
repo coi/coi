@@ -1,4 +1,4 @@
-// Test: calling a non-pub top-level function from another module - should fail
+// Test: non-pub function from another module
 import "modules/Geometry.coi";
 
 component App {

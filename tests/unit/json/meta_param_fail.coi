@@ -1,0 +1,7 @@
+// Test: bare Meta as a param type
+pod User { string name; }
+component MetaParamFail {
+    def got(User u, Meta meta) : void {}
+    view { <p></p> }
+}
+app { root = MetaParamFail; }

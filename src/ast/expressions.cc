@@ -164,8 +164,7 @@ static std::string transform_embedded_expression(const std::string& expr) {
     // Parse arguments
     std::vector<std::string> raw_args = parse_raw_args(args_str);
     
-    // A handle's own methods come first: blob.size() is not an array's length.
-    // @inline expands; @map calls webcc with the handle as first argument.
+    // handle methods first, blob.size() isn't an array length
     std::string obj_type = ComponentTypeContext::instance().get_symbol_type(obj);
     if (!obj_type.empty()) {
         obj_type = ComponentTypeContext::instance().resolve(obj_type);
@@ -218,6 +217,10 @@ static std::string transform_embedded_expression(const std::string& expr) {
     }
     result += ")" + suffix;
     return result;
+}
+
+std::string coi_embedded_expression(const std::string& expr) {
+    return transform_embedded_expression(expr);
 }
 
 // Helper to generate intrinsic code
@@ -484,26 +487,25 @@ std::string FunctionCall::args_to_string() {
     return result;
 }
 
-// A value of a platform enum or flags type goes to webcc as its enum class
+// platform enum/flags -> webcc enum class
 static std::string to_webcc_arg(const std::string& code, const std::string& coi_type) {
-    // An array literal is a bare {a, b} in C++: give it its vector type
+    // array literal needs its vector type
     if (coi_type.ends_with("[]") && !code.empty() && code[0] == '{')
         return "coi::vector<" + convert_type(coi_type.substr(0, coi_type.size() - 2)) + ">" + code;
     std::string cpp = DefSchema::instance().webcc_cast_type(coi_type);
-    return cpp.empty() ? code : "static_cast<" + cpp + ">(" + code + ")";
+    return cpp.empty() ? code : "static_cast<" + cpp + ">((int)(" + code + "))";
 }
 
-// And comes back as the Coi enum, or the flags' integer
+// and back
 static std::string from_webcc_value(const std::string& code, const std::string& coi_type) {
     const TypeDef* td = DefSchema::instance().lookup_type(coi_type);
     if (!td) return code;
-    if (!td->enum_cpp.empty()) return "static_cast<" + coi_type + ">(" + code + ")";
+    if (!td->enum_cpp.empty()) return "static_cast<" + coi_type + ">((int)(" + code + "))";
     if (!td->flags_cpp.empty()) return "static_cast<" + convert_type(td->alias_of) + ">(" + code + ")";
     return code;
 }
 
-// Parts of a call's argument list a schema method can take: plain values in order,
-// and callbacks (`&handler` or `&onX = handler`) that bind the handle the call returns
+// plain values and callbacks of a schema call
 struct SplitArgs {
     std::vector<const CallArg*> values;
     std::vector<std::pair<const MethodParam*, const CallArg*>> callbacks;
@@ -539,11 +541,7 @@ static SplitArgs split_call_args(const MethodDef& method, const std::vector<Call
     return out;
 }
 
-// coi_events<E>.set(handle, [this](const E& e) { this->handler(e.a, e.b); }, this)
-// The handler may take fewer parameters than the event has fields.
-// `this->callback(...)` for an event held in `evt` (a const webcc::ns::NameEvent&): the
-// handler gets the event as its pod, or a prefix of the fields converted to Coi types.
-// Records the event so the event loop dispatches it.
+// handler may take fewer params than the event has fields
 std::string generate_event_call(const MethodDef& event_method, const std::string& handle_type,
                                 const std::string& callback, const std::string& evt) {
     SchemaEventSpec spec = SchemaEventSpec::parse(event_method.mapping_value);
@@ -552,7 +550,7 @@ std::string generate_event_call(const MethodDef& event_method, const std::string
         if (is_callback_param(p)) field_types = callback_param_types(p.type);
     int n = ComponentTypeContext::instance().get_method_param_count(callback);
     if (n < 0 || n > (int)spec.fields.size()) n = (int)spec.fields.size();
-    // def h(PointerEvent e): all fields as one pod, in field order
+    // whole event as one pod
     bool as_pod = false;
     if (!spec.pod.empty()) {
         auto* sig = ComponentTypeContext::instance().get_method_signature(callback);
@@ -576,8 +574,7 @@ std::string generate_event_call(const MethodDef& event_method, const std::string
     return code;
 }
 
-// A page-wide event (Clipboard.onPasteText(&h)): turn it on with the whitelist's +listen
-// values, then register under this component, so every component that listens is called
+// page-wide event, turned on with the +listen values
 static std::string generate_page_event_registration(const MethodDef& event_method, const CallArg& arg) {
     SchemaEventSpec spec = SchemaEventSpec::parse(event_method.mapping_value);
     std::string full = "webcc::" + spec.struct_name();
@@ -604,7 +601,7 @@ static std::string generate_event_registration(const MethodDef& event_method, co
     return "coi_events<" + full + ">.set(" + handle_expr + ", [this](const " + full + "& _e) { (void)_e; " + call + "; }, this)";
 }
 
-// Callbacks on a call that returns a handle: `[&]() { auto _h = call; register...; return _h; }()`
+// callbacks on a call that returns a handle
 static std::string wrap_with_callbacks(const std::string& call, const MethodDef& method, const SplitArgs& split, const std::string& call_name) {
     if (split.callbacks.empty()) return call;
     std::string code = "[&]() {\n            auto _h = " + call + ";\n";
@@ -644,7 +641,7 @@ std::string FunctionCall::to_webcc() {
         {
             resolved_receiver = "(*" + resolved_receiver.substr(0, k) + ")" + resolved_receiver.substr(k);
         }
-        // Same for a receiver that starts with a top-level function call (`fmt(x).length()`)
+        // receiver starting with a top-level call, fmt(x).length()
         size_t paren = resolved_receiver.find('(');
         if (paren != std::string::npos && paren > 0)
         {
@@ -689,8 +686,15 @@ std::string FunctionCall::to_webcc() {
             }
         }
 
-        // Check for builtin type instance methods (string, array). Not for a handle
-        // receiver: blob.size() is the handle's own method, not an array's length.
+        // Enum.size()
+        if (method == "size" && args.empty() && std::isupper((unsigned char)type_or_obj[0]) &&
+            ComponentTypeContext::instance().get_symbol_type(type_or_obj).empty()) {
+            std::string cpp = type_or_obj.find('.') != std::string::npos ? convert_type(type_or_obj)
+                                                                       : ComponentTypeContext::instance().resolve(type_or_obj);
+            return "static_cast<int>(" + cpp + "::_COUNT)";
+        }
+
+        // string/array methods, not for handles
         std::string receiver_type = ComponentTypeContext::instance().get_symbol_type(type_or_obj);
         bool handle_receiver = !receiver_type.empty() && DefSchema::instance().is_handle(DefSchema::instance().resolve_alias(receiver_type));
         if (!handle_receiver) {
@@ -711,16 +715,6 @@ std::string FunctionCall::to_webcc() {
         }
     }
 
-    // Handle Enum.size() - special case not in def files
-    if (!type_or_obj.empty() && method == "size" && args.size() == 0 && std::isupper(type_or_obj[0])) {
-        size_t first_dot = type_or_obj.find('.');
-        if (first_dot != std::string::npos) {
-            std::string comp = type_or_obj.substr(0, first_dot);
-            std::string enum_name = type_or_obj.substr(first_dot + 1);
-            return "static_cast<int>(" + comp + "::" + enum_name + "::_COUNT)";
-        }
-        return "static_cast<int>(" + type_or_obj + "::_COUNT)";
-    }
 
     // DefSchema-based transformation for @map methods (webcc API calls)
     std::string obj_arg = "";
@@ -767,7 +761,7 @@ std::string FunctionCall::to_webcc() {
                             // Handle @inline methods for typed instance calls (e.g., socket.isConnected())
                             return expand_inline_template(map_method->mapping_value, resolved_receiver, args);
                         } else if (map_method->mapping_type == MappingType::Event) {
-                            // ws.onMessage(&handler): bind the handler to this handle's event
+                            // ws.onMessage(&handler)
                             if (args.size() != 1 || !args[0].is_reference)
                                 ErrorHandler::compiler_error("'" + name + "' takes one '&handler' argument");
                             return generate_event_registration(*map_method, obj_type, resolved_receiver, args[0]);
@@ -795,8 +789,7 @@ std::string FunctionCall::to_webcc() {
     }
 
     if (map_method && !map_ns.empty() && !map_func.empty()) {
-        // Callbacks (`&onX = handler`) are not passed to webcc: they bind the returned
-        // handle's events. Values that are left out use the C++ default argument.
+        // callbacks bind the returned handle, not passed to webcc
         SplitArgs split = split_call_args(*map_method, args, name);
         if (!split.callbacks.empty()) {
             std::string call = "webcc::" + map_ns + "::" + map_func + "(";
@@ -1159,7 +1152,9 @@ std::string IndexAccess::to_webcc() {
 }
 
 std::string EnumAccess::to_webcc() {
-    return enum_name + "::" + value_name;
+    if (!component_name.empty())
+        return convert_type(component_name + "." + enum_name) + "::" + value_name;
+    return ComponentTypeContext::instance().resolve(enum_name) + "::" + value_name;
 }
 
 std::string ComponentConstruction::to_webcc() {
@@ -1182,10 +1177,36 @@ std::string ComponentConstruction::to_webcc() {
     if (resolved_name.find("::") != std::string::npos) {
         resolved_name = convert_type(resolved_name);
     }
+    // named fields go out in declaration order
+    bool any_named = false;
+    for (const auto& a : args) any_named = any_named || !a.name.empty();
+    if (any_named) {
+        if (const auto* fields = DataTypeRegistry::instance().lookup(resolved_name)) {
+            std::string result = resolved_name + "{";
+            bool first = true;
+            for (const auto& field : *fields) {
+                for (const auto& a : args) {
+                    if (a.name != field.name) continue;
+                    std::string value = a.value->to_webcc();
+                    if (a.is_move) value = "coi::move(" + value + ")";
+                    result += (first ? "." : ", .") + field.name + " = " + value;
+                    first = false;
+                }
+            }
+            return result + "}";
+        }
+    }
+
     std::string result = resolved_name + "(";
     for (size_t i = 0; i < args.size(); i++) {
         if (i > 0) result += ", ";
-        result += args[i].value->to_webcc();
+        std::string value = args[i].value->to_webcc();
+        if (args[i].is_reference)
+            result += "&(" + value + ")";
+        else if (args[i].is_move)
+            result += "coi::move(" + value + ")";
+        else
+            result += value;
     }
     result += ")";
     return result;
@@ -1201,7 +1222,7 @@ std::vector<Expression*> ComponentConstruction::get_children() {
 // Match expression code generation
 // Generates a lambda (IIFE) with if-else chain
 std::string MatchExpr::to_webcc() {
-    std::string code = "[&]() {\n";
+    std::string code = result_type.empty() ? "[&]() {\n" : "[&]() -> " + convert_type(result_type) + " {\n";
     code += "        const auto& _match_subject = " + subject->to_webcc() + ";\n";
     
     bool first = true;

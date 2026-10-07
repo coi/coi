@@ -1,4 +1,4 @@
-// Test: values of two different enums can't be compared (both are 0 here)
+// Test: compare two different enums
 component EnumCompareFail {
     mut bool same = false;
     mount {

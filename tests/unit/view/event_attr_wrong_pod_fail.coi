@@ -1,4 +1,4 @@
-// Test: an onwheel handler can't take a PointerEvent
+// Test: wrong pod for onwheel
 component EventAttrWrongPodFail {
     def wheel(PointerEvent e) : void {}
     view { <canvas onwheel={wheel}></canvas> }

@@ -1,7 +1,6 @@
-// Fetch and WebSocket callbacks go through the schema-generated event dispatch.
-// A refused WebSocket fires error then close; both handlers must run, in order.
+// fetch and websocket callbacks; refused ws fires error then close
 
-// Both failures are the point of the scene
+// expected failures
 export const expectedConsoleErrors = ["ws://127.0.0.1:1/", "status of 404"];
 
 export async function run({ page, expect }) {

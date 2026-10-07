@@ -1,4 +1,4 @@
-// Test: top-level function referencing a name that isn't a param or local - should fail
+// Test: unknown identifier
 def addCount(int n) : int {
     return n + count;
 }

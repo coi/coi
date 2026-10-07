@@ -1,4 +1,4 @@
-// Test: a handler may take fewer parameters than the event, not more (OPEN has none)
+// Test: handler with too many params
 component CallbackExtraFail {
     mut WebSocket ws;
     def opened(string what) : void {}

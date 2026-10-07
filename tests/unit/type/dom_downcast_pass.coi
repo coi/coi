@@ -1,8 +1,17 @@
-component Test {
-    def fail() : void {
-        Canvas c = DOMElement.getBody();
+// Test: DOMElement to Canvas downcast
+component DomDowncast {
+    mut Canvas surface;
+    mut int w = 0;
+
+    def takes(DOMElement el) : void {
+        Canvas c = &el;
+        c.setSize(10, 10);
     }
+
+    mount { takes(surface); }
+
+    view { <canvas &={surface}></canvas> }
 }
 app {
-    root = Test;
+    root = DomDowncast;
 }

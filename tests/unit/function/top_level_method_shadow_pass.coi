@@ -1,5 +1,4 @@
-// Test: a component method wins over a top-level function with the same name - should pass
-// If pick() resolved to the top-level function this would fail (wrong arg count and type).
+// Test: method shadows top-level function
 def pick(string a, string b) : string {
     return a;
 }

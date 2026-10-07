@@ -1,4 +1,5 @@
 #include "statements.h"
+#include "../codegen/json_codegen.h"
 #include "codegen_state.h"
 #include "../defs/def_parser.h"
 #include "../codegen/codegen_utils.h"
@@ -203,7 +204,10 @@ std::string Assignment::to_webcc()
     auto hl = g_array_loops.find(name);
     if (hl != g_array_loops.end())
     {
-        return lhs + " = " + rhs + ";\n_sync_loop_" + std::to_string(hl->second.loop_id) + "();";
+        std::string result = lhs + " = " + rhs + ";";
+        for (const auto &loop : hl->second)
+            result += "\n_sync_loop_" + std::to_string(loop.loop_id) + "();";
+        return result;
     }
 
     return lhs + " = " + rhs + ";";
@@ -376,8 +380,16 @@ std::string ExpressionStatement::to_webcc()
                     }
                 }
                 
+                // pod fields have no _update_
+                std::string base = component_expr.substr(0, component_expr.find_first_of(".["));
+                std::string base_type = ComponentTypeContext::instance().get_symbol_type(base);
+                if (base_type.ends_with("[]"))
+                    base_type = base_type.substr(0, base_type.size() - 2);
+                std::string resolved = ComponentTypeContext::instance().resolve(base_type);
+                bool on_pod = DataTypeRegistry::instance().lookup(resolved) || DataTypeRegistry::instance().lookup(base_type);
+
                 // Top-level functions have no component to update
-                if (is_mutating && !ComponentTypeContext::instance().component_name.empty())
+                if (is_mutating && !on_pod && !ComponentTypeContext::instance().component_name.empty())
                 {
                     // Generate: field mutation + component update call
                     std::string result = call->to_webcc() + ";\n";
@@ -452,49 +464,54 @@ std::string ExpressionStatement::to_webcc()
             auto html_loop_it = g_array_loops.find(arr_name);
             if (html_loop_it != g_array_loops.end())
             {
-                const auto &info = html_loop_it->second;
-                std::string var = info.var_name;
+                const auto &loops = html_loop_it->second;
                 std::string result;
 
                 if (method == "push" && call->args.size() == 1)
                 {
                     std::string item_expr = call->args[0].value->to_webcc();
-                    std::string parent_var = info.parent_var;
-                    std::string count_var = "_loop_" + std::to_string(info.loop_id) + "_count";
                     result = "{\n";
                     result += arr_name + ".push_back(" + item_expr + ");\n";
-                    result += "if (" + parent_var + ".is_valid()) {\n";
-                    result += "    auto& " + var + " = " + arr_name + "[" + arr_name + ".size() - 1];\n";
-                    result += info.item_creation_code;
-                    if (!info.root_element_var.empty())
+                    for (const auto &info : loops)
                     {
-                        result += "    " + info.elements_vec_name + ".push_back(" + info.root_element_var + ");\n";
+                        std::string count_var = "_loop_" + std::to_string(info.loop_id) + "_count";
+                        result += "if (" + info.parent_var + ".is_valid()) {\n";
+                        result += "    auto& " + info.var_name + " = " + arr_name + "[" + arr_name + ".size() - 1];\n";
+                        result += info.item_creation_code;
+                        if (!info.root_element_var.empty())
+                            result += "    " + info.elements_vec_name + ".push_back(" + info.root_element_var + ");\n";
+                        result += "    " + count_var + " = (int)" + arr_name + ".size();\n";
+                        result += "}\n";
                     }
-                    result += "    " + count_var + " = (int)" + arr_name + ".size();\n";
-                    result += "}\n";
                     result += "}\n";
                     return result;
                 }
                 else if (method == "pop" && call->args.empty())
                 {
-                    std::string count_var = "_loop_" + std::to_string(info.loop_id) + "_count";
                     result = "if (!" + arr_name + ".empty()) {\n";
-                    result += "    if (!" + info.elements_vec_name + ".empty()) {\n";
-                    result += "        webcc::dom::remove_element(" + info.elements_vec_name + ".back());\n";
-                    result += "        " + info.elements_vec_name + ".pop_back();\n";
-                    result += "    }\n";
+                    for (const auto &info : loops)
+                    {
+                        result += "    if (!" + info.elements_vec_name + ".empty()) {\n";
+                        result += "        coi_forget_handle(" + info.elements_vec_name + ".back());\n";
+                        result += "        webcc::dom::remove_element(" + info.elements_vec_name + ".back());\n";
+                        result += "        " + info.elements_vec_name + ".pop_back();\n";
+                        result += "    }\n";
+                    }
                     result += "    " + arr_name + ".pop_back();\n";
-                    result += "    " + count_var + " = (int)" + arr_name + ".size();\n";
+                    for (const auto &info : loops)
+                        result += "    _loop_" + std::to_string(info.loop_id) + "_count = (int)" + arr_name + ".size();\n";
                     result += "}\n";
                     return result;
                 }
                 else if (method == "clear" && call->args.empty())
                 {
-                    std::string count_var = "_loop_" + std::to_string(info.loop_id) + "_count";
-                    result = "for (auto& _el : " + info.elements_vec_name + ") { webcc::dom::remove_element(_el); }\n";
-                    result += info.elements_vec_name + ".clear();\n";
+                    for (const auto &info : loops)
+                    {
+                        result += "for (auto& _el : " + info.elements_vec_name + ") { coi_forget_handle(_el); webcc::dom::remove_element(_el); }\n";
+                        result += info.elements_vec_name + ".clear();\n";
+                        result += "_loop_" + std::to_string(info.loop_id) + "_count = 0;\n";
+                    }
                     result += arr_name + ".clear();\n";
-                    result += count_var + " = 0;\n";
                     return result;
                 }
             }

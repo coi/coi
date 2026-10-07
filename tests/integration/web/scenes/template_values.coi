@@ -1,0 +1,32 @@
+// Bools in templates, push on a pod array field, named pod args, quotes in attributes.
+pod Bag {
+    string name;
+    int[] xs;
+}
+
+pod Size {
+    int w;
+    int h;
+}
+
+component TemplateValues {
+    mut bool on = true;
+    mut Bag bag = Bag{name = "b", xs = []};
+    mut Size size = Size{h = 2, w = 5};
+
+    def flip() : void { on = !on; }
+    def add() : void { bag.xs.push(bag.xs.size() + 1); }
+
+    view {
+        <div>
+            <button class="flip" onclick={flip}>flip</button>
+            <button class="add" onclick={add}>add</button>
+            <p class="flag">{`on=${on} off=${!on}`}</p>
+            <p class="count">{bag.xs.size()}</p>
+            <p class="size">{`${size.w}x${size.h}`}</p>
+            <p class="quoted" title="say \"hi\"">q</p>
+        </div>
+    }
+}
+
+app { root = TemplateValues; }

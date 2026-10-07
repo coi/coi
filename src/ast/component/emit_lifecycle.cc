@@ -6,7 +6,7 @@
 // "Turbo::Store", a route target) to the canonical qualified component name
 // used as the key of session.component_info and session.components_with_tick.
 // Returns "" if the name does not refer to a component (e.g. a pod type).
-static std::string resolve_component_qname(const CompilerSession &session,
+std::string resolve_component_qname(const CompilerSession &session,
                                            const std::string &module_name,
                                            std::string name)
 {
@@ -42,10 +42,7 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
         }
     };
 
-    // A handle type can name a webcc function to run on owned members when the
-    // component goes away (@cleanup in the def, e.g. websocket::close), so a
-    // page swapped out by the router doesn't leave its socket open. Callbacks
-    // the member had are dropped by coi_forget_owner.
+    // @cleanup on owned handle members
     auto emit_member_cleanup = [&]() {
         for (const auto &var : component.state)
         {

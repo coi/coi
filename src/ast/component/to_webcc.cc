@@ -426,7 +426,7 @@ std::string Component::to_webcc(CompilerSession &session)
             info.item_creation_code = transform_to_insert_before(region.item_creation_code, info.parent_var, info.anchor_var);
             info.root_element_var = region.root_element_var;
             info.is_only_child = region.is_only_child;
-            g_array_loops[region.iterable_expr] = info;
+            g_array_loops[region.iterable_expr].push_back(info);
 
             HtmlLoopVarInfo var_info;
             var_info.loop_id = region.loop_id;
@@ -489,7 +489,9 @@ std::string Component::to_webcc(CompilerSession &session)
             }
         }
 
-        ss << "    " << (var->is_mutable ? "" : "const ") << convert_type(resolve_component_type(var->type));
+        // never const, the parent calls _destroy etc. on it
+        bool component_member = !var->is_reference && session.component_info.count(resolve_component_qname(session, module_name, var->type));
+        ss << "    " << (var->is_mutable || component_member ? "" : "const ") << convert_type(resolve_component_type(var->type));
         if (var->is_reference)
             ss << "&";
         ss << " " << var->name;
@@ -1210,7 +1212,13 @@ std::string Component::to_webcc(CompilerSession &session)
         for (const auto &lr : loop_regions)
         {
             if (lr.loop_id != loop_id) continue;
-            if (!lr.component_type.empty())
+            if (lr.is_member_ref_loop)
+            {
+                // array owns the components, only remove their views
+                ss << "            for (auto& _item : " << lr.iterable_expr << ") _item._remove_view();\n";
+                ss << "            _loop_" << loop_id << "_count = 0;\n";
+            }
+            else if (!lr.component_type.empty())
             {
                 std::string vec_name = "_loop_" + lr.component_type + "s";
                 ss << "            while ((int)" << vec_name << ".size() > 0) {\n";
@@ -1223,6 +1231,7 @@ std::string Component::to_webcc(CompilerSession &session)
             {
                 std::string vec_name = "_loop_" + std::to_string(loop_id) + "_elements";
                 ss << "            while ((int)" << vec_name << ".size() > 0) {\n";
+                ss << "                coi_forget_handle(" << vec_name << "[" << vec_name << ".size() - 1]);\n";
                 ss << "                webcc::dom::remove_element(" << vec_name << "[" << vec_name << ".size() - 1]);\n";
                 ss << "                " << vec_name << ".pop_back();\n";
                 ss << "            }\n";
@@ -1332,37 +1341,7 @@ std::string Component::to_webcc(CompilerSession &session)
             ss << "            " << member_name << "._remove_view();\n";
         }
         for (int loop_id : region.else_loop_ids)
-        {
-            for (const auto &lr : loop_regions)
-            {
-                if (lr.loop_id == loop_id)
-                {
-                    if (!lr.component_type.empty())
-                    {
-                        std::string vec_name = "_loop_" + lr.component_type + "s";
-                        ss << "            while ((int)" << vec_name << ".size() > 0) {\n";
-                        ss << "                " << vec_name << "[" << vec_name << ".size() - 1]._destroy();\n";
-                        ss << "                " << vec_name << ".pop_back();\n";
-                        ss << "            }\n";
-                        ss << "            _loop_" << loop_id << "_count = 0;\n";
-                    }
-                    else if (lr.is_html_loop)
-                    {
-                        std::string vec_name = "_loop_" + std::to_string(loop_id) + "_elements";
-                        ss << "            while ((int)" << vec_name << ".size() > 0) {\n";
-                        ss << "                webcc::dom::remove_element(" << vec_name << "[" << vec_name << ".size() - 1]);\n";
-                        ss << "                " << vec_name << ".pop_back();\n";
-                        ss << "            }\n";
-                        ss << "            _loop_" << loop_id << "_count = 0;\n";
-                    }
-                    // Mark the loop unmounted so a later _sync_loop() (fired by an
-                    // array change while the region is hidden) cleanly no-ops
-                    // instead of inserting against a detached parent/anchor.
-                    ss << "            _loop_" << loop_id << "_parent = webcc::DOMElement();\n";
-                    break;
-                }
-            }
-        }
+            emit_loop_unmount(loop_id);
         for (int nested_if_id : region.else_if_ids)
         {
             for (const auto &nested_region : if_regions)
@@ -1408,37 +1387,7 @@ std::string Component::to_webcc(CompilerSession &session)
             ss << "            " << member_name << "._remove_view();\n";
         }
         for (int loop_id : region.then_loop_ids)
-        {
-            for (const auto &lr : loop_regions)
-            {
-                if (lr.loop_id == loop_id)
-                {
-                    if (!lr.component_type.empty())
-                    {
-                        std::string vec_name = "_loop_" + lr.component_type + "s";
-                        ss << "            while ((int)" << vec_name << ".size() > 0) {\n";
-                        ss << "                " << vec_name << "[" << vec_name << ".size() - 1]._destroy();\n";
-                        ss << "                " << vec_name << ".pop_back();\n";
-                        ss << "            }\n";
-                        ss << "            _loop_" << loop_id << "_count = 0;\n";
-                    }
-                    else if (lr.is_html_loop)
-                    {
-                        std::string vec_name = "_loop_" + std::to_string(loop_id) + "_elements";
-                        ss << "            while ((int)" << vec_name << ".size() > 0) {\n";
-                        ss << "                webcc::dom::remove_element(" << vec_name << "[" << vec_name << ".size() - 1]);\n";
-                        ss << "                " << vec_name << ".pop_back();\n";
-                        ss << "            }\n";
-                        ss << "            _loop_" << loop_id << "_count = 0;\n";
-                    }
-                    // Mark the loop unmounted so a later _sync_loop() (fired by an
-                    // array change while the region is hidden) cleanly no-ops
-                    // instead of inserting against a detached parent/anchor.
-                    ss << "            _loop_" << loop_id << "_parent = webcc::DOMElement();\n";
-                    break;
-                }
-            }
-        }
+            emit_loop_unmount(loop_id);
         for (int nested_if_id : region.then_if_ids)
         {
             for (const auto &nested_region : if_regions)

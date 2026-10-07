@@ -1,4 +1,4 @@
-// Test: top-level function mutating a pod through a reference param - should pass
+// Test: mut ref param
 pod Vec2 { float x; float y; }
 
 def scale(mut Vec2& v, float k) : void {

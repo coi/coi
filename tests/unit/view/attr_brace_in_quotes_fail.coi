@@ -1,0 +1,7 @@
+// Test: {x} inside a quoted attribute is an error, use ${x}
+component App {
+    mut int n = 1;
+    view { <p title="n is {n}">x</p> }
+}
+
+app { root = App; }

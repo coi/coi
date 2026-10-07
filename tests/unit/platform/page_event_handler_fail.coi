@@ -1,4 +1,4 @@
-// Test: a page-wide event handler must match the event (PASTE_TEXT carries a string)
+// Test: page event handler signature
 component PageEventHandlerFail {
     def pasted(int t) : void {}
     mount { Clipboard.onPasteText(&pasted); }

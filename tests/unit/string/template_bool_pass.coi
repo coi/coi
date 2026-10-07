@@ -1,0 +1,7 @@
+// Test: bool in a template string
+component App {
+    mut bool on = true;
+    view { <p>{`on=${on}`}</p> }
+}
+
+app { root = App; }

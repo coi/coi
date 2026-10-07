@@ -3,14 +3,14 @@
 #include <map>
 #include <set>
 #include <string>
+#include <vector>
 
 // Shared mutable state used during component->C++ lowering.
 // Declared here and defined in codegen_state.cc so ownership is explicit.
 
 extern std::set<std::string> g_ref_props;
 
-// webcc events a callback was registered for while lowering components. The event
-// loop dispatches exactly these (see emit_event_dispatch in codegen.cc).
+// webcc events with a registered callback
 struct UsedEvent
 {
     std::string ns, name, key, struct_name; // struct_name: webcc::ns::NameEvent
@@ -42,7 +42,7 @@ struct ArrayLoopInfo
     std::string root_element_var;
     bool is_only_child;
 };
-extern std::map<std::string, ArrayLoopInfo> g_array_loops;
+extern std::map<std::string, std::vector<ArrayLoopInfo>> g_array_loops;
 
 struct HtmlLoopVarInfo
 {

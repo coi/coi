@@ -1,4 +1,4 @@
-// Test: top-level function calling one defined later in the file - should pass
+// Test: forward call
 def sumOfSquares(int a, int b) : int {
     return square(a) + square(b);
 }

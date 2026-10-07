@@ -1,0 +1,16 @@
+// Test: Module::Pod{...} with positional and named fields
+import "modules/Geometry.coi";
+
+component App {
+    mut float d = 0.0;
+
+    init {
+        Geometry::Point a = Geometry::Point{0.0, 0.0};
+        Geometry::Point b = Geometry::Point{y = 4.0, x = 3.0};
+        d = Geometry::dist2(a, b);
+    }
+
+    view { <div>{d}</div> }
+}
+
+app { root = App; }

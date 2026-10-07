@@ -1,5 +1,4 @@
-// Pointer events through the generated onPointer callback: phase and type arrive as
-// Coi enums, buttons as flags, and the listener flags go in as PointerFlags.
+// pointer enums and flags through onPointer
 component PointerGroupsClick {
     mut Canvas surface;
     mut string log = "";

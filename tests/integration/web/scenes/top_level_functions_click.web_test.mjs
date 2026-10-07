@@ -1,6 +1,4 @@
-// Regression test: top-level functions compute the initial values, a method
-// shadows the free function of the same name, and mutating a pod through a
-// `mut Vec2&` param updates the view.
+// top-level functions, method shadowing, mut Vec2& param
 
 export async function run({ page, expect }) {
   await expect.textContains(page.locator(".size"), "25");

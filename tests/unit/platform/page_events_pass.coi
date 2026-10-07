@@ -1,5 +1,4 @@
-// Test: page-wide events as shared methods (fields, pod, no params), and whitelisted
-// functions whose names exist in several namespaces resolve on their own type
+// Test: page-wide events
 component PageEventsPass {
     mut Database db;
     mut PdfDocument doc;

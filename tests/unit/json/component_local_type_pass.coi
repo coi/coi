@@ -8,7 +8,7 @@ component JsonApp {
     
     mut string result = "not parsed";
 
-    def handleSuccess(User user, Meta meta) : void {
+    def handleSuccess(User user, UserMeta meta) : void {
         if (meta.has(User.name) && meta.has(User.age)) {
             result = "User: " + user.name + ", age " + user.age;
         } else {

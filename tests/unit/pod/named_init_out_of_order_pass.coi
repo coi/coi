@@ -1,0 +1,9 @@
+// Test: named pod fields in any order
+pod Size { int w; int h; }
+
+component App {
+    mut Size s = Size{h = 2, w = 5};
+    view { <p>{s.w}x{s.h}</p> }
+}
+
+app { root = App; }

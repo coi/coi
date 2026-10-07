@@ -1,4 +1,4 @@
-// Test: top-level function result assigned to the wrong type - should fail
+// Test: wrong result type
 def half(float v) : float {
     return v / 2.0;
 }

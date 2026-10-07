@@ -23,7 +23,7 @@ struct MethodParam
 {
     std::string type;
     std::string name;
-    bool has_default = false; // `= value` in the def: the argument may be left out
+    bool has_default = false; // argument may be left out
 };
 
 struct MethodDef
@@ -37,7 +37,7 @@ struct MethodDef
     MappingType mapping_type = MappingType::Map;
     std::string mapping_value; // The string in the annotation
 
-    // Leading params without a default: the least a call must pass
+    // least a call must pass
     size_t required_params() const
     {
         size_t n = 0;
@@ -47,9 +47,7 @@ struct MethodDef
     }
 };
 
-// @event("ns::NAME key f1,f2 last"): the webcc event a callback method binds to.
-// key is the event field holding the handle, fields are the rest in order (passed to
-// the callback), last means the handle gets no more events after this one.
+// @event("ns::NAME key f1,f2 last")
 struct SchemaEventSpec
 {
     std::string ns;
@@ -57,9 +55,8 @@ struct SchemaEventSpec
     std::string key;
     std::vector<std::string> fields;
     bool last = false;
-    std::string pod; // "PointerEvent": a handler may take the fields as this one pod
-    // The function that turns the event on ("add_pointer_listener") and the value of each of
-    // its params after the handle, from the whitelist's +listen
+    std::string pod; // event fields as one pod
+    // listener function and its param values from +listen
     struct ListenParam
     {
         std::string name, type, value;
@@ -72,13 +69,11 @@ struct SchemaEventSpec
     std::string method_name() const; // Coi's callback method: onName
 };
 
-// A view attribute for a webcc event, derived from the defs: every DOMElement event with
-// a listener gives on<event> (onpointer, onwheel), and an event whose first field is an
-// enum also gives one attribute per value (onpointerdown, onpointerup...)
+// view attribute for a webcc event: on<event>, plus one per enum value
 struct ViewEventAttr
 {
     std::string attr;         // "onpointerdown"
-    std::string type;         // "pointer": one handler table per event, shared by its attributes
+    std::string type;         // "pointer"
     const struct MethodDef *method = nullptr; // DOMElement.onPointer
     std::string phase;        // "Down" for a per-value attribute, else ""
     std::string phase_enum;   // "PointerPhase"
@@ -95,16 +90,13 @@ struct TypeDef
     bool is_handle = false;  // @handle - a webcc handle type (webcc::Name in C++)
     std::string extends;     // Parent type (for handle inheritance)
     std::string alias_of;    // @alias("target") - this type is an alias for another
-    std::string cleanup;     // @cleanup("ns::func") - called on owned members when the component is destroyed
-    // @enum("webcc::ns::Name") type Name { A, B }: a platform enum. The compiler adds it
-    // as a Coi enum; the values match the C++ enum class 1:1, so values convert by cast.
+    std::string cleanup;     // @cleanup("ns::func") - run on owned members on destroy
+    // @enum: platform enum, values match the C++ enum class
     std::string enum_cpp;
     std::vector<std::string> enum_values;
-    // @flags("webcc::ns::Name") @alias("uint8"): platform bit flags. Values are shared
-    // constants combined with |; the alias makes the type behave as its integer.
+    // @flags: platform bit flags, behaves as its integer
     std::string flags_cpp;
-    // @pod type PointerEvent { PointerPhase phase; float32 x; }: an event's fields as one
-    // value. The compiler adds it as a Coi pod.
+    // @pod: an event's fields as one value
     bool is_pod = false;
     std::vector<MethodParam> pod_fields;
     std::vector<MethodDef> methods;
@@ -202,17 +194,15 @@ public:
 
     // Lookup methods
     const MethodDef *lookup_method(const std::string &type_name, const std::string &method_name) const;
-    // Event attributes for elements, and listener options (attr -> Coi type, e.g.
-    // "pointerflags" -> "PointerFlags"); both derived from DOMElement's events
+    // event attributes and listener options
     const std::vector<ViewEventAttr> &view_event_attrs() const;
     const ViewEventAttr *find_view_event_attr(const std::string &attr) const;
     const std::map<std::string, std::string> &view_option_attrs() const;
 
-    // C++ type a value of this Coi type must be cast to when passed to webcc (platform
-    // enums and flags), or "" for anything else
+    // C++ type for platform enums/flags, else ""
     std::string webcc_cast_type(const std::string &type_name) const;
 
-    // With arg_count: an exact match first, then a method whose trailing params have defaults
+    // exact arg_count match first, then trailing defaults
     const MethodDef *lookup_method(const std::string &type_name, const std::string &method_name, size_t arg_count) const;
     const TypeDef *lookup_type(const std::string &type_name) const;
 

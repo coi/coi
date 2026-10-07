@@ -1,4 +1,4 @@
-// Test: a pod of your own can't take the name of a platform event pod
+// Test: user pod named like an event pod
 pod PointerEvent { int x; }
 component EventPodNameClashFail { view { <p></p> } }
 app { root = EventPodNameClashFail; }

@@ -389,7 +389,7 @@ With `<{todo}/>`, props like `id`, `text`, and `done` are automatically bound fr
 
 ## Dynamic Styles
 
-Embed expressions in style attributes:
+Embed values in quoted attributes with `${...}`, like in any string (bare `{...}` is for view text; in an attribute it is a compile error):
 
 ```tsx
 component Ball {
@@ -400,7 +400,7 @@ component Ball {
     view {
         <div 
             class="ball"
-            style="left: {x}px; top: {y}px; background: {color};"
+            style="left: ${x}px; top: ${y}px; background: ${color};"
         ></div>
     }
 }

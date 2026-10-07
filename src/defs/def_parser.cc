@@ -315,7 +315,7 @@ std::vector<MethodParam> DefParser::parse_params()
             
             param.type = func_type;
             
-            // Optional default (= void): the callback may be left out
+            // optional = void
             if (current_.type == Token::Equals)
             {
                 param.has_default = true;
@@ -355,7 +355,7 @@ std::vector<MethodParam> DefParser::parse_params()
             param.name = current_.value;
             advance();
 
-            // Optional default (= "" or = 0): skip it, numbers are not even tokens
+            // optional default, skipped
             if (current_.type == Token::Equals)
             {
                 param.has_default = true;
@@ -824,7 +824,7 @@ SchemaEventSpec SchemaEventSpec::parse(const std::string &value)
     return s;
 }
 
-// Same rule as webcc's header generator: PAGE_HIDE -> PageHideEvent
+// PAGE_HIDE -> PageHideEvent
 std::string SchemaEventSpec::struct_name() const
 {
     std::string out;
@@ -961,7 +961,7 @@ bool DefSchema::load_cache(const std::string &cache_path)
         return false;
     }
 
-    // Format version, so a cache from an older compiler is rebuilt instead of misread
+    // format version
     uint32_t magic = 0, version = 0;
     file.read(reinterpret_cast<char *>(&magic), sizeof(magic));
     file.read(reinterpret_cast<char *>(&version), sizeof(version));
@@ -1194,8 +1194,7 @@ bool DefSchema::inherits_from(const std::string &derived, const std::string &bas
 
 bool DefSchema::is_handle(const std::string &type_name) const
 {
-    // A handle is a webcc handle type (@handle, as gen_schema emits for every one), or a
-    // non-builtin type with @map/@intrinsic/@event methods
+    // @handle, or a non-builtin type with @map/@intrinsic/@event methods
     auto type_it = types_.find(type_name);
     if (type_it == types_.end())
         return false;
@@ -1283,8 +1282,7 @@ void DefSchema::build_view_attrs() const
                 for (const auto &v : first->enum_values)
                     view_attrs_.push_back({"on" + type + lower(v), type, &m, v, fields[0]});
         }
-        // A listener param typed with a platform enum/flags is settable per element, named
-        // after its type: pointerflags={...}
+        // enum/flags listener params are set per element: pointerflags={...}
         for (const auto &lp : spec.listen_params)
             if (!webcc_cast_type(lp.type).empty())
                 view_options_[lower(lp.type)] = lp.type;

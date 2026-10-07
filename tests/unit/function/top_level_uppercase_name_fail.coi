@@ -1,4 +1,4 @@
-// Test: top-level function names must start lowercase - should fail
+// Test: uppercase function name
 def Add(int a, int b) : int {
     return a + b;
 }

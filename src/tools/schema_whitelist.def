@@ -4,23 +4,21 @@
 //
 // Format:
 //   [namespace]
-//   [Type]                     - @intrinsic/@inline definitions for one handle type only (uppercase = type)
+//   [Type]                     - @intrinsic/@inline defs for one handle type
 //   function_name              - Regular webcc function (auto-generates @map)
 //   // comment                 - Preserved comment (emitted before next @intrinsic/@inline)
 //   @intrinsic("x") def ...    - Raw intrinsic definition (emitted as-is)
 //   @inline("x") def ...       - Raw inline definition (emitted as-is)
 
 [dom]
-# Event listeners. +listen makes their events view attributes (onpointerdown=, onwheel=...);
-# the view calls them with these values: pointer capture, and the page doesn't scroll under
-# a wheel handler. An element sets its own pointer flags with pointerflags={...}.
+# +listen makes these view attributes
 remove_pointer_listener
 add_pointer_listener +listen(POINTER) flags=1
 add_wheel_listener +listen(WHEEL) prevent_default=1
 observe_resize +listen(RESIZE)
 add_focus_listener +listen(FOCUS, BLUR)
 add_drop_listener +listen(DROP)
-# Text boxes over a canvas: move one, focus it, read what was typed (innerText)
+# text boxes over a canvas
 set_style
 focus
 blur
@@ -89,6 +87,7 @@ set_transform
 
 [audio]
 create_audio
+@inline("webcc::audio::create_audio(${0})") shared def load(string src): Audio
 play
 pause
 set_volume
@@ -97,17 +96,17 @@ get_current_time
 get_duration
 
 [image]
-# LOADED (size, after decoding) or ERROR; from_blob for pasted, dropped or stored bytes
+# LOADED or ERROR
 load +events
 from_blob +events
 free
 
 [input]
 exit_pointer_lock
-# Shortcuts: stop the browser's own action for a key combination (Ctrl+S saves the page)
+# block browser shortcuts like Ctrl+S
 prevent_key
 allow_key
-# Key events for Input.onKeyDown(&h) / onKeyUp
+# Input.onKeyDown / onKeyUp
 init_keyboard +listen(KEY_DOWN, KEY_UP)
 // Keyboard state queries (compiler intrinsics)
 @intrinsic("key_down") shared def isKeyDown(int keyCode): bool
@@ -120,19 +119,19 @@ remove_item
 clear
 
 [fetch]
-# Text requests; DONE is only for request() (needs bytes), so it is left out here
+# DONE needs bytes, only on request()
 get +events(SUCCESS, ERROR)
 post +events(SUCCESS, ERROR)
 patch +events(SUCCESS, ERROR)
-# Any method, binary body; DONE has the status and the body as a Blob
+# any method, binary body
 request +events(DONE, ERROR)
 abort
 
 [system]
-# Frames on demand (app { tick = demand; }), screen and connection
+# frames on demand, screen, connection
 get_device_pixel_ratio
 is_online
-# Page lifecycle for System.onPageHide(&h) etc.; save on visibility hidden, PAGE_HIDE is the last chance
+# page lifecycle, PAGE_HIDE is the last chance to save
 init_lifecycle +listen(PAGE_HIDE, PAGE_SHOW, ONLINE)
 init_visibility_change +listen(VISIBILITY_CHANGE)
 log
@@ -148,7 +147,7 @@ get_pathname
 get_search
 get_query_param
 get_visibility_state
-# Frames on demand: with app { tick = demand; } tick runs once per requested frame
+# for app { tick = demand; }
 request_frame
 @intrinsic("is_hidden") shared def isHidden(): bool
 // Router navigation (compiler intrinsics)
@@ -176,12 +175,12 @@ vertex_attrib_pointer
 draw_arrays
 
 [Canvas]
-// 2D context. lowLatency: the canvas may reach the screen without waiting for the page (less pen lag), opaque: no transparency, a bit faster
+// 2D context, lowLatency cuts pen lag, opaque skips alpha
 @inline("webcc::canvas::get_context_2d(${this})") def getContext2d(): CanvasContext2D
 @inline("webcc::canvas::get_context_2d(${this}, webcc::canvas::ContextFlags((${0} ? 1 : 0) | (${1} ? 2 : 0)))") def getContext2d(bool lowLatency, bool opaque): CanvasContext2D
 
 [blob]
-# Bytes held on the JS side (an IndexedDB value, a pasted image): read() keeps them, take() frees
+# bytes held on the JS side: read() keeps them, take() frees
 create
 size
 read
@@ -189,7 +188,7 @@ take
 free
 
 [idb]
-# Key-value storage: string keys, uint8[] values. Results arrive on the returned request
+# key-value store, results arrive on the returned request
 open +events
 put +events(DONE, ERROR)
 get +events(VALUE, ERROR)
@@ -200,16 +199,16 @@ close
 [clipboard]
 # write_text only works in a click or key handler
 write_text
-# Pastes outside text fields; inputs keep their native paste
+# pastes outside text fields
 init_paste +listen(PASTE_TEXT, PASTE_IMAGE) prevent_default=1
 
 [files]
-# open shows the file dialog (in a click or key handler); one OPENED per picked file
+# needs a click or key handler, one OPENED per file
 open +events
 save
 
 [pdf]
-# Import (pdf.js, shipped by the app: Pdf.setLibrary first) and export
+# import needs Pdf.setLibrary first
 set_library
 open +events
 page_width
@@ -239,7 +238,7 @@ draw_text
 finish
 
 [websocket]
-# An owned socket member is closed when its component is destroyed
+# owned sockets close on destroy
 @cleanup("websocket::close")
 connect +events
 send
@@ -251,7 +250,7 @@ get_buffered_amount
 get_protocol
 get_extensions
 get_url
-// True while the socket is open (not connecting, closing or closed)
+// true while open
 @inline("(webcc::websocket::get_ready_state($self) == webcc::websocket::ReadyState::OPEN)") def isConnected(): bool
 
 [wgpu]

@@ -1,4 +1,4 @@
-// Test: event callbacks on a handle type that has them only through the schema (Image)
+// Test: Image event callbacks
 component ImageLoadedPass {
     mut Image img;
     mut int w = 0;

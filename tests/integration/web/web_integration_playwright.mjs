@@ -87,8 +87,7 @@ async function runTestModule(testPath, ctx) {
   const run = mod?.run || mod?.default;
   if (typeof run !== "function") throw new Error(`Expected ${testPath} to export 'run' (or default export)`);
   await run(ctx);
-  // A scene that tests failure paths (a refused socket, a 404) can list the
-  // console errors it expects as substrings; those don't fail the run.
+  // substrings of console errors a scene expects
   return Array.isArray(mod?.expectedConsoleErrors) ? mod.expectedConsoleErrors : [];
 }
 

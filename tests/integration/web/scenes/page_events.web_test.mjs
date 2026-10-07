@@ -1,5 +1,4 @@
-// Page-wide handlers: every registered component gets the event, a destroyed one stops,
-// pastes and visibility changes arrive, writeText works from a click.
+// page-wide handlers, destroyed component stops getting events
 
 export async function run({ page, expect }) {
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
@@ -14,7 +13,7 @@ export async function run({ page, expect }) {
   // Control and S are two key-downs
   await expect.textContains(page.locator(".counter"), "3");
 
-  // The counter component goes away: its handler must not run (or crash) any more
+  // counter is gone, its handler must not run
   await page.locator(".hide").click();
   await page.keyboard.press("b");
   await expect.textContains(page.locator(".key"), "b");

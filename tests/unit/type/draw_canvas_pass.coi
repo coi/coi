@@ -1,4 +1,4 @@
-// Test: drawImage takes a Canvas (cache tile) as well as an Image, and a tile can be freed
+// Test: drawImage with a Canvas
 component DrawCanvasPass {
     mut Canvas screen;
     mut Canvas tile;

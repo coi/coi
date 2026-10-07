@@ -17,3 +17,5 @@ pointer_pod_click|tests/integration/web/scenes/pointer_pod_click.coi|web
 view_event_attrs|tests/integration/web/scenes/view_event_attrs.coi|web
 page_events|tests/integration/web/scenes/page_events.coi|web
 websocket_full|tests/integration/web/scenes/websocket_full.coi|web
+loop_updates|tests/integration/web/scenes/loop_updates.coi|web
+template_values|tests/integration/web/scenes/template_values.coi|web

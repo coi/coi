@@ -1,4 +1,4 @@
-// Test: generic top-level functions - should pass
+// Test: generic top-level functions
 def first<T>(T[]& items) : T {
     return items[0];
 }

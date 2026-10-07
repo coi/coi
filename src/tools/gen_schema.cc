@@ -17,13 +17,10 @@
 #include "../../deps/webcc/src/cli/schema.h"
 
 // Whitelist of functions and intrinsics exposed to Coi users
-//   name +events              - also take a trailing optional callback per event of the
-//   name +events(A, B)          returned handle type (all events, or the listed ones)
-//   name +listen(A, B) p=v    - name turns on events A, B of its first param's handle, so
-//                               they become view attributes (onpointer=...); p=v sets the
-//                               value Coi passes for param p (else the schema default)
-//   @cleanup("ns::func")      - type annotation: called on owned members when their
-//                               component is destroyed (e.g. close a socket)
+//   name +events              - optional callback per event of the returned handle
+//   name +events(A, B)        - only the listed events
+//   name +listen(A, B) p=v    - turns on view attributes for A, B; p=v sets a param
+//   @cleanup("ns::func")      - run on owned members on destroy
 // Loaded from src/tools/schema_whitelist.def at runtime
 //
 // Format:
@@ -206,10 +203,8 @@ std::string handle_namespace(const webcc::SchemaDefs &defs, const std::string &h
     return "";
 }
 
-// Events of a handle type that Coi can bind a callback to: the first field is the handle
-// and the event comes from the handle's own namespace. An event that only carries a
-// handle as data (clipboard PASTE_IMAGE hands over a new Blob) isn't an event of it.
-// Skipped: the four dom events the view syntax handles (onclick= etc.).
+// events Coi can bind on a handle type
+// skips the dom events the view handles itself
 std::vector<const webcc::SchemaEvent *> bindable_events(const webcc::SchemaDefs &defs, const std::string &handle_type)
 {
     std::vector<const webcc::SchemaEvent *> out;
@@ -227,10 +222,8 @@ std::vector<const webcc::SchemaEvent *> bindable_events(const webcc::SchemaDefs 
     return out;
 }
 
-// "def callback(string, int32): void" for an event's fields after the handle
-// An event belongs to a handle when its first field is a handle of its own namespace
-// (dom POINTER -> DOMElement). Anything else is page-wide (clipboard PASTE_TEXT, input
-// KEY_DOWN; PASTE_IMAGE only carries a Blob): all its params are data.
+// "def callback(string, int32): void"
+// first field is a handle of its own namespace, else page-wide
 bool is_handle_event(const webcc::SchemaDefs &defs, const webcc::SchemaEvent &e)
 {
     return !e.params.empty() && e.params[0].type == "handle" && !e.params[0].handle_type.empty() &&
@@ -291,9 +284,7 @@ void emit_param_list(std::ostream &out, const webcc::SchemaDefs &defs, const web
     out << list << events;
 }
 
-// Enum and flags groups of a namespace. An enum is a Coi enum (PointerPhase::Down),
-// flags are a type that behaves as its integer, with its bits as shared constants
-// (PointerFlags.Capture | PointerFlags.NoScroll).
+// enum and flags groups of a namespace
 void emit_groups(std::ostream &out, const webcc::SchemaDefs &defs, const std::string &ns)
 {
     for (const auto &g : defs.groups)
@@ -340,9 +331,7 @@ std::string field_camel(const std::string &snake)
     return out;
 }
 
-// Name of the pod for an event's fields, "" when it has fewer than two. PointerEvent; with
-// the namespace in front (FilesOpenedEvent) when another bindable event has the same name.
-// No pod when a field is a handle (a Blob): handles can't be copied, pods can.
+// pod name for an event, "" if fewer than two fields or a handle field
 bool event_gets_pod(const webcc::SchemaDefs &defs, const webcc::SchemaEvent &e)
 {
     size_t first = first_field(defs, e);
@@ -375,7 +364,7 @@ void emit_event_pods(std::ostream &out, const webcc::SchemaDefs &defs, const std
             std::string pod = event_pod_name(defs, *e);
             if (pod.empty() || !done.insert(pod).second)
                 continue;
-            out << "// Fields of a " << e->ns << " " << e->name << " event, for a handler that takes them as one value\n";
+            out << "// " << e->ns << " " << e->name << " event fields\n";
             out << "@pod\n";
             out << "type " << pod << " {\n";
             for (size_t i = first_field(defs, *e); i < e->params.size(); i++)
@@ -386,8 +375,7 @@ void emit_event_pods(std::ostream &out, const webcc::SchemaDefs &defs, const std
     }
 }
 
-// " listen:func(param:Type=value,...)" when the whitelist names a function that turns the
-// event on: the view calls it with exactly these values. "" when nothing does.
+// " listen:func(param:Type=value,...)", "" if nothing turns it on
 std::string event_listen_token(const webcc::SchemaDefs &defs, const webcc::SchemaEvent &e)
 {
     for (const auto &[key, entry] : LISTENS)
@@ -445,8 +433,7 @@ std::string event_annotation(const webcc::SchemaDefs &defs, const webcc::SchemaE
            (e.last ? " last" : "") + (pod.empty() ? "" : " pod:" + pod) + event_listen_token(defs, e) + "\")\n";
 }
 
-// Page-wide events of a namespace that something turns on (+listen): shared methods on the
-// namespace's type, Clipboard.onPasteText(&h)
+// page-wide events turned on by +listen
 std::vector<const webcc::SchemaEvent *> page_events(const webcc::SchemaDefs &defs, const std::string &ns)
 {
     std::vector<const webcc::SchemaEvent *> out;
@@ -461,7 +448,7 @@ void emit_page_event_methods(std::ostream &out, const webcc::SchemaDefs &defs, c
     auto events = page_events(defs, ns);
     if (events.empty())
         return;
-    out << "    // Page-wide events: every registered handler is called (handlers may take fewer parameters)\n";
+    out << "    // Page-wide events\n";
     for (const auto *e : events)
     {
         out << event_annotation(defs, *e);
@@ -475,7 +462,7 @@ void emit_event_methods(std::ostream &out, const webcc::SchemaDefs &defs, const 
     auto events = bindable_events(defs, handle_type);
     if (events.empty())
         return;
-    out << "    // Events: register a callback on this handle (handlers may take fewer parameters)\n";
+    out << "    // Events\n";
     for (const auto *e : events)
     {
         out << event_annotation(defs, *e);
@@ -554,7 +541,7 @@ std::string to_coi_type(const std::string &type, const std::string &handle_type,
     if (type == "bool")
         return "bool";
     if (type == "bytes")
-        return "uint8[]"; // webcc::bytes_view in, webcc::vector<uint8_t> out: both coi::vector<uint8_t>
+        return "uint8[]"; // bytes_view in, vector<uint8_t> out
     if (type == "func_ptr")
         return "func"; // Special case
     return type;
@@ -774,8 +761,7 @@ int main()
 
         for (const auto *cmd : commands)
         {
-            // Makes a handle of this namespace from a handle of another one (image::from_blob
-            // takes a Blob): a factory on its own type, Image.fromBlob(blob), not blob.fromBlob()
+            // factory from another namespace's handle, Image.fromBlob(blob)
             bool makes_own_from_foreign = !cmd->params.empty() && cmd->params[0].type == "handle" &&
                                           !cmd->return_handle_type.empty() &&
                                           handle_namespace(defs, cmd->return_handle_type) == ns &&
@@ -831,7 +817,7 @@ int main()
             std::string pod = event_pod_name(defs, *e);
             if (pod.empty())
                 continue;
-            out << "// Fields of a " << e->ns << " " << e->name << " event, for a handler that takes them as one value\n";
+            out << "// " << e->ns << " " << e->name << " event fields\n";
             out << "@pod\ntype " << pod << " {\n";
             for (size_t i = first_field(defs, *e); i < e->params.size(); i++)
                 out << "    " << to_coi_type(e->params[i].type, e->params[i].handle_type, e->params[i].enum_type) << " "

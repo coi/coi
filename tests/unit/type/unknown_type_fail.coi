@@ -1,0 +1,7 @@
+// Test: unknown type in a state declaration
+component App {
+    mut Point2 p;
+    view { <p>x</p> }
+}
+
+app { root = App; }

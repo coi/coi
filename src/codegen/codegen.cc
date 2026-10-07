@@ -6,15 +6,12 @@
 #include "json_codegen.h"
 #include <iostream>
 
-// One case per webcc event a component bound a callback to (collected while
-// lowering, see g_used_events). A "last" event also drops every callback the
-// handle had, so finished requests don't pile up in the tables.
+// one case per webcc event with a bound callback
 static void emit_event_dispatch(std::ostream &out, const FeatureFlags &features)
 {
     for (const auto &[key, ev] : g_used_events)
     {
-        // The keyboard feature (Input.isKeyDown) has its own case for these and calls the
-        // handlers from there
+        // keyboard feature dispatches these itself
         if (features.keyboard && (key == "input::KEY_DOWN" || key == "input::KEY_UP"))
             continue;
         out << "        } else if (e.opcode == " << ev.struct_name << "::OPCODE) {\n";
@@ -65,8 +62,7 @@ void generate_cpp_code(
     out << "using string_view = webcc::string_view;\n";
     out << "template<typename T> using vector = webcc::vector<T>;\n";
     out << "}\n";
-    // Event fields with bytes point into the event buffer, valid until the next poll:
-    // a callback gets its own copy
+    // bytes point into the event buffer, copy them
     out << "inline coi::vector<uint8_t> coi_bytes(webcc::bytes_view v) {\n";
     out << "    coi::vector<uint8_t> out; out.reserve(v.length());\n";
     out << "    for (uint32_t i = 0; i < v.length(); i++) out.push_back(v.data()[i]);\n";
@@ -200,15 +196,12 @@ void generate_cpp_code(
         }
     }
 
-    // Event dispatcher: callbacks keyed by handle. One instance per DOM event kind
-    // (g_dispatcher...) and, through coi_events<E>, one per webcc event type that a
-    // component registered a callback for. Every instance links itself into a list on
-    // first use, so coi_forget_owner can clear a destroyed component's entries from all
-    // of them without the compiler knowing which exist.
+    // callbacks keyed by handle
     out << "struct DispatcherBase {\n";
     out << "    static inline DispatcherBase* g_first = nullptr;\n";
     out << "    DispatcherBase* next = nullptr;\n";
     out << "    void (*forget)(DispatcherBase*, const void*) = nullptr;\n";
+    out << "    void (*forget_handle)(DispatcherBase*, webcc::handle) = nullptr;\n";
     out << "};\n";
     out << "template<typename Callback, int MaxListeners = 512>\n";
     out << "struct Dispatcher : DispatcherBase {\n";
@@ -220,7 +213,11 @@ void generate_cpp_code(
     // _destroy() (coi_forget_owner) removes every entry it owns, so a late
     // event never calls into freed memory and dead entries don't pile up
     out << "    void set(webcc::handle h, Callback cb, const void* owner = nullptr) {\n";
-    out << "        if (!forget) { forget = [](DispatcherBase* b, const void* o) { static_cast<Dispatcher*>(b)->remove_owner(o); }; next = g_first; g_first = this; }\n";
+    out << "        if (!forget) {\n";
+    out << "            forget = [](DispatcherBase* b, const void* o) { static_cast<Dispatcher*>(b)->remove_owner(o); };\n";
+    out << "            forget_handle = [](DispatcherBase* b, webcc::handle h) { static_cast<Dispatcher*>(b)->remove(h); };\n";
+    out << "            next = g_first; g_first = this;\n";
+    out << "        }\n";
     out << "        int32_t hid = (int32_t)h;\n";
     out << "        for (int i = 0; i < count; i++) {\n";
     out << "            if (handles[i] == hid) { callbacks[i] = cb; owners[i] = owner; return; }\n";
@@ -262,18 +259,19 @@ void generate_cpp_code(
     out << "        }\n";
     out << "        return false;\n";
     out << "    }\n";
-    // Every entry, for page-wide events. A handler may register or drop entries while
-    // this runs, so it stops at the count it started with and checks the bound
+    // handlers may register while this runs, stop at the starting count
     out << "    template<typename... Args>\n";
     out << "    void dispatch_all(Args&&... args) {\n";
     out << "        int n = count;\n";
     out << "        for (int i = 0; i < n && i < count; i++) callbacks[i](args...);\n";
     out << "    }\n";
     out << "};\n";
-    out << "// Callbacks for webcc event E, keyed by the handle in its first field\n";
     out << "template<typename E> Dispatcher<coi::function<void(const E&)>> coi_events;\n";
     out << "inline void coi_forget_owner(const void* owner) {\n";
     out << "    for (DispatcherBase* d = DispatcherBase::g_first; d; d = d->next) d->forget(d, owner);\n";
+    out << "}\n";
+    out << "inline void coi_forget_handle(webcc::handle h) {\n";
+    out << "    for (DispatcherBase* d = DispatcherBase::g_first; d; d = d->next) d->forget_handle(d, h);\n";
     out << "}\n\n";
 
     out << "int g_view_depth = 0;\n";
@@ -322,17 +320,7 @@ void generate_cpp_code(
     {
         for (const auto &enum_def : comp.enums)
         {
-            out << "enum struct " << qualified_name(comp.module_name, comp.name) << "_" << enum_def->name << " : ";
-            size_t total_values = enum_def->values.size() + 1;
-            if (total_values <= 256) out << "uint8_t";
-            else if (total_values <= 65536) out << "uint16_t";
-            else out << "uint32_t";
-            out << " {\n";
-            for (const auto &val : enum_def->values)
-            {
-                out << "    " << val << ",\n";
-            }
-            out << "    _COUNT\n};\n";
+            out << emit_coi_enum(qualified_name(comp.module_name, comp.name) + "_" + enum_def->name, enum_def->values);
         }
     }
 
@@ -381,6 +369,8 @@ void generate_cpp_code(
     {
         for (const auto &data_def : all_global_data)
         {
+            if (data_def->source_file.empty())
+                continue;
             out << generate_field_token_constants(qualified_name(data_def->module_name, data_def->name));
         }
         for (const auto &comp : all_components)
@@ -398,6 +388,8 @@ void generate_cpp_code(
     {
         for (const auto &data_def : all_global_data)
         {
+            if (data_def->source_file.empty())
+                continue;
             out << generate_meta_struct(qualified_name(data_def->module_name, data_def->name));
         }
         for (const auto &comp : all_components)
@@ -430,8 +422,7 @@ void generate_cpp_code(
         g_ref_props.clear();
     };
 
-    // Declarations first so functions can call each other in any order. Generic
-    // functions are templates, so their full definitions go here too.
+    // declarations first, generics are defined here too
     for (const auto &func : all_global_functions)
     {
         enter_function_scope(*func);
@@ -448,7 +439,7 @@ void generate_cpp_code(
         out << comp->to_webcc(session);
     }
 
-    // Non-generic definitions after components, so they can use component types
+    // non-generic definitions after components
     for (const auto &func : all_global_functions)
     {
         if (!func->type_params.empty()) continue;
@@ -541,9 +532,7 @@ void generate_cpp_code(
     out << "    app = new (app_mem) " << root_qualified << "();\n";
     emit_feature_init(out, features, root_qualified);
     out << "    app->view();\n";
-    // Without a tick nothing runs per frame but event dispatch, and every event
-    // requests a frame on its own, so the app can skip the rAF loop. With a
-    // tick the loop stays on unless the app opted into frames on demand.
+    // no rAF loop without a tick or with tick = demand
     bool has_tick = session.components_with_tick.count(root_qualified) > 0;
     if (!has_tick || final_app_config.tick_on_demand)
     {

@@ -1,0 +1,6 @@
+// Test: a static method that doesn't exist on a platform type is a type error
+component UnknownStaticMethodFail {
+    mount { DOMElement el = DOMElement.getBody(); }
+    view { <p></p> }
+}
+app { root = UnknownStaticMethodFail; }

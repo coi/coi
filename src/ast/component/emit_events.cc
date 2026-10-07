@@ -14,8 +14,7 @@ const std::vector<EventSpec> &get_event_specs()
             {"change", "g_change_dispatcher", "const coi::string& _value", "_value", "const coi::string& _value", "_value"},
             {"keydown", "g_keydown_dispatcher", "int _keycode", "_keycode", "int _keycode", "_keycode"},
         };
-        // One per webcc event behind a view attribute (onpointer..., onwheel...), from the
-        // defs. The handler body is generated, so it gets the whole event as `_e`.
+        // one per webcc event attribute, handler gets the event as _e
         std::set<std::string> seen;
         for (const auto &attr : DefSchema::instance().view_event_attrs())
         {

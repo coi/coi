@@ -194,9 +194,7 @@ static std::string build_lambda_call(FunctionCall *func_call)
 }
 
 // Build minimal lambda capture: [this] outside loops, [this, var] inside loops.
-// Body of a handler for a webcc event attribute (onpointerdown=, onwheel=...; derived from
-// the defs, see DefSchema::view_event_attrs): `this->h(fields or pod)` for a method name, or
-// the call as written for `onwheel={zoom(2)}`
+// handler body for a webcc event attribute
 static std::string view_event_call(const HTMLAttribute &attr, const ViewEventAttr &spec)
 {
     if (dynamic_cast<FunctionCall *>(attr.value.get()))
@@ -566,10 +564,7 @@ void HTMLElement::generate_code(ViewCodegenContext& ctx)
         ctx.ss << "        " << ref_binding << " = " << var << ";\n";
     }
 
-    // webcc event attributes. The per-value ones of an event (onpointerdown, onpointerup)
-    // share its handler table, so an element gets one handler per event that switches on
-    // the first field. The listener is called once per function, with the whitelist's
-    // values or the element's own (pointerflags={...}).
+    // webcc event attributes, one handler per event, switch on the first field
     {
         const auto &options = DefSchema::instance().view_option_attrs();
         std::map<std::string, std::string> option_values; // Coi type -> expression
@@ -606,7 +601,7 @@ void HTMLElement::generate_code(ViewCodegenContext& ctx)
             if (!pe.cases.empty())
             {
                 // switch (static_cast<PointerPhase>(_e.phase)) { case PointerPhase::Down: ... }
-                body += "switch (static_cast<" + pe.spec->phase_enum + ">(_e." + es.fields[0] + ")) { " + pe.cases + "default: break; }";
+                body += "switch ((int)_e." + es.fields[0] + ") { " + pe.cases + "default: break; }";
             }
             if (listened.insert(es.listen).second)
             {

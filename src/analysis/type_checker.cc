@@ -498,16 +498,55 @@ bool is_compatible_type(const std::string &source, const std::string &target)
     return false;
 }
 
-// Top-level functions and the lookup context for calls to them. The context is
-// the module/file/component whose code is being checked.
+// top-level functions and the module/file/component being checked
 static std::vector<const FunctionDef *> g_free_functions;
 static const std::map<std::string, std::set<std::string>> *g_file_imports = nullptr;
 static std::string g_ctx_module;
 static std::string g_ctx_file;
 static const Component *g_ctx_component = nullptr;
+static std::set<std::string> g_component_names;
 
-// A handler method for a schema event: it takes the event's pod, or a prefix of the
-// fields with matching types ("" when fine, else the error)
+static bool is_enum_type(const std::string &t);
+static bool is_data_type(const std::string &t);
+
+static bool is_known_type(std::string t, const std::vector<std::string> &type_params)
+{
+    while (!t.empty() && t.back() == ' ') t.pop_back();
+    if (t.empty() || t.rfind("def", 0) == 0 || t.find("function<") != std::string::npos)
+        return true;
+    if (t.ends_with("[]"))
+        return is_known_type(t.substr(0, t.size() - 2), type_params);
+    if (size_t open = t.rfind('['); open != std::string::npos && t.back() == ']')
+    {
+        std::string inner = t.substr(open + 1, t.size() - open - 2);
+        bool size = !inner.empty() && std::all_of(inner.begin(), inner.end(), ::isdigit);
+        return is_known_type(t.substr(0, open), type_params) && (size || is_known_type(inner, type_params));
+    }
+    if (size_t lt = t.find('<'); lt != std::string::npos)
+        t = t.substr(0, lt);
+    if (std::find(type_params.begin(), type_params.end(), t) != type_params.end())
+        return true;
+    std::string flat = t;
+    for (size_t pos; (pos = flat.find("::")) != std::string::npos;)
+        flat.replace(pos, 2, "_");
+    if (DefSchema::instance().lookup_type(t) || is_enum_type(t) || is_data_type(t) || is_data_type(flat) ||
+        g_component_names.count(t) || g_component_names.count(flat))
+        return true;
+    if (t.size() > 4 && t.ends_with("Meta"))
+        return is_data_type(t.substr(0, t.size() - 4)) || is_data_type(flat.substr(0, flat.size() - 4));
+    return t == "Meta";
+}
+
+static void check_known_type(const std::string &type, const std::vector<std::string> &type_params, int line)
+{
+    if (!is_known_type(type, type_params))
+    {
+        ErrorHandler::type_error("Unknown type '" + type + "'", line);
+        exit(1);
+    }
+}
+
+// handler takes the event pod or a prefix of its fields, "" if ok
 static std::string check_handler_signature(const FunctionDef &handler, const MethodParam &param, const std::string &call_name,
                                            const std::string &event_label, const std::string &pod)
 {
@@ -538,8 +577,7 @@ static const FunctionDef *find_component_method(const std::string &name)
     return nullptr;
 }
 
-// `&handler` for a schema callback param ("def(string,int32):void"): the handler must be
-// a method of the component taking the pod or a prefix of the event's fields.
+// &handler for a schema callback param
 static std::string check_schema_callback(const CallArg &arg, const MethodParam &param, const std::string &call_name,
                                          const std::string &event_label, const std::string &pod = "")
 {
@@ -565,7 +603,7 @@ static const FunctionDef *find_free_function(const std::string &module, const st
     return nullptr;
 }
 
-// Same rule as components: same file, same named module, or directly imported
+// same file, same module, or imported
 static bool is_free_function_accessible(const FunctionDef *fn)
 {
     if (fn->source_file == g_ctx_file)
@@ -578,9 +616,7 @@ static bool is_free_function_accessible(const FunctionDef *fn)
     return it != g_file_imports->end() && it->second.count(fn->source_file) > 0;
 }
 
-// Resolve a call name ("fn" or "Module::fn") to a top-level function. Returns
-// nullptr when the name isn't one (or is shadowed by a component method or a
-// function-typed variable); reports visibility errors.
+// nullptr if not a top-level function or shadowed
 static const FunctionDef *resolve_free_function(const std::string &name,
                                                 const std::map<std::string, std::string> &scope,
                                                 int line)
@@ -677,7 +713,7 @@ static std::string strip_module_prefix(const std::string &type)
     return dcolon == std::string::npos ? type : type.substr(dcolon + 2);
 }
 
-// Check a call against a top-level function's signature; returns its result type
+// returns the result type
 static std::string check_free_function_call(const FunctionDef *fn, FunctionCall *call,
                                             const std::map<std::string, std::string> &scope)
 {
@@ -845,7 +881,7 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                         return normalize_type(method->return_type);
                     }
                 }
-                // Not a variable, enum or pod: the member has to exist on the type
+                // not a variable, enum or pod: must be a member
                 else if (scope.find(id->name) == scope.end() && !is_enum_type(id->name) && !is_data_type(id->name))
                 {
                     std::string known;
@@ -977,6 +1013,8 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
             }
         }
         
+        if (result_type != "unknown" && result_type != "void")
+            match->result_type = result_type;
         return result_type;
     }
 
@@ -1054,8 +1092,7 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                 // Check if obj_name is a valid type with a namespace mapping (e.g., DOMElement -> dom, System -> system)
                 // Also walk the inheritance chain (e.g., Canvas -> DOMElement means check canvas:: then dom::)
                 std::string snake_method = DefSchema::to_snake_case(method_name);
-                // A shared method of the type itself (Image.fromBlob) is a valid static call,
-                // whatever its first param; the name-only lookup below can't tell
+                // Image.fromBlob: shared method on the type itself
                 const MethodDef *own = DefSchema::instance().lookup_method(obj_name, method_name);
                 bool is_valid_schema_call = own && own->is_shared;
                 
@@ -1101,6 +1138,24 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                     ErrorHandler::type_error("Undefined variable '" + obj_name + "' in method call", func->line);
                     exit(1);
                 }
+                if (is_handle && !is_valid_schema_call && !has_static_method &&
+                    !DefSchema::instance().lookup_method(obj_name, method_name))
+                {
+                    std::string known;
+                    std::set<std::string> seen;
+                    for (std::string t = obj_name; !t.empty();)
+                    {
+                        const TypeDef *td = DefSchema::instance().lookup_type(t);
+                        if (!td) break;
+                        for (const auto &m : td->methods)
+                            if (m.is_shared && !m.is_constant && seen.insert(m.name).second)
+                                known += (known.empty() ? "" : ", ") + m.name;
+                        t = td->extends;
+                    }
+                    ErrorHandler::type_error("'" + obj_name + "' has no static method '" + method_name + "'" +
+                                             (known.empty() ? "" : " (available: " + known + ")"), func->line);
+                    exit(1);
+                }
             }
         }
 
@@ -1121,8 +1176,7 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                 }
             }
             
-            // Strings and arrays only have the methods their core defs declare; anything
-            // else would only fail later, in the C++ build
+            // only methods declared in the core defs
             auto builtin_method_error = [&](const std::string &kind) {
                 const TypeDef *td = DefSchema::instance().lookup_type(kind);
                 std::set<std::string> names;
@@ -1178,7 +1232,7 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
             }
         }
 
-        // handle.onEvent(&handler): bind a callback to one of the handle's events
+        // handle.onEvent(&handler)
         if (!obj_name.empty() && scope.count(obj_name))
         {
             std::string obj_type = normalize_type(scope.at(obj_name));
@@ -1206,8 +1260,7 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
             }
         }
 
-        // A bare call to one of the component's own methods (get(0) inside a component
-        // with `def get`) is that method, whatever platform function shares the name
+        // own method wins over a platform function
         if (obj_name.empty() && g_ctx_component)
         {
             for (const auto &m : g_ctx_component->methods)
@@ -1215,7 +1268,7 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                     return m.return_type.empty() ? "void" : normalize_type(m.return_type);
         }
 
-        // Clipboard.onPasteText(&h): register a handler for a page-wide event
+        // Clipboard.onPasteText(&h)
         if (!obj_name.empty() && !scope.count(obj_name))
         {
             if (const MethodDef *ev = DefSchema::instance().lookup_method(obj_name, method_name);
@@ -1237,9 +1290,7 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
             }
         }
 
-        // The method of the receiver's own type first (Idb.open, not pdf::open): names like
-        // open, close and free exist in several namespaces. The name-only index is the
-        // fallback for receivers without a known type.
+        // receiver's own type first, open/close/free exist in several namespaces
         std::string snake_method = DefSchema::to_snake_case(method_name);
         const DefSchema::FuncLookupResult *entry = nullptr;
         DefSchema::FuncLookupResult typed_entry;
@@ -1294,8 +1345,7 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                 }
                 else if (obj_name.find('.') != std::string::npos && scope.count(obj_name.substr(0, obj_name.find('.'))))
                 {
-                    // A chain on a variable (b.servers.size()): a value, not a type name, so a
-                    // schema function that happens to share the method name doesn't apply
+                    // a value, not a type name
                     return "unknown";
                 }
                 else
@@ -1310,8 +1360,7 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                     
                     if (entry->method->is_shared && entry->type_name == obj_name)
                     {
-                        // A shared method of the type itself (Image.fromBlob(blob)), even when
-                        // its first param is another type's handle
+                        // Image.fromBlob(blob)
                         is_valid_call = true;
                     }
                     else if (!entry->method->params.empty() && DefSchema::instance().is_handle(entry->method->params[0].type))
@@ -1372,9 +1421,7 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                 param_offset = 1;
             }
 
-            // Plain values fill the params in order; the rest may have defaults.
-            // Callbacks (`&handler` or `&onX = handler`) bind events of the returned
-            // handle and are matched by name or by order among the callback params.
+            // values fill params in order, callbacks match by name or order
             const auto &params = entry->method->params;
             auto is_callback = [](const MethodParam &p) { return p.type.rfind("def", 0) == 0; };
             size_t value_params = 0, required_values = 0;
@@ -1492,8 +1539,7 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
         // Comparison operators return bool
         if (op == "==" || op == "!=" || op == "<" || op == ">" || op == "<=" || op == ">=")
         {
-            // Two different enums can share numbers (PointerPhase::Down and PointerType::Mouse
-            // are both 0), so comparing them is a mistake even though it would compile
+            // different enums can share values
             std::string ln = normalize_type(l), rn = normalize_type(r);
             if (is_enum_type(ln) && is_enum_type(rn))
             {
@@ -1605,14 +1651,24 @@ static void validate_variant_binding_types(ASTNode *node)
         validate_variant_binding_types(child);
 }
 
-// Type-check one function body. `comp` is the owning component, or nullptr for
-// a top-level function (no state, signals or sibling methods).
+// comp is nullptr for a top-level function
 static void check_function_body(const FunctionDef &method, const Component *comp,
                                 std::map<std::string, std::string> method_scope,
                                 std::set<std::string> mutable_vars,
                                 const std::set<std::string> &component_names,
                                 const std::map<std::string, const Component *> &component_map)
 {
+    // bare Meta only works in a match binding
+    for (const auto &p : method.params)
+    {
+        if (p.type == "Meta")
+        {
+            ErrorHandler::type_error("Parameter '" + p.name + "' of '" + method.name +
+                                     "' is a bare 'Meta': write the pod's meta type, e.g. 'UserMeta'", method.line);
+            exit(1);
+        }
+    }
+
     // Get expected return type for this method
     std::string expected_return = method.return_type.empty() ? "void" : normalize_type(method.return_type);
 
@@ -1756,6 +1812,7 @@ static void check_function_body(const FunctionDef &method, const Component *comp
         }
         else if (auto decl = dynamic_cast<VarDeclaration *>(stmt.get()))
         {
+            check_known_type(decl->type, method.type_params, decl->line);
             std::string type = normalize_type(decl->type);
             
             if (decl->initializer)
@@ -1830,8 +1887,7 @@ static void check_function_body(const FunctionDef &method, const Component *comp
         }
         else if (auto assign = dynamic_cast<Assignment *>(stmt.get()))
         {
-            // A local or parameter declared without mut is const in C++, so `t = 1` and
-            // `t += 1` must be stopped here (component state has its own check)
+            // locals without mut are const
             bool is_state = false;
             if (comp)
             {
@@ -2302,8 +2358,7 @@ static std::string root_identifier(Expression *expr)
     return "";
 }
 
-// A top-level function sees only its params and locals: reject any other name.
-// Also rejects assignments to non-mut params/locals and 'emit'.
+// only params and locals are visible
 static void check_free_function_names(const FunctionDef &fn, const std::set<std::string> &component_names)
 {
     using Scope = std::map<std::string, bool>;  // name -> is mutable
@@ -2354,7 +2409,7 @@ static void check_free_function_names(const FunctionDef &fn, const std::set<std:
                 line = call->line;
             if (call->name.find('.') != std::string::npos)
             {
-                // obj.method(): the receiver must be in scope (types are checked by inference)
+                // receiver must be in scope
                 std::string base = leading_identifier(call->name);
                 if (!base.empty() && std::islower(static_cast<unsigned char>(base[0])))
                     check_name(base, scope, line);
@@ -2380,7 +2435,7 @@ static void check_free_function_names(const FunctionDef &fn, const std::set<std:
         }
         else if (auto *str = dynamic_cast<StringLiteral *>(expr))
         {
-            // `{a.b}` yields "a" and "b"; only the leading name of each part is a variable
+            // only the leading name of each part is a variable
             for (const auto &part : str->parse())
             {
                 if (!part.is_expr)
@@ -2533,6 +2588,9 @@ void validate_types(const std::vector<Component> &components,
 
         component_names.insert(c.name);
         component_map[c.name] = &c;
+        g_component_names.insert(c.name);
+        if (!c.module_name.empty())
+            g_component_names.insert(c.module_name + "_" + c.name);
     }
 
     // Collect all enum type names (for enum <-> int conversion checking)
@@ -2622,6 +2680,17 @@ void validate_types(const std::vector<Component> &components,
         g_ctx_module = comp.module_name;
         g_ctx_file = comp.source_file;
         g_ctx_component = &comp;
+
+        for (const auto &param : comp.params)
+            check_known_type(param->type, {}, comp.line);
+        for (const auto &var : comp.state)
+            check_known_type(var->type, {}, var->line);
+        for (const auto &method : comp.methods)
+        {
+            for (const auto &p : method.params)
+                check_known_type(p.type, method.type_params, method.line);
+            check_known_type(method.return_type, method.type_params, method.line);
+        }
 
         std::map<std::string, std::string> scope;
 
@@ -3290,8 +3359,7 @@ void validate_view_hierarchy(const std::vector<Component> &components,
                 // Check if this is an event handler (starts with "on")
                 bool is_event_handler = attr.name.size() > 2 && attr.name[0] == 'o' && attr.name[1] == 'n';
 
-                // Listener options (pointerflags={PointerFlags.Capture | ...}): a value of
-                // that type, not a string attribute
+                // pointerflags={...}
                 const auto &view_options = DefSchema::instance().view_option_attrs();
                 if (auto opt = view_options.find(attr.name); opt != view_options.end())
                 {
@@ -3302,8 +3370,7 @@ void validate_view_hierarchy(const std::vector<Component> &components,
                     continue;
                 }
 
-                // webcc event attributes (derived from the defs): the handler takes the event's
-                // pod or a prefix of its fields
+                // webcc event attributes
                 const ViewEventAttr *view_event = DefSchema::instance().find_view_event_attr(attr.name);
                 if (is_event_handler && !view_event && attr.name != "onclick" && attr.name != "oninput" &&
                     attr.name != "onchange" && attr.name != "onkeydown")
@@ -3374,6 +3441,25 @@ void validate_view_hierarchy(const std::vector<Component> &components,
                 }
                 else
                 {
+                    // quoted attrs take ${w}, not {w}
+                    if (auto *str = dynamic_cast<StringLiteral *>(attr.value.get()))
+                    {
+                        const std::string &v = str->value;
+                        for (size_t i = 0; i < v.size(); i++)
+                        {
+                            if (v[i] != '{' || (i > 0 && (v[i - 1] == '$' || v[i - 1] == '\\')))
+                                continue;
+                            size_t close = v.find('}', i);
+                            if (close == std::string::npos || close == i + 1)
+                                continue;
+                            std::string inner = v.substr(i + 1, close - i - 1);
+                            bool looks_like_expr = std::isalpha((unsigned char)inner[0]) || inner[0] == '_';
+                            if (!looks_like_expr)
+                                continue;
+                            throw std::runtime_error("Attribute '" + attr.name + "' has '{" + inner + "}', which stays text: use '${" + inner +
+                                                     "}' for a value inside a quoted attribute at line " + std::to_string(el->line));
+                        }
+                    }
                     // Non-event attributes must be strings
                     std::string attr_type = normalize_type(infer_expression_type(attr.value.get(), scope));
                     if (attr_type != "string" && attr_type != "unknown")
@@ -3593,7 +3679,7 @@ void validate_type_imports(const std::vector<Component> &components,
                                   const std::string& type_source_file) -> bool {
         // Same file - always accessible
         if (user_file == type_source_file) return true;
-        // Platform types (enums from the web defs) have no source file
+        // platform enums have no source file
         if (type_source_file.empty()) return true;
         
         // Directly imported

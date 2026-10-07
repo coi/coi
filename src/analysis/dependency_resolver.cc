@@ -52,6 +52,19 @@ void collect_component_deps(ASTNode *node, std::set<std::string> &deps)
     }
 }
 
+// component types used in method bodies
+static void collect_body_component_types(ASTNode *node, std::set<std::string> &types)
+{
+    if (!node)
+        return;
+    if (auto *decl = dynamic_cast<VarDeclaration *>(node))
+        types.insert(decl->type);
+    if (auto *ctor = dynamic_cast<ComponentConstruction *>(node))
+        types.insert(ctor->component_name);
+    for (ASTNode *child : node->get_child_nodes())
+        collect_body_component_types(child, types);
+}
+
 // Extract base type name from array types (e.g., "Ball[]" -> "Ball")
 static std::string extract_base_type_name(const std::string &type)
 {
@@ -127,6 +140,23 @@ std::vector<Component *> topological_sort_components(std::vector<Component> &com
             if (comp_map.count(base_type))
             {
                 deps.insert(base_type);
+            }
+        }
+        {
+            std::set<std::string> body_types;
+            for (const auto &method : comp.methods)
+                for (const auto &stmt : method.body)
+                    collect_body_component_types(stmt.get(), body_types);
+            for (std::string base_type : body_types)
+            {
+                base_type = extract_base_type_name(base_type);
+                size_t dcolon = base_type.find("::");
+                if (dcolon != std::string::npos)
+                    base_type = base_type.substr(0, dcolon) + "_" + base_type.substr(dcolon + 2);
+                if (!comp_map.count(base_type))
+                    base_type = qualified_name(comp.module_name, base_type);
+                if (comp_map.count(base_type) && base_type != comp_qname)
+                    deps.insert(base_type);
             }
         }
         dependencies[comp_qname] = deps;

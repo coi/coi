@@ -276,7 +276,7 @@ component AnimatedBall {
     }
     
     view {
-        <div style="left: {x}px;"></div>
+        <div style="left: ${x}px;"></div>
     }
 }
 ```
@@ -314,7 +314,7 @@ component Fade {
     }
 
     view {
-        <button onclick={start} style="opacity: {alpha};">Fade</button>
+        <button onclick={start} style="opacity: ${alpha};">Fade</button>
     }
 }
 ```

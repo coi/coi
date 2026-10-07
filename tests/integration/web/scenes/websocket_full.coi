@@ -1,5 +1,4 @@
-// WebSocket against a real server (started by the test, its address in ?ws=): subprotocol
-// negotiation, text and binary both ways, state getters, and a close with code and reason.
+// websocket against a real server, address in ?ws=
 component WebSocketFull {
     mut WebSocket ws;
     mut string opened = "-";

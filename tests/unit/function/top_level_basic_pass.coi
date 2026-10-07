@@ -1,4 +1,4 @@
-// Test: top-level function called from a component - should pass
+// Test: top-level function call
 pod Vec2 { float x; float y; }
 
 def len2(Vec2 v) : float {

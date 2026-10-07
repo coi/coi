@@ -148,7 +148,7 @@ component ProgressBar {
         <div class="progress-container">
             <div 
                 class="progress-bar"
-                style="width: {progress}%; background: {color};"
+                style="width: ${progress}%; background: ${color};"
             ></div>
         </div>
     }

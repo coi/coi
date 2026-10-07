@@ -1,4 +1,4 @@
-// Test: a mut local can be assigned and compound-assigned, also in nested blocks
+// Test: assign to mut local
 component LocalAssignMutPass {
     mut int[] xs;
     mut int out = 0;

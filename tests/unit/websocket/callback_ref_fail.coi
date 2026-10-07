@@ -1,4 +1,4 @@
-// Test: a callback argument needs the & prefix
+// Test: callback without &
 component CallbackRefFail {
     mut WebSocket ws;
     def onMsg(string m) : void {}

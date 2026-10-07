@@ -1,5 +1,4 @@
-// Test: a handler can take an event's fields as one pod, bound after creation or as a
-// callback on the call that creates the handle
+// Test: event pod handlers
 component EventPodPass {
     mut Canvas surface;
     mut WebSocket ws;

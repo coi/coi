@@ -1,4 +1,4 @@
-// Test: wrong number of arguments to a top-level function - should fail
+// Test: wrong arg count
 def add(int a, int b) : int {
     return a + b;
 }

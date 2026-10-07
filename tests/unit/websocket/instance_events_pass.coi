@@ -1,5 +1,4 @@
-// Test: callbacks on a handle after creation, positional callbacks, and handlers
-// that take fewer parameters than the event has (CLOSE has code, reason, was_clean)
+// Test: instance and positional callbacks
 component InstanceEventsPass {
     mut WebSocket ws;
     mut string last = "";

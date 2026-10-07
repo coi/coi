@@ -1,6 +1,4 @@
-// View event attributes generated from the defs: a drag on a canvas (down, moves, up
-// with the element's own pointerflags), focus and blur on an input, a pointer handler in
-// a loop item, and one inside an if region that is toggled off and back on.
+// view event attributes: drag, focus/blur, loop item, if region
 component ViewEventAttrs {
     mut string drag = "-";
     mut int moves = 0;

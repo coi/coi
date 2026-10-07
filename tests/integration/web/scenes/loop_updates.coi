@@ -1,0 +1,36 @@
+// pop, two loops over one array, component array assigned inside an open <if>
+component Chip(pub string label) {
+    view { <span class="chip">{label}</span> }
+}
+
+component LoopUpdates {
+    mut string[] words = ["a", "b", "c"];
+    mut Chip[] chips;
+    mut bool open = true;
+    mut int next = 0;
+
+    def pop() : void { words.pop(); }
+    def push() : void { next++; words.push(`n${next}`); }
+    def replace() : void { words = ["x", "y"]; }
+    def setChips() : void { chips = [Chip("one"), Chip("two"), Chip("three")]; }
+    def toggle() : void { open = !open; }
+
+    view {
+        <div>
+            <button class="pop" onclick={pop}>pop</button>
+            <button class="push" onclick={push}>push</button>
+            <button class="replace" onclick={replace}>replace</button>
+            <button class="chips" onclick={setChips}>chips</button>
+            <button class="toggle" onclick={toggle}>toggle</button>
+            <p class="first"><for w in words key={w}><i>{w}</i></for></p>
+            <p class="second"><for w in words key={w}><b>{w}</b></for></p>
+            <if open>
+                <div class="chipbox">
+                    <for c in chips key={c.label}><{c} /></for>
+                </div>
+            </if>
+        </div>
+    }
+}
+
+app { root = LoopUpdates; }

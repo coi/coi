@@ -96,14 +96,13 @@ struct AppConfig {
     // Deploy base, emitted as <base href>. Set to a subpath (e.g. "/coi/") for
     // subpath deploys like GitHub project pages.
     std::string base = "/";
-    // app { tick = demand; }: no frame loop. tick runs once per frame the app
-    // asked for (an event arrived or System.requestFrame() was called).
+    // tick = demand: tick only on requested frames
     bool tick_on_demand = false;
-    // app { pwa = true; }: manifest.webmanifest + sw.js for offline use and install
+    // manifest + service worker
     bool pwa = false;
-    // Path in the output dir (e.g. "assets/icon.png"): favicon and manifest icon
+    // favicon and manifest icon, relative to the output dir
     std::string icon;
-    // CSS color for the browser UI (theme-color, manifest theme/background)
+    // theme-color
     std::string theme;
 };
 
@@ -124,6 +123,9 @@ struct EventSpec
 };
 
 const std::vector<EventSpec> &get_event_specs();
+
+// "" if the type isn't a component
+std::string resolve_component_qname(const CompilerSession &session, const std::string &module_name, std::string name);
 const EventSpec *find_event_spec(const std::string &event_type);
 bool has_event_mask(const EventMasks &masks, const std::string &event_type);
 bool event_mask_test(const EventMasks &masks, const std::string &event_type, int element_id);
