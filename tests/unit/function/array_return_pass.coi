@@ -1,0 +1,16 @@
+// Test: methods and top-level functions can return arrays and maps
+def doubled(int[] xs) : int[] {
+    mut int[] out;
+    for x in xs { out.push(x * 2); }
+    return out;
+}
+
+component App {
+    mut int n = 0;
+    def names() : string[] { return ["a", "b"]; }
+    def counts() : int[string] { mut int[string] m; m["a"] = 1; return m; }
+    init { n = names().size() + doubled([1, 2, 3]).size() + counts().size(); }
+    view { <p>{n}</p> }
+}
+
+app { root = App; }

@@ -102,6 +102,23 @@ struct IfStatement : Statement {
     std::vector<ASTNode*> get_child_nodes() override { return {condition.get(), then_branch.get(), else_branch.get()}; }
 };
 
+struct WhileStatement : Statement {
+    std::unique_ptr<Expression> condition;
+    std::unique_ptr<Statement> body;
+
+    std::string to_webcc() override;
+    void collect_dependencies(std::set<std::string>& deps) override;
+    std::vector<ASTNode*> get_child_nodes() override { return {condition.get(), body.get()}; }
+};
+
+struct BreakStatement : Statement {
+    std::string to_webcc() override { return "break;"; }
+};
+
+struct ContinueStatement : Statement {
+    std::string to_webcc() override { return "continue;"; }
+};
+
 struct ForRangeStatement : Statement {
     std::string var_name;
     std::unique_ptr<Expression> start;

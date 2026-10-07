@@ -28,12 +28,7 @@ std::string HandleBlock::wrap(const std::string& code) const
 
 // Helper to map Coi types to C++ types for lambda params
 static std::string coi_type_to_cpp(const std::string& type) {
-    if (type == "int" || type == "int32") return "int32_t";
-    if (type == "float" || type == "float64") return "double";
-    if (type == "float32") return "float";
-    if (type == "bool") return "bool";
-    if (type == "string") return "coi::string";
-    return "int32_t";  // default
+    return convert_type(type);
 }
 
 // Helper to build lambda parameter list from callback param types

@@ -1,0 +1,17 @@
+// Test: a callback prop taking a pod or an array
+pod Settings { float a; bool b; }
+
+component Panel(Settings s, def onChange(Settings) : void, def onList(int[]) : void) {
+    def bump() : void { mut Settings n = s; n.a += 1.0; onChange(n); onList([1, 2]); }
+    view { <button onclick={bump}>{s.a}</button> }
+}
+
+component App {
+    mut Settings s = Settings{a = 1.0, b = true};
+    mut int n = 0;
+    def changed(Settings v) : void { s = v; }
+    def list(int[] xs) : void { n = xs.size(); }
+    view { <div><Panel s={s} &onChange={changed} &onList={list} /><p>{n}</p></div> }
+}
+
+app { root = App; }

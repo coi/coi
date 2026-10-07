@@ -1401,9 +1401,14 @@ FunctionDef Parser::parse_function_def(bool is_public)
     }
     expect(TokenType::COLON, "Expected ':' for return type");
 
-    // Single return type
+    // Single return type, Point[] and int[string] included
     func.return_type = current().value;
     advance();
+    if (current().type == TokenType::LBRACKET)
+    {
+        advance();
+        func.return_type += parse_type_bracket_suffix();
+    }
     expect(TokenType::LBRACE, "Expected '{'");
 
     while (current().type != TokenType::RBRACE)

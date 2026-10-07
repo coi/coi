@@ -334,6 +334,7 @@ string d = match (p) {
 
 // Loops
 for i in 0:10 { sum += i; }     // range [0, 10) -> 0..9 (end exclusive)
+while (i >= 0) { if (done) break; i--; }   // break and continue work in every loop
 for score in scores { total += score; }   // foreach over array
 for key in someMap { }          // foreach over map keys
 ```

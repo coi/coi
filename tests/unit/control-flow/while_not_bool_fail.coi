@@ -1,0 +1,8 @@
+// Test: while needs a bool
+component App {
+    mut int n = 3;
+    init { while (n) { n--; } }
+    view { <p>{n}</p> }
+}
+
+app { root = App; }

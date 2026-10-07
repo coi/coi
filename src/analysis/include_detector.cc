@@ -154,6 +154,11 @@ static void collect_types_from_stmt(Statement *stmt, std::set<std::string> &type
         collect_types_from_stmt(if_stmt->then_branch.get(), types);
         collect_types_from_stmt(if_stmt->else_branch.get(), types);
     }
+    else if (auto *while_stmt = dynamic_cast<WhileStatement *>(stmt))
+    {
+        collect_types_from_expr(while_stmt->condition.get(), types);
+        collect_types_from_stmt(while_stmt->body.get(), types);
+    }
     else if (auto *for_stmt = dynamic_cast<ForRangeStatement *>(stmt))
     {
         collect_types_from_expr(for_stmt->start.get(), types);

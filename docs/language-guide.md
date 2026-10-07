@@ -867,7 +867,16 @@ for i in 0:10 {
 for score in scores {
     total += score;
 }
+
+// While: when the count isn't known up front
+mut int i = items.size() - 1;
+while (i >= 0) {
+    if (items[i].done) break;
+    i--;
+}
 ```
+
+`break` leaves the loop, `continue` skips to the next round. Prefer `for` when there is a counter or an array: it can't forget the increment.
 
 ## Operators
 

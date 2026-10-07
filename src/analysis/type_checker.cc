@@ -2135,6 +2135,18 @@ static void check_function_body(const FunctionDef &method, const Component *comp
             if (if_stmt->else_branch)
                 check_stmt(if_stmt->else_branch, current_scope);
         }
+        else if (auto while_stmt = dynamic_cast<WhileStatement *>(stmt.get()))
+        {
+            check_moved_use(while_stmt->condition.get(), while_stmt->line);
+            std::string cond_type = normalize_type(infer_expression_type(while_stmt->condition.get(), current_scope));
+            if (cond_type != "unknown" && cond_type != "bool")
+            {
+                ErrorHandler::type_error("while needs a bool condition, got '" + cond_type + "'", while_stmt->line);
+                exit(1);
+            }
+            std::map<std::string, std::string> loop_scope = current_scope;
+            check_stmt(while_stmt->body, loop_scope);
+        }
         else if (auto for_range = dynamic_cast<ForRangeStatement *>(stmt.get()))
         {
             // Check range expressions for use of moved variables
@@ -2167,6 +2179,8 @@ static void check_function_body(const FunctionDef &method, const Component *comp
             else if (iterable_type.ends_with("[]"))
             {
                 loop_scope[for_each->var_name] = iterable_type.substr(0, iterable_type.length() - 2);
+                if (auto *lit = dynamic_cast<ArrayLiteral *>(for_each->iterable.get()))
+                    lit->element_type = iterable_type.substr(0, iterable_type.length() - 2);
             }
             else
             {
@@ -2664,6 +2678,12 @@ static void check_free_function_names(const FunctionDef &fn, const std::set<std:
         {
             ErrorHandler::type_error("'emit' is only allowed inside a component (function '" + fn.name + "')", line);
             exit(1);
+        }
+        else if (auto *while_stmt = dynamic_cast<WhileStatement *>(stmt))
+        {
+            check_expr(while_stmt->condition.get(), scope, line);
+            Scope inner = scope;
+            check_stmt(while_stmt->body.get(), inner);
         }
         else if (auto *for_range = dynamic_cast<ForRangeStatement *>(stmt))
         {

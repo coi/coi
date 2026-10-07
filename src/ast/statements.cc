@@ -584,6 +584,17 @@ void IfStatement::collect_dependencies(std::set<std::string> &deps)
         else_branch->collect_dependencies(deps);
 }
 
+std::string WhileStatement::to_webcc()
+{
+    return "while(" + strip_outer_parens(condition->to_webcc()) + ") " + body->to_webcc();
+}
+
+void WhileStatement::collect_dependencies(std::set<std::string> &deps)
+{
+    condition->collect_dependencies(deps);
+    body->collect_dependencies(deps);
+}
+
 std::string ForRangeStatement::to_webcc()
 {
     std::string code = "for(int " + var_name + " = " + start->to_webcc() + "; ";
@@ -602,7 +613,11 @@ void ForRangeStatement::collect_dependencies(std::set<std::string> &deps)
 
 std::string ForEachStatement::to_webcc()
 {
-    std::string code = "for(auto& " + var_name + " : " + iterable->to_webcc() + ") ";
+    std::string over = iterable->to_webcc();
+    // for c in ["a", "b"]: a brace list needs a type to loop over
+    if (auto *lit = dynamic_cast<ArrayLiteral *>(iterable.get()); lit && !lit->element_type.empty())
+        over = "coi::vector<" + convert_type(lit->element_type) + ">" + over;
+    std::string code = "for(auto& " + var_name + " : " + over + ") ";
     code += body->to_webcc();
     return code;
 }

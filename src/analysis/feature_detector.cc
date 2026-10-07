@@ -181,6 +181,22 @@ FeatureFlags detect_features(const std::vector<Component> &components,
             for (auto &s : block->statements)
                 scan_stmt(s.get());
         }
+        else if (auto *w = dynamic_cast<WhileStatement *>(stmt))
+        {
+            scan_expr(w->condition.get());
+            scan_stmt(w->body.get());
+        }
+        else if (auto *fr = dynamic_cast<ForRangeStatement *>(stmt))
+        {
+            scan_expr(fr->start.get());
+            scan_expr(fr->end.get());
+            scan_stmt(fr->body.get());
+        }
+        else if (auto *fe = dynamic_cast<ForEachStatement *>(stmt))
+        {
+            scan_expr(fe->iterable.get());
+            scan_stmt(fe->body.get());
+        }
         else if (auto *ret = dynamic_cast<ReturnStatement *>(stmt))
         {
             scan_expr(ret->value.get());

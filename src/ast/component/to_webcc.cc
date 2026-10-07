@@ -1427,7 +1427,7 @@ std::string Component::to_webcc(CompilerSession &session)
     for (const auto &param : params)
     {
         const std::string &v = param->name;
-        ss << "    void _refresh_" << v << "() {";
+        ss << "    void _refresh_" << v << "() { if (!_coi_alive) return;";
         if (generated_updaters.count(v))
             ss << " _update_" << v << "();";
         for (int if_id : var_to_if_ids[v])

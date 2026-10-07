@@ -1,0 +1,14 @@
+// Test: while, break and continue
+component App {
+    mut int n = 0;
+    mut string s = "";
+    init {
+        mut int i = 10;
+        while (i > 0) { i--; if (i == 7) continue; if (i == 2) break; n += i; }
+        for k in 0:5 { if (k == 3) break; s += `${k}`; }
+        for c in ["a", "b", "c"] { if (c == "b") continue; s += c; }
+    }
+    view { <p>{n} {s}</p> }
+}
+
+app { root = App; }

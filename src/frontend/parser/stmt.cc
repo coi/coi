@@ -36,6 +36,30 @@ std::unique_ptr<Statement> Parser::parse_statement()
         return ifStmt;
     }
 
+    if (current().type == TokenType::WHILE)
+    {
+        int line = current().line;
+        advance();
+        expect(TokenType::LPAREN, "Expected '(' after while");
+        auto w = std::make_unique<WhileStatement>();
+        w->line = line;
+        w->condition = parse_expression();
+        expect(TokenType::RPAREN, "Expected ')'");
+        w->body = parse_statement();
+        return w;
+    }
+    if (current().type == TokenType::BREAK || current().type == TokenType::CONTINUE)
+    {
+        bool is_break = current().type == TokenType::BREAK;
+        int line = current().line;
+        advance();
+        expect(TokenType::SEMICOLON, "Expected ';'");
+        std::unique_ptr<Statement> s = is_break ? std::unique_ptr<Statement>(std::make_unique<BreakStatement>())
+                                                : std::unique_ptr<Statement>(std::make_unique<ContinueStatement>());
+        s->line = line;
+        return s;
+    }
+
     // For (three syntaxes: traditional, range-based, and foreach)
     if (current().type == TokenType::FOR)
     {
