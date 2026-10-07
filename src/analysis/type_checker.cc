@@ -1160,6 +1160,15 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
             }
         }
 
+        // A bare call to one of the component's own methods (get(0) inside a component
+        // with `def get`) is that method, whatever platform function shares the name
+        if (obj_name.empty() && g_ctx_component)
+        {
+            for (const auto &m : g_ctx_component->methods)
+                if (m.name == method_name)
+                    return m.return_type.empty() ? "void" : normalize_type(m.return_type);
+        }
+
         std::string snake_method = DefSchema::to_snake_case(method_name);
         const auto *entry = DefSchema::instance().lookup_func(snake_method);
 
@@ -1193,6 +1202,12 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                     {
                         return "unknown";
                     }
+                }
+                else if (obj_name.find('.') != std::string::npos && scope.count(obj_name.substr(0, obj_name.find('.'))))
+                {
+                    // A chain on a variable (b.servers.size()): a value, not a type name, so a
+                    // schema function that happens to share the method name doesn't apply
+                    return "unknown";
                 }
                 else
                 {

@@ -787,6 +787,9 @@ mount { ws = WebSocket.connect("wss://host", &onMessage = onMsg, &onOpen = onOpe
 // Platform flags (ints, combine with | and test with &): PointerFlags.Capture | PointerFlags.NoScroll, Buttons.Primary, Mods.Ctrl
 // Comparing two different enums is a compile error. surface.addPointerListener(flags); surface.onPointer(&h)
 // h: def h(PointerPhase phase, int id, PointerType type, Buttons buttons, float x, float y, ...) : void
+// Bytes are uint8[]. IndexedDB: db = Idb.open("name", &opened); db.put(key, bytes, &onDone = h, &onError = e);
+//   db.get(key, &got, &err) with def got(Blob value, uint8 found); value.take() -> uint8[]; db.keys(prefix, &onKeys = h)
+// Blob: Blob.create(bytes), b.size(), b.read(), b.take() (reads and frees), b.free(). ws.onBinaryMessage(&h) with def h(uint8[] data)
 ```
 
 ### Json (type-safe parsing against a pod schema)

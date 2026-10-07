@@ -1,0 +1,38 @@
+// Test: uint8[] crosses into webcc (put, Blob.create, sendBinary-like params) and
+// back (Blob.read/take, binary message fields); idb results arrive on the request
+component BytesIdbPass {
+    mut Database db;
+    mut WebSocket ws;
+    mut int total = 0;
+    mut string keyList = "";
+
+    def opened(uint8 ok) : void {
+        uint8[] data = [1, 2, 3, 250];
+        db.put("note/a", data, &onError = failed);
+        db.get("note/a", &gotValue, &failed);
+        db.keys("note/", &onKeys = gotKeys);
+    }
+
+    def gotValue(Blob value, uint8 found) : void {
+        if (found == 0) return;
+        uint8[] bytes = value.take();
+        for b in bytes { total += b; }
+    }
+
+    def gotKeys(string keys) : void { keyList = keys; }
+    def failed(string message) : void { keyList = message; }
+    def binary(uint8[] data) : void { total = data.size(); }
+
+    mount {
+        db = Idb.open("tests", &opened);
+        Blob copy = Blob.create([9, 8, 7]);
+        total = copy.size();
+        copy.free();
+        ws = WebSocket.connect("ws://localhost:1/");
+        ws.onBinaryMessage(&binary);
+    }
+
+    view { <p>{total} {keyList}</p> }
+}
+
+app { root = BytesIdbPass; }

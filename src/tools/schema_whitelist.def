@@ -147,6 +147,23 @@ draw_arrays
 @inline("webcc::canvas::get_context_2d(${this})") def getContext2d(): CanvasContext2D
 @inline("webcc::canvas::get_context_2d(${this}, webcc::canvas::ContextFlags((${0} ? 1 : 0) | (${1} ? 2 : 0)))") def getContext2d(bool lowLatency, bool opaque): CanvasContext2D
 
+[blob]
+# Bytes held on the JS side (an IndexedDB value, a pasted image): read() keeps them, take() frees
+create
+size
+read
+take
+free
+
+[idb]
+# Key-value storage: string keys, uint8[] values. Results arrive on the returned request
+open +events
+put +events(DONE, ERROR)
+get +events(VALUE, ERROR)
+remove +events(DONE, ERROR)
+keys +events(KEYS, ERROR)
+close
+
 [websocket]
 # An owned socket member is closed when its component is destroyed
 @cleanup("websocket::close")

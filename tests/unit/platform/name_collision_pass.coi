@@ -1,0 +1,36 @@
+// Test: user methods and array calls that share names with whitelisted platform
+// functions (blob size/read/take/free, idb get/put/keys/remove/close) stay the user's
+pod Shelf { string name; string[] books; }
+
+component Store {
+    mut string[] items;
+    mut Shelf shelf;
+    mut int count = 0;
+
+    pub def get(int i) : string { return items[i]; }
+    pub def put(string s) : void { items.push(s); }
+    pub def keys() : int { return items.size(); }
+    pub def remove() : void { items.clear(); }
+    pub def close() : void { count = 0; }
+    pub def read() : int { return shelf.books.size(); }
+    pub def take() : string { return get(0); }
+    pub def free() : void { remove(); }
+    pub def size() : int { return items.size() + shelf.books.size(); }
+}
+
+component NameCollisionPass {
+    mut Store store;
+    mut int n = 0;
+
+    def run() : void {
+        store.put("a");
+        n = store.size() + store.keys() + store.read();
+        string first = store.get(0);
+        store.close();
+        store.free();
+    }
+
+    view { <button onclick={run}>{n}</button> }
+}
+
+app { root = NameCollisionPass; }

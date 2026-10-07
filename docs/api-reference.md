@@ -891,6 +891,47 @@ component Chat {
 }
 ```
 
+## Storage (IndexedDB)
+
+A key-value store that survives reloads: string keys, `uint8[]` values, no practical size limit. Results arrive on the request each call returns, so pass the callbacks to the call.
+
+```tsx
+component Notebook {
+    mut Database db;
+    mut string status = "";
+
+    def opened(uint8 ok) : void {
+        db.put("page/1", encodePage(), &onError = failed);
+        db.get("page/1", &loaded, &failed);
+    }
+
+    def loaded(Blob value, uint8 found) : void {
+        if (found == 0) return;          // no such key
+        uint8[] bytes = value.take();    // take() reads and releases the blob
+        decodePage(bytes);
+    }
+
+    def failed(string message) : void { status = message; }
+
+    mount { db = Idb.open("notes", &opened); }
+}
+```
+
+| Call | Result events |
+|------|---------------|
+| `Idb.open(name, &onOpened)` | `onOpened(uint8 ok)` |
+| `db.put(key, bytes, &onDone, &onError)` | done once the write is committed |
+| `db.get(key, &onValue, &onError)` | `onValue(Blob value, uint8 found)`; `found` is 0 for a missing key |
+| `db.remove(key, &onDone, &onError)` | done also when the key didn't exist |
+| `db.keys(prefix, &onKeys, &onError)` | `onKeys(string keys)`: sorted, one per line |
+| `db.close()` | |
+
+Calls made before `onOpened` wait for the database, and calls on one database run in order.
+
+## Blob
+
+Bytes held by the browser until you ask for them: an IndexedDB value, a pasted or dropped file. `Blob.create(bytes)` makes one, `size()` tells its length, `read()` copies the bytes out, `take()` copies them out and releases the blob, `free()` releases it without reading.
+
 ## Events on handles
 
 Every browser object Coi hands you (`WebSocket`, `FetchRequest`, `Image`, a `Canvas` or any `DOMElement`...) is a *handle*, and the events the browser sends for it are methods named `on<Event>` on that handle type. They come straight from the platform schema, so a new API's events are available the moment the API is.

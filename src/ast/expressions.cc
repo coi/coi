@@ -78,6 +78,8 @@ static std::string expand_inline_template_raw(const std::string& tmpl, const std
 
 // Forward declaration for transform_embedded_expression
 static std::string transform_embedded_expression(const std::string& expr);
+static std::string to_webcc_arg(const std::string& code, const std::string& coi_type);
+static std::string from_webcc_value(const std::string& code, const std::string& coi_type);
 
 // Helper to parse raw argument strings from a method call expression
 // e.g., "arg1, arg2" -> ["arg1", "arg2"]
@@ -162,6 +164,28 @@ static std::string transform_embedded_expression(const std::string& expr) {
     // Parse arguments
     std::vector<std::string> raw_args = parse_raw_args(args_str);
     
+    // A handle's own methods come first: blob.size() is not an array's length.
+    // @inline expands; @map calls webcc with the handle as first argument.
+    std::string obj_type = ComponentTypeContext::instance().get_symbol_type(obj);
+    if (!obj_type.empty()) {
+        obj_type = ComponentTypeContext::instance().resolve(obj_type);
+        obj_type = DefSchema::instance().resolve_alias(obj_type);
+
+        if (auto* method_def = DefSchema::instance().lookup_method(obj_type, method, raw_args.size())) {
+            if (method_def->mapping_type == MappingType::Inline) {
+                return expand_inline_template_raw(method_def->mapping_value, obj, raw_args) + suffix;
+            }
+            if (method_def->mapping_type == MappingType::Map && !method_def->is_shared && DefSchema::instance().is_handle(obj_type)) {
+                std::string call = "webcc::" + method_def->mapping_value + "(" + obj;
+                for (size_t i = 0; i < raw_args.size(); i++) {
+                    std::string a = raw_args[i];
+                    call += ", " + (i < method_def->params.size() ? to_webcc_arg(a, method_def->params[i].type) : a);
+                }
+                return from_webcc_value(call + ")", method_def->return_type) + suffix;
+            }
+        }
+    }
+
     // Try to find @inline method in DefSchema
     // First check string methods
     if (auto* method_def = DefSchema::instance().lookup_method("string", method, raw_args.size())) {
@@ -178,11 +202,7 @@ static std::string transform_embedded_expression(const std::string& expr) {
     }
     
     // Check WebSocket and other typed methods by resolving symbol type
-    std::string obj_type = ComponentTypeContext::instance().get_symbol_type(obj);
     if (!obj_type.empty()) {
-        obj_type = ComponentTypeContext::instance().resolve(obj_type);
-        obj_type = DefSchema::instance().resolve_alias(obj_type);
-        
         if (auto* method_def = DefSchema::instance().lookup_method(obj_type, method, raw_args.size())) {
             if (method_def->mapping_type == MappingType::Inline) {
                 return expand_inline_template_raw(method_def->mapping_value, obj, raw_args) + suffix;
@@ -466,6 +486,9 @@ std::string FunctionCall::args_to_string() {
 
 // A value of a platform enum or flags type goes to webcc as its enum class
 static std::string to_webcc_arg(const std::string& code, const std::string& coi_type) {
+    // An array literal is a bare {a, b} in C++: give it its vector type
+    if (coi_type.ends_with("[]") && !code.empty() && code[0] == '{')
+        return "coi::vector<" + convert_type(coi_type.substr(0, coi_type.size() - 2)) + ">" + code;
     std::string cpp = DefSchema::instance().webcc_cast_type(coi_type);
     return cpp.empty() ? code : "static_cast<" + cpp + ">(" + code + ")";
 }
@@ -534,6 +557,7 @@ static std::string generate_event_registration(const MethodDef& event_method, co
         if (i) code += ", ";
         std::string ft = i < (int)field_types.size() ? field_types[i] : "";
         if (ft == "string") code += "coi::string(_e." + spec.fields[i] + ")";
+        else if (ft == "uint8[]") code += "coi_bytes(_e." + spec.fields[i] + ")"; // a view into the event buffer
         else code += from_webcc_value("_e." + spec.fields[i], ft);
     }
     code += "); }, this)";
@@ -621,19 +645,24 @@ std::string FunctionCall::to_webcc() {
             }
         }
 
-        // Check for builtin type instance methods (string, array)
-        // For string methods, we need to check against the "string" type
-        // Use arg_count to find the correct overload
-        if (auto* method_def = DefSchema::instance().lookup_method("string", method, args.size())) {
-            if (method_def->mapping_type == MappingType::Inline) {
-                return expand_inline_template(method_def->mapping_value, resolved_receiver, args);
+        // Check for builtin type instance methods (string, array). Not for a handle
+        // receiver: blob.size() is the handle's own method, not an array's length.
+        std::string receiver_type = ComponentTypeContext::instance().get_symbol_type(type_or_obj);
+        bool handle_receiver = !receiver_type.empty() && DefSchema::instance().is_handle(DefSchema::instance().resolve_alias(receiver_type));
+        if (!handle_receiver) {
+            // For string methods, we need to check against the "string" type
+            // Use arg_count to find the correct overload
+            if (auto* method_def = DefSchema::instance().lookup_method("string", method, args.size())) {
+                if (method_def->mapping_type == MappingType::Inline) {
+                    return expand_inline_template(method_def->mapping_value, resolved_receiver, args);
+                }
             }
-        }
 
-        // Check array methods
-        if (auto* method_def = DefSchema::instance().lookup_method("array", method, args.size())) {
-            if (method_def->mapping_type == MappingType::Inline) {
-                return expand_inline_template(method_def->mapping_value, resolved_receiver, args);
+            // Check array methods
+            if (auto* method_def = DefSchema::instance().lookup_method("array", method, args.size())) {
+                if (method_def->mapping_type == MappingType::Inline) {
+                    return expand_inline_template(method_def->mapping_value, resolved_receiver, args);
+                }
             }
         }
     }

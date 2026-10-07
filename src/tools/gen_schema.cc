@@ -162,23 +162,33 @@ std::string to_pascal_case(const std::string &upper_snake)
     return out;
 }
 
-// Events of a handle type that Coi can bind a callback to. Skipped: the four dom events
-// the view syntax handles (onclick= etc.), and events with a bytes field until bytes is
-// mapped to a Coi type.
+// Namespace whose commands create or act on a handle type (Blob -> blob)
+std::string handle_namespace(const webcc::SchemaDefs &defs, const std::string &handle_type)
+{
+    for (const auto &c : defs.commands)
+        if (c.return_handle_type == handle_type)
+            return c.ns;
+    for (const auto &c : defs.commands)
+        if (!c.params.empty() && c.params[0].handle_type == handle_type)
+            return c.ns;
+    return "";
+}
+
+// Events of a handle type that Coi can bind a callback to: the first field is the handle
+// and the event comes from the handle's own namespace. An event that only carries a
+// handle as data (clipboard PASTE_IMAGE hands over a new Blob) isn't an event of it.
+// Skipped: the four dom events the view syntax handles (onclick= etc.).
 std::vector<const webcc::SchemaEvent *> bindable_events(const webcc::SchemaDefs &defs, const std::string &handle_type)
 {
     std::vector<const webcc::SchemaEvent *> out;
+    std::string ns = handle_namespace(defs, handle_type);
     for (const auto &e : defs.events)
     {
         if (e.params.empty() || e.params[0].type != "handle" || e.params[0].handle_type != handle_type)
             continue;
-        if (e.ns == "dom" && (e.name == "CLICK" || e.name == "INPUT" || e.name == "CHANGE" || e.name == "KEYDOWN"))
+        if (e.ns != ns)
             continue;
-        bool has_bytes = false;
-        for (const auto &p : e.params)
-            if (p.type == "bytes")
-                has_bytes = true;
-        if (has_bytes)
+        if (e.ns == "dom" && (e.name == "CLICK" || e.name == "INPUT" || e.name == "CHANGE" || e.name == "KEYDOWN"))
             continue;
         out.push_back(&e);
     }
@@ -356,6 +366,8 @@ std::string to_coi_type(const std::string &type, const std::string &handle_type,
         return "string";
     if (type == "bool")
         return "bool";
+    if (type == "bytes")
+        return "uint8[]"; // webcc::bytes_view in, webcc::vector<uint8_t> out: both coi::vector<uint8_t>
     if (type == "func_ptr")
         return "func"; // Special case
     return type;

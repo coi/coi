@@ -53,6 +53,15 @@ void generate_cpp_code(
     out << "using string = webcc::string;\n";
     out << "using string_view = webcc::string_view;\n";
     out << "template<typename T> using vector = webcc::vector<T>;\n";
+    out << "}\n";
+    // Event fields with bytes point into the event buffer, valid until the next poll:
+    // a callback gets its own copy
+    out << "inline coi::vector<uint8_t> coi_bytes(webcc::bytes_view v) {\n";
+    out << "    coi::vector<uint8_t> out; out.reserve(v.length());\n";
+    out << "    for (uint32_t i = 0; i < v.length(); i++) out.push_back(v.data()[i]);\n";
+    out << "    return out;\n";
+    out << "}\n";
+    out << "namespace coi {\n";
     out << "template<typename T, size_t N> using array = webcc::array<T, N>;\n";
     out << "template<typename K, typename V> using map = webcc::unordered_map<K, V>;\n";
     out << "template<typename Signature> using function = webcc::function<Signature>;\n";

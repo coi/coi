@@ -12,3 +12,4 @@ nested_if_order_tick|tests/integration/web/scenes/nested_if_order_tick.coi|web
 top_level_functions_click|tests/integration/web/scenes/top_level_functions_click.coi|web
 events_fetch_ws|tests/integration/web/scenes/events_fetch_ws.coi|web
 pointer_groups_click|tests/integration/web/scenes/pointer_groups_click.coi|web
+idb_bytes_roundtrip|tests/integration/web/scenes/idb_bytes_roundtrip.coi|web

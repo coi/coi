@@ -293,6 +293,12 @@ std::vector<MethodParam> DefParser::parse_params()
                     first_param = false;
                     func_type += current_.value;
                     advance();
+                    if (current_.type == Token::LBracket) // T[]
+                    {
+                        advance();
+                        if (current_.type == Token::RBracket) advance();
+                        func_type += "[]";
+                    }
                     if (current_.type == Token::Comma) advance();
                 }
                 if (current_.type == Token::RParen) advance();
@@ -335,6 +341,14 @@ std::vector<MethodParam> DefParser::parse_params()
                     param.type += ">";
                     advance();
                 }
+            }
+
+            // T[]
+            if (current_.type == Token::LBracket)
+            {
+                advance();
+                if (current_.type == Token::RBracket) advance();
+                param.type += "[]";
             }
 
             // Name
@@ -444,6 +458,14 @@ std::optional<MethodDef> DefParser::parse_method(const std::vector<std::pair<std
         advance();
         method.return_type = current_.value;
         advance();
+
+        // T[] return
+        if (current_.type == Token::LBracket)
+        {
+            advance();
+            if (current_.type == Token::RBracket) advance();
+            method.return_type += "[]";
+        }
 
         // Handle generic return types
         if (current_.type == Token::Less)
@@ -706,7 +728,7 @@ std::vector<DefFile> DefParser::parse_directory(const std::string &dir_path)
 // ============================================================
 
 static constexpr uint32_t DEF_CACHE_MAGIC = 0x44494f43; // "COID"
-static constexpr uint32_t DEF_CACHE_VERSION = 3;
+static constexpr uint32_t DEF_CACHE_VERSION = 4;
 
 DefSchema &DefSchema::instance()
 {

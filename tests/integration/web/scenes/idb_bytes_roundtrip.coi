@@ -1,0 +1,60 @@
+// IndexedDB from Coi: bytes go in as uint8[], come back through a Blob, keys list,
+// a missing key reports found = 0. Each step writes into the view.
+component IdbBytesRoundtrip {
+    mut Database db;
+    mut string opened = "-";
+    mut string stored = "-";
+    mut string sum = "-";
+    mut string missing = "-";
+    mut string keyList = "-";
+    mut string blobSize = "-";
+
+    def onOpened(uint8 ok) : void {
+        opened = ok == 1 ? "yes" : "no";
+        uint8[] data = [1, 2, 3, 250];
+        db.put("note/a", data, &onDone = wrote, &onError = failed);
+        db.put("note/b", [7], &onError = failed);
+        db.put("other", [1], &onError = failed);
+        db.get("note/a", &gotValue, &failed);
+        db.get("nope", &onValue = gotMissing);
+        db.keys("note/", &onKeys = gotKeys);
+    }
+
+    def wrote() : void { stored = "done"; }
+    def failed(string message) : void { stored = "error " + message; }
+
+    def gotValue(Blob value, uint8 found) : void {
+        uint8[] bytes = value.take();
+        mut int total = 0;
+        for b in bytes { total += b; }
+        sum = `${bytes.size()} bytes, sum ${total}`;
+    }
+
+    def gotMissing(Blob value, uint8 found) : void {
+        missing = found == 0 ? "not found" : "found";
+    }
+
+    def gotKeys(string keys) : void {
+        keyList = keys;
+    }
+
+    mount {
+        db = Idb.open("coi-scene", &onOpened);
+        Blob b = Blob.create([9, 8, 7]);
+        blobSize = `${b.size()}`;
+        b.free();
+    }
+
+    view {
+        <div>
+            <p class="opened">{opened}</p>
+            <p class="stored">{stored}</p>
+            <p class="sum">{sum}</p>
+            <p class="missing">{missing}</p>
+            <p class="keys">{keyList}</p>
+            <p class="blob">{blobSize}</p>
+        </div>
+    }
+}
+
+app { root = IdbBytesRoundtrip; }
