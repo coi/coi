@@ -477,6 +477,20 @@ std::unique_ptr<Expression> Parser::parse_primary()
                     return std::make_unique<EnumAccess>(member, value_name, name);
                 }
 
+                // a method on a call result or an element: el.getProperty("x").trim(), xs[0].length()
+                bool call_receiver = dynamic_cast<FunctionCall *>(expr.get()) || dynamic_cast<MethodCall *>(expr.get()) ||
+                                     dynamic_cast<IndexAccess *>(expr.get());
+                if (call_receiver && current().type == TokenType::LPAREN)
+                {
+                    advance();
+                    auto call = std::make_unique<MethodCall>(std::move(expr), member);
+                    call->line = identifier_line;
+                    call->args = parse_call_args(TokenType::RPAREN);
+                    expect(TokenType::RPAREN, "Expected ')'");
+                    expr = std::move(call);
+                    continue;
+                }
+
                 expr = std::make_unique<MemberAccess>(std::move(expr), member);
             }
             else if (current().type == TokenType::LBRACKET)

@@ -18,6 +18,9 @@ type float32 {
     @inline("coi::to_int(${this})")
     def toInt(): int
 
+    @inline("(int64_t)(${this})")
+    def toInt64(): int64
+
     @inline("coi::to_string(${this})")
     def toString(): string
 }
@@ -27,6 +30,9 @@ type float32 {
 type float64 {
     @inline("coi::to_int(${this})")
     def toInt(): int
+
+    @inline("(int64_t)(${this})")
+    def toInt64(): int64
 
     @inline("coi::to_string(${this})")
     def toString(): string

@@ -1140,6 +1140,31 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
         return infer_expression_type(last_expr_stmt->expression.get(), scope);
     }
 
+    if (auto *cc = dynamic_cast<ComponentConstruction *>(expr))
+    {
+        const std::string &name = cc->component_name;
+        bool known_pod = g_data_type_field_types.count(name) > 0;
+        for (auto &a : cc->args)
+        {
+            std::string t = normalize_type(infer_expression_type(a.value.get(), scope));
+            if (!known_pod || a.name.empty())
+                continue;
+            std::string field_type = get_data_field_type(name, a.name);
+            if (field_type.empty())
+            {
+                ErrorHandler::type_error("'" + name + "' has no field '" + a.name + "'", cc->line);
+                exit(1);
+            }
+            if (t != "unknown" && !is_compatible_type(t, normalize_type(field_type)) && !literal_fits(a.value.get(), field_type))
+            {
+                ErrorHandler::type_error("Field '" + a.name + "' of '" + name + "' is '" + normalize_type(field_type) +
+                                         "' but got '" + t + "'", cc->line);
+                exit(1);
+            }
+        }
+        return name.empty() ? "unknown" : name;
+    }
+
     if (auto *mc = dynamic_cast<MethodCall *>(expr))
     {
         std::string t = normalize_type(infer_expression_type(mc->receiver.get(), scope));
@@ -1149,6 +1174,8 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
         if (t == "unknown")
             return "unknown";
         std::string def_t = !t.empty() && t.back() == ']' ? "array" : t;
+        if (def_t != "array" && !DefSchema::instance().lookup_type(def_t))
+            return "unknown";  // component or pod receiver, C++ resolves it
         const auto *m = DefSchema::instance().lookup_method(def_t, mc->method, mc->args.size());
         if (!m || m->is_shared)
         {

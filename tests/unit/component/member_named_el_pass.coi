@@ -1,0 +1,9 @@
+// Test: a member called el doesn't clash with generated code
+component App {
+    mut DOMElement el;
+    mut string text = "";
+    def read() : void { text = el.getProperty("innerText"); }
+    view { <div &={el} onclick={read}>hello {text}</div> }
+}
+
+app { root = App; }

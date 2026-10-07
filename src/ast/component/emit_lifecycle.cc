@@ -116,7 +116,7 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
             {
                 ss << "if (" << condition << ") ";
             }
-            ss << spec.dispatcher_name << ".remove(el[" << el_id << "]);\n";
+            ss << spec.dispatcher_name << ".remove(_el[" << el_id << "]);\n";
         }
     };
 
@@ -128,7 +128,7 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
                 continue;
             }
             ss << indent << "for (int i = 0; i < " << element_count << "; i++) if ("
-               << get_event_mask_name(spec.type) << "[i >> 6] & (1ULL << (i & 63))) " << spec.dispatcher_name << ".remove(el[i]);\n";
+               << get_event_mask_name(spec.type) << "[i >> 6] & (1ULL << (i & 63))) " << spec.dispatcher_name << ".remove(_el[i]);\n";
         }
     };
 
@@ -138,7 +138,7 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
     int root_if_id = -1;
     for (const auto &region : if_regions)
     {
-        // Check if this if region contains root-level elements (el[0] or similar low indices)
+        // Check if this if region contains root-level elements (_el[0] or similar low indices)
         for (int el_id : region.then_element_ids)
         {
             then_els.insert(el_id);
@@ -189,7 +189,7 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
             // Remove the then-branch root element
             if (!root_region->then_element_ids.empty())
             {
-                ss << "            webcc::dom::remove_element(el[" << root_region->then_element_ids[0] << "]);\n";
+                ss << "            webcc::dom::remove_element(_el[" << root_region->then_element_ids[0] << "]);\n";
             }
             ss << "        } else {\n";
             // Remove handlers for else-branch elements
@@ -200,7 +200,7 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
             // Remove the else-branch root element
             if (!root_region->else_element_ids.empty())
             {
-                ss << "            webcc::dom::remove_element(el[" << root_region->else_element_ids[0] << "]);\n";
+                ss << "            webcc::dom::remove_element(_el[" << root_region->else_element_ids[0] << "]);\n";
             }
             ss << "        }\n";
         }
@@ -233,7 +233,7 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
         // Remove root element (which removes all children)
         if (element_count > 0)
         {
-            ss << "        webcc::dom::remove_element(el[0]);\n";
+            ss << "        webcc::dom::remove_element(_el[0]);\n";
         }
     }
     else
@@ -242,7 +242,7 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
         emit_remove_handlers_loop("        ");
         if (element_count > 0)
         {
-            ss << "        webcc::dom::remove_element(el[0]);\n";
+            ss << "        webcc::dom::remove_element(_el[0]);\n";
         }
     }
     // Cleanup route components
@@ -272,7 +272,7 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
     if (root_if_id >= 0 && !if_regions.empty())
         ss << "        if (!_if_" << root_if_id << "_anchor.is_valid()) return;\n";
     else if (element_count > 0)
-        ss << "        if (!el[0].is_valid()) return;\n";
+        ss << "        if (!_el[0].is_valid()) return;\n";
 
     // If we have if/else at root level, handle both branches
     if (root_if_id >= 0 && !if_regions.empty())
@@ -297,7 +297,7 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
             // Remove the then-branch root element
             if (!root_region->then_element_ids.empty())
             {
-                ss << "            if (!skip_dom_removal) webcc::dom::remove_element(el[" << root_region->then_element_ids[0] << "]);\n";
+                ss << "            if (!skip_dom_removal) webcc::dom::remove_element(_el[" << root_region->then_element_ids[0] << "]);\n";
             }
             ss << "        } else {\n";
             // Remove handlers for else-branch elements
@@ -308,7 +308,7 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
             // Remove the else-branch root element
             if (!root_region->else_element_ids.empty())
             {
-                ss << "            if (!skip_dom_removal) webcc::dom::remove_element(el[" << root_region->else_element_ids[0] << "]);\n";
+                ss << "            if (!skip_dom_removal) webcc::dom::remove_element(_el[" << root_region->else_element_ids[0] << "]);\n";
             }
             ss << "        }\n";
             // Also remove the anchor
@@ -351,7 +351,7 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
         // Remove root element (which removes all children)
         if (element_count > 0)
         {
-            ss << "        if (!skip_dom_removal) webcc::dom::remove_element(el[0]);\n";
+            ss << "        if (!skip_dom_removal) webcc::dom::remove_element(_el[0]);\n";
         }
     }
     else
@@ -370,7 +370,7 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
         // Remove root element (which removes all children)
         if (element_count > 0)
         {
-            ss << "        if (!skip_dom_removal) webcc::dom::remove_element(el[0]);\n";
+            ss << "        if (!skip_dom_removal) webcc::dom::remove_element(_el[0]);\n";
         }
     }
     ss << "    }\n";
@@ -385,7 +385,7 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
         ss << "        if (_if_" << root_if_id << "_state) {\n";
         if (!root_region.then_element_ids.empty())
         {
-            ss << "            return el[" << root_region.then_element_ids[0] << "];\n";
+            ss << "            return _el[" << root_region.then_element_ids[0] << "];\n";
         }
         else
         {
@@ -394,7 +394,7 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
         ss << "        } else {\n";
         if (!root_region.else_element_ids.empty())
         {
-            ss << "            return el[" << root_region.else_element_ids[0] << "];\n";
+            ss << "            return _el[" << root_region.else_element_ids[0] << "];\n";
         }
         else
         {
@@ -404,10 +404,10 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
     }
     else
     {
-        // No if/else at root, just return el[0]
+        // No if/else at root, just return _el[0]
         if (element_count > 0)
         {
-            ss << "        return el[0];\n";
+            ss << "        return _el[0];\n";
         }
         else
         {

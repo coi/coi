@@ -63,8 +63,8 @@ static std::string build_forward_args(size_t count)
 }
 
 // Helper to transform append_child calls to insert_before for anchor-based if regions
-// Transforms: webcc::dom::append_child(_if_X_parent, el[N]);
-// To:         webcc::dom::insert_before(_if_X_parent, el[N], _if_X_anchor);
+// Transforms: webcc::dom::append_child(_if_X_parent, _el[N]);
+// To:         webcc::dom::insert_before(_if_X_parent, _el[N], _if_X_anchor);
 // Also rewrites child component renders (which append their roots internally)
 // to the anchor-aware form: X.view(_if_X_parent); -> X.view(_if_X_parent, _if_X_anchor);
 // Nested regions that share this parent alias it (`_if_Y_parent = _if_X_parent;`)
@@ -483,7 +483,7 @@ static void generate_view_child(ASTNode *child, ViewCodegenContext& ctx)
     {
         // Handle text nodes mixed with elements - create a text node
         int text_id = ctx.counter++;
-        std::string text_var = ctx.in_loop ? "_el_" + std::to_string(text_id) : "el[" + std::to_string(text_id) + "]";
+        std::string text_var = ctx.in_loop ? "_el_" + std::to_string(text_id) : "_el[" + std::to_string(text_id) + "]";
         if (ctx.in_loop) {
             ctx.ss << "        webcc::handle " << text_var << " = webcc::handle(" << ctx.next_handle() << ");\n";
         } else {
@@ -496,7 +496,7 @@ static void generate_view_child(ASTNode *child, ViewCodegenContext& ctx)
     {
         // Handle expression children (interpolations like {feature.text}) mixed with elements
         int text_id = ctx.counter++;
-        std::string text_var = ctx.in_loop ? "_el_" + std::to_string(text_id) : "el[" + std::to_string(text_id) + "]";
+        std::string text_var = ctx.in_loop ? "_el_" + std::to_string(text_id) : "_el[" + std::to_string(text_id) + "]";
         if (ctx.in_loop) {
             ctx.ss << "        webcc::handle " << text_var << " = webcc::handle(" << ctx.next_handle() << ");\n";
         } else {
@@ -549,8 +549,8 @@ void HTMLElement::generate_code(ViewCodegenContext& ctx)
     }
     else
     {
-        // Outside loops, store in el[] array with deferred creation
-        var = "el[" + std::to_string(my_id) + "]";
+        // Outside loops, store in _el[] array with deferred creation
+        var = "_el[" + std::to_string(my_id) + "]";
         ctx.ss << "        " << var << " = webcc::DOMElement(" << ctx.next_handle() << ");\n";
         if (has_scoped_css) {
             ctx.ss << "        webcc::dom::create_element_deferred_scoped(" << var << ", \"" << tag << "\", \"" << ctx.parent_component_name << "\");\n";
@@ -1095,7 +1095,7 @@ void ViewRawElement::generate_code(ViewCodegenContext& ctx)
     }
     else
     {
-        var = "el[" + std::to_string(my_id) + "]";
+        var = "_el[" + std::to_string(my_id) + "]";
         ctx.ss << "        " << var << " = webcc::DOMElement(" << ctx.next_handle() << ");\n";
         if (has_scoped_css) {
             ctx.ss << "        webcc::dom::create_element_deferred_scoped(" << var << ", \"span\", \"" << ctx.parent_component_name << "\");\n";

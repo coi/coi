@@ -19,8 +19,8 @@ static std::string make_callback_name(const std::string &var_name)
 }
 
 // Transform append_child calls to insert_before for anchor-based regions
-// Transforms: webcc::dom::append_child(parent_var, el[N]);
-// To:         webcc::dom::insert_before(parent_var, el[N], anchor_var);
+// Transforms: webcc::dom::append_child(parent_var, _el[N]);
+// To:         webcc::dom::insert_before(parent_var, _el[N], anchor_var);
 // Also rewrites child component renders (which append their roots internally)
 // to the anchor-aware form: X.view(parent_var); -> X.view(parent_var, anchor_var);
 static std::string transform_to_insert_before(const std::string &code, const std::string &parent_var, const std::string &anchor_var)
@@ -684,7 +684,7 @@ std::string Component::to_webcc(CompilerSession &session)
     // Element handles
     if (element_count > 0)
     {
-        ss << "    webcc::handle el[" << element_count << "];\n";
+        ss << "    webcc::handle _el[" << element_count << "];\n";
     }
 
     // Event handler bitmasks
@@ -789,7 +789,7 @@ std::string Component::to_webcc(CompilerSession &session)
         key.if_region_id = binding.if_region_id;
         key.in_then_branch = binding.in_then_branch;
 
-        std::string el_var = "el[" + std::to_string(binding.element_id) + "]";
+        std::string el_var = "_el[" + std::to_string(binding.element_id) + "]";
         std::string update_line;
         std::string dom_call;
         if (binding.type == "attr") {
@@ -1288,7 +1288,7 @@ std::string Component::to_webcc(CompilerSession &session)
                 {
                     ss << "if (" << condition_prefix << ") ";
                 }
-                ss << spec.dispatcher_name << ".remove(el[" << el_id << "]);\n";
+                ss << spec.dispatcher_name << ".remove(_el[" << el_id << "]);\n";
             }
         };
 
@@ -1329,7 +1329,7 @@ std::string Component::to_webcc(CompilerSession &session)
         {
             if (else_nested_if_els.count(el_id))
                 continue; // Handled by nested-if conditional removal below
-            ss << "            webcc::dom::remove_element(el[" << el_id << "]);\n";
+            ss << "            webcc::dom::remove_element(_el[" << el_id << "]);\n";
         }
         for (const auto &[comp_name, inst_id] : region.else_components)
         {
@@ -1351,12 +1351,12 @@ std::string Component::to_webcc(CompilerSession &session)
                     for (int el_id : nested_region.then_element_ids)
                     {
                         emit_remove_handlers_for_element(el_id, "_if_" + std::to_string(nested_if_id) + "_state");
-                        ss << "            if (_if_" << nested_if_id << "_state) webcc::dom::remove_element(el[" << el_id << "]);\n";
+                        ss << "            if (_if_" << nested_if_id << "_state) webcc::dom::remove_element(_el[" << el_id << "]);\n";
                     }
                     for (int el_id : nested_region.else_element_ids)
                     {
                         emit_remove_handlers_for_element(el_id, "!_if_" + std::to_string(nested_if_id) + "_state");
-                        ss << "            if (!_if_" << nested_if_id << "_state) webcc::dom::remove_element(el[" << el_id << "]);\n";
+                        ss << "            if (!_if_" << nested_if_id << "_state) webcc::dom::remove_element(_el[" << el_id << "]);\n";
                     }
                     emit_if_unmount(nested_if_id);
                 }
@@ -1375,7 +1375,7 @@ std::string Component::to_webcc(CompilerSession &session)
         {
             if (then_nested_if_els.count(el_id))
                 continue; // Handled by nested-if conditional removal below
-            ss << "            webcc::dom::remove_element(el[" << el_id << "]);\n";
+            ss << "            webcc::dom::remove_element(_el[" << el_id << "]);\n";
         }
         for (const auto &[comp_name, inst_id] : region.then_components)
         {
@@ -1397,12 +1397,12 @@ std::string Component::to_webcc(CompilerSession &session)
                     for (int el_id : nested_region.then_element_ids)
                     {
                         emit_remove_handlers_for_element(el_id, "_if_" + std::to_string(nested_if_id) + "_state");
-                        ss << "            if (_if_" << nested_if_id << "_state) webcc::dom::remove_element(el[" << el_id << "]);\n";
+                        ss << "            if (_if_" << nested_if_id << "_state) webcc::dom::remove_element(_el[" << el_id << "]);\n";
                     }
                     for (int el_id : nested_region.else_element_ids)
                     {
                         emit_remove_handlers_for_element(el_id, "!_if_" + std::to_string(nested_if_id) + "_state");
-                        ss << "            if (!_if_" << nested_if_id << "_state) webcc::dom::remove_element(el[" << el_id << "]);\n";
+                        ss << "            if (!_if_" << nested_if_id << "_state) webcc::dom::remove_element(_el[" << el_id << "]);\n";
                     }
                     emit_if_unmount(nested_if_id);
                 }
@@ -1621,7 +1621,7 @@ std::string Component::to_webcc(CompilerSession &session)
     {
         // Attach roots (and root-level child components) relative to _before.
         // Only top-level attaches use the literal "parent" var, so nested
-        // append_child(el[N], ...) calls are untouched.
+        // append_child(_el[N], ...) calls are untouched.
         ss << transform_to_insert_before(render_handles.wrap(ss_render.str()), "parent", "_before");
     }
     // End view - flushes only at outermost level, then register event handlers

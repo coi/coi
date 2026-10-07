@@ -1,0 +1,22 @@
+// Test: &method as a callback when constructing a component in code
+component Box(int id, def onChanged(int, string) : void, def onRemove(int) : void) {
+    def go() : void { onChanged(id, "x"); onRemove(id); }
+    view { <button onclick={go}>{id}</button> }
+}
+
+component App {
+    mut Box[] boxes;
+    mut string log = "";
+    def changed(int id, string text) : void { log = `${id}:${text}`; }
+    def remove(int id) : void { log = `${log} removed ${id}`; }
+    def add() : void { boxes.push(Box(boxes.size() + 1, &changed, &remove)); }
+    view {
+        <div>
+            <button onclick={add}>add</button>
+            <for b in boxes key={b.id}><{b} /></for>
+            <p>{log}</p>
+        </div>
+    }
+}
+
+app { root = App; }

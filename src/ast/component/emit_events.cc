@@ -161,7 +161,7 @@ void emit_event_registration(std::stringstream &ss,
                              const std::string &call_suffix)
 {
     ss << "        for (int i = 0; i < " << element_count << "; i++) if ((" << mask_name
-       << "[i >> 6] & (1ULL << (i & 63))) && el[i].is_valid()) " << dispatcher_name << ".set(el[i], [this, i](" << lambda_params << ") {\n";
+       << "[i >> 6] & (1ULL << (i & 63))) && _el[i].is_valid()) " << dispatcher_name << ".set(_el[i], [this, i](" << lambda_params << ") {\n";
     ss << "            switch(i) {\n";
     emit_handler_switch_cases(ss, handlers, event_type, call_suffix);
     ss << "            }\n";

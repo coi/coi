@@ -979,7 +979,24 @@ std::string ComponentConstruction::to_webcc() {
     for (size_t i = 0; i < args.size(); i++) {
         if (i > 0) result += ", ";
         std::string value = args[i].value->to_webcc();
-        if (args[i].is_reference)
+        auto* id = dynamic_cast<Identifier*>(args[i].value.get());
+        const auto& sigs = ComponentTypeContext::instance().method_signatures;
+        std::string free_fn = id ? FreeFunctionRegistry::instance().resolve_call(id->name) : "";
+        if (args[i].is_reference && id && (sigs.count(id->name) || !free_fn.empty())) {
+            // &method as a callback: Box(1, &changed)
+            std::string params, fwd;
+            if (sigs.count(id->name)) {
+                const auto& types = sigs.at(id->name).param_types;
+                for (size_t k = 0; k < types.size(); k++) {
+                    params += (k ? ", " : "") + convert_type(types[k]) + " _a" + std::to_string(k);
+                    fwd += (k ? ", _a" : "_a") + std::to_string(k);
+                }
+                result += "[this](" + params + ") { this->" + id->name + "(" + fwd + "); }";
+            } else {
+                result += "[](auto&&... _a) { return " + free_fn + "(_a...); }";
+            }
+        }
+        else if (args[i].is_reference)
             result += "&(" + value + ")";
         else if (args[i].is_move)
             result += "coi::move(" + value + ")";
@@ -1159,6 +1176,10 @@ std::string MethodCall::to_webcc() {
     if (dynamic_cast<StringLiteral*>(receiver.get()) && receiver->is_static())
         recv = "coi::string(" + recv + ")";
     const auto* m = DefSchema::instance().lookup_method(def_type, method, args.size());
+    if (!m && (type.empty() || type == "unknown")) {
+        m = DefSchema::instance().lookup_method("string", method, args.size());
+        if (!m) m = DefSchema::instance().lookup_method("array", method, args.size());
+    }
     if (m && m->mapping_type == MappingType::Inline)
         return expand_inline_template(m->mapping_value, "(" + recv + ")", args);
     if (m && m->mapping_type == MappingType::Map) {
