@@ -789,6 +789,10 @@ mount { ws = WebSocket.connect("wss://host", &onMessage = onMsg, &onOpen = onOpe
 // h: def h(PointerPhase phase, int id, PointerType type, Buttons buttons, float x, float y, ...) : void
 //   or as one pod: def h(PointerEvent e) : void { e.phase, e.x, e.y, e.pressure, e.pointerType, e.buttons, e.tiltX }
 //   pods: PointerEvent, WheelEvent, ResizeEvent, CloseEvent (ws), LoadedEvent (image); none for events carrying a Blob
+// View attributes: onpointer, onpointerdown/move/up/cancel/predicted, onwheel, onresize, onfocus, onblur, ondrop
+//   <canvas onpointerdown={start} onpointermove={draw} onpointerup={end}
+//           pointerflags={PointerFlags.Capture | PointerFlags.Coalesced | PointerFlags.NoScroll}></canvas>
+//   default pointer flags: Capture only; a drawing surface adds Coalesced | NoScroll
 // Bytes are uint8[]. IndexedDB: db = Idb.open("name", &opened); db.put(key, bytes, &onDone = h, &onError = e);
 //   db.get(key, &got, &err) with def got(Blob value, uint8 found); value.take() -> uint8[]; db.keys(prefix, &onKeys = h)
 // Blob: Blob.create(bytes), b.size(), b.read(), b.take() (reads and frees), b.free(). ws.onBinaryMessage(&h) with def h(uint8[] data)

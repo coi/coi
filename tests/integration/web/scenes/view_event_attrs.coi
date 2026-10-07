@@ -1,0 +1,44 @@
+// View event attributes generated from the defs: a drag on a canvas (down, moves, up
+// with the element's own pointerflags), focus and blur on an input, a pointer handler in
+// a loop item, and one inside an if region that is toggled off and back on.
+component ViewEventAttrs {
+    mut string drag = "-";
+    mut int moves = 0;
+    mut string focus = "-";
+    mut bool show = true;
+    mut int toggledHits = 0;
+    mut int picked = 0;
+    mut int[] items = [1, 2, 3];
+
+    def down(PointerEvent e) : void { moves = 0; drag = `down ${e.x.toInt()}`; }
+    def move() : void { moves++; }
+    def up(PointerEvent e) : void { drag = drag + ` up ${e.x.toInt()}`; }
+    def gotFocus() : void { focus = "focused"; }
+    def lostFocus() : void { focus = "blurred"; }
+    def hit() : void { toggledHits++; }
+    def flip() : void { show = !show; }
+    def pick(int i) : void { picked = i; }
+
+    view {
+        <div>
+            <canvas class="surface" width="200" height="60" style="display:block"
+                    onpointerdown={down} onpointermove={move} onpointerup={up}
+                    pointerflags={PointerFlags.Capture | PointerFlags.Coalesced | PointerFlags.NoScroll}></canvas>
+            <p class="drag">{drag}</p>
+            <p class="moves">{moves}</p>
+            <input class="field" onfocus={gotFocus} onblur={lostFocus} />
+            <p class="focus">{focus}</p>
+            <button class="flip" onclick={flip}>flip</button>
+            <if show>
+                <div class="toggled" onpointerdown={hit} style="width:80px;height:20px;background:#ccc">hit me</div>
+            </if>
+            <p class="hits">{toggledHits}</p>
+            <for item in items key={item}>
+                <span class={`item item${item}`} onpointerdown={pick(item)}>[{item}]</span>
+            </for>
+            <p class="picked">{picked}</p>
+        </div>
+    }
+}
+
+app { root = ViewEventAttrs; }

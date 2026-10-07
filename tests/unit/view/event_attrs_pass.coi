@@ -1,0 +1,40 @@
+// Test: webcc event attributes in views: pod, fields and no-param handlers, a call
+// expression, pointerflags, inside an if region and a for loop
+component EventAttrsPass {
+    mut float x = 0.0;
+    mut int moves = 0;
+    mut bool focused = false;
+    mut int w = 0;
+    mut bool show = true;
+    mut int[] items = [1, 2, 3];
+    mut int picked = 0;
+    mut string dropped = "";
+
+    def down(PointerEvent e) : void { x = e.x; }
+    def move(PointerPhase phase, int id, PointerType type) : void { moves++; }
+    def up() : void { moves = 0; }
+    def zoom(float dx, float dy, float px, float py, Mods mods) : void {
+        if ((mods & Mods.Ctrl) != 0) { x = x * 2.0; }
+    }
+    def sized(ResizeEvent e) : void { w = e.pixelWidth; }
+    def gotFocus() : void { focused = true; }
+    def lostFocus() : void { focused = false; }
+    def pick(int i) : void { picked = i; }
+    def drop(Blob data, string name) : void { dropped = name; data.free(); }
+
+    view {
+        <div onresize={sized} ondrop={drop}>
+            <canvas onpointerdown={down} onpointermove={move} onpointerup={up} onwheel={zoom}
+                    pointerflags={PointerFlags.Capture | PointerFlags.Coalesced | PointerFlags.NoScroll | PointerFlags.Predict}></canvas>
+            <input onfocus={gotFocus} onblur={lostFocus} />
+            <if show>
+                <div onpointerdown={up}>toggle</div>
+            </if>
+            <for item in items key={item}>
+                <span onpointerdown={pick(item)}>{item}</span>
+            </for>
+        </div>
+    }
+}
+
+app { root = EventAttrsPass; }

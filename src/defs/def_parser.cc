@@ -800,6 +800,26 @@ SchemaEventSpec SchemaEventSpec::parse(const std::string &value)
             s.last = true;
         else if (tokens[i].rfind("pod:", 0) == 0)
             s.pod = tokens[i].substr(4);
+        else if (tokens[i].rfind("listen:", 0) == 0)
+        {
+            // listen:func(name:Type=value,...)
+            std::string l = tokens[i].substr(7);
+            size_t open = l.find('(');
+            s.listen = l.substr(0, open);
+            std::string cur;
+            auto add = [&]() {
+                size_t colon = cur.find(':'), eq = cur.find('=');
+                if (colon != std::string::npos && eq != std::string::npos && colon < eq)
+                    s.listen_params.push_back({cur.substr(0, colon), cur.substr(colon + 1, eq - colon - 1), cur.substr(eq + 1)});
+                cur.clear();
+            };
+            if (open != std::string::npos)
+                for (char c : l.substr(open + 1))
+                {
+                    if (c == ',' || c == ')') add();
+                    else cur += c;
+                }
+        }
     }
     return s;
 }
@@ -1236,6 +1256,59 @@ bool DefSchema::is_nocopy(const std::string &type_name) const
     }
 
     return false;
+}
+
+void DefSchema::build_view_attrs() const
+{
+    if (view_attrs_built_)
+        return;
+    view_attrs_built_ = true;
+    auto lower = [](std::string s) { for (auto &c : s) c = (char)std::tolower((unsigned char)c); return s; };
+    const TypeDef *el = lookup_type("DOMElement");
+    if (!el)
+        return;
+    for (const auto &m : el->methods)
+    {
+        if (m.mapping_type != MappingType::Event || m.params.empty())
+            continue;
+        SchemaEventSpec spec = SchemaEventSpec::parse(m.mapping_value);
+        if (spec.listen.empty())
+            continue; // can't be turned on from a view
+        std::string type = lower(m.name.substr(2)); // onPointer -> pointer
+        view_attrs_.push_back({"on" + type, type, &m, "", ""});
+        std::vector<std::string> fields = callback_param_types(m.params[0].type);
+        if (!fields.empty())
+        {
+            if (const TypeDef *first = lookup_type(fields[0]); first && !first->enum_cpp.empty())
+                for (const auto &v : first->enum_values)
+                    view_attrs_.push_back({"on" + type + lower(v), type, &m, v, fields[0]});
+        }
+        // A listener param typed with a platform enum/flags is settable per element, named
+        // after its type: pointerflags={...}
+        for (const auto &lp : spec.listen_params)
+            if (!webcc_cast_type(lp.type).empty())
+                view_options_[lower(lp.type)] = lp.type;
+    }
+}
+
+const std::vector<ViewEventAttr> &DefSchema::view_event_attrs() const
+{
+    build_view_attrs();
+    return view_attrs_;
+}
+
+const ViewEventAttr *DefSchema::find_view_event_attr(const std::string &attr) const
+{
+    for (const auto &a : view_event_attrs())
+        if (a.attr == attr)
+            return &a;
+    return nullptr;
+}
+
+const std::map<std::string, std::string> &DefSchema::view_option_attrs() const
+{
+    build_view_attrs();
+    return view_options_;
 }
 
 std::string DefSchema::webcc_cast_type(const std::string &type_name) const

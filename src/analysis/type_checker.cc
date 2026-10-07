@@ -506,8 +506,40 @@ static std::string g_ctx_module;
 static std::string g_ctx_file;
 static const Component *g_ctx_component = nullptr;
 
+// A handler method for a schema event: it takes the event's pod, or a prefix of the
+// fields with matching types ("" when fine, else the error)
+static std::string check_handler_signature(const FunctionDef &handler, const MethodParam &param, const std::string &call_name,
+                                           const std::string &event_label, const std::string &pod)
+{
+    if (!pod.empty() && handler.params.size() == 1 && normalize_type(handler.params[0].type) == pod)
+        return "";
+    std::vector<std::string> want = callback_param_types(param.type);
+    if (handler.params.size() > want.size())
+        return "'" + call_name + "': '" + handler.name + "' takes " + std::to_string(handler.params.size()) +
+               " parameter(s) but the '" + event_label + "' event has " + std::to_string(want.size()) +
+               " (handlers may take fewer, not more" + (pod.empty() ? "" : ", or one " + pod) + ")";
+    for (size_t i = 0; i < handler.params.size(); i++)
+    {
+        std::string have = normalize_type(handler.params[i].type);
+        if (!is_compatible_type(normalize_type(want[i]), have))
+            return "'" + call_name + "': parameter " + std::to_string(i + 1) + " of '" + handler.name + "' is '" +
+                   handler.params[i].type + "' but the '" + event_label + "' event provides '" + want[i] + "'" +
+                   (pod.empty() || i > 0 ? "" : " (or take one " + pod + ")");
+    }
+    return "";
+}
+
+static const FunctionDef *find_component_method(const std::string &name)
+{
+    if (g_ctx_component)
+        for (const auto &m : g_ctx_component->methods)
+            if (m.name == name)
+                return &m;
+    return nullptr;
+}
+
 // `&handler` for a schema callback param ("def(string,int32):void"): the handler must be
-// a method of the component taking a prefix of the event's fields, same types.
+// a method of the component taking the pod or a prefix of the event's fields.
 static std::string check_schema_callback(const CallArg &arg, const MethodParam &param, const std::string &call_name,
                                          const std::string &event_label, const std::string &pod = "")
 {
@@ -516,29 +548,10 @@ static std::string check_schema_callback(const CallArg &arg, const MethodParam &
         arg_name = id->name;
     if (!arg.is_reference)
         return "'" + call_name + "': callback '" + event_label + "' requires '&' prefix. Use '&" + arg_name + "'";
-    const FunctionDef *handler = nullptr;
-    if (g_ctx_component)
-        for (const auto &m : g_ctx_component->methods)
-            if (m.name == arg_name)
-                handler = &m;
+    const FunctionDef *handler = find_component_method(arg_name);
     if (!handler)
         return "'" + call_name + "': callback '" + event_label + "' must name a method of this component, got '" + arg_name + "'";
-    // Or the event's fields as one pod: def h(PointerEvent e)
-    if (!pod.empty() && handler->params.size() == 1 && normalize_type(handler->params[0].type) == pod)
-        return "";
-    std::vector<std::string> want = callback_param_types(param.type);
-    if (handler->params.size() > want.size())
-        return "'" + call_name + "': '" + arg_name + "' takes " + std::to_string(handler->params.size()) +
-               " parameter(s) but the '" + event_label + "' event has " + std::to_string(want.size()) +
-               " (handlers may take fewer, not more)";
-    for (size_t i = 0; i < handler->params.size(); i++)
-    {
-        std::string have = normalize_type(handler->params[i].type);
-        if (!is_compatible_type(normalize_type(want[i]), have))
-            return "'" + call_name + "': parameter " + std::to_string(i + 1) + " of '" + arg_name + "' is '" +
-                   handler->params[i].type + "' but the '" + event_label + "' event provides '" + want[i] + "'";
-    }
-    return "";
+    return check_handler_signature(*handler, param, call_name, event_label, pod);
 }
 
 
@@ -3224,7 +3237,55 @@ void validate_view_hierarchy(const std::vector<Component> &components,
             {
                 // Check if this is an event handler (starts with "on")
                 bool is_event_handler = attr.name.size() > 2 && attr.name[0] == 'o' && attr.name[1] == 'n';
-                
+
+                // Listener options (pointerflags={PointerFlags.Capture | ...}): a value of
+                // that type, not a string attribute
+                const auto &view_options = DefSchema::instance().view_option_attrs();
+                if (auto opt = view_options.find(attr.name); opt != view_options.end())
+                {
+                    std::string t = normalize_type(infer_expression_type(attr.value.get(), scope));
+                    if (t != "unknown" && !is_compatible_type(t, normalize_type(opt->second)))
+                        throw std::runtime_error("'" + attr.name + "' takes a " + opt->second + ", got '" + t + "' at line " +
+                                                 std::to_string(el->line));
+                    continue;
+                }
+
+                // webcc event attributes (derived from the defs): the handler takes the event's
+                // pod or a prefix of its fields
+                const ViewEventAttr *view_event = DefSchema::instance().find_view_event_attr(attr.name);
+                if (is_event_handler && !view_event && attr.name != "onclick" && attr.name != "oninput" &&
+                    attr.name != "onchange" && attr.name != "onkeydown")
+                {
+                    std::string known = "onclick, oninput, onchange, onkeydown";
+                    for (const auto &v : DefSchema::instance().view_event_attrs())
+                        known += ", " + v.attr;
+                    throw std::runtime_error("Unknown event attribute '" + attr.name + "' (available: " + known + ") at line " +
+                                             std::to_string(el->line));
+                }
+                if (view_event)
+                {
+                    if (auto *id = dynamic_cast<Identifier *>(attr.value.get()))
+                    {
+                        const FunctionDef *handler = nullptr;
+                        if (parent_comp)
+                            for (const auto &m : parent_comp->methods)
+                                if (m.name == id->name)
+                                    handler = &m;
+                        if (!handler)
+                            throw std::runtime_error("'" + attr.name + "' handler '" + id->name +
+                                                     "' must be a method of this component at line " + std::to_string(el->line));
+                        const MethodDef *ev = view_event->method;
+                        if (!ev->params.empty())
+                        {
+                            std::string err = check_handler_signature(*handler, ev->params[0], attr.name, attr.name,
+                                                                      SchemaEventSpec::parse(ev->mapping_value).pod);
+                            if (!err.empty())
+                                throw std::runtime_error(err + " at line " + std::to_string(el->line));
+                        }
+                    }
+                    continue;
+                }
+
                 if (is_event_handler)
                 {
                     // Validate event handler parameter types

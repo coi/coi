@@ -1,6 +1,8 @@
 #include <cctype>
 #include <set>
 #include "view.h"
+#include "expressions.h"
+#include "../defs/def_parser.h"
 #include "../cli/error.h"
 #include "formatter.h"
 #include "../codegen/codegen_utils.h"
@@ -192,6 +194,16 @@ static std::string build_lambda_call(FunctionCall *func_call)
 }
 
 // Build minimal lambda capture: [this] outside loops, [this, var] inside loops.
+// Body of a handler for a webcc event attribute (onpointerdown=, onwheel=...; derived from
+// the defs, see DefSchema::view_event_attrs): `this->h(fields or pod)` for a method name, or
+// the call as written for `onwheel={zoom(2)}`
+static std::string view_event_call(const HTMLAttribute &attr, const ViewEventAttr &spec)
+{
+    if (dynamic_cast<FunctionCall *>(attr.value.get()))
+        return attr.value->to_webcc();
+    return generate_event_call(*spec.method, "DOMElement", attr.value->to_webcc(), "_e");
+}
+
 static std::string build_lambda_capture(const std::string &loop_var_name)
 {
     if (loop_var_name.empty())  // Not in a loop - just capture this
@@ -554,9 +566,77 @@ void HTMLElement::generate_code(ViewCodegenContext& ctx)
         ctx.ss << "        " << ref_binding << " = " << var << ";\n";
     }
 
+    // webcc event attributes. The per-value ones of an event (onpointerdown, onpointerup)
+    // share its handler table, so an element gets one handler per event that switches on
+    // the first field. The listener is called once per function, with the whitelist's
+    // values or the element's own (pointerflags={...}).
+    {
+        const auto &options = DefSchema::instance().view_option_attrs();
+        std::map<std::string, std::string> option_values; // Coi type -> expression
+        for (auto &attr : attributes)
+            if (auto it = options.find(attr.name); it != options.end())
+                option_values[it->second] = attr.value->to_webcc();
+
+        struct PerEvent
+        {
+            const ViewEventAttr *spec = nullptr;
+            std::string whole;  // on<event>= handler
+            std::string cases;  // switch cases of per-value handlers
+        };
+        std::map<std::string, PerEvent> events; // by type, in a stable order
+        for (auto &attr : attributes)
+        {
+            const ViewEventAttr *spec = DefSchema::instance().find_view_event_attr(attr.name);
+            if (!spec)
+                continue;
+            PerEvent &pe = events[spec->type];
+            pe.spec = spec;
+            std::string call = view_event_call(attr, *spec);
+            if (spec->phase.empty())
+                pe.whole = call + ";";
+            else
+                pe.cases += "case " + spec->phase_enum + "::" + spec->phase + ": " + call + "; break; ";
+        }
+
+        std::set<std::string> listened;
+        for (auto &[type, pe] : events)
+        {
+            SchemaEventSpec es = SchemaEventSpec::parse(pe.spec->method->mapping_value);
+            std::string body = pe.whole;
+            if (!pe.cases.empty())
+            {
+                // switch (static_cast<PointerPhase>(_e.phase)) { case PointerPhase::Down: ... }
+                body += "switch (static_cast<" + pe.spec->phase_enum + ">(_e." + es.fields[0] + ")) { " + pe.cases + "default: break; }";
+            }
+            if (listened.insert(es.listen).second)
+            {
+                std::string args;
+                for (const auto &lp : es.listen_params)
+                {
+                    auto own = option_values.find(lp.type);
+                    std::string value = own != option_values.end() ? own->second : lp.value;
+                    std::string cpp = DefSchema::instance().webcc_cast_type(lp.type);
+                    args += ", " + (cpp.empty() ? value : "static_cast<" + cpp + ">(" + value + ")");
+                }
+                ctx.ss << "        webcc::" << es.ns << "::" << es.listen << "(" << var << args << ");\n";
+            }
+            std::string full = "webcc::" + es.struct_name();
+            if (ctx.in_loop)
+            {
+                std::string capture = build_lambda_capture(ctx.loop_var_name);
+                ctx.ss << "        coi_events<" << full << ">.set(" << var << ", " << capture << "(const " << full
+                       << "& _e) { (void)_e; " << body << " }, this);\n";
+            }
+            else
+                ctx.event_handlers.push_back({my_id, type, body, true});
+        }
+    }
+
     // Attributes
     for (auto &attr : attributes)
     {
+        if (DefSchema::instance().find_view_event_attr(attr.name) || DefSchema::instance().view_option_attrs().count(attr.name))
+            continue;
         if (attr.name == "onclick")
         {
             ctx.ss << "        webcc::dom::add_click_listener(" << var << ");\n";

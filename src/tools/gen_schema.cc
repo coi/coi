@@ -19,6 +19,9 @@
 // Whitelist of functions and intrinsics exposed to Coi users
 //   name +events              - also take a trailing optional callback per event of the
 //   name +events(A, B)          returned handle type (all events, or the listed ones)
+//   name +listen(A, B) p=v    - name turns on events A, B of its first param's handle, so
+//                               they become view attributes (onpointer=...); p=v sets the
+//                               value Coi passes for param p (else the schema default)
 //   @cleanup("ns::func")      - type annotation: called on owned members when their
 //                               component is destroyed (e.g. close a socket)
 // Loaded from src/tools/schema_whitelist.def at runtime
@@ -35,6 +38,12 @@ static std::set<std::string> WHITELISTED_FUNCTIONS;
 static std::map<std::string, std::vector<std::string>> INTRINSIC_DEFS;
 static std::map<std::string, std::vector<std::string>> TYPE_ANNOTATIONS; // [section] -> lines before `type X`
 static std::map<std::string, std::vector<std::string>> FACTORY_EVENTS; // ns::func -> event names (empty = all)
+struct ListenEntry
+{
+    std::vector<std::string> events;              // event names it turns on
+    std::map<std::string, std::string> overrides; // param -> value Coi passes
+};
+static std::map<std::string, ListenEntry> LISTENS; // ns::func -> events it turns on
 
 // Load whitelist from src/tools/schema_whitelist.def
 bool load_whitelist(const std::string &path)
@@ -116,28 +125,50 @@ bool load_whitelist(const std::string &path)
             }
             else
             {
-                // Regular function name, optionally "name +events" / "name +events(A, B)"
-                std::string fn = line, events;
-                size_t plus = line.find(" +events");
-                if (plus != std::string::npos)
-                {
-                    fn = line.substr(0, plus);
-                    std::string rest = line.substr(plus + 8);
-                    size_t open = rest.find('('), close = rest.find(')');
+                // Function name, then modifiers: +events, +events(A, B), +listen(A, B), p=v
+                std::istringstream ls(line);
+                std::string fn, word;
+                ls >> fn;
+                std::string key = current_ns + "::" + fn;
+                std::string rest;
+                std::getline(ls, rest);
+                auto list_of = [](const std::string &s) {
                     std::vector<std::string> names;
-                    if (open != std::string::npos && close != std::string::npos)
+                    std::string cur;
+                    for (char c : s)
                     {
-                        std::string cur;
-                        for (char c : rest.substr(open + 1, close - open - 1))
-                        {
-                            if (c == ',' || c == ' ') { if (!cur.empty()) names.push_back(cur); cur.clear(); }
-                            else cur += c;
-                        }
-                        if (!cur.empty()) names.push_back(cur);
+                        if (c == ',' || c == ' ') { if (!cur.empty()) names.push_back(cur); cur.clear(); }
+                        else cur += c;
                     }
-                    FACTORY_EVENTS[current_ns + "::" + fn] = names; // empty = every event
+                    if (!cur.empty()) names.push_back(cur);
+                    return names;
+                };
+                size_t pos = 0;
+                while (pos < rest.size())
+                {
+                    while (pos < rest.size() && rest[pos] == ' ') pos++;
+                    if (pos >= rest.size()) break;
+                    size_t end = rest.find(' ', pos);
+                    size_t paren = rest.find('(', pos);
+                    if (paren != std::string::npos && (end == std::string::npos || paren < end))
+                        end = rest.find(')', paren) + 1; // a (...) list may hold spaces
+                    std::string mod = rest.substr(pos, end == std::string::npos ? std::string::npos : end - pos);
+                    pos = end == std::string::npos ? rest.size() : end;
+                    size_t open = mod.find('(');
+                    std::string args = open == std::string::npos ? "" : mod.substr(open + 1, mod.size() - open - 2);
+                    if (mod.rfind("+events", 0) == 0)
+                        FACTORY_EVENTS[key] = list_of(args); // empty = every event
+                    else if (mod.rfind("+listen", 0) == 0)
+                        LISTENS[key].events = list_of(args);
+                    else if (mod.find('=') != std::string::npos)
+                        LISTENS[key].overrides[mod.substr(0, mod.find('='))] = mod.substr(mod.find('=') + 1);
+                    else
+                    {
+                        std::cerr << "[Coi] Error: unknown whitelist modifier '" << mod << "' on " << key << std::endl;
+                        return false;
+                    }
                 }
-                WHITELISTED_FUNCTIONS.insert(current_ns + "::" + fn);
+                WHITELISTED_FUNCTIONS.insert(key);
                 pending_comments.clear();
             }
         }
@@ -339,6 +370,52 @@ void emit_event_pods(std::ostream &out, const webcc::SchemaDefs &defs, const std
     }
 }
 
+// " listen:func(param:Type=value,...)" when the whitelist names a function that turns the
+// event on: the view calls it with exactly these values. "" when nothing does.
+std::string event_listen_token(const webcc::SchemaDefs &defs, const webcc::SchemaEvent &e)
+{
+    for (const auto &[key, entry] : LISTENS)
+    {
+        if (key.rfind(e.ns + "::", 0) != 0 || std::find(entry.events.begin(), entry.events.end(), e.name) == entry.events.end())
+            continue;
+        std::string fn = key.substr(e.ns.size() + 2);
+        const webcc::SchemaCommand *cmd = nullptr;
+        for (const auto &c : defs.commands)
+            if (c.ns == e.ns && c.func_name == fn)
+                cmd = &c;
+        if (!cmd || cmd->params.empty() || cmd->params[0].handle_type != e.params[0].handle_type)
+        {
+            std::cerr << "[Coi] Error: +listen on " << key << ": it must take the " << e.name << " event's handle first" << std::endl;
+            exit(1);
+        }
+        std::string args;
+        for (size_t i = 1; i < cmd->params.size(); i++)
+        {
+            const auto &p = cmd->params[i];
+            auto ov = entry.overrides.find(p.name);
+            std::string value = ov != entry.overrides.end() ? ov->second : p.default_value;
+            if (value.empty())
+            {
+                std::cerr << "[Coi] Error: +listen on " << key << ": param '" << p.name << "' needs a value (p=v) or a schema default" << std::endl;
+                exit(1);
+            }
+            args += (args.empty() ? "" : ",") + p.name + ":" + to_coi_type(p.type, p.handle_type, p.enum_type) + "=" + value;
+        }
+        for (const auto &[name, _] : entry.overrides)
+        {
+            bool found = false;
+            for (const auto &p : cmd->params) found = found || p.name == name;
+            if (!found)
+            {
+                std::cerr << "[Coi] Error: +listen on " << key << ": no param '" << name << "'" << std::endl;
+                exit(1);
+            }
+        }
+        return " listen:" + fn + "(" + args + ")";
+    }
+    return "";
+}
+
 // Callback methods for the events of a handle type
 void emit_event_methods(std::ostream &out, const webcc::SchemaDefs &defs, const std::string &handle_type)
 {
@@ -353,7 +430,7 @@ void emit_event_methods(std::ostream &out, const webcc::SchemaDefs &defs, const 
             fields += (i > 1 ? "," : "") + (e->params[i].name.empty() ? "arg" + std::to_string(i) : e->params[i].name);
         std::string pod = event_pod_name(defs, *e);
         out << "    @event(\"" << e->ns << "::" << e->name << " " << e->params[0].name << " " << (fields.empty() ? "-" : fields) << (e->last ? " last" : "")
-            << (pod.empty() ? "" : " pod:" + pod) << "\")\n";
+            << (pod.empty() ? "" : " pod:" + pod) << event_listen_token(defs, *e) << "\")\n";
         out << "    def on" << to_pascal_case(e->name) << "(" << event_callback_type(*e, "callback") << "): void\n\n";
     }
 }

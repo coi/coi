@@ -2,6 +2,11 @@
 
 #include "node.h"
 
+struct MethodDef;
+// `this->callback(...)` for a webcc event held in `evt`; see expressions.cc
+std::string generate_event_call(const MethodDef& event_method, const std::string& handle_type,
+                                const std::string& callback, const std::string& evt);
+
 struct IntLiteral : Expression {
     int value;
     explicit IntLiteral(int v) : value(v){}

@@ -11,9 +11,15 @@
 //   @inline("x") def ...       - Raw inline definition (emitted as-is)
 
 [dom]
-# Pointer input; events arrive through onPointer(&handler)
-add_pointer_listener
+# Event listeners. +listen makes their events view attributes (onpointerdown=, onwheel=...);
+# the view calls them with these values: pointer capture, and the page doesn't scroll under
+# a wheel handler. An element sets its own pointer flags with pointerflags={...}.
 remove_pointer_listener
+add_pointer_listener +listen(POINTER) flags=1
+add_wheel_listener +listen(WHEEL) prevent_default=1
+observe_resize +listen(RESIZE)
+add_focus_listener +listen(FOCUS, BLUR)
+add_drop_listener +listen(DROP)
 request_fullscreen
 request_pointer_lock
 scroll_to_top

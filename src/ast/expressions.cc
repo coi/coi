@@ -541,10 +541,12 @@ static SplitArgs split_call_args(const MethodDef& method, const std::vector<Call
 
 // coi_events<E>.set(handle, [this](const E& e) { this->handler(e.a, e.b); }, this)
 // The handler may take fewer parameters than the event has fields.
-static std::string generate_event_registration(const MethodDef& event_method, const std::string& handle_type,
-                                               const std::string& handle_expr, const CallArg& arg) {
+// `this->callback(...)` for an event held in `evt` (a const webcc::ns::NameEvent&): the
+// handler gets the event as its pod, or a prefix of the fields converted to Coi types.
+// Records the event so the event loop dispatches it.
+std::string generate_event_call(const MethodDef& event_method, const std::string& handle_type,
+                                const std::string& callback, const std::string& evt) {
     SchemaEventSpec spec = SchemaEventSpec::parse(event_method.mapping_value);
-    std::string callback = arg.value->to_webcc();
     std::vector<std::string> field_types;
     for (const auto& p : event_method.params)
         if (is_callback_param(p)) field_types = callback_param_types(p.type);
@@ -557,21 +559,30 @@ static std::string generate_event_registration(const MethodDef& event_method, co
         as_pod = sig && sig->param_types.size() == 1 && DefSchema::instance().resolve_alias(sig->param_types[0]) == spec.pod;
     }
     if (as_pod) n = (int)spec.fields.size();
-    std::string full = "webcc::" + spec.struct_name();
-    std::string code = "coi_events<" + full + ">.set(" + handle_expr + ", [this](const " + full + "& _e) { ";
-    code += "(void)_e; this->" + callback + "(";
+    std::string code = "this->" + callback + "(";
     if (as_pod) code += spec.pod + "{";
     for (int i = 0; i < n; i++) {
         if (i) code += ", ";
         std::string ft = i < (int)field_types.size() ? field_types[i] : "";
-        if (ft == "string") code += "coi::string(_e." + spec.fields[i] + ")";
-        else if (ft == "uint8[]") code += "coi_bytes(_e." + spec.fields[i] + ")"; // a view into the event buffer
-        else code += from_webcc_value("_e." + spec.fields[i], ft);
+        std::string f = evt + "." + spec.fields[i];
+        if (ft == "string") code += "coi::string(" + f + ")";
+        else if (ft == "uint8[]") code += "coi_bytes(" + f + ")"; // a view into the event buffer
+        else code += from_webcc_value(f, ft);
     }
     if (as_pod) code += "}";
-    code += "); }, this)";
+    code += ")";
+    std::string full = "webcc::" + spec.struct_name();
     g_used_events[spec.ns + "::" + spec.name] = {spec.ns, spec.name, spec.key, full, handle_type, spec.last};
     return code;
+}
+
+// coi_events<E>.set(handle, [this](const E& _e) { this->handler(...); }, this)
+static std::string generate_event_registration(const MethodDef& event_method, const std::string& handle_type,
+                                               const std::string& handle_expr, const CallArg& arg) {
+    SchemaEventSpec spec = SchemaEventSpec::parse(event_method.mapping_value);
+    std::string full = "webcc::" + spec.struct_name();
+    std::string call = generate_event_call(event_method, handle_type, arg.value->to_webcc(), "_e");
+    return "coi_events<" + full + ">.set(" + handle_expr + ", [this](const " + full + "& _e) { (void)_e; " + call + "; }, this)";
 }
 
 // Callbacks on a call that returns a handle: `[&]() { auto _h = call; register...; return _h; }()`

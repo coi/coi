@@ -155,6 +155,45 @@ component KeyboardInput {
 | `onchange` | `def handler(string value) : void` | Input lost focus after change |
 | `onkeydown` | `def handler(int keycode) : void` | Key pressed |
 
+### Pointer, wheel, resize, focus and drop
+
+These come from the platform's events, so their handlers work like [events on handles](api-reference.md#events-on-handles): a handler takes the event's pod, its leading fields, or nothing.
+
+```tsx
+component Sketch {
+    def start(PointerEvent e) : void { beginStroke(e.x, e.y, e.pressure); }
+    def draw(PointerEvent e) : void { addPoint(e.x, e.y, e.pressure); }
+    def end() : void { finishStroke(); }
+    def zoom(WheelEvent w) : void { if ((w.mods & Mods.Ctrl) != 0) zoomBy(w.deltaY); }
+    def sized(ResizeEvent r) : void { surfaceWidth = r.pixelWidth; }
+
+    view {
+        <canvas onpointerdown={start} onpointermove={draw} onpointerup={end} onwheel={zoom} onresize={sized}
+                pointerflags={PointerFlags.Capture | PointerFlags.Coalesced | PointerFlags.NoScroll}></canvas>
+    }
+}
+```
+
+| Attribute | Handler takes | Notes |
+|-----------|---------------|-------|
+| `onpointer` | `PointerEvent` | Every pointer event; `e.phase` says which |
+| `onpointerdown`, `onpointermove`, `onpointerup`, `onpointercancel`, `onpointerpredicted` | `PointerEvent` | One phase each. Cancel means the browser took over (e.g. a touch became a scroll): not a finished stroke |
+| `onwheel` | `WheelEvent` | The page doesn't scroll or zoom while over the element. A trackpad pinch has `Mods.Ctrl` set |
+| `onresize` | `ResizeEvent` | Once when the element appears, then on every size or pixel-ratio change |
+| `onfocus`, `onblur` | nothing | |
+| `ondrop` | `(Blob data, string name, string mime, float x, float y, int index, int count)` | One call per dropped file. No pod, since `Blob` is a handle |
+
+**Pointer flags.** By default the pointer is captured, so `onpointerup` arrives even when it's released outside the element. A drawing surface wants more, and sets `pointerflags`:
+
+| Flag | Effect |
+|------|--------|
+| `PointerFlags.Capture` | Keep the pointer after it leaves the element |
+| `PointerFlags.Coalesced` | Report every move sample, not one per frame: smoother fast strokes |
+| `PointerFlags.NoScroll` | Touch and pen don't scroll the page or select text, and a tap doesn't take focus away |
+| `PointerFlags.Predict` | Also report predicted samples (`onpointerpredicted`), to draw ahead of the pen |
+
+A misspelled event attribute is a compile error that lists the real ones.
+
 ## Element References
 
 Bind DOM elements to variables with `&=`:

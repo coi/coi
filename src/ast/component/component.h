@@ -115,12 +115,12 @@ using EventMasks = std::map<std::string, EventMask>;
 // Centralized metadata for supported DOM events used by code generation.
 struct EventSpec
 {
-    const char *type;                    // Event name in templates/handlers (e.g., "click", "input")
-    const char *dispatcher_name;         // Global dispatcher symbol used for bind/remove
-    const char *dispatcher_lambda_params; // Lambda signature used when registering dispatcher callback
-    const char *dispatcher_call_arg;     // Argument forwarded from dispatcher lambda into _handler_* call
-    const char *handler_param_decl;      // Generated _handler_* parameter declaration
-    const char *handler_call_arg;        // Argument passed to user callback inside generated _handler_*
+    std::string type;                     // Event name in templates/handlers (e.g., "click", "input")
+    std::string dispatcher_name;          // Global dispatcher symbol used for bind/remove
+    std::string dispatcher_lambda_params; // Lambda signature used when registering dispatcher callback
+    std::string dispatcher_call_arg;      // Argument forwarded from dispatcher lambda into _handler_* call
+    std::string handler_param_decl;       // Generated _handler_* parameter declaration
+    std::string handler_call_arg;         // Argument passed to user callback inside generated _handler_*
 };
 
 const std::vector<EventSpec> &get_event_specs();

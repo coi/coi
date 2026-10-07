@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <map>
 #include <memory>
 #include <optional>
 
@@ -57,10 +58,30 @@ struct SchemaEventSpec
     std::vector<std::string> fields;
     bool last = false;
     std::string pod; // "PointerEvent": a handler may take the fields as this one pod
+    // The function that turns the event on ("add_pointer_listener") and the value of each of
+    // its params after the handle, from the whitelist's +listen
+    struct ListenParam
+    {
+        std::string name, type, value;
+    };
+    std::string listen;
+    std::vector<ListenParam> listen_params;
 
     static SchemaEventSpec parse(const std::string &value);
     std::string struct_name() const; // webcc's C++ struct: ns::NameEvent
     std::string method_name() const; // Coi's callback method: onName
+};
+
+// A view attribute for a webcc event, derived from the defs: every DOMElement event with
+// a listener gives on<event> (onpointer, onwheel), and an event whose first field is an
+// enum also gives one attribute per value (onpointerdown, onpointerup...)
+struct ViewEventAttr
+{
+    std::string attr;         // "onpointerdown"
+    std::string type;         // "pointer": one handler table per event, shared by its attributes
+    const struct MethodDef *method = nullptr; // DOMElement.onPointer
+    std::string phase;        // "Down" for a per-value attribute, else ""
+    std::string phase_enum;   // "PointerPhase"
 };
 
 // Callback type "def(T1,T2):ret" as written in a def file
@@ -181,6 +202,12 @@ public:
 
     // Lookup methods
     const MethodDef *lookup_method(const std::string &type_name, const std::string &method_name) const;
+    // Event attributes for elements, and listener options (attr -> Coi type, e.g.
+    // "pointerflags" -> "PointerFlags"); both derived from DOMElement's events
+    const std::vector<ViewEventAttr> &view_event_attrs() const;
+    const ViewEventAttr *find_view_event_attr(const std::string &attr) const;
+    const std::map<std::string, std::string> &view_option_attrs() const;
+
     // C++ type a value of this Coi type must be cast to when passed to webcc (platform
     // enums and flags), or "" for anything else
     std::string webcc_cast_type(const std::string &type_name) const;
@@ -236,6 +263,10 @@ private:
 
     // Index for fast func name lookups: "snake_func" -> FuncLookupResult
     mutable std::unordered_map<std::string, FuncLookupResult> func_index_;
+    mutable std::vector<ViewEventAttr> view_attrs_;
+    mutable std::map<std::string, std::string> view_options_;
+    mutable bool view_attrs_built_ = false;
+    void build_view_attrs() const;
     mutable bool func_index_built_ = false;
     void build_func_index() const;
 

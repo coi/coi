@@ -1,15 +1,32 @@
 #include "component.h"
+#include "../../defs/def_parser.h"
+#include <set>
 #include <cstdint>
 
 const std::vector<EventSpec> &get_event_specs()
 {
-    static const std::vector<EventSpec> kSpecs = {
-        {"click", "g_dispatcher", "", "", "", ""},
-        {"input", "g_input_dispatcher", "const coi::string& _value", "_value", "const coi::string& _value", "_value"},
-        {"change", "g_change_dispatcher", "const coi::string& _value", "_value", "const coi::string& _value", "_value"},
-        {"keydown", "g_keydown_dispatcher", "int _keycode", "_keycode", "int _keycode", "_keycode"},
-    };
-    return kSpecs;
+    static std::vector<EventSpec> specs;
+    if (specs.empty())
+    {
+        specs = {
+            {"click", "g_dispatcher", "", "", "", ""},
+            {"input", "g_input_dispatcher", "const coi::string& _value", "_value", "const coi::string& _value", "_value"},
+            {"change", "g_change_dispatcher", "const coi::string& _value", "_value", "const coi::string& _value", "_value"},
+            {"keydown", "g_keydown_dispatcher", "int _keycode", "_keycode", "int _keycode", "_keycode"},
+        };
+        // One per webcc event behind a view attribute (onpointer..., onwheel...), from the
+        // defs. The handler body is generated, so it gets the whole event as `_e`.
+        std::set<std::string> seen;
+        for (const auto &attr : DefSchema::instance().view_event_attrs())
+        {
+            if (!seen.insert(attr.type).second)
+                continue;
+            std::string full = "webcc::" + SchemaEventSpec::parse(attr.method->mapping_value).struct_name();
+            std::string param = "const " + full + "& _e";
+            specs.push_back({attr.type, "coi_events<" + full + ">", param, "_e", param, "_e"});
+        }
+    }
+    return specs;
 }
 
 const EventSpec *find_event_spec(const std::string &event_type)
