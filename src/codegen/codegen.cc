@@ -6,6 +6,24 @@
 #include "json_codegen.h"
 #include <iostream>
 
+// One case per webcc event a component bound a callback to (collected while
+// lowering, see g_used_events). A "last" event also drops every callback the
+// handle had, so finished requests don't pile up in the tables.
+static void emit_event_dispatch(std::ostream &out)
+{
+    for (const auto &[key, ev] : g_used_events)
+    {
+        out << "        } else if (e.opcode == " << ev.struct_name << "::OPCODE) {\n";
+        out << "            if (auto evt = e.as<" << ev.struct_name << ">()) {\n";
+        out << "                coi_events<" << ev.struct_name << ">.dispatch(evt->" << ev.key << ", *evt);\n";
+        if (ev.last)
+            for (const auto &[key2, other] : g_used_events)
+                if (other.handle_type == ev.handle_type)
+                    out << "                coi_events<" << other.struct_name << ">.remove(evt->" << ev.key << ");\n";
+        out << "            }\n";
+    }
+}
+
 void generate_cpp_code(
     std::ostream &out,
     std::vector<Component> &all_components,
@@ -162,68 +180,82 @@ void generate_cpp_code(
         }
     }
 
-    // Generic event dispatcher template (only if needed)
-    if (needs_dispatcher(features))
-    {
-        out << "template<typename Callback, int MaxListeners = 512>\n";
-        out << "struct Dispatcher {\n";
-        out << "    int32_t handles[MaxListeners];\n";
-        out << "    Callback callbacks[MaxListeners];\n";
-        out << "    const void* owners[MaxListeners];\n";
-        out << "    int count = 0;\n";
-        // owner: the component whose method the callback calls into; its
-        // _destroy() (coi_forget_owner) removes every entry it owns, so a late
-        // event never calls into freed memory and dead entries don't pile up
-        out << "    void set(webcc::handle h, Callback cb, const void* owner = nullptr) {\n";
-        out << "        int32_t hid = (int32_t)h;\n";
-        out << "        for (int i = 0; i < count; i++) {\n";
-        out << "            if (handles[i] == hid) { callbacks[i] = cb; owners[i] = owner; return; }\n";
-        out << "        }\n";
-        out << "        if (count < MaxListeners) {\n";
-        out << "            handles[count] = hid;\n";
-        out << "            callbacks[count] = cb;\n";
-        out << "            owners[count] = owner;\n";
-        out << "            count++;\n";
-        out << "        }\n";
-        out << "    }\n";
-        out << "    void remove_owner(const void* owner) {\n";
-        out << "        for (int i = 0; i < count; ) {\n";
-        out << "            if (owners[i] == owner) {\n";
-        out << "                handles[i] = handles[count-1];\n";
-        out << "                callbacks[i] = callbacks[count-1];\n";
-        out << "                owners[i] = owners[count-1];\n";
-        out << "                count--;\n";
-        out << "            } else { i++; }\n";
-        out << "        }\n";
-        out << "    }\n";
-        out << "    void remove(webcc::handle h) {\n";
-        out << "        int32_t hid = (int32_t)h;\n";
-        out << "        for (int i = 0; i < count; i++) {\n";
-        out << "            if (handles[i] == hid) {\n";
-        out << "                handles[i] = handles[count-1];\n";
-        out << "                callbacks[i] = callbacks[count-1];\n";
-        out << "                owners[i] = owners[count-1];\n";
-        out << "                count--;\n";
-        out << "                return;\n";
-        out << "            }\n";
-        out << "        }\n";
-        out << "    }\n";
-        out << "    template<typename... Args>\n";
-        out << "    bool dispatch(webcc::handle h, Args&&... args) {\n";
-        out << "        int32_t hid = (int32_t)h;\n";
-        out << "        for (int i = 0; i < count; i++) {\n";
-        out << "            if (handles[i] == hid) { callbacks[i](args...); return true; }\n";
-        out << "        }\n";
-        out << "        return false;\n";
-        out << "    }\n";
-        out << "};\n\n";
-    }
+    // Event dispatcher: callbacks keyed by handle. One instance per DOM event kind
+    // (g_dispatcher...) and, through coi_events<E>, one per webcc event type that a
+    // component registered a callback for. Every instance links itself into a list on
+    // first use, so coi_forget_owner can clear a destroyed component's entries from all
+    // of them without the compiler knowing which exist.
+    out << "struct DispatcherBase {\n";
+    out << "    static inline DispatcherBase* g_first = nullptr;\n";
+    out << "    DispatcherBase* next = nullptr;\n";
+    out << "    void (*forget)(DispatcherBase*, const void*) = nullptr;\n";
+    out << "};\n";
+    out << "template<typename Callback, int MaxListeners = 512>\n";
+    out << "struct Dispatcher : DispatcherBase {\n";
+    out << "    int32_t handles[MaxListeners];\n";
+    out << "    Callback callbacks[MaxListeners];\n";
+    out << "    const void* owners[MaxListeners];\n";
+    out << "    int count = 0;\n";
+    // owner: the component whose method the callback calls into; its
+    // _destroy() (coi_forget_owner) removes every entry it owns, so a late
+    // event never calls into freed memory and dead entries don't pile up
+    out << "    void set(webcc::handle h, Callback cb, const void* owner = nullptr) {\n";
+    out << "        if (!forget) { forget = [](DispatcherBase* b, const void* o) { static_cast<Dispatcher*>(b)->remove_owner(o); }; next = g_first; g_first = this; }\n";
+    out << "        int32_t hid = (int32_t)h;\n";
+    out << "        for (int i = 0; i < count; i++) {\n";
+    out << "            if (handles[i] == hid) { callbacks[i] = cb; owners[i] = owner; return; }\n";
+    out << "        }\n";
+    out << "        if (count < MaxListeners) {\n";
+    out << "            handles[count] = hid;\n";
+    out << "            callbacks[count] = cb;\n";
+    out << "            owners[count] = owner;\n";
+    out << "            count++;\n";
+    out << "        }\n";
+    out << "    }\n";
+    out << "    void remove_owner(const void* owner) {\n";
+    out << "        for (int i = 0; i < count; ) {\n";
+    out << "            if (owners[i] == owner) {\n";
+    out << "                handles[i] = handles[count-1];\n";
+    out << "                callbacks[i] = callbacks[count-1];\n";
+    out << "                owners[i] = owners[count-1];\n";
+    out << "                count--;\n";
+    out << "            } else { i++; }\n";
+    out << "        }\n";
+    out << "    }\n";
+    out << "    void remove(webcc::handle h) {\n";
+    out << "        int32_t hid = (int32_t)h;\n";
+    out << "        for (int i = 0; i < count; i++) {\n";
+    out << "            if (handles[i] == hid) {\n";
+    out << "                handles[i] = handles[count-1];\n";
+    out << "                callbacks[i] = callbacks[count-1];\n";
+    out << "                owners[i] = owners[count-1];\n";
+    out << "                count--;\n";
+    out << "                return;\n";
+    out << "            }\n";
+    out << "        }\n";
+    out << "    }\n";
+    out << "    template<typename... Args>\n";
+    out << "    bool dispatch(webcc::handle h, Args&&... args) {\n";
+    out << "        int32_t hid = (int32_t)h;\n";
+    out << "        for (int i = 0; i < count; i++) {\n";
+    out << "            if (handles[i] == hid) { callbacks[i](args...); return true; }\n";
+    out << "        }\n";
+    out << "        return false;\n";
+    out << "    }\n";
+    out << "};\n";
+    out << "// Callbacks for webcc event E, keyed by the handle in its first field\n";
+    out << "template<typename E> Dispatcher<coi::function<void(const E&)>> coi_events;\n";
+    out << "inline void coi_forget_owner(const void* owner) {\n";
+    out << "    for (DispatcherBase* d = DispatcherBase::g_first; d; d = d->next) d->forget(d, owner);\n";
+    out << "}\n\n";
 
     out << "int g_view_depth = 0;\n";
 
     // Emit feature-specific globals (dispatchers, callbacks, etc.)
     emit_feature_globals(out, features);
     out << "\n";
+
+    g_used_events.clear();
 
     // Create compiler session for cross-component state
     CompilerSession session;
@@ -441,6 +473,7 @@ void generate_cpp_code(
     out << "        const auto& e = events[i];\n";
     out << "        if (false) {\n"; // Dummy to allow all handlers to use "} else if"
     emit_feature_event_handlers(out, features);
+    emit_event_dispatch(out);
     out << "        }\n";
     out << "    }\n";
     out << "}\n\n";

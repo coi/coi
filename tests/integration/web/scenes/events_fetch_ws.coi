@@ -1,0 +1,39 @@
+// Schema-driven event callbacks in a real browser: fetch success and error,
+// callbacks bound after creation, handlers with fewer parameters than the
+// event, and a WebSocket that fails: error first, then close (close must still
+// arrive after an error).
+component EventsFetchWs {
+    mut WebSocket ws;
+    mut string fetched = "-";
+    mut string missing = "-";
+    mut string wsOrder = "";
+    mut int closeCode = 0;
+
+    def gotPage(string data) : void {
+        fetched = data.length() > 0 ? "success" : "empty";
+    }
+    def pageFailed(string error) : void { fetched = "error " + error; }
+    def missingOk() : void { missing = "unexpected success"; }
+    def missingFailed(string error) : void { missing = "error"; }
+    def wsFailed() : void { wsOrder = wsOrder + "error "; }
+    def wsClosed(int code) : void { wsOrder = wsOrder + "close"; closeCode = code; }
+
+    mount {
+        FetchRequest.get("./index.html", &gotPage, &pageFailed);
+        FetchRequest.get("./does-not-exist.txt", &onSuccess = missingOk, &onError = missingFailed);
+        ws = WebSocket.connect("ws://127.0.0.1:1/", &onError = wsFailed);
+        ws.onClose(&wsClosed);
+    }
+
+    view {
+        <div>
+            <p class="fetched">{fetched}</p>
+            <p class="missing">{missing}</p>
+            <p class="ws">{wsOrder}</p>
+            <p class="code">{closeCode}</p>
+            <p class="connected">{ws.isConnected() ? "open" : "closed"}</p>
+        </div>
+    }
+}
+
+app { root = EventsFetchWs; }

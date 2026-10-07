@@ -93,12 +93,10 @@ remove_item
 clear
 
 [fetch]
-// FetchRequest.get with optional callback parameters (compiler intrinsic)
-@intrinsic("fetch_get") shared def get(string url, string headers = "", def onSuccess(string): void = void, def onError(string): void = void): FetchRequest
-// FetchRequest.post with optional callback parameters (compiler intrinsic)
-@intrinsic("fetch_post") shared def post(string url, string body, string headers = "", def onSuccess(string): void = void, def onError(string): void = void): FetchRequest
-// FetchRequest.patch with optional callback parameters (compiler intrinsic)
-@intrinsic("fetch_patch") shared def patch(string url, string body, string headers = "", def onSuccess(string): void = void, def onError(string): void = void): FetchRequest
+# Text requests; DONE is only for request() (needs bytes), so it is left out here
+get +events(SUCCESS, ERROR)
+post +events(SUCCESS, ERROR)
+patch +events(SUCCESS, ERROR)
 
 [system]
 log
@@ -147,17 +145,13 @@ draw_arrays
 @inline("webcc::canvas::get_context_2d(${this}, (${0} ? webcc::canvas::CONTEXT_LOW_LATENCY : 0) | (${1} ? webcc::canvas::CONTEXT_OPAQUE : 0))") def getContext2d(bool lowLatency, bool opaque): CanvasContext2D
 
 [websocket]
+# An owned socket member is closed when its component is destroyed
+@cleanup("websocket::close")
+connect +events
 send
 close
-// Check if the WebSocket is connected (handle is valid)
-@inline("$self.is_valid()") def isConnected(): bool
-// WebSocket.connect with optional callback parameters (compiler intrinsic)
-@intrinsic("ws_connect") shared def connect(string url, def onMessage(string): void = void, def onOpen(): void = void, def onClose(): void = void, def onError(): void = void): WebSocket
-// WebSocket callback registration (compiler intrinsics)
-@intrinsic("ws_on_message") def onMessage(def callback(string): void): void
-@intrinsic("ws_on_open") def onOpen(def callback: void): void
-@intrinsic("ws_on_close") def onClose(def callback: void): void
-@intrinsic("ws_on_error") def onError(def callback: void): void
+// True while the socket is open (not connecting, closing or closed)
+@inline("(webcc::websocket::get_ready_state($self) == webcc::websocket::STATE_OPEN)") def isConnected(): bool
 
 [wgpu]
 request_adapter

@@ -1,6 +1,7 @@
 // Definition file parser implementation
 
 #include "def_parser.h"
+#include <cctype>
 #include "../cli/error.h"
 #include <cstdint>
 #include <fstream>
@@ -308,9 +309,10 @@ std::vector<MethodParam> DefParser::parse_params()
             
             param.type = func_type;
             
-            // Skip optional default value (= void or = something)
+            // Optional default (= void): the callback may be left out
             if (current_.type == Token::Equals)
             {
+                param.has_default = true;
                 advance(); // skip '='
                 advance(); // skip the default value
             }
@@ -338,6 +340,15 @@ std::vector<MethodParam> DefParser::parse_params()
             // Name
             param.name = current_.value;
             advance();
+
+            // Optional default (= "" or = 0): skip it, numbers are not even tokens
+            if (current_.type == Token::Equals)
+            {
+                param.has_default = true;
+                advance();
+                while (current_.type != Token::Comma && current_.type != Token::RParen && current_.type != Token::Eof)
+                    advance();
+            }
         }
 
         params.push_back(param);
@@ -403,6 +414,11 @@ std::optional<MethodDef> DefParser::parse_method(const std::vector<std::pair<std
                 method.mapping_type = MappingType::Intrinsic;
                 method.mapping_value = value;
             }
+            else if (name == "event")
+            {
+                method.mapping_type = MappingType::Event;
+                method.mapping_value = value;
+            }
         }
 
         // Skip semicolon if present
@@ -460,6 +476,11 @@ std::optional<MethodDef> DefParser::parse_method(const std::vector<std::pair<std
         else if (name == "intrinsic")
         {
             method.mapping_type = MappingType::Intrinsic;
+            method.mapping_value = value;
+        }
+        else if (name == "event")
+        {
+            method.mapping_type = MappingType::Event;
             method.mapping_value = value;
         }
     }
@@ -537,6 +558,14 @@ std::optional<TypeDef> DefParser::parse_type()
         else if (name == "alias")
         {
             type_def.alias_of = value;
+        }
+        else if (name == "handle")
+        {
+            type_def.is_handle = true;
+        }
+        else if (name == "cleanup")
+        {
+            type_def.cleanup = value;
         }
     }
 
@@ -655,10 +684,85 @@ std::vector<DefFile> DefParser::parse_directory(const std::string &dir_path)
 // DefSchema - Singleton
 // ============================================================
 
+static constexpr uint32_t DEF_CACHE_MAGIC = 0x44494f43; // "COID"
+static constexpr uint32_t DEF_CACHE_VERSION = 2;
+
 DefSchema &DefSchema::instance()
 {
     static DefSchema instance;
     return instance;
+}
+
+SchemaEventSpec SchemaEventSpec::parse(const std::string &value)
+{
+    SchemaEventSpec s;
+    std::vector<std::string> tokens;
+    std::string cur;
+    for (char c : value)
+    {
+        if (c == ' ') { if (!cur.empty()) tokens.push_back(cur); cur.clear(); }
+        else cur += c;
+    }
+    if (!cur.empty()) tokens.push_back(cur);
+    if (!tokens.empty())
+    {
+        size_t sep = tokens[0].find("::");
+        if (sep != std::string::npos)
+        {
+            s.ns = tokens[0].substr(0, sep);
+            s.name = tokens[0].substr(sep + 2);
+        }
+    }
+    if (tokens.size() > 1) s.key = tokens[1];
+    if (tokens.size() > 2 && tokens[2] != "-")
+    {
+        std::string f;
+        for (char c : tokens[2])
+        {
+            if (c == ',') { s.fields.push_back(f); f.clear(); }
+            else f += c;
+        }
+        if (!f.empty()) s.fields.push_back(f);
+    }
+    s.last = tokens.size() > 3 && tokens[3] == "last";
+    return s;
+}
+
+// Same rule as webcc's header generator: PAGE_HIDE -> PageHideEvent
+std::string SchemaEventSpec::struct_name() const
+{
+    std::string out;
+    bool upper = true;
+    for (char c : name)
+    {
+        if (c == '_') { upper = true; continue; }
+        out += upper ? (char)std::toupper((unsigned char)c) : (char)std::tolower((unsigned char)c);
+        upper = false;
+    }
+    return ns + "::" + out + "Event";
+}
+
+std::string SchemaEventSpec::method_name() const
+{
+    std::string s = struct_name();
+    s = s.substr(s.find("::") + 2);
+    return "on" + s.substr(0, s.size() - 5);
+}
+
+std::vector<std::string> callback_param_types(const std::string &def_type)
+{
+    std::vector<std::string> types;
+    size_t open = def_type.find('('), close = def_type.rfind(')');
+    if (open == std::string::npos || close == std::string::npos || close < open)
+        return types;
+    std::string cur;
+    for (size_t i = open + 1; i < close; i++)
+    {
+        if (def_type[i] == ',') { types.push_back(cur); cur.clear(); }
+        else if (def_type[i] != ' ') cur += def_type[i];
+    }
+    if (!cur.empty()) types.push_back(cur);
+    return types;
 }
 
 bool DefSchema::is_cache_valid(const std::string &cache_path, const std::string &def_dir)
@@ -724,6 +828,10 @@ bool DefSchema::load(const std::string &def_dir)
                 {
                     it->second.extends = type_def.extends;
                 }
+                if (type_def.is_handle)
+                    it->second.is_handle = true;
+                if (!type_def.cleanup.empty() && it->second.cleanup.empty())
+                    it->second.cleanup = type_def.cleanup;
             }
             else
             {
@@ -745,6 +853,13 @@ bool DefSchema::load_cache(const std::string &cache_path)
         return false;
     }
 
+    // Format version, so a cache from an older compiler is rebuilt instead of misread
+    uint32_t magic = 0, version = 0;
+    file.read(reinterpret_cast<char *>(&magic), sizeof(magic));
+    file.read(reinterpret_cast<char *>(&version), sizeof(version));
+    if (!file || magic != DEF_CACHE_MAGIC || version != DEF_CACHE_VERSION)
+        return false;
+
     // Read number of types
     uint32_t type_count;
     file.read(reinterpret_cast<char *>(&type_count), sizeof(type_count));
@@ -764,8 +879,10 @@ bool DefSchema::load_cache(const std::string &cache_path)
         type_def.name = read_string();
         type_def.is_builtin = file.get() != 0;
         type_def.is_nocopy = file.get() != 0;
+        type_def.is_handle = file.get() != 0;
         type_def.extends = read_string();
         type_def.alias_of = read_string();
+        type_def.cleanup = read_string();
 
         uint32_t method_count;
         file.read(reinterpret_cast<char *>(&method_count), sizeof(method_count));
@@ -788,6 +905,7 @@ bool DefSchema::load_cache(const std::string &cache_path)
                 MethodParam param;
                 param.type = read_string();
                 param.name = read_string();
+                param.has_default = file.get() != 0;
                 method.params.push_back(param);
             }
 
@@ -815,6 +933,9 @@ bool DefSchema::save_cache(const std::string &cache_path)
         file.write(s.data(), len);
     };
 
+    file.write(reinterpret_cast<const char *>(&DEF_CACHE_MAGIC), sizeof(DEF_CACHE_MAGIC));
+    file.write(reinterpret_cast<const char *>(&DEF_CACHE_VERSION), sizeof(DEF_CACHE_VERSION));
+
     uint32_t type_count = types_.size();
     file.write(reinterpret_cast<const char *>(&type_count), sizeof(type_count));
 
@@ -823,8 +944,10 @@ bool DefSchema::save_cache(const std::string &cache_path)
         write_string(type_def.name);
         file.put(type_def.is_builtin ? 1 : 0);
         file.put(type_def.is_nocopy ? 1 : 0);
+        file.put(type_def.is_handle ? 1 : 0);
         write_string(type_def.extends);
         write_string(type_def.alias_of);
+        write_string(type_def.cleanup);
 
         uint32_t method_count = type_def.methods.size();
         file.write(reinterpret_cast<const char *>(&method_count), sizeof(method_count));
@@ -845,6 +968,7 @@ bool DefSchema::save_cache(const std::string &cache_path)
             {
                 write_string(param.type);
                 write_string(param.name);
+                file.put(param.has_default ? 1 : 0);
             }
         }
     }
@@ -889,6 +1013,14 @@ const MethodDef *DefSchema::lookup_method(const std::string &type_name, const st
             return &method;
         }
     }
+    // Fewer args than params: the rest must have defaults
+    for (const auto &method : type_it->second.methods)
+    {
+        if (method.name == method_name && arg_count < method.params.size() && arg_count >= method.required_params())
+        {
+            return &method;
+        }
+    }
 
     // Check parent type
     if (!type_it->second.extends.empty())
@@ -924,18 +1056,21 @@ bool DefSchema::inherits_from(const std::string &derived, const std::string &bas
 
 bool DefSchema::is_handle(const std::string &type_name) const
 {
-    // A handle is a non-builtin type that has methods with @map or @intrinsic annotations
+    // A handle is a webcc handle type (@handle, as gen_schema emits for every one), or a
+    // non-builtin type with @map/@intrinsic/@event methods
     auto type_it = types_.find(type_name);
     if (type_it == types_.end())
         return false;
     if (type_it->second.is_builtin)
         return false;
+    if (type_it->second.is_handle)
+        return true;
 
-    // Check if it has any @map or @intrinsic methods (webcc handle or intrinsic type)
     for (const auto &method : type_it->second.methods)
     {
         if (method.mapping_type == MappingType::Map || 
-            method.mapping_type == MappingType::Intrinsic)
+            method.mapping_type == MappingType::Intrinsic ||
+            method.mapping_type == MappingType::Event)
         {
             return true;
         }
@@ -1013,8 +1148,8 @@ std::string DefSchema::get_namespace_for_type(const std::string &type_name) cons
             continue;
 
         size_t sep = std::string::npos;
-        if (method.mapping_type == MappingType::Map)
-            sep = method.mapping_value.find("::"); // "ns::func_name"
+        if (method.mapping_type == MappingType::Map || method.mapping_type == MappingType::Event)
+            sep = method.mapping_value.find("::"); // "ns::func_name" / "ns::EVENT ..."
         else if (method.mapping_type == MappingType::Intrinsic)
             sep = method.mapping_value.find('_');  // "ns_func"
         else if (method.mapping_type == MappingType::Inline)

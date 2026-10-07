@@ -506,6 +506,39 @@ static std::string g_ctx_module;
 static std::string g_ctx_file;
 static const Component *g_ctx_component = nullptr;
 
+// `&handler` for a schema callback param ("def(string,int32):void"): the handler must be
+// a method of the component taking a prefix of the event's fields, same types.
+static std::string check_schema_callback(const CallArg &arg, const MethodParam &param, const std::string &call_name,
+                                         const std::string &event_label)
+{
+    std::string arg_name = "argument";
+    if (auto *id = dynamic_cast<Identifier *>(arg.value.get()))
+        arg_name = id->name;
+    if (!arg.is_reference)
+        return "'" + call_name + "': callback '" + event_label + "' requires '&' prefix. Use '&" + arg_name + "'";
+    const FunctionDef *handler = nullptr;
+    if (g_ctx_component)
+        for (const auto &m : g_ctx_component->methods)
+            if (m.name == arg_name)
+                handler = &m;
+    if (!handler)
+        return "'" + call_name + "': callback '" + event_label + "' must name a method of this component, got '" + arg_name + "'";
+    std::vector<std::string> want = callback_param_types(param.type);
+    if (handler->params.size() > want.size())
+        return "'" + call_name + "': '" + arg_name + "' takes " + std::to_string(handler->params.size()) +
+               " parameter(s) but the '" + event_label + "' event has " + std::to_string(want.size()) +
+               " (handlers may take fewer, not more)";
+    for (size_t i = 0; i < handler->params.size(); i++)
+    {
+        std::string have = normalize_type(handler->params[i].type);
+        if (!is_compatible_type(normalize_type(want[i]), have))
+            return "'" + call_name + "': parameter " + std::to_string(i + 1) + " of '" + arg_name + "' is '" +
+                   handler->params[i].type + "' but the '" + event_label + "' event provides '" + want[i] + "'";
+    }
+    return "";
+}
+
+
 static const FunctionDef *find_free_function(const std::string &module, const std::string &name)
 {
     for (const auto *fn : g_free_functions)
@@ -1088,6 +1121,33 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
             }
         }
 
+        // handle.onEvent(&handler): bind a callback to one of the handle's events
+        if (!obj_name.empty() && scope.count(obj_name))
+        {
+            std::string obj_type = normalize_type(scope.at(obj_name));
+            if (DefSchema::instance().is_handle(obj_type))
+            {
+                if (auto *ev = DefSchema::instance().lookup_method(obj_type, method_name))
+                {
+                    if (ev->mapping_type == MappingType::Event)
+                    {
+                        if (func->args.size() != 1 || ev->params.empty())
+                        {
+                            ErrorHandler::type_error("'" + full_name + "' takes exactly one '&handler' argument", func->line);
+                            exit(1);
+                        }
+                        std::string err = check_schema_callback(func->args[0], ev->params[0], full_name, method_name);
+                        if (!err.empty())
+                        {
+                            ErrorHandler::type_error(err, func->line);
+                            exit(1);
+                        }
+                        return "void";
+                    }
+                }
+            }
+        }
+
         std::string snake_method = DefSchema::to_snake_case(method_name);
         const auto *entry = DefSchema::instance().lookup_func(snake_method);
 
@@ -1190,31 +1250,92 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                 param_offset = 1;
             }
 
-            if (actual_args != (expected_args - param_offset))
+            // Plain values fill the params in order; the rest may have defaults.
+            // Callbacks (`&handler` or `&onX = handler`) bind events of the returned
+            // handle and are matched by name or by order among the callback params.
+            const auto &params = entry->method->params;
+            auto is_callback = [](const MethodParam &p) { return p.type.rfind("def", 0) == 0; };
+            size_t value_params = 0, required_values = 0;
+            for (size_t i = param_offset; i < params.size(); i++)
             {
-                ErrorHandler::type_error(
-                    "Function '" + full_name + "' expects " + std::to_string(expected_args - param_offset) +
-                    " arguments but got " + std::to_string(actual_args),
-                    func->line);
-                exit(1);
+                if (is_callback(params[i])) continue;
+                value_params++;
+                if (!params[i].has_default) required_values++;
             }
+            std::vector<const MethodParam *> callback_params;
+            for (size_t i = param_offset; i < params.size(); i++)
+                if (is_callback(params[i])) callback_params.push_back(&params[i]);
 
+            size_t value_index = 0, next_callback = 0;
+            std::set<const MethodParam *> bound;
             for (size_t i = 0; i < actual_args; ++i)
             {
-                std::string arg_type = infer_expression_type(func->args[i].value.get(), scope);
-                std::string expected_type = entry->method->params[i + param_offset].type;
-
-                // Note: Schema methods (external APIs) don't support reference parameters,
-                // so we don't validate &arg/:arg here. That validation happens for component methods.
-
-                if (!is_compatible_type(arg_type, expected_type))
+                const auto &arg = func->args[i];
+                if (!arg.is_reference && arg.name.empty())
                 {
-                    ErrorHandler::type_error(
-                        "Argument " + std::to_string(i + 1) + " of '" + full_name + "' expects '" + expected_type +
-                        "' but got '" + arg_type + "'",
-                        func->line);
+                    if (value_index >= value_params)
+                    {
+                        ErrorHandler::type_error(
+                            "Function '" + full_name + "' takes " + std::to_string(value_params) +
+                            " value argument(s) but got more", func->line);
+                        exit(1);
+                    }
+                    // the value_index-th non-callback param
+                    size_t pi = param_offset, seen = 0;
+                    while (pi < params.size() && (is_callback(params[pi]) || seen++ != value_index)) pi++;
+                    std::string arg_type = infer_expression_type(arg.value.get(), scope);
+                    std::string expected_type = params[pi].type;
+                    if (!is_compatible_type(arg_type, expected_type))
+                    {
+                        ErrorHandler::type_error(
+                            "Argument " + std::to_string(i + 1) + " of '" + full_name + "' expects '" + expected_type +
+                            "' but got '" + arg_type + "'",
+                            func->line);
+                        exit(1);
+                    }
+                    value_index++;
+                    continue;
+                }
+                const MethodParam *param = nullptr;
+                if (!arg.name.empty())
+                {
+                    for (const auto *p : callback_params)
+                        if (p->name == arg.name) param = p;
+                    if (!param)
+                    {
+                        std::string names;
+                        for (const auto *p : callback_params) names += (names.empty() ? "" : ", ") + p->name;
+                        ErrorHandler::type_error(
+                            "'" + full_name + "' has no callback named '" + arg.name + "'" +
+                            (names.empty() ? "" : " (available: " + names + ")"), func->line);
+                        exit(1);
+                    }
+                }
+                else
+                {
+                    while (next_callback < callback_params.size() && bound.count(callback_params[next_callback])) next_callback++;
+                    if (next_callback >= callback_params.size())
+                    {
+                        ErrorHandler::type_error("'" + full_name + "' got more callback arguments than it has events", func->line);
+                        exit(1);
+                    }
+                    param = callback_params[next_callback++];
+                }
+                bound.insert(param);
+                std::string err = check_schema_callback(arg, *param, full_name, param->name);
+                if (!err.empty())
+                {
+                    ErrorHandler::type_error(err, func->line);
                     exit(1);
                 }
+            }
+            if (value_index < required_values)
+            {
+                ErrorHandler::type_error(
+                    "Function '" + full_name + "' expects at least " + std::to_string(required_values) +
+                    " argument(s) but got " + std::to_string(value_index),
+                    func->line);
+                exit(1);
             }
 
             return entry->method->return_type.empty() ? "void" : entry->method->return_type;

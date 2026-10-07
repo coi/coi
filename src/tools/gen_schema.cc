@@ -17,6 +17,10 @@
 #include "../../deps/webcc/src/cli/schema.h"
 
 // Whitelist of functions and intrinsics exposed to Coi users
+//   name +events              - also take a trailing optional callback per event of the
+//   name +events(A, B)          returned handle type (all events, or the listed ones)
+//   @cleanup("ns::func")      - type annotation: called on owned members when their
+//                               component is destroyed (e.g. close a socket)
 // Loaded from src/tools/schema_whitelist.def at runtime
 //
 // Format:
@@ -29,6 +33,8 @@ static std::set<std::string> WHITELISTED_FUNCTIONS;
 
 // Intrinsic definitions by namespace - stores raw lines to emit (with preceding comments)
 static std::map<std::string, std::vector<std::string>> INTRINSIC_DEFS;
+static std::map<std::string, std::vector<std::string>> TYPE_ANNOTATIONS; // [section] -> lines before `type X`
+static std::map<std::string, std::vector<std::string>> FACTORY_EVENTS; // ns::func -> event names (empty = all)
 
 // Load whitelist from src/tools/schema_whitelist.def
 bool load_whitelist(const std::string &path)
@@ -85,8 +91,14 @@ bool load_whitelist(const std::string &path)
 
         if (!current_ns.empty())
         {
+            // Type annotations go before `type X`, not inside it
+            if (line.rfind("@cleanup", 0) == 0)
+            {
+                TYPE_ANNOTATIONS[current_ns].push_back(line);
+                pending_comments.clear();
+            }
             // Check if it's an intrinsic/inline definition (@intrinsic or @inline)
-            if (line[0] == '@')
+            else if (line[0] == '@')
             {
                 // Add pending comments first
                 for (const auto &comment : pending_comments)
@@ -104,14 +116,139 @@ bool load_whitelist(const std::string &path)
             }
             else
             {
-                // Regular function name
-                WHITELISTED_FUNCTIONS.insert(current_ns + "::" + line);
+                // Regular function name, optionally "name +events" / "name +events(A, B)"
+                std::string fn = line, events;
+                size_t plus = line.find(" +events");
+                if (plus != std::string::npos)
+                {
+                    fn = line.substr(0, plus);
+                    std::string rest = line.substr(plus + 8);
+                    size_t open = rest.find('('), close = rest.find(')');
+                    std::vector<std::string> names;
+                    if (open != std::string::npos && close != std::string::npos)
+                    {
+                        std::string cur;
+                        for (char c : rest.substr(open + 1, close - open - 1))
+                        {
+                            if (c == ',' || c == ' ') { if (!cur.empty()) names.push_back(cur); cur.clear(); }
+                            else cur += c;
+                        }
+                        if (!cur.empty()) names.push_back(cur);
+                    }
+                    FACTORY_EVENTS[current_ns + "::" + fn] = names; // empty = every event
+                }
+                WHITELISTED_FUNCTIONS.insert(current_ns + "::" + fn);
                 pending_comments.clear();
             }
         }
     }
 
     return true;
+}
+
+std::string to_coi_type(const std::string &type, const std::string &handle_type);
+
+// MESSAGE -> Message, PAGE_HIDE -> PageHide (webcc's struct naming, minus "Event")
+std::string to_pascal_case(const std::string &upper_snake)
+{
+    std::string out;
+    bool upper = true;
+    for (char c : upper_snake)
+    {
+        if (c == '_') { upper = true; continue; }
+        out += upper ? (char)std::toupper((unsigned char)c) : (char)std::tolower((unsigned char)c);
+        upper = false;
+    }
+    return out;
+}
+
+// Events of a handle type that Coi can bind a callback to. Skipped: the four dom events
+// the view syntax handles (onclick= etc.), and events with a bytes field until bytes is
+// mapped to a Coi type.
+std::vector<const webcc::SchemaEvent *> bindable_events(const webcc::SchemaDefs &defs, const std::string &handle_type)
+{
+    std::vector<const webcc::SchemaEvent *> out;
+    for (const auto &e : defs.events)
+    {
+        if (e.params.empty() || e.params[0].type != "handle" || e.params[0].handle_type != handle_type)
+            continue;
+        if (e.ns == "dom" && (e.name == "CLICK" || e.name == "INPUT" || e.name == "CHANGE" || e.name == "KEYDOWN"))
+            continue;
+        bool has_bytes = false;
+        for (const auto &p : e.params)
+            if (p.type == "bytes")
+                has_bytes = true;
+        if (has_bytes)
+            continue;
+        out.push_back(&e);
+    }
+    return out;
+}
+
+// "def callback(string, int32): void" for an event's fields after the handle
+std::string event_callback_type(const webcc::SchemaEvent &e, const std::string &name)
+{
+    std::string out = "def " + name;
+    if (e.params.size() > 1)
+    {
+        out += "(";
+        for (size_t i = 1; i < e.params.size(); i++)
+        {
+            if (i > 1) out += ", ";
+            out += to_coi_type(e.params[i].type, e.params[i].handle_type);
+        }
+        out += ")";
+    }
+    return out + ": void";
+}
+
+// Trailing ", def onX(...): void = void" params for a "+events" function
+std::string factory_event_params(const webcc::SchemaDefs &defs, const webcc::SchemaCommand &cmd)
+{
+    auto it = FACTORY_EVENTS.find(cmd.ns + "::" + cmd.func_name);
+    if (it == FACTORY_EVENTS.end() || cmd.return_handle_type.empty())
+        return "";
+    std::string out;
+    for (const auto *e : bindable_events(defs, cmd.return_handle_type))
+    {
+        if (!it->second.empty() && std::find(it->second.begin(), it->second.end(), e->name) == it->second.end())
+            continue;
+        out += ", " + event_callback_type(*e, "on" + to_pascal_case(e->name)) + " = void";
+    }
+    return out;
+}
+
+// Parameters from index `start` on, with defaults and the "+events" callbacks
+void emit_param_list(std::ostream &out, const webcc::SchemaDefs &defs, const webcc::SchemaCommand &cmd, size_t start)
+{
+    std::string list;
+    for (size_t i = start; i < cmd.params.size(); ++i)
+    {
+        const auto &p = cmd.params[i];
+        if (!list.empty()) list += ", ";
+        list += to_coi_type(p.type, p.handle_type) + " " + (p.name.empty() ? "arg" : p.name);
+        if (!p.default_value.empty()) list += " = " + p.default_value;
+    }
+    std::string events = factory_event_params(defs, cmd);
+    if (list.empty() && events.rfind(", ", 0) == 0) events = events.substr(2);
+    out << list << events;
+}
+
+// Callback methods for the events of a handle type
+void emit_event_methods(std::ostream &out, const webcc::SchemaDefs &defs, const std::string &handle_type)
+{
+    auto events = bindable_events(defs, handle_type);
+    if (events.empty())
+        return;
+    out << "    // Events: register a callback on this handle (handlers may take fewer parameters)\n";
+    for (const auto *e : events)
+    {
+        std::string fields;
+        for (size_t i = 1; i < e->params.size(); i++)
+            fields += (i > 1 ? "," : "") + (e->params[i].name.empty() ? "arg" + std::to_string(i) : e->params[i].name);
+        out << "    @event(\"" << e->ns << "::" << e->name << " " << e->params[0].name << " " << (fields.empty() ? "-" : fields) << (e->last ? " last" : "") << "\")\n";
+        out << "    def on" << to_pascal_case(e->name) << "(" << event_callback_type(*e, "callback") << "): void\n\n";
+    }
 }
 
 // Count total intrinsic definitions
@@ -467,6 +604,18 @@ int main()
             {
                 out << "@nocopy\n";
             }
+            // webcc::Name in C++, whether or not any of its functions are whitelisted
+            out << "@handle\n";
+            {
+                std::string handle_ns_key;
+                auto ns_it2 = type_to_ns.find(handle_type);
+                if (ns_it2 != type_to_ns.end())
+                    handle_ns_key = ns_it2->second;
+                for (const std::string &key : {handle_ns_key, handle_type})
+                    if (!key.empty() && TYPE_ANNOTATIONS.count(key))
+                        for (const auto &line : TYPE_ANNOTATIONS[key])
+                            out << line << "\n";
+            }
             out << "type " << handle_type;
             if (!extends.empty())
             {
@@ -485,18 +634,7 @@ int main()
 
                     out << "    @map(\"" << ns << "::" << cmd->func_name << "\")\n";
                     out << "    shared def " << coi_name << "(";
-
-                    bool first = true;
-                    for (const auto &p : cmd->params)
-                    {
-                        if (!first)
-                            out << ", ";
-                        first = false;
-                        std::string param_type = to_coi_type(p.type, p.handle_type);
-                        std::string param_name = p.name.empty() ? "arg" : p.name;
-                        out << param_type << " " << param_name;
-                    }
-
+                    emit_param_list(out, defs, *cmd, 0);
                     out << "): " << return_type << "\n\n";
                 }
             }
@@ -516,21 +654,12 @@ int main()
                     out << "    def " << coi_name << "(";
 
                     // Skip first param (it's the receiver/this)
-                    bool first = true;
-                    for (size_t i = 1; i < cmd->params.size(); ++i)
-                    {
-                        const auto &p = cmd->params[i];
-                        if (!first)
-                            out << ", ";
-                        first = false;
-                        std::string param_type = to_coi_type(p.type, p.handle_type);
-                        std::string param_name = p.name.empty() ? "arg" : p.name;
-                        out << param_type << " " << param_name;
-                    }
-
+                    emit_param_list(out, defs, *cmd, 1);
                     out << "): " << return_type << "\n\n";
                 }
             }
+
+            emit_event_methods(out, defs, handle_type);
 
             // Emit intrinsic definitions from whitelist for this handle type
             // Handle types like WebSocket, FetchRequest have intrinsics defined in the whitelist
@@ -591,18 +720,7 @@ int main()
 
                 out << "    @map(\"" << ns << "::" << cmd->func_name << "\")\n";
                 out << "    shared def " << coi_name << "(";
-
-                bool first = true;
-                for (const auto &p : cmd->params)
-                {
-                    if (!first)
-                        out << ", ";
-                    first = false;
-                    std::string param_type = to_coi_type(p.type, p.handle_type);
-                    std::string param_name = p.name.empty() ? "arg" : p.name;
-                    out << param_type << " " << param_name;
-                }
-
+                emit_param_list(out, defs, *cmd, 0);
                 out << "): " << return_type << "\n\n";
             }
 

@@ -1,0 +1,19 @@
+// Test: event callbacks on a handle type that has them only through the schema (Image)
+component ImageLoadedPass {
+    mut Image img;
+    mut int w = 0;
+    mut int h = 0;
+    mut bool broken = false;
+
+    def loaded(int width, int height) : void { w = width; h = height; }
+    def failed() : void { broken = true; }
+
+    mount {
+        img = Image.load("/pic.png");
+        img.onLoaded(&loaded);
+        img.onError(&failed);
+    }
+
+    view { <p>{w}x{h}</p> }
+}
+app { root = ImageLoadedPass; }

@@ -87,6 +87,9 @@ async function runTestModule(testPath, ctx) {
   const run = mod?.run || mod?.default;
   if (typeof run !== "function") throw new Error(`Expected ${testPath} to export 'run' (or default export)`);
   await run(ctx);
+  // A scene that tests failure paths (a refused socket, a 404) can list the
+  // console errors it expects as substrings; those don't fail the run.
+  return Array.isArray(mod?.expectedConsoleErrors) ? mod.expectedConsoleErrors : [];
 }
 
 async function main() {
@@ -115,12 +118,14 @@ async function main() {
     await waitForCoiMount(page);
 
     const expect = makeExpect(page);
+    let expectedErrors = [];
     if (test) {
-      await runTestModule(test, { page, expect });
+      expectedErrors = await runTestModule(test, { page, expect });
     }
 
-    if (consoleErrors.length) {
-      throw new Error(`Console errors:\n${consoleErrors.map((s) => `- ${s}`).join("\n")}`);
+    const unexpected = consoleErrors.filter((e) => !expectedErrors.some((sub) => e.includes(sub)));
+    if (unexpected.length) {
+      throw new Error(`Console errors:\n${unexpected.map((s) => `- ${s}`).join("\n")}`);
     }
   } catch (err) {
     if (screenshot) {

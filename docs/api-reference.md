@@ -492,7 +492,7 @@ component VideoPlayer {
 
 ## Fetch
 
-HTTP requests with callback-based response handling. Returns a `FetchRequest` handle.
+HTTP requests with callback-based response handling. Returns a `FetchRequest` handle. See [Events on handles](#events-on-handles) for how callbacks work.
 
 ### Methods
 
@@ -501,15 +501,18 @@ HTTP requests with callback-based response handling. Returns a `FetchRequest` ha
 | `FetchRequest.get(url, headers="", &onSuccess=..., &onError=...)` | Make a GET request (static) |
 | `FetchRequest.post(url, body, headers="", &onSuccess=..., &onError=...)` | Make a POST request (static) |
 | `FetchRequest.patch(url, body, headers="", &onSuccess=..., &onError=...)` | Make a PATCH request (static) |
+| `onSuccess(&handler)`, `onError(&handler)` | Bind a callback to a request after creating it |
 
-`headers` is a JSON object string (for example: `"{\"Authorization\":\"Bearer token\",\"Content-Type\":\"application/json\"}"`).
+`headers` is a JSON object string (for example: `"{\"Authorization\":\"Bearer token\",\"Content-Type\":\"application/json\"}"`). Callbacks can be passed by name (`&onError = handleError`) or by position (`&ok, &err`).
 
-### Callback Signatures
+### Events
 
-| Callback | Signature | Description |
-|----------|-----------|-------------|
-| `onSuccess` | `def handler(string data) : void` | Called with response data |
-| `onError` | `def handler(string error) : void` | Called on request error |
+| Event | Handler parameters | When |
+|-------|--------------------|------|
+| `onSuccess` | `string data` | Response with a 2xx status; `data` is the body |
+| `onError` | `string error` | Network failure or non-2xx status; `error` is the body or `"status text"` |
+
+A request produces exactly one of them, after which its callbacks are released.
 
 ### Example
 
@@ -816,25 +819,28 @@ match (Json.parse(User, payload)) {
 
 ## WebSocket
 
-Real-time bidirectional communication with WebSocket servers. The handle is automatically invalidated when the connection closes or errors.
+Real-time bidirectional communication with WebSocket servers. An owned `WebSocket` member is closed when its component is destroyed.
 
 ### Methods
 
 | Method | Description |
 |--------|-------------|
-| `WebSocket.connect(url, &onMessage=..., &onOpen=..., &onClose=..., &onError=...)` | Create connection with callback handlers |
-| `send(string msg)` | Send message (only when connected) |
+| `WebSocket.connect(url, protocols="", &onMessage=..., &onOpen=..., &onClose=..., &onError=...)` | Create connection with callback handlers |
+| `send(string msg)` | Send message (dropped unless the socket is open) |
 | `close()` | Close connection |
-| `isConnected()` | Check if WebSocket is connected (handle is valid) |
+| `isConnected()` | True while the socket is open (not connecting, closing or closed) |
+| `onMessage(&h)`, `onOpen(&h)`, `onClose(&h)`, `onError(&h)` | Bind a callback after connecting |
 
-### Callback Signatures
+### Events
 
-| Callback | Signature | Description |
-|----------|-----------|-------------|
-| `onMessage` | `def handler(string msg) : void` | Called when message received |
-| `onOpen` | `def handler : void` | Called when connection opens |
-| `onClose` | `def handler : void` | Called when connection closes |
-| `onError` | `def handler : void` | Called on connection error |
+| Event | Handler parameters | When |
+|-------|--------------------|------|
+| `onMessage` | `string msg` | A text message arrived |
+| `onOpen` | none | The connection is open |
+| `onClose` | `int code, string reason, uint8 wasClean` | The connection closed. Always the last event, also after an error; afterwards the socket's callbacks are released |
+| `onError` | none | The connection failed. The browser sends `onClose` right after |
+
+Handlers may take fewer parameters than the event provides: `def handleClose() : void` is fine for `onClose`.
 
 ### Example
 
@@ -884,6 +890,32 @@ component Chat {
     }
 }
 ```
+
+## Events on handles
+
+Every browser object Coi hands you (`WebSocket`, `FetchRequest`, `Image`, a `Canvas` or any `DOMElement`...) is a *handle*, and the events the browser sends for it are methods named `on<Event>` on that handle type. They come straight from the platform schema, so a new API's events are available the moment the API is.
+
+```tsx
+mut Image logo;
+
+def placed(int width, int height) : void { ... }
+def broken() : void { ... }
+
+mount {
+    logo = Image.load("/logo.png");
+    logo.onLoaded(&placed);   // LOADED carries width and height
+    logo.onError(&broken);
+}
+```
+
+The rules:
+
+- A callback is a method of the component, passed with `&`. It runs on the next frame after the event, with the component alive.
+- A handler may take **fewer** parameters than the event provides (the leading ones), never more or of another type. The compiler checks this.
+- Functions that create a handle take the handle's callbacks as optional trailing arguments, by name (`&onError = failed`) or in event order (`&ok, &err`). `WebSocket.connect(...)` and `FetchRequest.get(...)` work this way.
+- Events after which a handle is finished (a fetch's result, a socket's close) release that handle's callbacks. A destroyed component releases all of its callbacks, so a late event never reaches freed memory.
+
+The generated definitions in `defs/web/*.d.coi` list every handle type's events with their parameters.
 
 ## Available APIs
 

@@ -12,15 +12,17 @@
 // Method mapping types
 enum class MappingType
 {
-    Map,      // @map("ns::func") - calls webcc function
-    Inline,   // @inline("${this}.method()") - inline C++ template
-    Intrinsic // @intrinsic("name") - special compiler handling
+    Map,       // @map("ns::func") - calls webcc function
+    Inline,    // @inline("${this}.method()") - inline C++ template
+    Intrinsic, // @intrinsic("name") - special compiler handling
+    Event      // @event("ns::NAME key fields [last]") - registers a callback for a webcc event
 };
 
 struct MethodParam
 {
     std::string type;
     std::string name;
+    bool has_default = false; // `= value` in the def: the argument may be left out
 };
 
 struct MethodDef
@@ -33,15 +35,45 @@ struct MethodDef
 
     MappingType mapping_type = MappingType::Map;
     std::string mapping_value; // The string in the annotation
+
+    // Leading params without a default: the least a call must pass
+    size_t required_params() const
+    {
+        size_t n = 0;
+        while (n < params.size() && !params[n].has_default)
+            n++;
+        return n;
+    }
 };
+
+// @event("ns::NAME key f1,f2 last"): the webcc event a callback method binds to.
+// key is the event field holding the handle, fields are the rest in order (passed to
+// the callback), last means the handle gets no more events after this one.
+struct SchemaEventSpec
+{
+    std::string ns;
+    std::string name;
+    std::string key;
+    std::vector<std::string> fields;
+    bool last = false;
+
+    static SchemaEventSpec parse(const std::string &value);
+    std::string struct_name() const; // webcc's C++ struct: ns::NameEvent
+    std::string method_name() const; // Coi's callback method: onName
+};
+
+// Callback type "def(T1,T2):ret" as written in a def file
+std::vector<std::string> callback_param_types(const std::string &def_type);
 
 struct TypeDef
 {
     std::string name;
     bool is_builtin = false; // @builtin types like string, array
     bool is_nocopy = false;  // @nocopy - type cannot be copied, only moved or referenced
+    bool is_handle = false;  // @handle - a webcc handle type (webcc::Name in C++)
     std::string extends;     // Parent type (for handle inheritance)
     std::string alias_of;    // @alias("target") - this type is an alias for another
+    std::string cleanup;     // @cleanup("ns::func") - called on owned members when the component is destroyed
     std::vector<MethodDef> methods;
 };
 
@@ -137,6 +169,7 @@ public:
 
     // Lookup methods
     const MethodDef *lookup_method(const std::string &type_name, const std::string &method_name) const;
+    // With arg_count: an exact match first, then a method whose trailing params have defaults
     const MethodDef *lookup_method(const std::string &type_name, const std::string &method_name, size_t arg_count) const;
     const TypeDef *lookup_type(const std::string &type_name) const;
 

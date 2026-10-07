@@ -200,34 +200,6 @@ static std::string transform_embedded_expression(const std::string& expr) {
     return result;
 }
 
-// Helper to generate WebSocket dispatcher registration code
-// ws_member is the member variable name (e.g., "ws") for invalidation on close/error
-static std::string generate_ws_dispatcher(const std::string& event_type,
-                                          const std::string& ws_obj,
-                                          const std::string& callback,
-                                          const std::string& ws_member = "") {
-    int param_count = ComponentTypeContext::instance().get_method_param_count(callback);
-    
-    if (event_type == "onMessage") {
-        // onMessage can accept 0 or 1 (string) param
-        if (param_count >= 1) {
-            return "g_ws_message_dispatcher.set(" + ws_obj + ", [this](const coi::string& msg) { this->" + callback + "(msg); })";
-        } else {
-            return "g_ws_message_dispatcher.set(" + ws_obj + ", [this](const coi::string&) { this->" + callback + "(); })";
-        }
-    } else if (event_type == "onOpen") {
-        return "g_ws_open_dispatcher.set(" + ws_obj + ", [this]() { this->" + callback + "(); })";
-    } else if (event_type == "onClose" || event_type == "onError") {
-        // invalidate first so the callback sees a dead socket; guard so a stale
-        // close from a replaced socket can't clobber the new handle
-        std::string capture = ws_member.empty() ? "[this]" : "[this, " + ws_obj + "]";
-        std::string invalidate = ws_member.empty() ? "" : " if (this->" + ws_member + " == " + ws_obj + ") this->" + ws_member + " = webcc::WebSocket(-1);";
-        std::string dispatcher = event_type == "onClose" ? "g_ws_close_dispatcher" : "g_ws_error_dispatcher";
-        return dispatcher + ".set(" + ws_obj + ", " + capture + "() {" + invalidate + " this->" + callback + "(); })";
-    }
-    return "";
-}
-
 // Helper to generate intrinsic code
 static std::string generate_intrinsic(const std::string& intrinsic_name,
                                       const std::vector<CallArg>& args) {                           
@@ -255,244 +227,6 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
         return "(webcc::system::is_hidden() != 0)";
     }
     
-    // WebSocket.connect with callback arguments
-    // Usage: WebSocket.connect("url", msgHandler, openHandler, closeHandler, errorHandler)
-    //    or: WebSocket.connect("url", &onMessage = handler, &onOpen = handler, ...)
-    if (intrinsic_name == "ws_connect") {
-        if (args.empty()) return "";
-        
-        std::string url = args[0].value->to_webcc();
-        std::string ws_member = g_ws_assignment_target;  // Capture the assignment target for invalidation
-        std::string code = "[&]() {\n";
-        code += "            auto _ws = webcc::websocket::connect(" + url + ");\n";
-        
-        // Process callback arguments - support both positional and named
-        // Positional order: onMessage, onOpen, onClose, onError
-        const char* positional_names[] = {"onMessage", "onOpen", "onClose", "onError"};
-        for (size_t i = 1; i < args.size(); i++) {
-            const auto& arg = args[i];
-            // Enforce & prefix for callback arguments
-            if (!arg.is_reference) {
-                ErrorHandler::compiler_error("Callback argument must use '&' prefix (e.g., &" + arg.value->to_webcc() + ")");
-            }
-            std::string callback = arg.value->to_webcc();
-            std::string event_name;
-            
-            if (!arg.name.empty()) {
-                event_name = arg.name;
-            } else if (i - 1 < 4) {
-                event_name = positional_names[i - 1];
-            }
-            
-            std::string dispatcher_code = generate_ws_dispatcher(event_name, "_ws", callback, ws_member);
-            if (!dispatcher_code.empty()) {
-                code += "            " + dispatcher_code + ";\n";
-            }
-        }
-        
-        code += "            return _ws;\n";
-        code += "        }()";
-        return code;
-    }
-    
-    // FetchRequest.get with callback arguments
-    if (intrinsic_name == "fetch_get") {
-        if (args.empty()) return "";
-        
-        std::string url = args[0].value->to_webcc();
-        std::string headers = "\"\"";
-        bool headers_set = false;
-        std::string code = "[&]() {\n";
-        
-        size_t callback_position = 0;
-        for (size_t i = 1; i < args.size(); i++) {
-            const auto& arg = args[i];
-            if (!arg.is_reference) {
-                if (headers_set) {
-                    ErrorHandler::compiler_error("fetch.get accepts a single headers argument (JSON string). Combine all headers into one object string, e.g. '{\"Authorization\":\"Bearer ...\",\"Content-Type\":\"application/json\"}'.");
-                }
-                if (!arg.name.empty() && arg.name != "headers") {
-                    ErrorHandler::compiler_error("Invalid named argument '" + arg.name + "' for fetch.get");
-                }
-                headers = arg.value->to_webcc();
-                headers_set = true;
-                continue;
-            }
-            callback_position++;
-        }
-
-        code += "            auto _req = webcc::fetch::get(" + url + ", " + headers + ");\n";
-        
-        callback_position = 0;
-        for (size_t i = 1; i < args.size(); i++) {
-            const auto& arg = args[i];
-            if (!arg.is_reference) {
-                continue;
-            }
-            // Enforce & prefix for callback arguments
-            if (!arg.is_reference) {
-                ErrorHandler::compiler_error("Callback argument must use '&' prefix (e.g., &" + arg.value->to_webcc() + ")");
-            }
-            std::string callback = arg.value->to_webcc();
-            std::string event_name = !arg.name.empty() ? arg.name : (callback_position == 0 ? "onSuccess" : "onError");
-            callback_position++;
-            int param_count = ComponentTypeContext::instance().get_method_param_count(callback);
-            
-            if (event_name == "onSuccess") {
-                if (param_count >= 1) {
-                    code += "            g_fetch_success_dispatcher.set(_req, [this](const coi::string& data) { this->" + callback + "(data); }, this);\n";
-                } else {
-                    code += "            g_fetch_success_dispatcher.set(_req, [this](const coi::string&) { this->" + callback + "(); }, this);\n";
-                }
-            } else if (event_name == "onError") {
-                if (param_count >= 1) {
-                    code += "            g_fetch_error_dispatcher.set(_req, [this](const coi::string& error) { this->" + callback + "(error); }, this);\n";
-                } else {
-                    code += "            g_fetch_error_dispatcher.set(_req, [this](const coi::string&) { this->" + callback + "(); }, this);\n";
-                }
-            } else {
-                ErrorHandler::compiler_error("Invalid callback name '" + event_name + "' for fetch.get (expected onSuccess or onError)");
-            }
-        }
-        
-        code += "            return _req;\n";
-        code += "        }()";
-        return code;
-    }
-    
-    // FetchRequest.post with callback arguments
-    if (intrinsic_name == "fetch_post") {
-        if (args.size() < 2) return "";
-        
-        std::string url = args[0].value->to_webcc();
-        std::string body = args[1].value->to_webcc();
-        std::string headers = "\"\"";
-        bool headers_set = false;
-        std::string code = "[&]() {\n";
-
-        size_t callback_position = 0;
-        for (size_t i = 2; i < args.size(); i++) {
-            const auto& arg = args[i];
-            if (!arg.is_reference) {
-                if (headers_set) {
-                    ErrorHandler::compiler_error("fetch.post accepts a single headers argument (JSON string). Combine all headers into one object string, e.g. '{\"Authorization\":\"Bearer ...\",\"Content-Type\":\"application/json\"}'.");
-                }
-                if (!arg.name.empty() && arg.name != "headers") {
-                    ErrorHandler::compiler_error("Invalid named argument '" + arg.name + "' for fetch.post");
-                }
-                headers = arg.value->to_webcc();
-                headers_set = true;
-                continue;
-            }
-            callback_position++;
-        }
-
-        code += "            auto _req = webcc::fetch::post(" + url + ", " + body + ", " + headers + ");\n";
-        
-        callback_position = 0;
-        for (size_t i = 2; i < args.size(); i++) {
-            const auto& arg = args[i];
-            if (!arg.is_reference) {
-                continue;
-            }
-            // Enforce & prefix for callback arguments
-            if (!arg.is_reference) {
-                ErrorHandler::compiler_error("Callback argument must use '&' prefix (e.g., &" + arg.value->to_webcc() + ")");
-            }
-            std::string callback = arg.value->to_webcc();
-            std::string event_name = !arg.name.empty() ? arg.name : (callback_position == 0 ? "onSuccess" : "onError");
-            callback_position++;
-            int param_count = ComponentTypeContext::instance().get_method_param_count(callback);
-            
-            if (event_name == "onSuccess") {
-                if (param_count >= 1) {
-                    code += "            g_fetch_success_dispatcher.set(_req, [this](const coi::string& data) { this->" + callback + "(data); }, this);\n";
-                } else {
-                    code += "            g_fetch_success_dispatcher.set(_req, [this](const coi::string&) { this->" + callback + "(); }, this);\n";
-                }
-            } else if (event_name == "onError") {
-                if (param_count >= 1) {
-                    code += "            g_fetch_error_dispatcher.set(_req, [this](const coi::string& error) { this->" + callback + "(error); }, this);\n";
-                } else {
-                    code += "            g_fetch_error_dispatcher.set(_req, [this](const coi::string&) { this->" + callback + "(); }, this);\n";
-                }
-            } else {
-                ErrorHandler::compiler_error("Invalid callback name '" + event_name + "' for fetch.post (expected onSuccess or onError)");
-            }
-        }
-        
-        code += "            return _req;\n";
-        code += "        }()";
-        return code;
-    }
-
-    // FetchRequest.patch with callback arguments
-    if (intrinsic_name == "fetch_patch") {
-        if (args.size() < 2) return "";
-
-        std::string url = args[0].value->to_webcc();
-        std::string body = args[1].value->to_webcc();
-        std::string headers = "\"\"";
-        bool headers_set = false;
-        std::string code = "[&]() {\n";
-
-        size_t callback_position = 0;
-        for (size_t i = 2; i < args.size(); i++) {
-            const auto& arg = args[i];
-            if (!arg.is_reference) {
-                if (headers_set) {
-                    ErrorHandler::compiler_error("fetch.patch accepts a single headers argument (JSON string). Combine all headers into one object string, e.g. '{\"Authorization\":\"Bearer ...\",\"Content-Type\":\"application/json\"}'.");
-                }
-                if (!arg.name.empty() && arg.name != "headers") {
-                    ErrorHandler::compiler_error("Invalid named argument '" + arg.name + "' for fetch.patch");
-                }
-                headers = arg.value->to_webcc();
-                headers_set = true;
-                continue;
-            }
-            callback_position++;
-        }
-
-        code += "            auto _req = webcc::fetch::patch(" + url + ", " + body + ", " + headers + ");\n";
-
-        callback_position = 0;
-        for (size_t i = 2; i < args.size(); i++) {
-            const auto& arg = args[i];
-            if (!arg.is_reference) {
-                continue;
-            }
-            // Enforce & prefix for callback arguments
-            if (!arg.is_reference) {
-                ErrorHandler::compiler_error("Callback argument must use '&' prefix (e.g., &" + arg.value->to_webcc() + ")");
-            }
-            std::string callback = arg.value->to_webcc();
-            std::string event_name = !arg.name.empty() ? arg.name : (callback_position == 0 ? "onSuccess" : "onError");
-            callback_position++;
-            int param_count = ComponentTypeContext::instance().get_method_param_count(callback);
-
-            if (event_name == "onSuccess") {
-                if (param_count >= 1) {
-                    code += "            g_fetch_success_dispatcher.set(_req, [this](const coi::string& data) { this->" + callback + "(data); }, this);\n";
-                } else {
-                    code += "            g_fetch_success_dispatcher.set(_req, [this](const coi::string&) { this->" + callback + "(); }, this);\n";
-                }
-            } else if (event_name == "onError") {
-                if (param_count >= 1) {
-                    code += "            g_fetch_error_dispatcher.set(_req, [this](const coi::string& error) { this->" + callback + "(error); }, this);\n";
-                } else {
-                    code += "            g_fetch_error_dispatcher.set(_req, [this](const coi::string&) { this->" + callback + "(); }, this);\n";
-                }
-            } else {
-                ErrorHandler::compiler_error("Invalid callback name '" + event_name + "' for fetch.patch (expected onSuccess or onError)");
-            }
-        }
-
-        code += "            return _req;\n";
-        code += "        }()";
-        return code;
-    }
-    
-    // Json.parse - returns a result value consumed via match
     if (intrinsic_name == "json_parse") {
         if (args.size() != 2) {
             ErrorHandler::compiler_error(
@@ -730,6 +464,80 @@ std::string FunctionCall::args_to_string() {
     return result;
 }
 
+// Parts of a call's argument list a schema method can take: plain values in order,
+// and callbacks (`&handler` or `&onX = handler`) that bind the handle the call returns
+struct SplitArgs {
+    std::vector<const CallArg*> values;
+    std::vector<std::pair<const MethodParam*, const CallArg*>> callbacks;
+};
+
+static bool is_callback_param(const MethodParam& p) { return p.type.rfind("def", 0) == 0; }
+
+static SplitArgs split_call_args(const MethodDef& method, const std::vector<CallArg>& args, const std::string& call_name) {
+    SplitArgs out;
+    std::vector<const MethodParam*> callback_params;
+    for (const auto& p : method.params)
+        if (is_callback_param(p)) callback_params.push_back(&p);
+    size_t next_positional = 0;
+    for (const auto& arg : args) {
+        if (!arg.is_reference && arg.name.empty()) { out.values.push_back(&arg); continue; }
+        const MethodParam* param = nullptr;
+        if (!arg.name.empty()) {
+            for (const auto* p : callback_params) if (p->name == arg.name) param = p;
+            if (!param) ErrorHandler::compiler_error("'" + call_name + "' has no callback named '" + arg.name + "'");
+        } else {
+            while (next_positional < callback_params.size()) {
+                const auto* p = callback_params[next_positional++];
+                bool taken = false;
+                for (auto& [used, _] : out.callbacks) if (used == p) taken = true;
+                if (!taken) { param = p; break; }
+            }
+            if (!param) ErrorHandler::compiler_error("Too many callback arguments for '" + call_name + "'");
+        }
+        if (!arg.is_reference)
+            ErrorHandler::compiler_error("Callback argument must use '&' prefix (e.g., &" + arg.value->to_webcc() + ")");
+        out.callbacks.push_back({param, &arg});
+    }
+    return out;
+}
+
+// coi_events<E>.set(handle, [this](const E& e) { this->handler(e.a, e.b); }, this)
+// The handler may take fewer parameters than the event has fields.
+static std::string generate_event_registration(const MethodDef& event_method, const std::string& handle_type,
+                                               const std::string& handle_expr, const CallArg& arg) {
+    SchemaEventSpec spec = SchemaEventSpec::parse(event_method.mapping_value);
+    std::string callback = arg.value->to_webcc();
+    std::vector<std::string> field_types;
+    for (const auto& p : event_method.params)
+        if (is_callback_param(p)) field_types = callback_param_types(p.type);
+    int n = ComponentTypeContext::instance().get_method_param_count(callback);
+    if (n < 0 || n > (int)spec.fields.size()) n = (int)spec.fields.size();
+    std::string full = "webcc::" + spec.struct_name();
+    std::string code = "coi_events<" + full + ">.set(" + handle_expr + ", [this](const " + full + "& _e) { ";
+    code += "(void)_e; this->" + callback + "(";
+    for (int i = 0; i < n; i++) {
+        if (i) code += ", ";
+        bool is_string = i < (int)field_types.size() && field_types[i] == "string";
+        code += is_string ? "coi::string(_e." + spec.fields[i] + ")" : "_e." + spec.fields[i];
+    }
+    code += "); }, this)";
+    g_used_events[spec.ns + "::" + spec.name] = {spec.ns, spec.name, spec.key, full, handle_type, spec.last};
+    return code;
+}
+
+// Callbacks on a call that returns a handle: `[&]() { auto _h = call; register...; return _h; }()`
+static std::string wrap_with_callbacks(const std::string& call, const MethodDef& method, const SplitArgs& split, const std::string& call_name) {
+    if (split.callbacks.empty()) return call;
+    std::string code = "[&]() {\n            auto _h = " + call + ";\n";
+    for (const auto& [param, arg] : split.callbacks) {
+        const MethodDef* ev = DefSchema::instance().lookup_method(method.return_type, param->name);
+        if (!ev || ev->mapping_type != MappingType::Event)
+            ErrorHandler::compiler_error("'" + call_name + "': '" + param->name + "' is not an event of " + method.return_type);
+        code += "            " + generate_event_registration(*ev, method.return_type, "_h", *arg) + ";\n";
+    }
+    return code + "            return _h;\n        }()";
+}
+
 std::string FunctionCall::to_webcc() {
     // Parse Type.method or instance.method
     size_t dot_pos = name.rfind('.');
@@ -869,6 +677,11 @@ std::string FunctionCall::to_webcc() {
                         if (map_method->mapping_type == MappingType::Inline) {
                             // Handle @inline methods for typed instance calls (e.g., socket.isConnected())
                             return expand_inline_template(map_method->mapping_value, resolved_receiver, args);
+                        } else if (map_method->mapping_type == MappingType::Event) {
+                            // ws.onMessage(&handler): bind the handler to this handle's event
+                            if (args.size() != 1 || !args[0].is_reference)
+                                ErrorHandler::compiler_error("'" + name + "' takes one '&handler' argument");
+                            return generate_event_registration(*map_method, obj_type, resolved_receiver, args[0]);
                         } else if (map_method->mapping_type == MappingType::Map) {
                             pass_obj = true;
                             obj_arg = resolved_receiver;
@@ -893,6 +706,22 @@ std::string FunctionCall::to_webcc() {
     }
 
     if (map_method && !map_ns.empty() && !map_func.empty()) {
+        // Callbacks (`&onX = handler`) are not passed to webcc: they bind the returned
+        // handle's events. Values that are left out use the C++ default argument.
+        SplitArgs split = split_call_args(*map_method, args, name);
+        if (!split.callbacks.empty()) {
+            std::string call = "webcc::" + map_ns + "::" + map_func + "(";
+            bool first_arg = true;
+            if (pass_obj) { call += obj_arg; first_arg = false; }
+            for (const auto* arg : split.values) {
+                if (!first_arg) call += ", ";
+                call += arg->value->to_webcc();
+                first_arg = false;
+            }
+            call += ")";
+            return wrap_with_callbacks(call, *map_method, split, name);
+        }
+
         // Check for string concat argument - use formatter block
         bool has_string_concat_arg = false;
         int string_concat_arg_idx = -1;

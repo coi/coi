@@ -1,0 +1,10 @@
+// Test: a callback argument needs the & prefix
+component CallbackRefFail {
+    mut WebSocket ws;
+    def onMsg(string m) : void {}
+    mount {
+        ws = WebSocket.connect("ws://localhost:1/", onMessage = onMsg);
+    }
+    view { <p></p> }
+}
+app { root = CallbackRefFail; }

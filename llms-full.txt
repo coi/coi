@@ -769,7 +769,8 @@ def load() : void {
 // FetchRequest.post(url, body, headers="", &onSuccess=..., &onError=...)
 // FetchRequest.patch(url, body, headers="", &onSuccess=..., &onError=...)
 // headers is a JSON object string, e.g. "{\"Content-Type\":\"application/json\"}"
-// onSuccess: def h(string data) : void ; onError: def h(string error) : void
+// onSuccess: def h(string data) : void ; onError: def h(string error) : void (non-2xx too)
+// callbacks by name (&onError = h) or in order (&ok, &err); or bind later: req.onError(&h)
 ```
 
 ### WebSocket
@@ -777,8 +778,11 @@ def load() : void {
 mut WebSocket ws;
 def onMsg(string m) : void { messages.push(m); }
 def onOpen() : void { connected = true; ws.send("hi"); }
-mount { ws = WebSocket.connect("wss://host", &onMessage = onMsg, &onOpen = onOpen); }
-// send(msg) close() isConnected() ; callbacks onMessage(string), onOpen, onClose, onError
+mount { ws = WebSocket.connect("wss://host", &onMessage = onMsg, &onOpen = onOpen); ws.onClose(&onClosed); }
+// send(msg) close() isConnected() ; events onMessage(string), onOpen, onClose(int code, string reason, uint8 wasClean), onError
+// onClose always comes last (also after onError). Handlers may take fewer params than the event has.
+// Every handle type has on<Event>(&handler) methods for its browser events (e.g. img.onLoaded(&h) with (int w, int h)).
+// An owned WebSocket member is closed when its component is destroyed.
 ```
 
 ### Json (type-safe parsing against a pod schema)

@@ -1,0 +1,10 @@
+// Test: a named callback must be an event of the returned handle
+component CallbackUnknownFail {
+    mut WebSocket ws;
+    def done() : void {}
+    mount {
+        ws = WebSocket.connect("ws://localhost:1/", &onDone = done);
+    }
+    view { <p></p> }
+}
+app { root = CallbackUnknownFail; }

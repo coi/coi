@@ -90,15 +90,7 @@ std::string VarDeclaration::to_webcc()
     result += " " + name;
     if (initializer)
     {
-        // Set WebSocket assignment target for lifetime tracking (auto-invalidate on close/error)
-        if (type == "WebSocket") {
-            g_ws_assignment_target = name;
-        }
-        
         std::string init_code = initializer->to_webcc();
-        
-        // Clear the target after generating the initializer
-        g_ws_assignment_target.clear();
         
         // Wrap in coi::move() if this is a move assignment (:=)
         if (is_move)
@@ -132,11 +124,6 @@ std::string Assignment::to_webcc()
         lhs = "(*" + name + ")";
     }
 
-    // Set WebSocket assignment target for lifetime tracking (auto-invalidate on close/error)
-    if (target_type == "WebSocket") {
-        g_ws_assignment_target = name;
-    }
-
     std::string rhs;
     
     // Handle member function reference assigned to coi::function type
@@ -158,9 +145,6 @@ std::string Assignment::to_webcc()
         rhs = value->to_webcc();
     }
     
-    // Clear the target after generating the RHS
-    g_ws_assignment_target.clear();
-
     // Wrap in coi::move() for move assignments
     if (is_move)
     {

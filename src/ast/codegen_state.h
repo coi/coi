@@ -8,7 +8,16 @@
 // Declared here and defined in codegen_state.cc so ownership is explicit.
 
 extern std::set<std::string> g_ref_props;
-extern std::string g_ws_assignment_target;
+
+// webcc events a callback was registered for while lowering components. The event
+// loop dispatches exactly these (see emit_event_dispatch in codegen.cc).
+struct UsedEvent
+{
+    std::string ns, name, key, struct_name; // struct_name: webcc::ns::NameEvent
+    std::string handle_type;                // Coi type of the handle in `key`
+    bool last;                              // drop the handle's callbacks after it
+};
+extern std::map<std::string, UsedEvent> g_used_events; // "ns::NAME" -> event
 
 struct ComponentArrayLoopInfo
 {

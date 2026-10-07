@@ -1,0 +1,10 @@
+// Test: a handler's parameter type must match the event field (MESSAGE carries a string)
+component CallbackSigFail {
+    mut WebSocket ws;
+    def onMsg(int m) : void {}
+    mount {
+        ws = WebSocket.connect("ws://localhost:1/", &onMessage = onMsg);
+    }
+    view { <p></p> }
+}
+app { root = CallbackSigFail; }

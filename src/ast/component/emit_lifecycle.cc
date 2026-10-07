@@ -1,3 +1,4 @@
+#include "defs/def_parser.h"
 #include "component.h"
 
 // Resolve a component reference as it appears at a use site (a view child key
@@ -41,25 +42,28 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
         }
     };
 
-    // WebSocket callbacks are registered in global dispatchers keyed by the
-    // socket handle and captured with [this]. When a component is destroyed
-    // (e.g. a routed page swapped out by _sync_route), those entries must be
-    // removed, or a later async message/open/close/error event dispatches into
-    // freed memory (use-after-free). Owned (non-reference) WebSocket members are
-    // torn down here; any component with a WebSocket member always has the
-    // websocket feature enabled, so the g_ws_* dispatchers are guaranteed to
-    // exist.
-    auto emit_websocket_teardown = [&]() {
+    // A handle type can name a webcc function to run on owned members when the
+    // component goes away (@cleanup in the def, e.g. websocket::close), so a
+    // page swapped out by the router doesn't leave its socket open. Callbacks
+    // the member had are dropped by coi_forget_owner.
+    auto emit_member_cleanup = [&]() {
         for (const auto &var : component.state)
         {
-            if (!var || var->type != "WebSocket" || var->is_reference)
+            if (!var || var->is_reference)
                 continue;
-            const std::string &name = var->name;
-            ss << "        if (" << name << ".is_valid()) { webcc::websocket::close(" << name << "); }\n";
-            ss << "        g_ws_message_dispatcher.remove(" << name << ");\n";
-            ss << "        g_ws_open_dispatcher.remove(" << name << ");\n";
-            ss << "        g_ws_close_dispatcher.remove(" << name << ");\n";
-            ss << "        g_ws_error_dispatcher.remove(" << name << ");\n";
+            std::string type = var->type;
+            std::string cleanup;
+            while (!type.empty())
+            {
+                const TypeDef *td = DefSchema::instance().lookup_type(type);
+                if (!td)
+                    break;
+                if (!td->cleanup.empty()) { cleanup = td->cleanup; break; }
+                type = td->extends;
+            }
+            if (cleanup.empty())
+                continue;
+            ss << "        if (" << var->name << ".is_valid()) { webcc::" << cleanup << "(" << var->name << "); }\n";
         }
     };
 
@@ -256,9 +260,7 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
     // Unregister signal listeners bound via listen { ... }
     emit_listen_unregistration();
 
-    // Tear down owned WebSocket callbacks so no async event fires into freed
-    // memory after this component is deleted.
-    emit_websocket_teardown();
+    emit_member_cleanup();
 
     ss << "    }\n";
 

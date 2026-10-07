@@ -21,8 +21,6 @@ struct FeatureFlags
     // Runtime features
     bool keyboard = false;    // Global key state tracking (Input.isKeyDown)
     bool router = false;      // Browser history/popstate (any component)
-    bool websocket = false;   // WebSocket connections
-    bool fetch = false;       // HTTP fetch requests
     bool json = false;        // JSON parsing (Json.parse)
 };
 
@@ -36,9 +34,6 @@ void emit_feature_globals(std::ostream &out, const FeatureFlags &f);
 
 // Emit event handlers for enabled features
 void emit_feature_event_handlers(std::ostream &out, const FeatureFlags &f);
-
-// Check if the Dispatcher template is needed
-bool needs_dispatcher(const FeatureFlags &f);
 
 // Emit initialization code for enabled features
 void emit_feature_init(std::ostream &out, const FeatureFlags &f, const std::string &root_comp);

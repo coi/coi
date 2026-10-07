@@ -1,0 +1,11 @@
+// Test: a handler may take fewer parameters than the event, not more (OPEN has none)
+component CallbackExtraFail {
+    mut WebSocket ws;
+    def opened(string what) : void {}
+    mount {
+        ws = WebSocket.connect("ws://localhost:1/");
+        ws.onOpen(&opened);
+    }
+    view { <p></p> }
+}
+app { root = CallbackExtraFail; }

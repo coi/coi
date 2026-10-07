@@ -1,0 +1,25 @@
+// Test: callbacks on a handle after creation, positional callbacks, and handlers
+// that take fewer parameters than the event has (CLOSE has code, reason, was_clean)
+component InstanceEventsPass {
+    mut WebSocket ws;
+    mut string last = "";
+    mut int closeCode = 0;
+    mut string closeReason = "";
+
+    def onMsg(string m) : void { last = m; }
+    def opened() : void { ws.send("hi"); }
+    def closed(int code, string reason) : void { closeCode = code; closeReason = reason; }
+    def failed() : void { last = "error"; }
+
+    mount {
+        ws = WebSocket.connect("ws://localhost:1/", &onMsg, &opened);
+        ws.onClose(&closed);
+        ws.onError(&failed);
+    }
+
+    view {
+        <p>{last} {closeCode} {closeReason}</p>
+    }
+}
+
+app { root = InstanceEventsPass; }

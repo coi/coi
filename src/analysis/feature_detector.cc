@@ -51,8 +51,7 @@ FeatureFlags detect_features(const std::vector<Component> &components,
                               const std::vector<std::unique_ptr<FunctionDef>> &functions)
 {
     FeatureFlags flags;
-    flags.websocket = headers.count("websocket") > 0;
-    flags.fetch = headers.count("fetch") > 0;
+    (void)headers;
 
     // Scan all components for routers
     for (const auto &comp : components)
@@ -237,41 +236,6 @@ void emit_feature_globals(std::ostream &out, const FeatureFlags &f)
     {
         out << "coi::function<void(const coi::string&)> g_popstate_callback;\n";
     }
-    if (f.websocket)
-    {
-        out << "Dispatcher<coi::function<void(const coi::string&)>> g_ws_message_dispatcher;\n";
-        out << "Dispatcher<coi::function<void()>> g_ws_open_dispatcher;\n";
-        out << "Dispatcher<coi::function<void()>> g_ws_close_dispatcher;\n";
-        out << "Dispatcher<coi::function<void()>> g_ws_error_dispatcher;\n";
-    }
-    if (f.fetch)
-    {
-        out << "Dispatcher<coi::function<void(const coi::string&)>> g_fetch_success_dispatcher;\n";
-        out << "Dispatcher<coi::function<void(const coi::string&)>> g_fetch_error_dispatcher;\n";
-    }
-
-    // Every handler and async callback is registered with its component as
-    // owner; _destroy() calls this so nothing can fire into freed memory and
-    // the dispatcher tables don't fill up with dead entries.
-    out << "inline void coi_forget_owner(const void* owner) {\n";
-    if (f.click) out << "    g_dispatcher.remove_owner(owner);\n";
-    if (f.input) out << "    g_input_dispatcher.remove_owner(owner);\n";
-    if (f.change) out << "    g_change_dispatcher.remove_owner(owner);\n";
-    if (f.keydown) out << "    g_keydown_dispatcher.remove_owner(owner);\n";
-    if (f.websocket)
-    {
-        out << "    g_ws_message_dispatcher.remove_owner(owner);\n";
-        out << "    g_ws_open_dispatcher.remove_owner(owner);\n";
-        out << "    g_ws_close_dispatcher.remove_owner(owner);\n";
-        out << "    g_ws_error_dispatcher.remove_owner(owner);\n";
-    }
-    if (f.fetch)
-    {
-        out << "    g_fetch_success_dispatcher.remove_owner(owner);\n";
-        out << "    g_fetch_error_dispatcher.remove_owner(owner);\n";
-    }
-    out << "    (void)owner;\n";
-    out << "}\n";
 }
 
 // Emit event handlers for enabled features
@@ -311,50 +275,6 @@ void emit_feature_event_handlers(std::ostream &out, const FeatureFlags &f)
         out << "        } else if (e.opcode == webcc::system::PopstateEvent::OPCODE) {\n";
         out << "            if (auto evt = e.as<webcc::system::PopstateEvent>()) { if (g_popstate_callback) g_popstate_callback(coi::string(evt->path)); }\n";
     }
-    if (f.websocket)
-    {
-        out << "        } else if (e.opcode == webcc::websocket::MessageEvent::OPCODE) {\n";
-        out << "            if (auto evt = e.as<webcc::websocket::MessageEvent>()) g_ws_message_dispatcher.dispatch(evt->handle, coi::string(evt->data));\n";
-        out << "        } else if (e.opcode == webcc::websocket::OpenEvent::OPCODE) {\n";
-        out << "            if (auto evt = e.as<webcc::websocket::OpenEvent>()) g_ws_open_dispatcher.dispatch(evt->handle);\n";
-        out << "        } else if (e.opcode == webcc::websocket::CloseEvent::OPCODE) {\n";
-        out << "            if (auto evt = e.as<webcc::websocket::CloseEvent>()) {\n";
-        out << "                g_ws_close_dispatcher.dispatch(evt->handle);\n";
-        out << "                g_ws_message_dispatcher.remove(evt->handle);\n";
-        out << "                g_ws_open_dispatcher.remove(evt->handle);\n";
-        out << "                g_ws_close_dispatcher.remove(evt->handle);\n";
-        out << "                g_ws_error_dispatcher.remove(evt->handle);\n";
-        out << "            }\n";
-        out << "        } else if (e.opcode == webcc::websocket::ErrorEvent::OPCODE) {\n";
-        out << "            if (auto evt = e.as<webcc::websocket::ErrorEvent>()) {\n";
-        out << "                g_ws_error_dispatcher.dispatch(evt->handle);\n";
-        out << "                g_ws_message_dispatcher.remove(evt->handle);\n";
-        out << "                g_ws_open_dispatcher.remove(evt->handle);\n";
-        out << "                g_ws_close_dispatcher.remove(evt->handle);\n";
-        out << "                g_ws_error_dispatcher.remove(evt->handle);\n";
-        out << "            }\n";
-    }
-    if (f.fetch)
-    {
-        out << "        } else if (e.opcode == webcc::fetch::SuccessEvent::OPCODE) {\n";
-        out << "            if (auto evt = e.as<webcc::fetch::SuccessEvent>()) {\n";
-        out << "                g_fetch_success_dispatcher.dispatch(evt->id, coi::string(evt->data));\n";
-        out << "                g_fetch_success_dispatcher.remove(evt->id);\n";
-        out << "                g_fetch_error_dispatcher.remove(evt->id);\n";
-        out << "            }\n";
-        out << "        } else if (e.opcode == webcc::fetch::ErrorEvent::OPCODE) {\n";
-        out << "            if (auto evt = e.as<webcc::fetch::ErrorEvent>()) {\n";
-        out << "                g_fetch_error_dispatcher.dispatch(evt->id, coi::string(evt->error));\n";
-        out << "                g_fetch_success_dispatcher.remove(evt->id);\n";
-        out << "                g_fetch_error_dispatcher.remove(evt->id);\n";
-        out << "            }\n";
-    }
-}
-
-// Check if the Dispatcher template is needed
-bool needs_dispatcher(const FeatureFlags &f)
-{
-    return f.click || f.input || f.change || f.keydown || f.websocket || f.fetch;
 }
 
 // Emit initialization code for enabled features

@@ -1,0 +1,16 @@
+// Test: callbacks by position, headers left out (default), and a handler without parameters
+component FetchPositionalPass {
+    mut string result = "";
+    mut bool failed = false;
+
+    def ok(string data) : void { result = data; }
+    def err() : void { failed = true; }
+
+    def load() : void {
+        FetchRequest.get("/data.json", &ok, &err);
+        FetchRequest.post("/save", `{"a":1}`, `{"Content-Type":"application/json"}`, &ok, &err);
+    }
+
+    view { <button onclick={load}>{result}</button> }
+}
+app { root = FetchPositionalPass; }
