@@ -41,22 +41,32 @@ void generate_css_file(
             // Sort for deterministic order
             std::sort(css_files.begin(), css_files.end());
 
+            // @import only counts at the top of a stylesheet
+            std::string imports, rest;
             for (const auto &css_file_path : css_files)
             {
                 std::ifstream style_file(css_file_path);
                 if (style_file)
                 {
                     fs::path rel_path = fs::relative(css_file_path, styles_dir.parent_path());
-                    css_out << "/* " << rel_path.string() << " */\n";
-                    css_out << std::string((std::istreambuf_iterator<char>(style_file)),
-                                           std::istreambuf_iterator<char>());
-                    css_out << "\n";
+                    rest += "/* " + rel_path.string() + " */\n";
+                    std::string line;
+                    while (std::getline(style_file, line))
+                    {
+                        size_t start = line.find_first_not_of(" \t");
+                        if (start != std::string::npos && line.compare(start, 7, "@import") == 0)
+                            imports += line + "\n";
+                        else
+                            rest += line + "\n";
+                    }
+                    rest += "\n";
                 }
                 else
                 {
                     ErrorHandler::warning("Could not open stylesheet: " + css_file_path.string());
                 }
             }
+            css_out << imports << rest;
         }
     }
 
