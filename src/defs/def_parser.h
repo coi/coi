@@ -56,6 +56,7 @@ struct SchemaEventSpec
     std::string key;
     std::vector<std::string> fields;
     bool last = false;
+    std::string pod; // "PointerEvent": a handler may take the fields as this one pod
 
     static SchemaEventSpec parse(const std::string &value);
     std::string struct_name() const; // webcc's C++ struct: ns::NameEvent
@@ -81,6 +82,10 @@ struct TypeDef
     // @flags("webcc::ns::Name") @alias("uint8"): platform bit flags. Values are shared
     // constants combined with |; the alias makes the type behave as its integer.
     std::string flags_cpp;
+    // @pod type PointerEvent { PointerPhase phase; float32 x; }: an event's fields as one
+    // value. The compiler adds it as a Coi pod.
+    bool is_pod = false;
+    std::vector<MethodParam> pod_fields;
     std::vector<MethodDef> methods;
 };
 

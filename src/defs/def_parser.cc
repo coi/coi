@@ -597,11 +597,38 @@ std::optional<TypeDef> DefParser::parse_type()
         {
             type_def.flags_cpp = value;
         }
+        else if (name == "pod")
+        {
+            type_def.is_pod = true;
+        }
     }
 
     // Parse body
     if (!expect(Token::LBrace, "expected '{'"))
         return std::nullopt;
+
+    // A pod's body is its fields: { Type name; Type[] name; }
+    if (type_def.is_pod)
+    {
+        while (current_.type != Token::RBrace && current_.type != Token::Eof)
+        {
+            MethodParam field;
+            field.type = current_.value;
+            advance();
+            if (current_.type == Token::LBracket)
+            {
+                advance();
+                if (current_.type == Token::RBracket) advance();
+                field.type += "[]";
+            }
+            field.name = current_.value;
+            advance();
+            if (!field.type.empty() && !field.name.empty())
+                type_def.pod_fields.push_back(field);
+        }
+        expect(Token::RBrace, "expected '}'");
+        return type_def;
+    }
 
     // An enum's body is its value list: { A, B, C }
     if (!type_def.enum_cpp.empty())
@@ -728,7 +755,7 @@ std::vector<DefFile> DefParser::parse_directory(const std::string &dir_path)
 // ============================================================
 
 static constexpr uint32_t DEF_CACHE_MAGIC = 0x44494f43; // "COID"
-static constexpr uint32_t DEF_CACHE_VERSION = 4;
+static constexpr uint32_t DEF_CACHE_VERSION = 5;
 
 DefSchema &DefSchema::instance()
 {
@@ -767,7 +794,13 @@ SchemaEventSpec SchemaEventSpec::parse(const std::string &value)
         }
         if (!f.empty()) s.fields.push_back(f);
     }
-    s.last = tokens.size() > 3 && tokens[3] == "last";
+    for (size_t i = 3; i < tokens.size(); i++)
+    {
+        if (tokens[i] == "last")
+            s.last = true;
+        else if (tokens[i].rfind("pod:", 0) == 0)
+            s.pod = tokens[i].substr(4);
+    }
     return s;
 }
 
@@ -880,6 +913,11 @@ bool DefSchema::load(const std::string &def_dir)
                 }
                 if (!type_def.flags_cpp.empty())
                     it->second.flags_cpp = type_def.flags_cpp;
+                if (type_def.is_pod)
+                {
+                    it->second.is_pod = true;
+                    it->second.pod_fields = type_def.pod_fields;
+                }
                 if (!type_def.cleanup.empty() && it->second.cleanup.empty())
                     it->second.cleanup = type_def.cleanup;
             }
@@ -939,6 +977,16 @@ bool DefSchema::load_cache(const std::string &cache_path)
         file.read(reinterpret_cast<char *>(&value_count), sizeof(value_count));
         for (uint32_t v = 0; v < value_count; ++v)
             type_def.enum_values.push_back(read_string());
+        type_def.is_pod = file.get() != 0;
+        uint32_t field_count = 0;
+        file.read(reinterpret_cast<char *>(&field_count), sizeof(field_count));
+        for (uint32_t f = 0; f < field_count; ++f)
+        {
+            MethodParam field;
+            field.type = read_string();
+            field.name = read_string();
+            type_def.pod_fields.push_back(field);
+        }
 
         uint32_t method_count;
         file.read(reinterpret_cast<char *>(&method_count), sizeof(method_count));
@@ -1010,6 +1058,14 @@ bool DefSchema::save_cache(const std::string &cache_path)
         file.write(reinterpret_cast<const char *>(&value_count), sizeof(value_count));
         for (const auto &v : type_def.enum_values)
             write_string(v);
+        file.put(type_def.is_pod ? 1 : 0);
+        uint32_t field_count = type_def.pod_fields.size();
+        file.write(reinterpret_cast<const char *>(&field_count), sizeof(field_count));
+        for (const auto &f : type_def.pod_fields)
+        {
+            write_string(f.type);
+            write_string(f.name);
+        }
 
         uint32_t method_count = type_def.methods.size();
         file.write(reinterpret_cast<const char *>(&method_count), sizeof(method_count));

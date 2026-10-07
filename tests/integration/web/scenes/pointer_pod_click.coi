@@ -1,0 +1,32 @@
+// A pointer handler that takes the event as one PointerEvent pod: position relative to
+// the canvas, phase, type and buttons all arrive in the right fields.
+component PointerPodClick {
+    mut Canvas surface;
+    mut string down = "-";
+    mut string up = "-";
+
+    def onPtr(PointerEvent e) : void {
+        if (e.phase == PointerPhase::Down) {
+            string tip = (e.buttons & Buttons.Primary) != 0 ? "primary" : "none";
+            string kind = e.pointerType == PointerType::Mouse ? "mouse" : "other";
+            down = `${e.x.toInt()},${e.y.toInt()} ${kind} ${tip}`;
+        } else if (e.phase == PointerPhase::Up) {
+            up = `${e.x.toInt()},${e.y.toInt()}`;
+        }
+    }
+
+    mount {
+        surface.addPointerListener(PointerFlags.Capture | PointerFlags.NoScroll);
+        surface.onPointer(&onPtr);
+    }
+
+    view {
+        <div>
+            <canvas class="surface" &={surface} width="200" height="100" style="display:block"></canvas>
+            <p class="down">{down}</p>
+            <p class="up">{up}</p>
+        </div>
+    }
+}
+
+app { root = PointerPodClick; }

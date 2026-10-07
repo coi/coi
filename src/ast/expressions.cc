@@ -550,9 +550,17 @@ static std::string generate_event_registration(const MethodDef& event_method, co
         if (is_callback_param(p)) field_types = callback_param_types(p.type);
     int n = ComponentTypeContext::instance().get_method_param_count(callback);
     if (n < 0 || n > (int)spec.fields.size()) n = (int)spec.fields.size();
+    // def h(PointerEvent e): all fields as one pod, in field order
+    bool as_pod = false;
+    if (!spec.pod.empty()) {
+        auto* sig = ComponentTypeContext::instance().get_method_signature(callback);
+        as_pod = sig && sig->param_types.size() == 1 && DefSchema::instance().resolve_alias(sig->param_types[0]) == spec.pod;
+    }
+    if (as_pod) n = (int)spec.fields.size();
     std::string full = "webcc::" + spec.struct_name();
     std::string code = "coi_events<" + full + ">.set(" + handle_expr + ", [this](const " + full + "& _e) { ";
     code += "(void)_e; this->" + callback + "(";
+    if (as_pod) code += spec.pod + "{";
     for (int i = 0; i < n; i++) {
         if (i) code += ", ";
         std::string ft = i < (int)field_types.size() ? field_types[i] : "";
@@ -560,6 +568,7 @@ static std::string generate_event_registration(const MethodDef& event_method, co
         else if (ft == "uint8[]") code += "coi_bytes(_e." + spec.fields[i] + ")"; // a view into the event buffer
         else code += from_webcc_value("_e." + spec.fields[i], ft);
     }
+    if (as_pod) code += "}";
     code += "); }, this)";
     g_used_events[spec.ns + "::" + spec.name] = {spec.ns, spec.name, spec.key, full, handle_type, spec.last};
     return code;

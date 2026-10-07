@@ -472,6 +472,27 @@ int main(int argc, char **argv)
             platform->is_public = true;
             all_global_enums.push_back(std::move(platform));
         }
+        // Event pods (PointerEvent...) likewise: a handler can take an event as one value
+        for (const auto &[type_name, type_def] : DefSchema::instance().types())
+        {
+            if (!type_def.is_pod)
+                continue;
+            for (const auto &d : all_global_data)
+            {
+                if (d->name == type_name)
+                {
+                    std::cerr << colors::RED << "Error:" << colors::RESET << " pod '" << type_name << "' in " << d->source_file
+                              << " has the name of a platform type. Rename it." << std::endl;
+                    return 1;
+                }
+            }
+            auto pod = std::make_unique<DataDef>();
+            pod->name = type_name;
+            pod->is_public = true;
+            for (const auto &f : type_def.pod_fields)
+                pod->fields.push_back({f.type, f.name});
+            all_global_data.push_back(std::move(pod));
+        }
 
         validate_view_hierarchy(all_components, file_imports);
         validate_type_imports(all_components, all_global_enums, all_global_data, file_imports);

@@ -1,0 +1,8 @@
+// Test: the pod must be the one of the event (pointer events are not wheel events)
+component EventPodWrongFail {
+    mut Canvas surface;
+    def onPtr(WheelEvent e) : void {}
+    mount { surface.onPointer(&onPtr); }
+    view { <canvas &={surface}></canvas> }
+}
+app { root = EventPodWrongFail; }

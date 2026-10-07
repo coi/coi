@@ -509,7 +509,7 @@ static const Component *g_ctx_component = nullptr;
 // `&handler` for a schema callback param ("def(string,int32):void"): the handler must be
 // a method of the component taking a prefix of the event's fields, same types.
 static std::string check_schema_callback(const CallArg &arg, const MethodParam &param, const std::string &call_name,
-                                         const std::string &event_label)
+                                         const std::string &event_label, const std::string &pod = "")
 {
     std::string arg_name = "argument";
     if (auto *id = dynamic_cast<Identifier *>(arg.value.get()))
@@ -523,6 +523,9 @@ static std::string check_schema_callback(const CallArg &arg, const MethodParam &
                 handler = &m;
     if (!handler)
         return "'" + call_name + "': callback '" + event_label + "' must name a method of this component, got '" + arg_name + "'";
+    // Or the event's fields as one pod: def h(PointerEvent e)
+    if (!pod.empty() && handler->params.size() == 1 && normalize_type(handler->params[0].type) == pod)
+        return "";
     std::vector<std::string> want = callback_param_types(param.type);
     if (handler->params.size() > want.size())
         return "'" + call_name + "': '" + arg_name + "' takes " + std::to_string(handler->params.size()) +
@@ -1174,7 +1177,8 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                             ErrorHandler::type_error("'" + full_name + "' takes exactly one '&handler' argument", func->line);
                             exit(1);
                         }
-                        std::string err = check_schema_callback(func->args[0], ev->params[0], full_name, method_name);
+                        std::string err = check_schema_callback(func->args[0], ev->params[0], full_name, method_name,
+                                                                SchemaEventSpec::parse(ev->mapping_value).pod);
                         if (!err.empty())
                         {
                             ErrorHandler::type_error(err, func->line);
@@ -1375,7 +1379,11 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                     param = callback_params[next_callback++];
                 }
                 bound.insert(param);
-                std::string err = check_schema_callback(arg, *param, full_name, param->name);
+                std::string pod;
+                if (const MethodDef *ev = DefSchema::instance().lookup_method(normalize_type(entry->method->return_type), param->name))
+                    if (ev->mapping_type == MappingType::Event)
+                        pod = SchemaEventSpec::parse(ev->mapping_value).pod;
+                std::string err = check_schema_callback(arg, *param, full_name, param->name, pod);
                 if (!err.empty())
                 {
                     ErrorHandler::type_error(err, func->line);

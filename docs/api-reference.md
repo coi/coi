@@ -949,10 +949,30 @@ mount {
 }
 ```
 
+An event with several fields can also arrive as one value. Every such event has a pod named after it, and a handler can take that instead of the separate fields:
+
+```tsx
+def onPtr(PointerEvent e) : void {
+    if (e.phase == PointerPhase::Down) startStroke(e.x, e.y, e.pressure);
+}
+
+mount { surface.onPointer(&onPtr); }
+```
+
+| Pod | Fields |
+|-----|--------|
+| `PointerEvent` | `phase`, `pointerId`, `pointerType`, `buttons`, `x`, `y`, `pressure`, `tiltX`, `tiltY`, `time` |
+| `WheelEvent` | `deltaX`, `deltaY`, `x`, `y`, `mods` |
+| `ResizeEvent` | `width`, `height`, `pixelWidth`, `pixelHeight`, `dpr` |
+| `CloseEvent` | `code`, `reason`, `wasClean` (WebSocket) |
+| `LoadedEvent` | `width`, `height` (Image) |
+
+Events that carry a handle (a `Blob` in an IndexedDB value, a dropped or opened file) have no pod, since a handle can't be copied: take their fields as separate parameters.
+
 The rules:
 
 - A callback is a method of the component, passed with `&`. It runs on the next frame after the event, with the component alive.
-- A handler may take **fewer** parameters than the event provides (the leading ones), never more or of another type. The compiler checks this.
+- A handler takes the event's pod, or its fields as separate parameters: **fewer** than the event provides is fine (the leading ones), never more or of another type. The compiler checks this.
 - Functions that create a handle take the handle's callbacks as optional trailing arguments, by name (`&onError = failed`) or in event order (`&ok, &err`). `WebSocket.connect(...)` and `FetchRequest.get(...)` work this way.
 - Events after which a handle is finished (a fetch's result, a socket's close) release that handle's callbacks. A destroyed component releases all of its callbacks, so a late event never reaches freed memory.
 

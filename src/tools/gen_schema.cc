@@ -279,6 +279,66 @@ void emit_groups(std::ostream &out, const webcc::SchemaDefs &defs, const std::st
     }
 }
 
+// pointer_id -> pointerId
+std::string field_camel(const std::string &snake)
+{
+    std::string out;
+    bool upper = false;
+    for (char c : snake)
+    {
+        if (c == '_') { upper = true; continue; }
+        out += upper ? (char)std::toupper((unsigned char)c) : c;
+        upper = false;
+    }
+    return out;
+}
+
+// Name of the pod for an event's fields, "" when it has fewer than two. PointerEvent; with
+// the namespace in front (FilesOpenedEvent) when another bindable event has the same name.
+// No pod when a field is a handle (a Blob): handles can't be copied, pods can.
+std::string event_pod_name(const webcc::SchemaDefs &defs, const webcc::SchemaEvent &e)
+{
+    if (e.params.size() < 3)
+        return "";
+    for (size_t i = 1; i < e.params.size(); i++)
+        if (e.params[i].type == "handle")
+            return "";
+    auto gets_pod = [](const webcc::SchemaEvent &ev) {
+        if (ev.params.size() < 3 || ev.params[0].type != "handle")
+            return false;
+        for (size_t i = 1; i < ev.params.size(); i++)
+            if (ev.params[i].type == "handle")
+                return false;
+        return true;
+    };
+    for (const auto &other : defs.events)
+        if (&other != &e && other.name == e.name && gets_pod(other))
+            return to_pascal_case(e.ns) + to_pascal_case(e.name) + "Event";
+    return to_pascal_case(e.name) + "Event";
+}
+
+// Pods for the multi-field events of a namespace's handle types
+void emit_event_pods(std::ostream &out, const webcc::SchemaDefs &defs, const std::set<std::string> &handle_types)
+{
+    std::set<std::string> done;
+    for (const auto &handle_type : handle_types)
+    {
+        for (const auto *e : bindable_events(defs, handle_type))
+        {
+            std::string pod = event_pod_name(defs, *e);
+            if (pod.empty() || !done.insert(pod).second)
+                continue;
+            out << "// Fields of a " << e->ns << " " << e->name << " event, for a handler that takes them as one value\n";
+            out << "@pod\n";
+            out << "type " << pod << " {\n";
+            for (size_t i = 1; i < e->params.size(); i++)
+                out << "    " << to_coi_type(e->params[i].type, e->params[i].handle_type, e->params[i].enum_type) << " "
+                    << field_camel(e->params[i].name) << ";\n";
+            out << "}\n\n";
+        }
+    }
+}
+
 // Callback methods for the events of a handle type
 void emit_event_methods(std::ostream &out, const webcc::SchemaDefs &defs, const std::string &handle_type)
 {
@@ -291,7 +351,9 @@ void emit_event_methods(std::ostream &out, const webcc::SchemaDefs &defs, const 
         std::string fields;
         for (size_t i = 1; i < e->params.size(); i++)
             fields += (i > 1 ? "," : "") + (e->params[i].name.empty() ? "arg" + std::to_string(i) : e->params[i].name);
-        out << "    @event(\"" << e->ns << "::" << e->name << " " << e->params[0].name << " " << (fields.empty() ? "-" : fields) << (e->last ? " last" : "") << "\")\n";
+        std::string pod = event_pod_name(defs, *e);
+        out << "    @event(\"" << e->ns << "::" << e->name << " " << e->params[0].name << " " << (fields.empty() ? "-" : fields) << (e->last ? " last" : "")
+            << (pod.empty() ? "" : " pod:" + pod) << "\")\n";
         out << "    def on" << to_pascal_case(e->name) << "(" << event_callback_type(*e, "callback") << "): void\n\n";
     }
 }
@@ -627,6 +689,8 @@ int main()
                 all_handle_types.insert(type);
             }
         }
+
+        emit_event_pods(out, defs, all_handle_types);
 
         // Generate each handle type with both static and instance methods combined
         for (const auto &handle_type : all_handle_types)

@@ -1,0 +1,31 @@
+// Test: a handler can take an event's fields as one pod, bound after creation or as a
+// callback on the call that creates the handle
+component EventPodPass {
+    mut Canvas surface;
+    mut WebSocket ws;
+    mut float lastX = 0.0;
+    mut string why = "";
+
+    def onPtr(PointerEvent e) : void {
+        if (e.phase == PointerPhase::Down && e.pointerType == PointerType::Pen) {
+            lastX = e.x + e.pressure;
+        }
+        bool tip = (e.buttons & Buttons.Primary) != 0;
+    }
+
+    def closed(CloseEvent e) : void { why = `${e.code} ${e.reason}`; }
+
+    def loaded(LoadedEvent e) : void { lastX = e.width; }
+
+    mount {
+        surface.addPointerListener(PointerFlags.Capture);
+        surface.onPointer(&onPtr);
+        ws = WebSocket.connect("ws://localhost:1/", &onClose = closed);
+        Image img = Image.load("/a.png");
+        img.onLoaded(&loaded);
+    }
+
+    view { <canvas &={surface}></canvas> }
+}
+
+app { root = EventPodPass; }
