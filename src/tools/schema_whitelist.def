@@ -20,6 +20,7 @@ create_canvas
 get_context_webgl
 get_context_webgpu
 set_size
+free
 log_canvas_info
 set_fill_style
 set_fill_style_str

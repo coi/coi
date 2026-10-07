@@ -1,0 +1,26 @@
+// Test: drawImage takes a Canvas (cache tile) as well as an Image, and a tile can be freed
+component DrawCanvasPass {
+    mut Canvas screen;
+    mut Canvas tile;
+    mut CanvasContext2D ctx;
+    mut CanvasContext2D tctx;
+    mut Image img;
+
+    mount {
+        ctx = screen.getContext2d();
+        tile = Canvas.createCanvas("", 20, 20);
+        tctx = tile.getContext2d();
+        tctx.fillRect(0, 0, 20, 20);
+        img = Image.load("/a.png");
+        ctx.drawImage(tile, 0, 0);
+        ctx.drawImageScaled(tile, 0, 0, 40, 40);
+        ctx.drawImage(img, 0, 0);
+        tile.free();
+    }
+
+    view {
+        <canvas &={screen}></canvas>
+    }
+}
+
+app { root = DrawCanvasPass; }
