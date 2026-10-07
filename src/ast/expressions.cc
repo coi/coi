@@ -576,6 +576,25 @@ std::string generate_event_call(const MethodDef& event_method, const std::string
     return code;
 }
 
+// A page-wide event (Clipboard.onPasteText(&h)): turn it on with the whitelist's +listen
+// values, then register under this component, so every component that listens is called
+static std::string generate_page_event_registration(const MethodDef& event_method, const CallArg& arg) {
+    SchemaEventSpec spec = SchemaEventSpec::parse(event_method.mapping_value);
+    std::string full = "webcc::" + spec.struct_name();
+    std::string call = generate_event_call(event_method, "", arg.value->to_webcc(), "_e");
+    std::string listen;
+    if (!spec.listen.empty()) {
+        listen = "webcc::" + spec.ns + "::" + spec.listen + "(";
+        for (size_t i = 0; i < spec.listen_params.size(); i++) {
+            const auto& lp = spec.listen_params[i];
+            listen += (i ? ", " : "") + to_webcc_arg(lp.value, lp.type);
+        }
+        listen += "), ";
+    }
+    return "(" + listen + "coi_events<" + full + ">.set(webcc::handle((int32_t)(uintptr_t)this), [this](const " + full +
+           "& _e) { (void)_e; " + call + "; }, this))";
+}
+
 // coi_events<E>.set(handle, [this](const E& _e) { this->handler(...); }, this)
 static std::string generate_event_registration(const MethodDef& event_method, const std::string& handle_type,
                                                const std::string& handle_expr, const CallArg& arg) {
@@ -659,6 +678,11 @@ std::string FunctionCall::to_webcc() {
                             return expand_inline_template(method_def->mapping_value, type_or_obj, args);
                         case MappingType::Map:
                             // Handled below by existing schema lookup
+                            break;
+                        case MappingType::Event:
+                            // Clipboard.onPasteText(&h): a page-wide event
+                            if (method_def->is_shared && args.size() == 1)
+                                return generate_page_event_registration(*method_def, args[0]);
                             break;
                     }
                 }

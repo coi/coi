@@ -1,5 +1,6 @@
 #include "feature_detector.h"
 #include "ast/ast.h"
+#include "ast/codegen_state.h"
 #include <functional>
 
 // Scan view nodes for event handler attributes
@@ -265,10 +266,13 @@ void emit_feature_event_handlers(std::ostream &out, const FeatureFlags &f)
     // Runtime features
     if (f.keyboard)
     {
+        // Input.onKeyDown(&h) handlers, when used, run from here too (see emit_event_dispatch)
+        std::string down_handlers = g_used_events.count("input::KEY_DOWN") ? " coi_events<webcc::input::KeyDownEvent>.dispatch_all(*evt);" : "";
+        std::string up_handlers = g_used_events.count("input::KEY_UP") ? " coi_events<webcc::input::KeyUpEvent>.dispatch_all(*evt);" : "";
         out << "        } else if (e.opcode == webcc::input::KeyDownEvent::OPCODE) {\n";
-        out << "            if (auto evt = e.as<webcc::input::KeyDownEvent>()) { if (evt->key_code >= 0 && evt->key_code < 256) g_key_state[evt->key_code] = true; }\n";
+        out << "            if (auto evt = e.as<webcc::input::KeyDownEvent>()) { if (evt->key_code >= 0 && evt->key_code < 256) g_key_state[evt->key_code] = true;" << down_handlers << " }\n";
         out << "        } else if (e.opcode == webcc::input::KeyUpEvent::OPCODE) {\n";
-        out << "            if (auto evt = e.as<webcc::input::KeyUpEvent>()) { if (evt->key_code >= 0 && evt->key_code < 256) g_key_state[evt->key_code] = false; }\n";
+        out << "            if (auto evt = e.as<webcc::input::KeyUpEvent>()) { if (evt->key_code >= 0 && evt->key_code < 256) g_key_state[evt->key_code] = false;" << up_handlers << " }\n";
     }
     if (f.router)
     {

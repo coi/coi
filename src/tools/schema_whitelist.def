@@ -20,6 +20,11 @@ add_wheel_listener +listen(WHEEL) prevent_default=1
 observe_resize +listen(RESIZE)
 add_focus_listener +listen(FOCUS, BLUR)
 add_drop_listener +listen(DROP)
+# Text boxes over a canvas: move one, focus it, read what was typed (innerText)
+set_style
+focus
+blur
+get_property
 request_fullscreen
 request_pointer_lock
 scroll_to_top
@@ -68,7 +73,12 @@ clip
 stroke_text
 set_text_baseline
 draw_image_scaled
-draw_image_region
+draw_image_full
+set_global_composite_operation
+transform
+set_miter_limit
+set_image_smoothing_enabled
+measure_text_width
 measure_text
 ellipse
 arc_to
@@ -87,10 +97,18 @@ get_current_time
 get_duration
 
 [image]
-load
+# LOADED (size, after decoding) or ERROR; from_blob for pasted, dropped or stored bytes
+load +events
+from_blob +events
+free
 
 [input]
 exit_pointer_lock
+# Shortcuts: stop the browser's own action for a key combination (Ctrl+S saves the page)
+prevent_key
+allow_key
+# Key events for Input.onKeyDown(&h) / onKeyUp
+init_keyboard +listen(KEY_DOWN, KEY_UP)
 // Keyboard state queries (compiler intrinsics)
 @intrinsic("key_down") shared def isKeyDown(int keyCode): bool
 @intrinsic("key_up") shared def isKeyUp(int keyCode): bool
@@ -106,8 +124,17 @@ clear
 get +events(SUCCESS, ERROR)
 post +events(SUCCESS, ERROR)
 patch +events(SUCCESS, ERROR)
+# Any method, binary body; DONE has the status and the body as a Blob
+request +events(DONE, ERROR)
+abort
 
 [system]
+# Frames on demand (app { tick = demand; }), screen and connection
+get_device_pixel_ratio
+is_online
+# Page lifecycle for System.onPageHide(&h) etc.; save on visibility hidden, PAGE_HIDE is the last chance
+init_lifecycle +listen(PAGE_HIDE, PAGE_SHOW, ONLINE)
+init_visibility_change +listen(VISIBILITY_CHANGE)
 log
 warn
 error
@@ -170,6 +197,47 @@ remove +events(DONE, ERROR)
 keys +events(KEYS, ERROR)
 close
 
+[clipboard]
+# write_text only works in a click or key handler
+write_text
+# Pastes outside text fields; inputs keep their native paste
+init_paste +listen(PASTE_TEXT, PASTE_IMAGE) prevent_default=1
+
+[files]
+# open shows the file dialog (in a click or key handler); one OPENED per picked file
+open +events
+save
+
+[pdf]
+# Import (pdf.js, shipped by the app: Pdf.setLibrary first) and export
+set_library
+open +events
+page_width
+page_height
+render_page +events
+cancel_render
+close
+create_writer +events
+add_page
+set_stroke_color
+set_fill_color
+set_line_width
+set_line_cap
+set_line_join
+move_to
+line_to
+quad_to
+curve_to
+rect
+close_path
+stroke
+fill
+save
+restore
+draw_image
+draw_text
+finish
+
 [websocket]
 # An owned socket member is closed when its component is destroyed
 @cleanup("websocket::close")
@@ -177,6 +245,12 @@ connect +events
 send
 close
 get_ready_state
+send_binary
+close_with_code
+get_buffered_amount
+get_protocol
+get_extensions
+get_url
 // True while the socket is open (not connecting, closing or closed)
 @inline("(webcc::websocket::get_ready_state($self) == webcc::websocket::ReadyState::OPEN)") def isConnected(): bool
 

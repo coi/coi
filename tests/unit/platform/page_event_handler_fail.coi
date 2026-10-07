@@ -1,0 +1,7 @@
+// Test: a page-wide event handler must match the event (PASTE_TEXT carries a string)
+component PageEventHandlerFail {
+    def pasted(int t) : void {}
+    mount { Clipboard.onPasteText(&pasted); }
+    view { <p></p> }
+}
+app { root = PageEventHandlerFail; }

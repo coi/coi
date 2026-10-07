@@ -9,12 +9,23 @@
 // One case per webcc event a component bound a callback to (collected while
 // lowering, see g_used_events). A "last" event also drops every callback the
 // handle had, so finished requests don't pile up in the tables.
-static void emit_event_dispatch(std::ostream &out)
+static void emit_event_dispatch(std::ostream &out, const FeatureFlags &features)
 {
     for (const auto &[key, ev] : g_used_events)
     {
+        // The keyboard feature (Input.isKeyDown) has its own case for these and calls the
+        // handlers from there
+        if (features.keyboard && (key == "input::KEY_DOWN" || key == "input::KEY_UP"))
+            continue;
         out << "        } else if (e.opcode == " << ev.struct_name << "::OPCODE) {\n";
         out << "            if (auto evt = e.as<" << ev.struct_name << ">()) {\n";
+        if (ev.key == "-")
+        {
+            // Page-wide: every component that registered
+            out << "                coi_events<" << ev.struct_name << ">.dispatch_all(*evt);\n";
+            out << "            }\n";
+            continue;
+        }
         out << "                coi_events<" << ev.struct_name << ">.dispatch(evt->" << ev.key << ", *evt);\n";
         if (ev.last)
             for (const auto &[key2, other] : g_used_events)
@@ -251,6 +262,13 @@ void generate_cpp_code(
     out << "        }\n";
     out << "        return false;\n";
     out << "    }\n";
+    // Every entry, for page-wide events. A handler may register or drop entries while
+    // this runs, so it stops at the count it started with and checks the bound
+    out << "    template<typename... Args>\n";
+    out << "    void dispatch_all(Args&&... args) {\n";
+    out << "        int n = count;\n";
+    out << "        for (int i = 0; i < n && i < count; i++) callbacks[i](args...);\n";
+    out << "    }\n";
     out << "};\n";
     out << "// Callbacks for webcc event E, keyed by the handle in its first field\n";
     out << "template<typename E> Dispatcher<coi::function<void(const E&)>> coi_events;\n";
@@ -482,7 +500,7 @@ void generate_cpp_code(
     out << "        const auto& e = events[i];\n";
     out << "        if (false) {\n"; // Dummy to allow all handlers to use "} else if"
     emit_feature_event_handlers(out, features);
-    emit_event_dispatch(out);
+    emit_event_dispatch(out, features);
     out << "        }\n";
     out << "    }\n";
     out << "}\n\n";

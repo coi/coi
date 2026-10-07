@@ -1,0 +1,45 @@
+// Page-wide events from Coi: paste text, key presses (two components both listening, one
+// of them removed later), visibility, and copying from a click.
+component KeyCounter {
+    pub mut int count = 0;
+    def onKey(KeyDownEvent k) : void { count++; }
+    mount { Input.onKeyDown(&onKey); }
+    view { <span class="counter">{count}</span> }
+}
+
+component PageEvents {
+    mut string pasted = "-";
+    mut string lastKey = "-";
+    mut string visibility = "-";
+    mut bool showCounter = true;
+
+    def onPaste(string text) : void { pasted = text; }
+    def onKey(int code, Mods mods, uint8 repeat, string key) : void {
+        lastKey = (mods & Mods.Ctrl) != 0 ? `ctrl+${key}` : key;
+    }
+    def onVisibility(VisibilityChangeEvent v) : void { visibility = v.state; }
+    def copy() : void { Clipboard.writeText("copied from coi"); }
+    def hideCounter() : void { showCounter = false; }
+
+    mount {
+        Clipboard.onPasteText(&onPaste);
+        Input.onKeyDown(&onKey);
+        System.onVisibilityChange(&onVisibility);
+        Input.preventKey(83, Mods.Ctrl);
+    }
+
+    view {
+        <div>
+            <p class="pasted">{pasted}</p>
+            <p class="key">{lastKey}</p>
+            <p class="vis">{visibility}</p>
+            <button class="copy" onclick={copy}>copy</button>
+            <button class="hide" onclick={hideCounter}>hide</button>
+            <if showCounter>
+                <KeyCounter />
+            </if>
+        </div>
+    }
+}
+
+app { root = PageEvents; }

@@ -793,6 +793,11 @@ mount { ws = WebSocket.connect("wss://host", &onMessage = onMsg, &onOpen = onOpe
 //   <canvas onpointerdown={start} onpointermove={draw} onpointerup={end}
 //           pointerflags={PointerFlags.Capture | PointerFlags.Coalesced | PointerFlags.NoScroll}></canvas>
 //   default pointer flags: Capture only; a drawing surface adds Coalesced | NoScroll
+// Page-wide events (shared, every registered component is called; registering turns them on):
+//   Clipboard.onPasteText(&h) h(string), Clipboard.onPasteImage(&h) h(Blob, string mime), Input.onKeyDown(&h) h(KeyDownEvent k: keyCode, mods, repeat, key),
+//   System.onVisibilityChange(&h) h(VisibilityChangeEvent v: hidden, state), System.onPageHide/onPageShow/onOnline. Input.preventKey(83, Mods.Ctrl)
+// Clipboard.writeText(t) (click/key handler), FileRequest.open(".pdf", 0, &onOpened = h) h(Blob, string name, ...), Files.save(name, mime, bytes)
+// FetchRequest.request(method, url, headers, bytes, &onDone = h) h(int status, Blob body); Image.fromBlob(blob, mime); PdfDocument.open(blob, &onOpened = h)
 // Bytes are uint8[]. IndexedDB: db = Idb.open("name", &opened); db.put(key, bytes, &onDone = h, &onError = e);
 //   db.get(key, &got, &err) with def got(Blob value, uint8 found); value.take() -> uint8[]; db.keys(prefix, &onKeys = h)
 // Blob: Blob.create(bytes), b.size(), b.read(), b.take() (reads and frees), b.free(). ws.onBinaryMessage(&h) with def h(uint8[] data)

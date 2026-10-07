@@ -1,0 +1,50 @@
+// Test: page-wide events as shared methods (fields, pod, no params), and whitelisted
+// functions whose names exist in several namespaces resolve on their own type
+component PageEventsPass {
+    mut Database db;
+    mut PdfDocument doc;
+    mut PdfWriter writer;
+    mut Image img;
+    mut Canvas surface;
+    mut FileRequest pick;
+    mut string text = "";
+    mut int n = 0;
+
+    def pasted(string t) : void { text = t; }
+    def pastedImage(Blob image, string mime) : void { img = Image.fromBlob(image, mime); image.free(); }
+    def keyPressed(KeyDownEvent k) : void { n = k.keyCode; }
+    def hidden() : void { n = 0; }
+    def online(uint8 up) : void { n = up == 1 ? 1 : 0; }
+    def opened(int pages, string error) : void { n = pages; doc.renderPage(0, surface, 2.0); }
+    def written(Blob data, string error) : void { uint8[] bytes = data.take(); Files.save("notes.pdf", "application/pdf", bytes); }
+    def picked(Blob data, string name) : void { doc = PdfDocument.open(data, &onOpened = opened); data.free(); }
+    def done(int status, Blob body) : void { body.free(); }
+
+    def importPdf() : void { pick = FileRequest.open(".pdf", 0, &onOpened = picked); }
+
+    def exportPdf() : void {
+        writer = PdfWriter.createWriter(&onWritten = written);
+        writer.addPage(595, 842);
+        writer.setLineCap(LineCap::Round);
+        writer.moveTo(10, 10);
+        writer.lineTo(100, 100);
+        writer.stroke();
+        writer.finish();
+    }
+
+    mount {
+        Clipboard.onPasteText(&pasted);
+        Clipboard.onPasteImage(&pastedImage);
+        Input.onKeyDown(&keyPressed);
+        System.onPageHide(&hidden);
+        System.onOnline(&online);
+        Pdf.setLibrary("assets/pdf.min.mjs", "assets/pdf.worker.min.mjs");
+        db = Idb.open("x");
+        db.close();
+        FetchRequest.request("PUT", "/sync", "", [1, 2, 3], &onDone = done);
+        bool up = System.isOnline() == 1;
+    }
+
+    view { <canvas &={surface} onclick={exportPdf}></canvas> }
+}
+app { root = PageEventsPass; }

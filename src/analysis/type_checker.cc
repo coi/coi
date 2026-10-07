@@ -1054,7 +1054,10 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                 // Check if obj_name is a valid type with a namespace mapping (e.g., DOMElement -> dom, System -> system)
                 // Also walk the inheritance chain (e.g., Canvas -> DOMElement means check canvas:: then dom::)
                 std::string snake_method = DefSchema::to_snake_case(method_name);
-                bool is_valid_schema_call = false;
+                // A shared method of the type itself (Image.fromBlob) is a valid static call,
+                // whatever its first param; the name-only lookup below can't tell
+                const MethodDef *own = DefSchema::instance().lookup_method(obj_name, method_name);
+                bool is_valid_schema_call = own && own->is_shared;
                 
                 std::string current_type = obj_name;
                 while (!current_type.empty() && !is_valid_schema_call) {
@@ -1212,8 +1215,51 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                     return m.return_type.empty() ? "void" : normalize_type(m.return_type);
         }
 
+        // Clipboard.onPasteText(&h): register a handler for a page-wide event
+        if (!obj_name.empty() && !scope.count(obj_name))
+        {
+            if (const MethodDef *ev = DefSchema::instance().lookup_method(obj_name, method_name);
+                ev && ev->mapping_type == MappingType::Event && ev->is_shared)
+            {
+                if (func->args.size() != 1 || ev->params.empty())
+                {
+                    ErrorHandler::type_error("'" + full_name + "' takes exactly one '&handler' argument", func->line);
+                    exit(1);
+                }
+                std::string err = check_schema_callback(func->args[0], ev->params[0], full_name, method_name,
+                                                        SchemaEventSpec::parse(ev->mapping_value).pod);
+                if (!err.empty())
+                {
+                    ErrorHandler::type_error(err, func->line);
+                    exit(1);
+                }
+                return "void";
+            }
+        }
+
+        // The method of the receiver's own type first (Idb.open, not pdf::open): names like
+        // open, close and free exist in several namespaces. The name-only index is the
+        // fallback for receivers without a known type.
         std::string snake_method = DefSchema::to_snake_case(method_name);
-        const auto *entry = DefSchema::instance().lookup_func(snake_method);
+        const DefSchema::FuncLookupResult *entry = nullptr;
+        DefSchema::FuncLookupResult typed_entry;
+        if (!obj_name.empty())
+        {
+            std::string owner = scope.count(obj_name) ? normalize_type(scope.at(obj_name)) : obj_name;
+            if (DefSchema::instance().lookup_type(owner))
+            {
+                const MethodDef *md = DefSchema::instance().lookup_method(owner, method_name);
+                if (md && md->mapping_type == MappingType::Map && md->mapping_value.find("::") != std::string::npos)
+                {
+                    typed_entry.ns = md->mapping_value.substr(0, md->mapping_value.find("::"));
+                    typed_entry.type_name = owner;
+                    typed_entry.method = md;
+                    entry = &typed_entry;
+                }
+            }
+        }
+        if (!entry)
+            entry = DefSchema::instance().lookup_func(snake_method);
 
         if (entry)
         {
@@ -1262,7 +1308,13 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                     // Check if obj_name is a known handle type
                     bool is_handle_type = DefSchema::instance().is_handle(obj_name);
                     
-                    if (!entry->method->params.empty() && DefSchema::instance().is_handle(entry->method->params[0].type))
+                    if (entry->method->is_shared && entry->type_name == obj_name)
+                    {
+                        // A shared method of the type itself (Image.fromBlob(blob)), even when
+                        // its first param is another type's handle
+                        is_valid_call = true;
+                    }
+                    else if (!entry->method->params.empty() && DefSchema::instance().is_handle(entry->method->params[0].type))
                     {
                         // Method expects a handle as first param (instance method)
                         // Only allow if obj_name matches the expected handle type
@@ -1354,7 +1406,7 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                     size_t pi = param_offset, seen = 0;
                     while (pi < params.size() && (is_callback(params[pi]) || seen++ != value_index)) pi++;
                     std::string arg_type = infer_expression_type(arg.value.get(), scope);
-                    std::string expected_type = params[pi].type;
+                    std::string expected_type = normalize_type(params[pi].type); // Mods -> uint8
                     if (!is_compatible_type(arg_type, expected_type))
                     {
                         ErrorHandler::type_error(

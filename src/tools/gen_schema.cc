@@ -178,6 +178,7 @@ bool load_whitelist(const std::string &path)
 }
 
 std::string to_coi_type(const std::string &type, const std::string &handle_type, const std::string &enum_type = "");
+std::string handle_namespace(const webcc::SchemaDefs &defs, const std::string &handle_type);
 
 // MESSAGE -> Message, PAGE_HIDE -> PageHide (webcc's struct naming, minus "Event")
 std::string to_pascal_case(const std::string &upper_snake)
@@ -227,15 +228,30 @@ std::vector<const webcc::SchemaEvent *> bindable_events(const webcc::SchemaDefs 
 }
 
 // "def callback(string, int32): void" for an event's fields after the handle
-std::string event_callback_type(const webcc::SchemaEvent &e, const std::string &name)
+// An event belongs to a handle when its first field is a handle of its own namespace
+// (dom POINTER -> DOMElement). Anything else is page-wide (clipboard PASTE_TEXT, input
+// KEY_DOWN; PASTE_IMAGE only carries a Blob): all its params are data.
+bool is_handle_event(const webcc::SchemaDefs &defs, const webcc::SchemaEvent &e)
+{
+    return !e.params.empty() && e.params[0].type == "handle" && !e.params[0].handle_type.empty() &&
+           handle_namespace(defs, e.params[0].handle_type) == e.ns;
+}
+
+size_t first_field(const webcc::SchemaDefs &defs, const webcc::SchemaEvent &e)
+{
+    return is_handle_event(defs, e) ? 1 : 0;
+}
+
+std::string event_callback_type(const webcc::SchemaDefs &defs, const webcc::SchemaEvent &e, const std::string &name)
 {
     std::string out = "def " + name;
-    if (e.params.size() > 1)
+    size_t first = first_field(defs, e);
+    if (e.params.size() > first)
     {
         out += "(";
-        for (size_t i = 1; i < e.params.size(); i++)
+        for (size_t i = first; i < e.params.size(); i++)
         {
-            if (i > 1) out += ", ";
+            if (i > first) out += ", ";
             out += to_coi_type(e.params[i].type, e.params[i].handle_type, e.params[i].enum_type);
         }
         out += ")";
@@ -254,7 +270,7 @@ std::string factory_event_params(const webcc::SchemaDefs &defs, const webcc::Sch
     {
         if (!it->second.empty() && std::find(it->second.begin(), it->second.end(), e->name) == it->second.end())
             continue;
-        out += ", " + event_callback_type(*e, "on" + to_pascal_case(e->name)) + " = void";
+        out += ", " + event_callback_type(defs, *e, "on" + to_pascal_case(e->name)) + " = void";
     }
     return out;
 }
@@ -327,23 +343,23 @@ std::string field_camel(const std::string &snake)
 // Name of the pod for an event's fields, "" when it has fewer than two. PointerEvent; with
 // the namespace in front (FilesOpenedEvent) when another bindable event has the same name.
 // No pod when a field is a handle (a Blob): handles can't be copied, pods can.
+bool event_gets_pod(const webcc::SchemaDefs &defs, const webcc::SchemaEvent &e)
+{
+    size_t first = first_field(defs, e);
+    if (e.params.size() < first + 2)
+        return false;
+    for (size_t i = first; i < e.params.size(); i++)
+        if (e.params[i].type == "handle")
+            return false;
+    return true;
+}
+
 std::string event_pod_name(const webcc::SchemaDefs &defs, const webcc::SchemaEvent &e)
 {
-    if (e.params.size() < 3)
+    if (!event_gets_pod(defs, e))
         return "";
-    for (size_t i = 1; i < e.params.size(); i++)
-        if (e.params[i].type == "handle")
-            return "";
-    auto gets_pod = [](const webcc::SchemaEvent &ev) {
-        if (ev.params.size() < 3 || ev.params[0].type != "handle")
-            return false;
-        for (size_t i = 1; i < ev.params.size(); i++)
-            if (ev.params[i].type == "handle")
-                return false;
-        return true;
-    };
     for (const auto &other : defs.events)
-        if (&other != &e && other.name == e.name && gets_pod(other))
+        if (&other != &e && other.name == e.name && event_gets_pod(defs, other))
             return to_pascal_case(e.ns) + to_pascal_case(e.name) + "Event";
     return to_pascal_case(e.name) + "Event";
 }
@@ -362,7 +378,7 @@ void emit_event_pods(std::ostream &out, const webcc::SchemaDefs &defs, const std
             out << "// Fields of a " << e->ns << " " << e->name << " event, for a handler that takes them as one value\n";
             out << "@pod\n";
             out << "type " << pod << " {\n";
-            for (size_t i = 1; i < e->params.size(); i++)
+            for (size_t i = first_field(defs, *e); i < e->params.size(); i++)
                 out << "    " << to_coi_type(e->params[i].type, e->params[i].handle_type, e->params[i].enum_type) << " "
                     << field_camel(e->params[i].name) << ";\n";
             out << "}\n\n";
@@ -383,13 +399,14 @@ std::string event_listen_token(const webcc::SchemaDefs &defs, const webcc::Schem
         for (const auto &c : defs.commands)
             if (c.ns == e.ns && c.func_name == fn)
                 cmd = &c;
-        if (!cmd || cmd->params.empty() || cmd->params[0].handle_type != e.params[0].handle_type)
+        bool handle_event = is_handle_event(defs, e);
+        if (!cmd || (handle_event && (cmd->params.empty() || cmd->params[0].handle_type != e.params[0].handle_type)))
         {
             std::cerr << "[Coi] Error: +listen on " << key << ": it must take the " << e.name << " event's handle first" << std::endl;
             exit(1);
         }
         std::string args;
-        for (size_t i = 1; i < cmd->params.size(); i++)
+        for (size_t i = handle_event ? 1 : 0; i < cmd->params.size(); i++)
         {
             const auto &p = cmd->params[i];
             auto ov = entry.overrides.find(p.name);
@@ -416,6 +433,42 @@ std::string event_listen_token(const webcc::SchemaDefs &defs, const webcc::Schem
     return "";
 }
 
+// @event("ns::NAME key fields [last] [pod:P] [listen:f(...)]"); key is "-" for a page-wide event
+std::string event_annotation(const webcc::SchemaDefs &defs, const webcc::SchemaEvent &e)
+{
+    size_t first = first_field(defs, e);
+    std::string fields;
+    for (size_t i = first; i < e.params.size(); i++)
+        fields += (i > first ? "," : "") + (e.params[i].name.empty() ? "arg" + std::to_string(i) : e.params[i].name);
+    std::string pod = event_pod_name(defs, e);
+    return "    @event(\"" + e.ns + "::" + e.name + " " + (first ? e.params[0].name : "-") + " " + (fields.empty() ? "-" : fields) +
+           (e.last ? " last" : "") + (pod.empty() ? "" : " pod:" + pod) + event_listen_token(defs, e) + "\")\n";
+}
+
+// Page-wide events of a namespace that something turns on (+listen): shared methods on the
+// namespace's type, Clipboard.onPasteText(&h)
+std::vector<const webcc::SchemaEvent *> page_events(const webcc::SchemaDefs &defs, const std::string &ns)
+{
+    std::vector<const webcc::SchemaEvent *> out;
+    for (const auto &e : defs.events)
+        if (e.ns == ns && !is_handle_event(defs, e) && !event_listen_token(defs, e).empty())
+            out.push_back(&e);
+    return out;
+}
+
+void emit_page_event_methods(std::ostream &out, const webcc::SchemaDefs &defs, const std::string &ns)
+{
+    auto events = page_events(defs, ns);
+    if (events.empty())
+        return;
+    out << "    // Page-wide events: every registered handler is called (handlers may take fewer parameters)\n";
+    for (const auto *e : events)
+    {
+        out << event_annotation(defs, *e);
+        out << "    shared def on" << to_pascal_case(e->name) << "(" << event_callback_type(defs, *e, "callback") << "): void\n\n";
+    }
+}
+
 // Callback methods for the events of a handle type
 void emit_event_methods(std::ostream &out, const webcc::SchemaDefs &defs, const std::string &handle_type)
 {
@@ -425,13 +478,8 @@ void emit_event_methods(std::ostream &out, const webcc::SchemaDefs &defs, const 
     out << "    // Events: register a callback on this handle (handlers may take fewer parameters)\n";
     for (const auto *e : events)
     {
-        std::string fields;
-        for (size_t i = 1; i < e->params.size(); i++)
-            fields += (i > 1 ? "," : "") + (e->params[i].name.empty() ? "arg" + std::to_string(i) : e->params[i].name);
-        std::string pod = event_pod_name(defs, *e);
-        out << "    @event(\"" << e->ns << "::" << e->name << " " << e->params[0].name << " " << (fields.empty() ? "-" : fields) << (e->last ? " last" : "")
-            << (pod.empty() ? "" : " pod:" + pod) << event_listen_token(defs, *e) << "\")\n";
-        out << "    def on" << to_pascal_case(e->name) << "(" << event_callback_type(*e, "callback") << "): void\n\n";
+        out << event_annotation(defs, *e);
+        out << "    def on" << to_pascal_case(e->name) << "(" << event_callback_type(defs, *e, "callback") << "): void\n\n";
     }
 }
 
@@ -726,8 +774,18 @@ int main()
 
         for (const auto *cmd : commands)
         {
+            // Makes a handle of this namespace from a handle of another one (image::from_blob
+            // takes a Blob): a factory on its own type, Image.fromBlob(blob), not blob.fromBlob()
+            bool makes_own_from_foreign = !cmd->params.empty() && cmd->params[0].type == "handle" &&
+                                          !cmd->return_handle_type.empty() &&
+                                          handle_namespace(defs, cmd->return_handle_type) == ns &&
+                                          handle_namespace(defs, cmd->params[0].handle_type) != ns;
+            if (makes_own_from_foreign)
+            {
+                static_factories.push_back(cmd);
+            }
             // Check if first param is a handle (making this an instance method)
-            if (!cmd->params.empty() && cmd->params[0].type == "handle" && !cmd->params[0].handle_type.empty())
+            else if (!cmd->params.empty() && cmd->params[0].type == "handle" && !cmd->params[0].handle_type.empty())
             {
                 methods_by_handle[cmd->params[0].handle_type].push_back(cmd);
             }
@@ -768,6 +826,18 @@ int main()
         }
 
         emit_event_pods(out, defs, all_handle_types);
+        for (const auto *e : page_events(defs, ns))
+        {
+            std::string pod = event_pod_name(defs, *e);
+            if (pod.empty())
+                continue;
+            out << "// Fields of a " << e->ns << " " << e->name << " event, for a handler that takes them as one value\n";
+            out << "@pod\ntype " << pod << " {\n";
+            for (size_t i = first_field(defs, *e); i < e->params.size(); i++)
+                out << "    " << to_coi_type(e->params[i].type, e->params[i].handle_type, e->params[i].enum_type) << " "
+                    << field_camel(e->params[i].name) << ";\n";
+            out << "}\n\n";
+        }
 
         // Generate each handle type with both static and instance methods combined
         for (const auto &handle_type : all_handle_types)
@@ -884,7 +954,7 @@ int main()
 
         // Generate namespace utilities as a type with shared methods (e.g., Storage.clear, System.log)
         // These are types with only shared (static) methods - not instantiable
-        if (!namespace_utils.empty())
+        if (!namespace_utils.empty() || !page_events(defs, ns).empty())
         {
             // Check if we already generated this type (with factories or instance methods)
             if (!all_handle_types.count(ns_type))
@@ -915,6 +985,8 @@ int main()
                 emit_param_list(out, defs, *cmd, 0);
                 out << "): " << return_type << "\n\n";
             }
+
+            emit_page_event_methods(out, defs, ns);
 
             // Emit intrinsic definitions from whitelist for this namespace
             if (INTRINSIC_DEFS.count(ns))

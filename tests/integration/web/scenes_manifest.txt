@@ -15,3 +15,4 @@ pointer_groups_click|tests/integration/web/scenes/pointer_groups_click.coi|web
 idb_bytes_roundtrip|tests/integration/web/scenes/idb_bytes_roundtrip.coi|web
 pointer_pod_click|tests/integration/web/scenes/pointer_pod_click.coi|web
 view_event_attrs|tests/integration/web/scenes/view_event_attrs.coi|web
+page_events|tests/integration/web/scenes/page_events.coi|web

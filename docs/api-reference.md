@@ -978,6 +978,55 @@ The rules:
 
 The generated definitions in `defs/web/*.d.coi` list every handle type's events with their parameters.
 
+## Page-wide events
+
+Some events belong to the whole page, not to one handle: pastes, key presses, the page being hidden. They are shared methods on their area's type, and every component that registers is called. Registering turns the event on, and a component's handlers go away with it.
+
+```tsx
+component Editor {
+    def pasted(string text) : void { insertText(text); }
+    def pastedImage(Blob image, string mime) : void { placeImage(Image.fromBlob(image, mime)); image.free(); }
+    def key(KeyDownEvent k) : void {
+        if ((k.mods & (Mods.Ctrl | Mods.Meta)) != 0 && k.key == "z") undo();
+    }
+    def hidden(VisibilityChangeEvent v) : void { if (v.hidden == 1) saveNow(); }
+
+    mount {
+        Clipboard.onPasteText(&pasted);
+        Clipboard.onPasteImage(&pastedImage);
+        Input.onKeyDown(&key);
+        Input.preventKey(83, Mods.Ctrl);   // Ctrl+S saves the note, not the page
+        System.onVisibilityChange(&hidden);
+    }
+}
+```
+
+| Event | Handler takes |
+|-------|---------------|
+| `Clipboard.onPasteText` | `string text` (pastes into text fields stay with the field) |
+| `Clipboard.onPasteImage` | `Blob image, string mime` |
+| `Input.onKeyDown` / `onKeyUp` | `KeyDownEvent` / `KeyUpEvent` (`keyCode`, `mods`, `repeat`, `key`) |
+| `System.onVisibilityChange` | `VisibilityChangeEvent` (`hidden`, `state`): the moment to save |
+| `System.onPageHide` / `onPageShow` | `uint8 persisted` |
+| `System.onOnline` | `uint8 online` |
+
+Events of a handle you create in code (`img.onLoaded(&h)`) need that handle's listener turned on where there is one (`surface.addPointerListener(flags)` before `surface.onPointer(&h)`); the view attributes (`onpointerdown=`) and page-wide events do it for you.
+
+## More platform functions
+
+| Call | What it does |
+|------|--------------|
+| `Clipboard.writeText(text)` | Copy (only in a click or key handler) |
+| `FileRequest.open(accept, multiple, &onOpened = h)` | File dialog (in a click or key handler); `h(Blob data, string name, string mime, int index, int count)` per file |
+| `Files.save(name, mime, bytes)` | Download |
+| `FetchRequest.request(method, url, headers, bytes, &onDone = h, &onError = e)` | Any method, binary body; `h(int status, Blob body)` for every response |
+| `Image.fromBlob(blob, mime, &onLoaded = h)` | Image from bytes; `img.free()` releases it |
+| `PdfDocument.open(blob, &onOpened = h)`, `doc.renderPage(page, canvas, scale)` | PDF import (`Pdf.setLibrary(lib, worker)` first, see webcc's pdf docs) |
+| `PdfWriter.createWriter(&onWritten = h)`, `addPage`, `moveTo`, `lineTo`, `stroke`, `drawImage`, `drawText`, `finish` | PDF export |
+| `System.getDevicePixelRatio()`, `System.isOnline()` | Screen and connection |
+| `el.setStyle(name, value)`, `el.focus()`, `el.blur()`, `el.getProperty(name)` | Text boxes over a canvas |
+| `ws.sendBinary(bytes)`, `ws.closeWithCode(code, reason)`, `ws.getBufferedAmount()` | WebSocket extras |
+
 ## Platform enums and flags
 
 Values the browser picks from a fixed set come in two kinds.
