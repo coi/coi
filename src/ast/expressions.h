@@ -3,14 +3,13 @@
 #include "node.h"
 
 struct MethodDef;
-std::string coi_embedded_expression(const std::string& expr);
 // this->callback(...) for a webcc event in evt
 std::string generate_event_call(const MethodDef& event_method, const std::string& handle_type,
                                 const std::string& callback, const std::string& evt);
 
 struct IntLiteral : Expression {
-    int value;
-    explicit IntLiteral(int v) : value(v){}
+    int64_t value;
+    explicit IntLiteral(int64_t v) : value(v){}
     std::string to_webcc() override;
     bool is_static() override { return true; }
 };
@@ -37,14 +36,16 @@ struct StringLiteral : Expression {
     struct Part {
         bool is_expr;
         std::string content;
+        std::unique_ptr<Expression> expr;  // ${...}, set by the parser
     };
+    std::vector<Part> parts;
 
-    std::vector<Part> parse() const;
+    // text and ${...} pieces, expr left empty
+    static std::vector<Part> split(const std::string& value);
+    const std::vector<Part>& parse() const { return parts; }
     std::string to_webcc() override;
     bool is_static() override;
-    // Custom implementation needed for template string parsing
-    void collect_dependencies(std::set<std::string>& deps) override;
-    void collect_member_dependencies(std::set<MemberDependency>& member_deps) override;
+    std::vector<Expression*> get_children() override;
 };
 
 struct Identifier : Expression {
@@ -93,6 +94,19 @@ struct FunctionCall : Expression {
     std::vector<Expression*> get_children() override;
     // Custom: also handles object.method() dot notation
     void collect_dependencies(std::set<std::string>& deps) override;
+};
+
+// "abc".at(0), (a + b).toString()
+struct MethodCall : Expression {
+    std::unique_ptr<Expression> receiver;
+    std::string method;
+    std::vector<CallArg> args;
+    std::string receiver_type;  // set by the type checker
+    int line = 0;
+
+    MethodCall(std::unique_ptr<Expression> r, const std::string& m) : receiver(std::move(r)), method(m) {}
+    std::string to_webcc() override;
+    std::vector<Expression*> get_children() override;
 };
 
 struct MemberAccess : Expression {

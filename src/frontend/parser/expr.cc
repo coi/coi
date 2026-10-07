@@ -1,4 +1,5 @@
 #include "parser.h"
+#include "frontend/lexer.h"
 #include "cli/error.h"
 #include <limits>
 #include <stdexcept>
@@ -189,6 +190,25 @@ std::unique_ptr<Expression> Parser::parse_postfix()
             advance();
             expr = std::make_unique<PostfixOp>(std::move(expr), "--");
         }
+        else if (current().type == TokenType::DOT && peek().type == TokenType::IDENTIFIER)
+        {
+            // "abc".at(0), (a + b).x; names chain in parse_primary
+            advance();
+            std::string member = current().value;
+            int line = current().line;
+            advance();
+            if (current().type == TokenType::LPAREN)
+            {
+                advance();
+                auto call = std::make_unique<MethodCall>(std::move(expr), member);
+                call->line = line;
+                call->args = parse_call_args(TokenType::RPAREN);
+                expect(TokenType::RPAREN, "Expected ')'");
+                expr = std::move(call);
+            }
+            else
+                expr = std::make_unique<MemberAccess>(std::move(expr), member);
+        }
         else
         {
             break;
@@ -251,16 +271,11 @@ std::unique_ptr<Expression> Parser::parse_primary()
     // Integer literal
     if (current().type == TokenType::INT_LITERAL)
     {
-        int value;
+        int64_t value = 0;
         try
         {
-            // Use base 0 to auto-detect decimal (10) or hexadecimal (0x)
-            long long ll_value = std::stoll(current().value, nullptr, 0);
-            if (ll_value > std::numeric_limits<int>::max() || ll_value < std::numeric_limits<int>::min())
-            {
-                throw std::out_of_range("overflow");
-            }
-            value = static_cast<int>(ll_value);
+            // base 0: decimal or 0x
+            value = std::stoll(current().value, nullptr, 0);
         }
         catch (const std::out_of_range &)
         {
@@ -297,17 +312,17 @@ std::unique_ptr<Expression> Parser::parse_primary()
     // String literal
     if (current().type == TokenType::STRING_LITERAL)
     {
-        std::string value = current().value;
+        Token tok = current();
         advance();
-        return std::make_unique<StringLiteral>(value, false);
+        return make_string_literal(tok.value, false, tok.line);
     }
 
     // Template string (backticks)
     if (current().type == TokenType::TEMPLATE_STRING)
     {
-        std::string value = current().value;
+        Token tok = current();
         advance();
-        return std::make_unique<StringLiteral>(value, true);
+        return make_string_literal(tok.value, true, tok.line);
     }
 
     // Boolean literal
@@ -337,7 +352,11 @@ std::unique_ptr<Expression> Parser::parse_primary()
     }
 
     // Identifer or function call (also allow 'key' and 'data' keywords as identifier)
-    if (is_identifier_token())
+    // string.fromBytes(...): a type keyword names the type for a static call
+    bool type_static = (current().type == TokenType::STRING || current().type == TokenType::INT ||
+                        current().type == TokenType::FLOAT || current().type == TokenType::FLOAT32 ||
+                        current().type == TokenType::BOOL) && peek().type == TokenType::DOT;
+    if (is_identifier_token() || type_static)
     {
         std::string name = current().value;
         int identifier_line = current().line;
@@ -755,3 +774,24 @@ std::unique_ptr<Expression> Parser::parse_match()
     return match_expr;
 }
 
+
+std::unique_ptr<StringLiteral> Parser::make_string_literal(const std::string &value, bool is_template, int line)
+{
+    auto lit = std::make_unique<StringLiteral>(value, is_template);
+    lit->parts = StringLiteral::split(value);
+    for (auto &part : lit->parts)
+    {
+        if (!part.is_expr)
+            continue;
+        auto toks = Lexer(part.content).tokenize();
+        for (auto &t : toks)
+            t.line += line - 1;
+        Parser sub(toks);
+        sub.component_member_types = component_member_types;
+        sub.component_array_types = component_array_types;
+        part.expr = sub.parse_expression();
+        if (sub.current().type != TokenType::END_OF_FILE)
+            ErrorHandler::compiler_error("Unexpected '" + sub.current().value + "' in ${" + part.content + "}", line);
+    }
+    return lit;
+}

@@ -1,0 +1,15 @@
+// Test: methods on literals and parenthesized expressions
+component App {
+    mut string first = "";
+    mut int n = 0;
+    mut string sum = "";
+    mut int a = 1;
+    init {
+        first = "Hello".at(0);
+        n = "abc".length() + ("x" + first).length();
+        sum = (a + 2).toString();
+    }
+    view { <p>{first} {n} {sum}</p> }
+}
+
+app { root = App; }

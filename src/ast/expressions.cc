@@ -43,185 +43,9 @@ static std::string expand_inline_template(const std::string& tmpl, const std::st
     return result;
 }
 
-// Helper to expand @inline templates with raw string arguments (for string template embedded expressions)
-static std::string expand_inline_template_raw(const std::string& tmpl, const std::string& receiver,
-                                              const std::vector<std::string>& raw_args) {
-    std::string result;
-    for (size_t i = 0; i < tmpl.size(); ++i) {
-        if (tmpl[i] == '$' && i + 1 < tmpl.size()) {
-            if (tmpl[i + 1] == '{') {
-                size_t end = tmpl.find('}', i + 2);
-                if (end != std::string::npos) {
-                    std::string var = tmpl.substr(i + 2, end - i - 2);
-                    if (var == "this") {
-                        result += receiver;
-                    } else {
-                        int idx = std::stoi(var);
-                        if (idx >= 0 && idx < (int)raw_args.size()) {
-                            result += raw_args[idx];
-                        }
-                    }
-                    i = end;
-                    continue;
-                }
-            } else if (tmpl.substr(i, 5) == "$self") {
-                // Handle $self (used in WebSocket @inline)
-                result += receiver;
-                i += 4;  // Skip "self" ($ already consumed by i+=1 after continue isn't called)
-                continue;
-            }
-        }
-        result += tmpl[i];
-    }
-    return result;
-}
-
-// Forward declaration for transform_embedded_expression
-static std::string transform_embedded_expression(const std::string& expr);
 static std::string to_webcc_arg(const std::string& code, const std::string& coi_type);
 static std::string from_webcc_value(const std::string& code, const std::string& coi_type);
 
-// Helper to parse raw argument strings from a method call expression
-// e.g., "arg1, arg2" -> ["arg1", "arg2"]
-static std::vector<std::string> parse_raw_args(const std::string& args_str) {
-    std::vector<std::string> result;
-    int depth = 0;
-    std::string current;
-    for (size_t i = 0; i < args_str.size(); ++i) {
-        char c = args_str[i];
-        if (c == '(' || c == '[' || c == '{') depth++;
-        else if (c == ')' || c == ']' || c == '}') depth--;
-        else if (c == ',' && depth == 0) {
-            // Trim whitespace
-            size_t start = current.find_first_not_of(" \t");
-            size_t end = current.find_last_not_of(" \t");
-            if (start != std::string::npos) {
-                result.push_back(current.substr(start, end - start + 1));
-            }
-            current.clear();
-            continue;
-        }
-        current += c;
-    }
-    if (!current.empty()) {
-        size_t start = current.find_first_not_of(" \t");
-        size_t end = current.find_last_not_of(" \t");
-        if (start != std::string::npos) {
-            result.push_back(current.substr(start, end - start + 1));
-        }
-    }
-    // Recursively transform nested expressions in arguments
-    for (auto& arg : result) {
-        arg = transform_embedded_expression(arg);
-    }
-    return result;
-}
-
-// Transform a raw expression string by applying DefSchema @inline templates
-// This handles method calls like "obj.method(args)" embedded in string templates
-static std::string transform_embedded_expression(const std::string& expr) {
-    // Find the last dot before the opening paren (for method call)
-    size_t paren_pos = expr.find('(');
-    if (paren_pos == std::string::npos) {
-        // No method call, return as-is
-        return expr;
-    }
-    
-    // Find the matching closing paren
-    int depth = 1;
-    size_t close_paren = paren_pos + 1;
-    while (close_paren < expr.size() && depth > 0) {
-        if (expr[close_paren] == '(') depth++;
-        else if (expr[close_paren] == ')') depth--;
-        close_paren++;
-    }
-    if (depth != 0) return expr;  // Unbalanced parens
-    close_paren--;  // Point to the actual close paren
-
-    // Top-level function call: name(args) or Module::name(args)
-    std::string callee = expr.substr(0, paren_pos);
-    size_t callee_start = callee.find_first_not_of(" \t");
-    size_t callee_end = callee.find_last_not_of(" \t");
-    if (callee_start != std::string::npos) {
-        std::string free_fn = FreeFunctionRegistry::instance().resolve_call(callee.substr(callee_start, callee_end - callee_start + 1));
-        if (!free_fn.empty()) return free_fn + expr.substr(paren_pos);
-    }
-    
-    // Find the dot before the method name
-    size_t dot_pos = expr.rfind('.', paren_pos);
-    if (dot_pos == std::string::npos || dot_pos == 0) {
-        return expr;  // No object.method pattern
-    }
-    
-    std::string obj = expr.substr(0, dot_pos);
-    std::string method = expr.substr(dot_pos + 1, paren_pos - dot_pos - 1);
-    std::string args_str = expr.substr(paren_pos + 1, close_paren - paren_pos - 1);
-    std::string suffix = (close_paren + 1 < expr.size()) ? expr.substr(close_paren + 1) : "";
-    
-    // Recursively transform the object part (handles chained calls)
-    obj = transform_embedded_expression(obj);
-    
-    // Parse arguments
-    std::vector<std::string> raw_args = parse_raw_args(args_str);
-    
-    // handle methods first, blob.size() isn't an array length
-    std::string obj_type = ComponentTypeContext::instance().get_symbol_type(obj);
-    if (!obj_type.empty()) {
-        obj_type = ComponentTypeContext::instance().resolve(obj_type);
-        obj_type = DefSchema::instance().resolve_alias(obj_type);
-
-        if (auto* method_def = DefSchema::instance().lookup_method(obj_type, method, raw_args.size())) {
-            if (method_def->mapping_type == MappingType::Inline) {
-                return expand_inline_template_raw(method_def->mapping_value, obj, raw_args) + suffix;
-            }
-            if (method_def->mapping_type == MappingType::Map && !method_def->is_shared && DefSchema::instance().is_handle(obj_type)) {
-                std::string call = "webcc::" + method_def->mapping_value + "(" + obj;
-                for (size_t i = 0; i < raw_args.size(); i++) {
-                    std::string a = raw_args[i];
-                    call += ", " + (i < method_def->params.size() ? to_webcc_arg(a, method_def->params[i].type) : a);
-                }
-                return from_webcc_value(call + ")", method_def->return_type) + suffix;
-            }
-        }
-    }
-
-    // Try to find @inline method in DefSchema
-    // First check string methods
-    if (auto* method_def = DefSchema::instance().lookup_method("string", method, raw_args.size())) {
-        if (method_def->mapping_type == MappingType::Inline) {
-            return expand_inline_template_raw(method_def->mapping_value, obj, raw_args) + suffix;
-        }
-    }
-    
-    // Check array methods
-    if (auto* method_def = DefSchema::instance().lookup_method("array", method, raw_args.size())) {
-        if (method_def->mapping_type == MappingType::Inline) {
-            return expand_inline_template_raw(method_def->mapping_value, obj, raw_args) + suffix;
-        }
-    }
-    
-    // Check WebSocket and other typed methods by resolving symbol type
-    if (!obj_type.empty()) {
-        if (auto* method_def = DefSchema::instance().lookup_method(obj_type, method, raw_args.size())) {
-            if (method_def->mapping_type == MappingType::Inline) {
-                return expand_inline_template_raw(method_def->mapping_value, obj, raw_args) + suffix;
-            }
-        }
-    }
-    
-    // No transformation found, reconstruct with transformed parts
-    std::string result = obj + "." + method + "(";
-    for (size_t i = 0; i < raw_args.size(); ++i) {
-        if (i > 0) result += ", ";
-        result += raw_args[i];
-    }
-    result += ")" + suffix;
-    return result;
-}
-
-std::string coi_embedded_expression(const std::string& expr) {
-    return transform_embedded_expression(expr);
-}
 
 // Helper to generate intrinsic code
 static std::string generate_intrinsic(const std::string& intrinsic_name,
@@ -250,6 +74,14 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
         return "(webcc::system::is_hidden() != 0)";
     }
     
+    if (intrinsic_name == "json_stringify" && args.size() == 1) {
+        std::string value = args[0].value->to_webcc();
+        auto* arr = dynamic_cast<ArrayLiteral*>(args[0].value.get());
+        if (arr && !arr->element_type.empty())
+            value = "coi::vector<" + convert_type(arr->element_type) + ">" + value;
+        return "__coi_json_stringify(" + value + ")";
+    }
+
     if (intrinsic_name == "json_parse") {
         if (args.size() != 2) {
             ErrorHandler::compiler_error(
@@ -291,7 +123,10 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
     return "";  // Unknown intrinsic
 }
 
-std::string IntLiteral::to_webcc() { return std::to_string(value); }
+std::string IntLiteral::to_webcc() {
+    if (value >= INT32_MIN && value <= INT32_MAX) return std::to_string(value);
+    return std::to_string(value) + "LL";
+}
 
 std::string FloatLiteral::to_webcc() {
     std::string s = std::to_string(value);
@@ -302,152 +137,95 @@ std::string FloatLiteral::to_webcc() {
     return s;  // No 'f' suffix - using double (64-bit)
 }
 
-std::vector<StringLiteral::Part> StringLiteral::parse() const {
-    std::vector<Part> parts;
-    std::string current;
-    for(size_t i=0; i<value.length(); ++i) {
-        // Handle escaped $ (\$ becomes literal $)
-        if(value[i] == '\\' && i + 1 < value.length() && value[i+1] == '$') {
-            current += '$';
-            i++;
-        } else if(value[i] == '$' && i + 1 < value.length() && value[i+1] == '{') {
-            // Found ${ - look for closing }
-            size_t close_pos = value.find('}', i + 2);
-            if (close_pos == std::string::npos) {
-                // No closing brace found - treat as literal
-                current += '$';
-                current += '{';
-                i++; // skip the {
-            } else {
-                // Extract expression between ${ and }
-                if(!current.empty()) parts.push_back({false, current});
-                current = "";
-                i += 2; // skip ${
-                while(i < value.length() && value[i] != '}') {
-                    current += value[i];
-                    i++;
-                }
-                // Only treat as expression if content is non-empty
-                if (!current.empty()) {
-                    parts.push_back({true, current});
-                } else {
-                    // Empty ${} - treat as literal
-                    parts.push_back({false, "${}"});
-                }
-                current = "";
-            }
-        } else {
-            current += value[i];
-        }
+static std::string escape_cpp(const std::string& text) {
+    std::string escaped;
+    for (char c : text) {
+        if (c == '"') escaped += "\\\"";
+        else if (c == '\\') escaped += "\\\\";
+        else if (c == '\n') escaped += "\\n";
+        else if (c == '\t') escaped += "\\t";
+        else escaped += c;
     }
-    if(!current.empty()) parts.push_back({false, current});
+    return escaped;
+}
+
+// end of a quoted string or nested template starting at i
+static size_t skip_quoted(const std::string& v, size_t i) {
+    char q = v[i++];
+    while (i < v.size() && v[i] != q) {
+        if (v[i] == '\\') i++;
+        else if (q == '`' && v[i] == '$' && i + 1 < v.size() && v[i + 1] == '{') {
+            int depth = 0;
+            for (i += 1; i < v.size(); i++) {
+                if (v[i] == '"' || v[i] == '\'' || v[i] == '`') i = skip_quoted(v, i);
+                else if (v[i] == '{') depth++;
+                else if (v[i] == '}' && --depth == 0) break;
+            }
+        }
+        i++;
+    }
+    return i;
+}
+
+std::vector<StringLiteral::Part> StringLiteral::split(const std::string& value) {
+    std::vector<Part> parts;
+    std::string text;
+    for (size_t i = 0; i < value.size(); ++i) {
+        if (value[i] == '\\' && i + 1 < value.size() && value[i + 1] == '$') {
+            text += '$';
+            i++;
+            continue;
+        }
+        if (value[i] != '$' || i + 1 >= value.size() || value[i + 1] != '{') {
+            text += value[i];
+            continue;
+        }
+        int depth = 0;
+        size_t close = i + 1;
+        for (; close < value.size(); close++) {
+            char c = value[close];
+            if (c == '"' || c == '\'' || c == '`') close = skip_quoted(value, close);
+            else if (c == '{') depth++;
+            else if (c == '}' && --depth == 0) break;
+        }
+        std::string inner = close < value.size() ? value.substr(i + 2, close - i - 2) : "";
+        if (close >= value.size() || inner.find_first_not_of(" \t\n") == std::string::npos) {
+            text += value[i];
+            continue;
+        }
+        if (!text.empty()) parts.push_back({false, text, nullptr});
+        text.clear();
+        parts.push_back({true, inner, nullptr});
+        i = close;
+    }
+    if (!text.empty()) parts.push_back({false, text, nullptr});
     return parts;
 }
 
 std::string StringLiteral::to_webcc() {
-    auto parts = parse();
-    if(parts.empty()) return "\"\"";
-    bool has_expr = false;
-    for(auto& p : parts) if(p.is_expr) has_expr = true;
-
-    if(!has_expr) {
+    if (parts.empty()) return "\"\"";
+    if (is_static()) {
         std::string content;
-        for(auto& p : parts) content += p.content;
-
-        std::string escaped;
-        for(char c : content) {
-            if(c == '"') escaped += "\\\"";
-            else if(c == '\\') escaped += "\\\\";
-            else if(c == '\n') escaped += "\\n";
-            else if(c == '\t') escaped += "\\t";
-            else escaped += c;
-        }
-        return "\"" + escaped + "\"";
+        for (auto& p : parts) content += p.content;
+        return "\"" + escape_cpp(content) + "\"";
     }
-
     std::string code = "coi::string::concat(";
-    for(size_t i=0; i<parts.size(); ++i) {
-        if(i > 0) code += ", ";
-        if(parts[i].is_expr) {
-            // Transform embedded expressions to apply @inline templates (e.g., subStr -> substr)
-            code += transform_embedded_expression(parts[i].content);
-        } else {
-            std::string escaped;
-            for(char c : parts[i].content) {
-                if(c == '"') escaped += "\\\"";
-                else if(c == '\\') escaped += "\\\\";
-                else if(c == '\n') escaped += "\\n";
-                else if(c == '\t') escaped += "\\t";
-                else escaped += c;
-            }
-            code += "\"" + escaped + "\"";
-        }
+    for (size_t i = 0; i < parts.size(); ++i) {
+        if (i > 0) code += ", ";
+        code += parts[i].is_expr ? parts[i].expr->to_webcc() : "\"" + escape_cpp(parts[i].content) + "\"";
     }
-    code += ")";
-    return code;
+    return code + ")";
 }
 
 bool StringLiteral::is_static() {
-    auto parts = parse();
-    for(auto& p : parts) if(p.is_expr) return false;
+    for (auto& p : parts) if (p.is_expr) return false;
     return true;
 }
 
-void StringLiteral::collect_dependencies(std::set<std::string>& deps) {
-    auto parts = parse();
-    for(auto& p : parts) {
-        if(p.is_expr) {
-            std::string expr = p.content;
-            std::string id;
-            for(char c : expr) {
-                if(isalnum(c) || c == '_') {
-                    id += c;
-                } else {
-                    if(!id.empty()) {
-                        if(!isdigit(id[0])) deps.insert(id);
-                        id = "";
-                    }
-                }
-            }
-            if(!id.empty()) {
-                if(!isdigit(id[0])) deps.insert(id);
-            }
-        }
-    }
-}
-
-void StringLiteral::collect_member_dependencies(std::set<MemberDependency>& member_deps) {
-    auto parts = parse();
-    for(auto& p : parts) {
-        if(p.is_expr) {
-            // Parse expressions like "pos.x" to extract object.member pairs
-            std::string expr = p.content;
-            size_t pos = 0;
-            while (pos < expr.length()) {
-                // Skip non-identifier chars
-                while (pos < expr.length() && !isalnum(expr[pos]) && expr[pos] != '_') pos++;
-                if (pos >= expr.length()) break;
-
-                // Extract identifier
-                std::string obj;
-                while (pos < expr.length() && (isalnum(expr[pos]) || expr[pos] == '_')) {
-                    obj += expr[pos++];
-                }
-
-                // Check if followed by '.'
-                if (pos < expr.length() && expr[pos] == '.') {
-                    pos++; // skip '.'
-                    std::string member;
-                    while (pos < expr.length() && (isalnum(expr[pos]) || expr[pos] == '_')) {
-                        member += expr[pos++];
-                    }
-                    if (!obj.empty() && !member.empty() && !isdigit(obj[0])) {
-                        member_deps.insert({obj, member});
-                    }
-                }
-            }
-        }
-    }
+std::vector<Expression*> StringLiteral::get_children() {
+    std::vector<Expression*> children;
+    for (auto& p : parts) if (p.expr) children.push_back(p.expr.get());
+    return children;
 }
 
 std::string Identifier::to_webcc() {
@@ -1361,3 +1139,37 @@ void BlockExpr::collect_dependencies(std::set<std::string>& deps) {
     }
 }
 
+
+std::vector<Expression*> MethodCall::get_children() {
+    std::vector<Expression*> children{receiver.get()};
+    for (auto& a : args) children.push_back(a.value.get());
+    return children;
+}
+
+std::string MethodCall::to_webcc() {
+    std::string type = receiver_type;
+    if (type.empty()) {
+        if (dynamic_cast<StringLiteral*>(receiver.get())) type = "string";
+        else if (dynamic_cast<IntLiteral*>(receiver.get())) type = "int32";
+        else if (dynamic_cast<FloatLiteral*>(receiver.get())) type = "float64";
+        else if (dynamic_cast<BoolLiteral*>(receiver.get())) type = "bool";
+    }
+    std::string def_type = !type.empty() && type.back() == ']' ? "array" : DefSchema::instance().resolve_alias(type);
+    std::string recv = receiver->to_webcc();
+    if (dynamic_cast<StringLiteral*>(receiver.get()) && receiver->is_static())
+        recv = "coi::string(" + recv + ")";
+    const auto* m = DefSchema::instance().lookup_method(def_type, method, args.size());
+    if (m && m->mapping_type == MappingType::Inline)
+        return expand_inline_template(m->mapping_value, "(" + recv + ")", args);
+    if (m && m->mapping_type == MappingType::Map) {
+        std::string call = "webcc::" + m->mapping_value + "(" + recv;
+        for (size_t i = 0; i < args.size(); i++) {
+            std::string a = args[i].value->to_webcc();
+            call += ", " + (i < m->params.size() ? to_webcc_arg(a, m->params[i].type) : a);
+        }
+        return from_webcc_value(call + ")", m->return_type);
+    }
+    std::string call = "(" + recv + ")." + method + "(";
+    for (size_t i = 0; i < args.size(); i++) call += (i ? ", " : "") + args[i].value->to_webcc();
+    return call + ")";
+}

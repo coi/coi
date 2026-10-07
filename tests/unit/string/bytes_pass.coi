@@ -1,0 +1,13 @@
+// Test: string to UTF-8 bytes and back
+component App {
+    mut string back = "";
+    mut int size = 0;
+    init {
+        uint8[] b = "héllo".toBytes();
+        size = b.size();
+        back = string.fromBytes(b);
+    }
+    view { <p>{back} {size}</p> }
+}
+
+app { root = App; }

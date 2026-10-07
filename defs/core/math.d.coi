@@ -18,14 +18,35 @@ type Math {
     @inline("coi::math::RAD2DEG")
     shared float RAD2DEG;
 
-    // Basic Math Functions
+    @inline("coi::math::E")
+    shared float E;
+
+    // Basic
     @inline("coi::math::abs(${0})")
     shared def abs(float x) : float
 
     @inline("coi::math::sqrt(${0})")
     shared def sqrt(float x) : float
 
-    // Trigonometric Functions
+    @inline("coi::math::pow(${0}, ${1})")
+    shared def pow(float base, float exponent) : float
+
+    @inline("coi::math::exp(${0})")
+    shared def exp(float x) : float
+
+    @inline("coi::math::log(${0})")
+    shared def log(float x) : float
+
+    @inline("coi::math::log2(${0})")
+    shared def log2(float x) : float
+
+    @inline("coi::math::log10(${0})")
+    shared def log10(float x) : float
+
+    @inline("coi::math::hypot(${0}, ${1})")
+    shared def hypot(float x, float y) : float
+
+    // Trigonometric
     @inline("coi::math::sin(${0})")
     shared def sin(float x) : float
 
@@ -35,32 +56,48 @@ type Math {
     @inline("coi::math::tan(${0})")
     shared def tan(float x) : float
 
-    // Random number generation (compiler intrinsics)
-    @intrinsic("random")
-    
-    shared def random(): float
-    @intrinsic("random_seeded")
-    shared def random(int seed): float
+    @inline("coi::math::asin(${0})")
+    shared def asin(float x) : float
 
-    // Utility Functions
-    @inline("(${0} < ${1} ? ${0} : ${1})")
-    shared def min(float a, float b) : float
+    @inline("coi::math::acos(${0})")
+    shared def acos(float x) : float
 
-    @inline("(${0} > ${1} ? ${0} : ${1})")
-    shared def max(float a, float b) : float
+    @inline("coi::math::atan(${0})")
+    shared def atan(float x) : float
 
-    @inline("((${0} < ${2}) ? ${2} : ((${0} > ${1}) ? ${1} : ${0}))")
-    shared def clamp(float value, float min, float max) : float
+    @inline("coi::math::atan2(${0}, ${1})")
+    shared def atan2(float y, float x) : float
 
-    @inline("(${0} * (1.0f - ${2}) + ${1} * ${2})")
-    shared def lerp(float a, float b, float t) : float
-
-    @inline("((float)(int)${0})")
+    // Rounding
+    @inline("coi::math::floor(${0})")
     shared def floor(float x) : float
 
-    @inline("((float)((int)${0} + 1))")
+    @inline("coi::math::ceil(${0})")
     shared def ceil(float x) : float
 
-    @inline("((float)(int)(${0} + 0.5f))")
+    @inline("coi::math::round(${0})")
     shared def round(float x) : float
+
+    @inline("coi::math::trunc(${0})")
+    shared def trunc(float x) : float
+
+    // Utility
+    @inline("coi::math::min(${0}, ${1})")
+    shared def min(float a, float b) : float
+
+    @inline("coi::math::max(${0}, ${1})")
+    shared def max(float a, float b) : float
+
+    @inline("coi::math::clamp(${0}, ${1}, ${2})")
+    shared def clamp(float value, float min, float max) : float
+
+    @inline("coi::math::lerp(${0}, ${1}, ${2})")
+    shared def lerp(float a, float b, float t) : float
+
+    // Random
+    @intrinsic("random")
+    shared def random(): float
+
+    @intrinsic("random_seeded")
+    shared def random(int seed): float
 }

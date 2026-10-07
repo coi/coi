@@ -1,0 +1,15 @@
+// Test: every Math function
+component App {
+    mut float r = 0.0;
+    init {
+        r = Math.abs(-1.0) + Math.sqrt(4.0) + Math.pow(2.0, 3.0) + Math.exp(0.0) + Math.log(Math.E)
+          + Math.log2(8.0) + Math.log10(100.0) + Math.hypot(3.0, 4.0)
+          + Math.sin(1.0) + Math.cos(1.0) + Math.tan(1.0) + Math.asin(0.5) + Math.acos(0.5) + Math.atan(1.0) + Math.atan2(1.0, 2.0)
+          + Math.floor(1.5) + Math.ceil(1.5) + Math.round(1.5) + Math.trunc(1.5)
+          + Math.min(1.0, 2.0) + Math.max(1.0, 2.0) + Math.clamp(5.0, 0.0, 1.0) + Math.lerp(0.0, 1.0, 0.5)
+          + Math.PI + Math.TAU + Math.HALF_PI + Math.DEG2RAD + Math.RAD2DEG;
+    }
+    view { <p>{r}</p> }
+}
+
+app { root = App; }

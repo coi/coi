@@ -57,6 +57,7 @@ class Parser{
         std::vector<FunctionDef::Param> parse_method_params();
 
         std::unique_ptr<Expression> parse_expression();
+        std::unique_ptr<StringLiteral> make_string_literal(const std::string& value, bool is_template, int line);
         std::unique_ptr<Expression> parse_expression_no_gt();  // Parse expression without > as comparison
         std::unique_ptr<Expression> parse_ternary();
         std::unique_ptr<Expression> parse_or();

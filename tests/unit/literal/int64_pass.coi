@@ -1,0 +1,9 @@
+// Test: integer literals past 32 bits
+component App {
+    mut int64 t = 1760000000123;
+    mut uint32 color = 0xFF3366CC;
+    mut int64 neg = -5000000000;
+    view { <p>{t} {color} {neg}</p> }
+}
+
+app { root = App; }

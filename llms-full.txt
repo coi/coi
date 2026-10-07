@@ -183,6 +183,7 @@ bool has  = t.contains("World");
 string tr = t.trim();         // also trimStart(), trimEnd()
 int i     = "42".toInt();
 float g   = "3.14".toFloat();
+uint8[] u = t.toBytes();      // UTF-8; back: string.fromBytes(u)
 // append mutates in place (requires mut):
 mut string acc = "a"; acc.append("b");   // acc == "ab"
 ```
@@ -193,7 +194,10 @@ string name = "Alice"; int age = 25;
 string g1 = "Hello, ${name}! You are ${age}.";
 string g2 = `Hello, ${name}!`;   // template string (backticks)
 string lit = "Use \${x} for a literal dollar-brace";  // \$ escapes
+string any = `${items.size()} ${Math.PI * 2.0} ${ok ? "yes" : "no"}`;  // any expression
 ```
+Numbers, strings, bools and enums can be interpolated (arrays/pods are an error). Floats print
+like JS: `3.0` -> `3`, `0.1 + 0.2` -> `0.30000000000000004`.
 Regular strings `"..."` need escapes `\"`, `\n`, `\\`. Template strings `` `...` `` are
 multi-line and only escape `` \` ``. Template strings are ideal for JSON:
 ```coi
@@ -425,12 +429,12 @@ component Dashboard(mut Timer& timer) { // receives the emitter by reference
 
 ### Math library (all via `Math.`)
 ```coi
-Math.PI  Math.HALF_PI  Math.TAU  Math.DEG2RAD  Math.RAD2DEG
-Math.abs(x)  Math.sqrt(x)
-Math.sin(x)  Math.cos(x)  Math.tan(x)          // radians
+Math.PI  Math.HALF_PI  Math.TAU  Math.DEG2RAD  Math.RAD2DEG  Math.E
+Math.abs(x)  Math.sqrt(x)  Math.pow(b,e)  Math.exp(x)  Math.log(x)  Math.log2(x)  Math.log10(x)  Math.hypot(x,y)
+Math.sin(x)  Math.cos(x)  Math.tan(x)  Math.asin(x)  Math.acos(x)  Math.atan(x)  Math.atan2(y,x)   // radians
 Math.random()  Math.random(seed)               // [0.0, 1.0)
 Math.min(a,b)  Math.max(a,b)  Math.clamp(v,lo,hi)  Math.lerp(a,b,t)
-Math.floor(x)  Math.ceil(x)  Math.round(x)
+Math.floor(x)  Math.ceil(x)  Math.round(x)  Math.trunc(x)   // round: halves away from zero
 ```
 
 ---
@@ -818,7 +822,8 @@ def handle(string data) : void {
     };
 }
 // Arrays: match (Json.parse(User[], json)) { Success(User[] data, UserMeta[] metas) => ...; Error(string m) => ...; };
-// Serialize: string s = Json.stringify(user);
+// Serialize: string s = Json.stringify(user);  // pods, arrays, maps; shortest round-trip numbers, enums as index
+// Save: db.put(key, Json.stringify(page).toBytes());  load: string.fromBytes(blob.take())
 ```
 `Json.parse(...)` must be consumed by `match` with `Success(...)`/`Error(...)`. Each pod gets
 an auto-generated Meta type; `meta.has(Type.field)` reports whether a field was present

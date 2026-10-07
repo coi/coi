@@ -1,0 +1,21 @@
+// Test: literals fit every integer and float type in range
+component App {
+    init {
+        int8 tiny = 127;
+        int16 small = 32000;
+        int32 count = 42;
+        int64 big = 9000000000;
+        uint8 byte = 255;
+        uint16 port = 8080;
+        uint32 id = 4000000000;
+        uint64 huge = 10000000000;
+        int GL_ARRAY_BUFFER = 0x8892;
+        uint32 color = 0xFF00FF;
+        int flags = 0b1010;
+        int bitMask = 0b11110000;
+        float32 precise = 3.14;
+        float64 speed = 3.14159;
+    }
+    view { <p>x</p> }
+}
+app { root = App; }

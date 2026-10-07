@@ -11,14 +11,14 @@ std::unique_ptr<Expression> Parser::parse_prop_or_attr_value()
 
     if (current().type == TokenType::STRING_LITERAL)
     {
-        auto val = std::make_unique<StringLiteral>(current().value);
+        Token tok = current();
         advance();
-        return val;
+        return make_string_literal(tok.value, false, tok.line);
     }
 
     if (current().type == TokenType::INT_LITERAL)
     {
-        auto val = std::make_unique<IntLiteral>(std::stoi(current().value));
+        auto val = std::make_unique<IntLiteral>(std::stoll(current().value, nullptr, 0));
         advance();
         return val;
     }
@@ -34,7 +34,7 @@ std::unique_ptr<Expression> Parser::parse_prop_or_attr_value()
     {
         if (current().type == TokenType::INT_LITERAL)
         {
-            auto val = std::make_unique<IntLiteral>(-std::stoi(current().value));
+            auto val = std::make_unique<IntLiteral>(-std::stoll(current().value, nullptr, 0));
             advance();
             return val;
         }

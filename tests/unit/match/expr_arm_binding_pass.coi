@@ -1,0 +1,16 @@
+// Test: expression arms use their bindings
+pod Pt { float x; float y; }
+
+component App {
+    mut int n = 0;
+    mut string s = "[{\"x\":1,\"y\":2}]";
+    init {
+        n = match (Json.parse(Pt[], s)) {
+            Success(Pt[] data, PtMeta[] metas) => data.size();
+            Error(string message) => message.length();
+        };
+    }
+    view { <p>{n}</p> }
+}
+
+app { root = App; }

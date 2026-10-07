@@ -51,3 +51,12 @@ std::string generate_meta_struct(const std::string& data_type);
 // This is called once at the top of app.cc when Json.parse is used
 void emit_json_runtime(std::ostream& out);
 
+// Json.stringify, writers go after the pod structs
+void emit_json_writer_runtime(std::ostream& out);
+struct JsonPod {
+    std::string name;
+    std::vector<std::string> type_params;
+    std::vector<DataField> fields;
+};
+std::string generate_json_writers(const std::vector<JsonPod>& pods);
+

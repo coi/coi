@@ -63,31 +63,18 @@ std::string generate_meta_struct(const std::string& data_type) {
 // JSON Parse Code Generation
 // ============================================================================
 
-// Map Coi types to extraction calls
-static std::string get_extractor(const std::string& type, const std::string& pos_var) {
-    if (type == "string") {
-        return "__coi_json::ext_str(_s, " + pos_var + ", _len)";
-    }
-    if (type == "int") {
-        return "__coi_json::ext_int(_s, " + pos_var + ", _len, _ok)";
-    }
-    if (type == "float") {
-        return "__coi_json::ext_float(_s, " + pos_var + ", _len, _ok)";
-    }
-    if (type == "bool") {
-        return "__coi_json::ext_bool(_s, " + pos_var + ", _len, _ok)";
-    }
-    // Nested data type - will need recursive parsing
-    if (!type.empty() && std::isupper(type[0])) {
-        return "__json_parse_" + type + "(_s + " + pos_var + ", _len - " + pos_var + ")";
-    }
-    // Array types handled separately
-    return "";
+// how a JSON value is read into a field of this Coi type
+static std::string scalar_kind(const std::string& type) {
+    if (type == "string" || type == "bool") return type;
+    if (type.rfind("float", 0) == 0) return "float";
+    return "int";  // int*, uint*, enums
 }
 
-// Check if type needs the _ok variable
-static bool needs_ok_var(const std::string& type) {
-    return type == "int" || type == "float" || type == "bool";
+static std::string extract_scalar(const std::string& kind, const std::string& target_type,
+                                  const std::string& s, const std::string& p, const std::string& len, const std::string& ok) {
+    if (kind == "string") return "__coi_json::ext_str(" + s + ", " + p + ", " + len + ")";
+    if (kind == "bool") return "__coi_json::ext_bool(" + s + ", " + p + ", " + len + ", " + ok + ")";
+    return "(" + target_type + ")__coi_json::ext_" + kind + "(" + s + ", " + p + ", " + len + ", " + ok + ")";
 }
 
 // Check if type is an array
@@ -157,13 +144,13 @@ static void generate_primitive_field_parse(std::stringstream& ss,
                                             const std::string& ok_var,
                                             const std::string& indent) {
     ss << indent << "if (!__coi_json::is_null(" << src_var << ", " << pos_var << ", " << len_var << ")) {\n";
-    if (field_type == "string") {
-        ss << indent << "    " << result_var << "." << field_name << " = __coi_json::ext_str(" << src_var << ", " << pos_var << ", " << len_var << ");\n";
+    std::string kind = scalar_kind(field_type);
+    std::string target = result_var + "." + field_name;
+    ss << indent << "    " << target << " = " << extract_scalar(kind, "decltype(" + target + ")", src_var, pos_var, len_var, ok_var) << ";\n";
+    if (kind == "string")
         ss << indent << "    " << meta_var << ".set(" << field_idx << ");\n";
-    } else {
-        ss << indent << "    " << result_var << "." << field_name << " = __coi_json::ext_" << field_type << "(" << src_var << ", " << pos_var << ", " << len_var << ", " << ok_var << ");\n";
+    else
         ss << indent << "    if (" << ok_var << ") " << meta_var << ".set(" << field_idx << ");\n";
-    }
     ss << indent << "}\n";
 }
 
@@ -189,12 +176,13 @@ static void generate_array_field_parse(std::stringstream& ss,
     ss << indent << "if (" << arr_view << ".length() > 0) {\n";
     ss << indent << "    __coi_json::for_each(" << arr_view << ".data(), 0, " << arr_view << ".length(), [&](const char* " << aes << ", uint32_t " << aep << ", uint32_t " << aelen << ") {\n";
 
-    if (elem_type == "string") {
-        ss << indent << "        " << result_var << "." << field_name << ".push_back(__coi_json::ext_str(" << aes << ", " << aep << ", " << aelen << "));\n";
-    } else if (elem_type == "int" || elem_type == "float" || elem_type == "bool") {
+    if (!(!elem_type.empty() && std::isupper(elem_type[0]) && DataTypeRegistry::instance().lookup(elem_type))) {
+        std::string target = result_var + "." + field_name;
         ss << indent << "        bool " << aok << ";\n";
-        ss << indent << "        " << result_var << "." << field_name << ".push_back(__coi_json::ext_" << elem_type << "(" << aes << ", " << aep << ", " << aelen << ", " << aok << "));\n";
-    } else if (!elem_type.empty() && std::isupper(elem_type[0]) && DataTypeRegistry::instance().lookup(elem_type)) {
+        ss << indent << "        " << target << ".push_back("
+           << extract_scalar(scalar_kind(elem_type), "decltype(" + target + ")::value_type", aes, aep, aelen, aok) << ");\n";
+        ss << indent << "        (void)" << aok << ";\n";
+    } else {
         // Nested data type array
         ss << indent << "        auto " << ae_view << " = __coi_json::isolate(" << aes << ", " << aep << ", " << aelen << ");\n";
         ss << indent << "        if (" << ae_view << ".length() > 0) {\n";
@@ -460,45 +448,76 @@ inline coi::string_view isolate(const char* s, uint32_t p, uint32_t len) {
     return depth == 0 ? coi::string_view(s + start, p - start) : coi::string_view();
 }
 
+inline uint32_t hex4(const char* s, uint32_t p, uint32_t len) {
+    uint32_t v = 0;
+    for (uint32_t i = 0; i < 4; i++) {
+        if (p + i >= len) return 0xFFFFFFFF;
+        char c = s[p + i];
+        uint32_t d = c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : c >= 'A' && c <= 'F' ? c - 'A' + 10 : 16;
+        if (d == 16) return 0xFFFFFFFF;
+        v = v * 16 + d;
+    }
+    return v;
+}
+
+inline void put_utf8(coi::vector<char>& out, uint32_t cp) {
+    if (cp < 0x80) out.push_back((char)cp);
+    else if (cp < 0x800) { out.push_back((char)(0xC0 | (cp >> 6))); out.push_back((char)(0x80 | (cp & 0x3F))); }
+    else if (cp < 0x10000) { out.push_back((char)(0xE0 | (cp >> 12))); out.push_back((char)(0x80 | ((cp >> 6) & 0x3F))); out.push_back((char)(0x80 | (cp & 0x3F))); }
+    else { out.push_back((char)(0xF0 | (cp >> 18))); out.push_back((char)(0x80 | ((cp >> 12) & 0x3F))); out.push_back((char)(0x80 | ((cp >> 6) & 0x3F))); out.push_back((char)(0x80 | (cp & 0x3F))); }
+}
+
 inline coi::string ext_str(const char* s, uint32_t p, uint32_t len) {
     if (p >= len || s[p] != '"') return {};
     p++;
-    coi::string r;
+    coi::vector<char> r;
     while (p < len && s[p] != '"') {
-        if (s[p] == '\\' && p + 1 < len) {
-            p++;
-            switch (s[p]) {
-                case '"': r += '"'; break; case '\\': r += '\\'; break;
-                case 'n': r += '\n'; break; case 'r': r += '\r'; break;
-                case 't': r += '\t'; break; default: r += s[p]; break;
+        if (s[p] != '\\' || p + 1 >= len) { r.push_back(s[p++]); continue; }
+        p++;
+        switch (s[p]) {
+            case 'n': r.push_back('\n'); break;
+            case 'r': r.push_back('\r'); break;
+            case 't': r.push_back('\t'); break;
+            case 'b': r.push_back('\b'); break;
+            case 'f': r.push_back('\f'); break;
+            case 'u': {
+                uint32_t cp = hex4(s, p + 1, len);
+                if (cp == 0xFFFFFFFF) { r.push_back('u'); break; }
+                p += 4;
+                if (cp >= 0xD800 && cp < 0xDC00 && p + 6 < len && s[p + 1] == '\\' && s[p + 2] == 'u') {
+                    uint32_t lo = hex4(s, p + 3, len);
+                    if (lo >= 0xDC00 && lo < 0xE000) { cp = 0x10000 + ((cp - 0xD800) << 10) + (lo - 0xDC00); p += 6; }
+                }
+                put_utf8(r, cp);
+                break;
             }
-        } else r += s[p];
+            default: r.push_back(s[p]); break;
+        }
         p++;
     }
-    return r;
+    return coi::string(r.data(), (uint32_t)r.size());
 }
 
-inline int32_t ext_int(const char* s, uint32_t p, uint32_t len, bool& ok) {
+inline int64_t ext_int(const char* s, uint32_t p, uint32_t len, bool& ok) {
     ok = false;
-    if (p >= len) return 0;
-    bool neg = s[p] == '-'; if (neg) p++;
+    uint32_t start = p;
+    if (p < len && s[p] == '-') p++;
     if (p >= len || s[p] < '0' || s[p] > '9') return 0;
-    int32_t r = 0;
-    while (p < len && s[p] >= '0' && s[p] <= '9') { r = r * 10 + (s[p] - '0'); p++; }
+    uint64_t r = 0;
+    while (p < len && s[p] >= '0' && s[p] <= '9') { r = r * 10 + (uint64_t)(s[p] - '0'); p++; }
     ok = true;
-    return neg ? -r : r;
+    if (p < len && (s[p] == '.' || s[p] == 'e' || s[p] == 'E')) {
+        uint32_t used;
+        return (int64_t)webcc::parse_double(s + start, len - start, used);
+    }
+    return s[start] == '-' ? -(int64_t)r : (int64_t)r;
 }
 
 inline double ext_float(const char* s, uint32_t p, uint32_t len, bool& ok) {
-    ok = false;
-    if (p >= len) return 0;
-    bool neg = s[p] == '-'; if (neg) p++;
-    if (p >= len || s[p] < '0' || s[p] > '9') return 0;
-    double r = 0;
-    while (p < len && s[p] >= '0' && s[p] <= '9') { r = r * 10 + (s[p] - '0'); p++; }
-    if (p < len && s[p] == '.') { p++; double d = 10; while (p < len && s[p] >= '0' && s[p] <= '9') { r += (s[p] - '0') / d; d *= 10; p++; } }
-    ok = true;
-    return neg ? -r : r;
+    uint32_t used = 0;
+    double v = p < len ? webcc::parse_double(s + p, len - p, used) : 0;
+    ok = used > 0;
+    return v;
 }
 
 inline bool ext_bool(const char* s, uint32_t p, uint32_t len, bool& ok) {
@@ -543,4 +562,112 @@ inline void for_each(const char* s, uint32_t p, uint32_t len, F fn) {
 } // namespace __coi_json
 
 )";
+}
+
+void emit_json_writer_runtime(std::ostream& out) {
+    out << R"(
+struct __coi_json_writer {
+    coi::vector<char> buf;
+    void put(char c) { buf.push_back(c); }
+    void put(const char* s) { while (*s) buf.push_back(*s++); }
+};
+inline void __coi_json_write(__coi_json_writer& w, bool v) { w.put(v ? "true" : "false"); }
+inline void __coi_json_write(__coi_json_writer& w, double v) {
+    if (webcc::isnan(v) || webcc::isinf(v)) { w.put("null"); return; }
+    char b[32]; webcc::format_double(v, b); w.put(b);
+}
+inline void __coi_json_write(__coi_json_writer& w, float v) {
+    if (webcc::isnan(v) || webcc::isinf(v)) { w.put("null"); return; }
+    char b[32]; webcc::format_float(v, b); w.put(b);
+}
+inline void __coi_json_write(__coi_json_writer& w, long long v) {
+    char b[24]; uint64_t u = v < 0 ? 0 - (uint64_t)v : (uint64_t)v;
+    int n = 0; do { b[n++] = (char)('0' + u % 10); u /= 10; } while (u);
+    if (v < 0) w.put('-');
+    while (n) w.put(b[--n]);
+}
+inline void __coi_json_write(__coi_json_writer& w, unsigned long long v) {
+    char b[24]; int n = 0; do { b[n++] = (char)('0' + v % 10); v /= 10; } while (v);
+    while (n) w.put(b[--n]);
+}
+inline void __coi_json_write(__coi_json_writer& w, int v) { __coi_json_write(w, (long long)v); }
+inline void __coi_json_write(__coi_json_writer& w, long v) { __coi_json_write(w, (long long)v); }
+inline void __coi_json_write(__coi_json_writer& w, short v) { __coi_json_write(w, (long long)v); }
+inline void __coi_json_write(__coi_json_writer& w, signed char v) { __coi_json_write(w, (long long)v); }
+inline void __coi_json_write(__coi_json_writer& w, unsigned int v) { __coi_json_write(w, (unsigned long long)v); }
+inline void __coi_json_write(__coi_json_writer& w, unsigned long v) { __coi_json_write(w, (unsigned long long)v); }
+inline void __coi_json_write(__coi_json_writer& w, unsigned short v) { __coi_json_write(w, (unsigned long long)v); }
+inline void __coi_json_write(__coi_json_writer& w, unsigned char v) { __coi_json_write(w, (unsigned long long)v); }
+inline void __coi_json_write(__coi_json_writer& w, const coi::string& v) {
+    static const char hex[] = "0123456789abcdef";
+    w.put('"');
+    for (uint32_t i = 0; i < v.length(); i++) {
+        unsigned char c = (unsigned char)v.data()[i];
+        if (c == '"') w.put("\\\"");
+        else if (c == '\\') w.put("\\\\");
+        else if (c == '\n') w.put("\\n");
+        else if (c == '\r') w.put("\\r");
+        else if (c == '\t') w.put("\\t");
+        else if (c < 0x20) { w.put("\\u00"); w.put(hex[c >> 4]); w.put(hex[c & 15]); }
+        else w.put((char)c);
+    }
+    w.put('"');
+}
+// templates on the writer, only compiled when used
+template<typename W, typename T> inline void __coi_json_write(W& w, const T& v) { __coi_json_write(w, (int)v); }
+template<typename W, typename T> inline void __coi_json_write(W& w, const coi::vector<T>& v) {
+    w.put('[');
+    for (uint32_t i = 0; i < v.size(); i++) { if (i) w.put(','); __coi_json_write(w, v[i]); }
+    w.put(']');
+}
+template<typename W, typename T, size_t N> inline void __coi_json_write(W& w, const coi::array<T, N>& v) {
+    w.put('[');
+    for (size_t i = 0; i < N; i++) { if (i) w.put(','); __coi_json_write(w, v[i]); }
+    w.put(']');
+}
+// object keys are strings
+inline void __coi_json_key(__coi_json_writer& w, const coi::string& k) { __coi_json_write(w, k); }
+template<typename W, typename K> inline void __coi_json_key(W& w, const K& k) { w.put('"'); __coi_json_write(w, k); w.put('"'); }
+template<typename W, typename K, typename V> inline void __coi_json_write(W& w, const coi::map<K, V>& m) {
+    w.put('{');
+    bool first = true;
+    for (const auto& k : m) {
+        if (!first) w.put(',');
+        first = false;
+        __coi_json_key(w, k);
+        w.put(':');
+        __coi_json_write(w, m[k]);
+    }
+    w.put('}');
+}
+)";
+}
+
+std::string generate_json_writers(const std::vector<JsonPod>& pods) {
+    std::stringstream ss;
+    auto signature = [](const JsonPod& pod) {
+        std::string tmpl = "template<typename W", args;
+        for (size_t i = 0; i < pod.type_params.size(); i++) {
+            tmpl += ", typename " + pod.type_params[i];
+            args += (i ? ", " : "<") + pod.type_params[i];
+        }
+        if (!args.empty()) args += ">";
+        return tmpl + "> inline void __coi_json_write(W& w, const " + pod.name + args + "& v)";
+    };
+    for (const auto& pod : pods)
+        ss << signature(pod) << ";\n";
+    for (const auto& pod : pods) {
+        ss << signature(pod) << " {\n";
+        for (size_t i = 0; i < pod.fields.size(); i++) {
+            const auto& f = pod.fields[i];
+            ss << "    w.put(\"" << (i ? "," : "{") << "\\\"" << f.name << "\\\":\"); __coi_json_write(w, v." << f.name << ");\n";
+        }
+        ss << "    w.put(\"" << (pod.fields.empty() ? "{}" : "}") << "\");\n";
+        ss << "}\n";
+    }
+    ss << "template<typename T> inline coi::string __coi_json_stringify(const T& v) {\n";
+    ss << "    __coi_json_writer w; __coi_json_write(w, v);\n";
+    ss << "    return coi::string(w.buf.data(), (uint32_t)w.buf.size());\n";
+    ss << "}\n";
+    return ss.str();
 }

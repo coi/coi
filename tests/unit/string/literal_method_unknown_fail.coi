@@ -1,0 +1,8 @@
+// Test: unknown method on a string literal
+component App {
+    mut int n = 0;
+    init { n = "abc".nope(); }
+    view { <p>{n}</p> }
+}
+
+app { root = App; }

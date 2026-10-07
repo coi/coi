@@ -1,0 +1,16 @@
+// Test: Json.stringify on pods, arrays, maps and enums, with a generic pod declared
+enum Kind { A, B }
+pod Pt { float x; float y; }
+pod Shape { string name; Kind kind; int64 id; uint8 alpha; Pt[] pts; Pt origin; int[string] counts; }
+pod Box<T> { T value; }
+
+component App {
+    mut string out = "";
+    init {
+        Shape s = Shape{name = "a\"b", kind = Kind::B, id = 1700000000000, alpha = 255, pts = [Pt{x = 0.5, y = 1.0}], origin = Pt{x = 0.0, y = 0.0}};
+        out = Json.stringify(s) + Json.stringify(s.pts) + Json.stringify([1, 2]);
+    }
+    view { <p>{out}</p> }
+}
+
+app { root = App; }

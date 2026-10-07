@@ -1,0 +1,9 @@
+// Test: an array in a template string
+component App {
+    mut string s = "";
+    mut int[] xs;
+    init { s = `xs ${xs}`; }
+    view { <p>{s}</p> }
+}
+
+app { root = App; }

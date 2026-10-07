@@ -66,10 +66,9 @@ std::string generate_formatter_block_from_string_literal(StringLiteral* strLit,
                                                          const std::string& callback_prefix,
                                                          const std::string& callback_suffix) {
     std::string code = "{ webcc::hybrid_formatter<" + std::to_string(FORMATTER_BUFFER_SIZE) + "> _fmt; ";
-    auto parts = strLit->parse();
-    for (auto& p : parts) {
+    for (auto& p : strLit->parse()) {
         if (p.is_expr) {
-            code += "_fmt << (" + coi_embedded_expression(p.content) + "); ";
+            code += "_fmt << (" + p.expr->to_webcc() + "); ";
         } else {
             std::string escaped;
             for (char c : p.content) {

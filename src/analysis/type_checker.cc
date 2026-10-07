@@ -18,6 +18,7 @@ static std::map<std::string, std::map<std::string, std::string>> g_data_type_fie
 std::string normalize_type(const std::string &type);
 bool is_compatible_type(const std::string &source, const std::string &target);
 std::string infer_expression_type(Expression *expr, const std::map<std::string, std::string> &scope);
+static bool literal_fits(Expression *expr, const std::string &target);
 
 static std::string extract_base_type(const std::string &type)
 {
@@ -148,7 +149,7 @@ static std::string validate_component_args(
         {
             std::string arg_type = infer_expression_type(arg.value.get(), scope);
             std::string expected_type = normalize_type(param->type);
-            if (arg_type != "unknown" && !is_compatible_type(arg_type, expected_type))
+            if (arg_type != "unknown" && !is_compatible_type(arg_type, expected_type) && !literal_fits(arg.value.get(), expected_type))
             {
                 return context_desc + ": argument " + std::to_string(i + 1) + " ('" + arg_name + 
                     "') expects type '" + expected_type + "' but got '" + arg_type + 
@@ -295,6 +296,61 @@ static bool has_data_field(const std::string& type_name, const std::string& fiel
     }
 
     return false;
+}
+
+// int8 x = 127: a literal fits any type that holds its value
+static bool literal_fits(Expression *expr, const std::string &target)
+{
+    int64_t v = 0;
+    bool neg = false;
+    if (auto *u = dynamic_cast<UnaryOp *>(expr); u && u->op == "-")
+    {
+        expr = u->operand.get();
+        neg = true;
+    }
+    std::string t = normalize_type(target);
+    if (dynamic_cast<FloatLiteral *>(expr))
+        return t == "float32" || t == "float64";
+    auto *lit = dynamic_cast<IntLiteral *>(expr);
+    if (!lit)
+        return false;
+    v = neg ? -lit->value : lit->value;
+    if (t == "float32" || t == "float64" || t == "int64")
+        return true;
+    static const std::map<std::string, std::pair<int64_t, int64_t>> ranges = {
+        {"int8", {-128, 127}}, {"int16", {-32768, 32767}}, {"int32", {INT32_MIN, INT32_MAX}},
+        {"uint8", {0, 255}}, {"uint16", {0, 65535}}, {"uint32", {0, UINT32_MAX}}, {"uint64", {0, INT64_MAX}}};
+    auto it = ranges.find(t);
+    return it != ranges.end() && v >= it->second.first && v <= it->second.second;
+}
+
+static bool is_known_type(std::string t, const std::vector<std::string> &type_params);
+
+// what Json.stringify can write; generic params count as fine
+static bool is_json_type(const std::string &raw, int depth = 0)
+{
+    std::string t = normalize_type(raw);
+    static const std::set<std::string> scalars = {
+        "string", "bool", "int8", "int16", "int32", "int64",
+        "uint8", "uint16", "uint32", "uint64", "float32", "float64", "unknown"};
+    if (scalars.count(t) || is_enum_type(t) || depth > 16)
+        return true;
+    if (t.ends_with("[]"))
+        return is_json_type(t.substr(0, t.size() - 2), depth + 1);
+    auto [map_val, map_key] = extract_map_types(t);
+    if (!map_val.empty())
+        return is_json_type(map_val, depth + 1);
+    size_t br = t.rfind('[');
+    if (br != std::string::npos && t.back() == ']')
+        return is_json_type(t.substr(0, br), depth + 1);
+    std::string base = t.substr(0, t.find('<'));
+    auto it = g_data_type_field_types.find(base);
+    if (it == g_data_type_field_types.end())
+        return !is_known_type(t, {});
+    for (const auto &[name, field_type] : it->second)
+        if (!is_json_type(field_type, depth + 1))
+            return false;
+    return true;
 }
 
 // Get the type of a field on a known data type (returns empty string if not found)
@@ -474,6 +530,13 @@ bool is_compatible_type(const std::string &source, const std::string &target)
         return true;
     // Numeric conversions
     if (source == "int32" && (target == "float64" || target == "float32" || target == "uint8"))
+        return true;
+    // widening
+    if ((source == "int8" || source == "int16" || source == "int32" || source == "uint8" || source == "uint16" || source == "uint32") && target == "int64")
+        return true;
+    if ((source == "uint8" || source == "uint16" || source == "uint32") && target == "uint64")
+        return true;
+    if (source == "int64" && target == "float64")
         return true;
     if (source == "float64" && target == "float32")
         return true;  // Allow narrowing from float64 to float32
@@ -756,7 +819,7 @@ static std::string check_free_function_call(const FunctionDef *fn, FunctionCall 
         if (is_function_param || mentions_type_param(param.type, fn->type_params))
             continue;
         std::string expected = normalize_type(param.type);
-        if (actual != "unknown" &&
+        if (actual != "unknown" && !literal_fits(arg.value.get(), expected) &&
             !is_compatible_type(strip_module_prefix(actual), strip_module_prefix(expected)))
         {
             ErrorHandler::type_error(
@@ -773,12 +836,33 @@ static std::string check_free_function_call(const FunctionDef *fn, FunctionCall 
 
 std::string infer_expression_type(Expression *expr, const std::map<std::string, std::string> &scope)
 {
-    if (dynamic_cast<IntLiteral *>(expr))
-        return "int32";
+    if (auto *lit = dynamic_cast<IntLiteral *>(expr))
+    {
+        if (lit->value >= INT32_MIN && lit->value <= INT32_MAX)
+            return "int32";
+        return lit->value >= 0 && lit->value <= UINT32_MAX ? "uint32" : "int64";
+    }
     if (dynamic_cast<FloatLiteral *>(expr))
         return "float64";  // float literals are 64-bit by default
-    if (dynamic_cast<StringLiteral *>(expr))
+    if (auto *str = dynamic_cast<StringLiteral *>(expr))
+    {
+        for (const auto &part : str->parse())
+        {
+            if (!part.expr)
+                continue;
+            std::string t = normalize_type(infer_expression_type(part.expr.get(), scope));
+            static const std::set<std::string> printable_types = {
+                "unknown", "string", "bool", "int8", "int16", "int32", "int64",
+                "uint8", "uint16", "uint32", "uint64", "float32", "float64"};
+            bool printable = printable_types.count(t) || is_enum_type(t);
+            if (!printable)
+            {
+                ErrorHandler::type_error("'" + t + "' can't go in a string: ${" + part.content + "}");
+                exit(1);
+            }
+        }
         return "string";
+    }
     if (dynamic_cast<BoolLiteral *>(expr))
         return "bool";
     
@@ -938,9 +1022,11 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
         // Unary +/- only makes sense on numeric types
         if (unary->op == "-" || unary->op == "+")
         {
-            if (operand_type == "int32" || operand_type == "float64" || operand_type == "float32")
+            static const std::set<std::string> numeric = {
+                "int8", "int16", "int32", "int64", "uint8", "uint16", "uint32", "uint64", "float32", "float64"};
+            if (numeric.count(operand_type))
             {
-                return operand_type;
+                return operand_type == "uint32" ? "int64" : operand_type;
             }
             if (operand_type != "unknown")
             {
@@ -990,7 +1076,13 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
         std::string result_type = "unknown";
         for (const auto& arm : match->arms)
         {
-            std::string arm_type = infer_expression_type(arm.body.get(), scope);
+            auto arm_scope = scope;
+            for (const auto &binding : arm.pattern.variant_bindings)
+                arm_scope[binding.name] = binding.type;
+            for (const auto &field : arm.pattern.fields)
+                if (!field.value)
+                    arm_scope[field.name] = get_data_field_type(arm.pattern.type_name, field.name);
+            std::string arm_type = infer_expression_type(arm.body.get(), arm_scope);
             if (arm_type == "unknown") continue;
             
             if (result_type == "unknown")
@@ -1048,8 +1140,39 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
         return infer_expression_type(last_expr_stmt->expression.get(), scope);
     }
 
+    if (auto *mc = dynamic_cast<MethodCall *>(expr))
+    {
+        std::string t = normalize_type(infer_expression_type(mc->receiver.get(), scope));
+        mc->receiver_type = t;
+        for (auto &a : mc->args)
+            infer_expression_type(a.value.get(), scope);
+        if (t == "unknown")
+            return "unknown";
+        std::string def_t = !t.empty() && t.back() == ']' ? "array" : t;
+        const auto *m = DefSchema::instance().lookup_method(def_t, mc->method, mc->args.size());
+        if (!m || m->is_shared)
+        {
+            ErrorHandler::type_error("'" + t + "' has no method '" + mc->method + "' with " +
+                                     std::to_string(mc->args.size()) + " argument(s)", mc->line);
+            exit(1);
+        }
+        return m->return_type.empty() ? "void" : normalize_type(m->return_type);
+    }
+
     if (auto func = dynamic_cast<FunctionCall *>(expr))
     {
+        if (func->name == "Json.stringify" && func->args.size() == 1)
+        {
+            std::string t = normalize_type(infer_expression_type(func->args[0].value.get(), scope));
+            if (auto *arr = dynamic_cast<ArrayLiteral *>(func->args[0].value.get()); arr && t.ends_with("[]"))
+                arr->element_type = t.substr(0, t.size() - 2);
+            if (!is_json_type(t))
+            {
+                ErrorHandler::type_error("Json.stringify can't write a '" + t + "'", func->line);
+                exit(1);
+            }
+            return "string";
+        }
         if (const FunctionDef *free_fn = resolve_free_function(func->name, scope, func->line))
         {
             return check_free_function_call(free_fn, func, scope);
@@ -1294,6 +1417,7 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
         std::string snake_method = DefSchema::to_snake_case(method_name);
         const DefSchema::FuncLookupResult *entry = nullptr;
         DefSchema::FuncLookupResult typed_entry;
+        bool own_method = false;  // Math.log is Math's, not system::log
         if (!obj_name.empty())
         {
             std::string owner = scope.count(obj_name) ? normalize_type(scope.at(obj_name)) : obj_name;
@@ -1307,9 +1431,11 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                     typed_entry.method = md;
                     entry = &typed_entry;
                 }
+                else if (md)
+                    own_method = true;
             }
         }
-        if (!entry)
+        if (!entry && !own_method)
             entry = DefSchema::instance().lookup_func(snake_method);
 
         if (entry)
@@ -1454,7 +1580,7 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                     while (pi < params.size() && (is_callback(params[pi]) || seen++ != value_index)) pi++;
                     std::string arg_type = infer_expression_type(arg.value.get(), scope);
                     std::string expected_type = normalize_type(params[pi].type); // Mods -> uint8
-                    if (!is_compatible_type(arg_type, expected_type))
+                    if (!is_compatible_type(arg_type, expected_type) && !literal_fits(arg.value.get(), expected_type))
                     {
                         ErrorHandler::type_error(
                             "Argument " + std::to_string(i + 1) + " of '" + full_name + "' expects '" + expected_type +
@@ -1871,7 +1997,7 @@ static void check_function_body(const FunctionDef &method, const Component *comp
                 }
                 
                 std::string init = infer_expression_type(decl->initializer.get(), current_scope);
-                if (init != "unknown" && !is_compatible_type(init, type))
+                if (init != "unknown" && !is_compatible_type(init, type) && !literal_fits(decl->initializer.get(), type))
                 {
                     ErrorHandler::type_error(
                         "Variable '" + decl->name + "' expects '" + type + "' but got '" + init + "'",
@@ -1964,7 +2090,7 @@ static void check_function_body(const FunctionDef &method, const Component *comp
 
             if (var_type != "unknown" && val_type != "unknown")
             {
-                if (!is_compatible_type(val_type, var_type))
+                if (!is_compatible_type(val_type, var_type) && !literal_fits(assign->value.get(), var_type))
                 {
                     ErrorHandler::type_error(
                         "Assigning '" + val_type + "' to '" + assign->name + "' of type '" + var_type + "'",
@@ -2191,7 +2317,7 @@ static void check_function_body(const FunctionDef &method, const Component *comp
                 check_moved_use(emit_stmt->args[i].get(), emit_stmt->line);
                 std::string actual = infer_expression_type(emit_stmt->args[i].get(), current_scope);
                 std::string expected = normalize_type(signal->params[i].type);
-                if (actual != "unknown" && !is_compatible_type(actual, expected))
+                if (actual != "unknown" && !is_compatible_type(actual, expected) && !literal_fits(emit_stmt->args[i].get(), expected))
                 {
                     ErrorHandler::type_error(
                         "Signal '" + signal->name + "' argument " + std::to_string(i + 1) +
@@ -2303,7 +2429,7 @@ static void check_function_body(const FunctionDef &method, const Component *comp
                     exit(1);
                 }
                 std::string actual_return = infer_expression_type(ret_stmt->value.get(), current_scope);
-                if (actual_return != "unknown" && !is_compatible_type(actual_return, expected_return))
+                if (actual_return != "unknown" && !is_compatible_type(actual_return, expected_return) && !literal_fits(ret_stmt->value.get(), expected_return))
                 {
                     ErrorHandler::type_error(
                         "Function '" + method.name + "' expects return type '" + expected_return +
@@ -2435,19 +2561,9 @@ static void check_free_function_names(const FunctionDef &fn, const std::set<std:
         }
         else if (auto *str = dynamic_cast<StringLiteral *>(expr))
         {
-            // only the leading name of each part is a variable
             for (const auto &part : str->parse())
-            {
-                if (!part.is_expr)
-                    continue;
-                std::string text = part.content;
-                size_t start = text.find_first_not_of(" \t");
-                if (start == std::string::npos)
-                    continue;
-                std::string base = leading_identifier(text.substr(start));
-                if (!base.empty() && !std::isdigit(static_cast<unsigned char>(base[0])))
-                    check_name(base, scope, line);
-            }
+                if (part.expr)
+                    check_expr(part.expr.get(), scope, line);
         }
         else if (auto *match = dynamic_cast<MatchExpr *>(expr))
         {
@@ -2715,7 +2831,7 @@ void validate_types(const std::vector<Component> &components,
             if (param->default_value)
             {
                 std::string init = infer_expression_type(param->default_value.get(), scope);
-                if (init != "unknown" && !is_compatible_type(init, type))
+                if (init != "unknown" && !is_compatible_type(init, type) && !literal_fits(param->default_value.get(), type))
                 {
                     ErrorHandler::type_error(
                         "Parameter '" + param->name + "' expects '" + type + "' but initialized with '" + init + "'");
@@ -2819,7 +2935,7 @@ void validate_types(const std::vector<Component> &components,
                 }
                 
                 std::string init = infer_expression_type(var->initializer.get(), scope);
-                if (init != "unknown" && !is_compatible_type(init, type))
+                if (init != "unknown" && !is_compatible_type(init, type) && !literal_fits(var->initializer.get(), type))
                 {
                     ErrorHandler::type_error(
                         "Variable '" + var->name + "' expects '" + type + "' but initialized with '" + init + "'");
@@ -3306,7 +3422,7 @@ void validate_view_hierarchy(const std::vector<Component> &components,
                             {
                                 std::string passed_type = infer_expression_type(passed_prop.value.get(), scope);
                                 std::string expected_type = normalize_type(declared_param->type);
-                                if (passed_type != "unknown" && !is_compatible_type(passed_type, expected_type))
+                                if (passed_type != "unknown" && !is_compatible_type(passed_type, expected_type) && !literal_fits(passed_prop.value.get(), expected_type))
                                 {
                                     throw std::runtime_error(
                                         "Parameter '" + passed_prop.name + "' in component '" + comp_inst->component_name +

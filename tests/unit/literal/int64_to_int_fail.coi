@@ -1,0 +1,7 @@
+// Test: a 64-bit literal doesn't fit an int
+component App {
+    mut int t = 1760000000123;
+    view { <p>{t}</p> }
+}
+
+app { root = App; }

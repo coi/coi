@@ -1,0 +1,75 @@
+// note -> JSON -> bytes -> IndexedDB -> back, plus math and number printing
+enum Tool { Pen, Marker, Eraser }
+
+pod Point { float x; float y; float pressure; }
+pod Stroke { Tool tool; uint32 color; float width; Point[] points; }
+pod Page { string title; int64 modified; bool pinned; string[] tags; Stroke[] strokes; }
+
+component DataRoundtrip {
+    mut Database db;
+    mut Page page;
+    mut string json = "-";
+    mut string result = "-";
+    mut string math = "-";
+    mut string numbers = "-";
+
+    def onOpened(uint8 ok) : void {
+        db.put("page/1", Json.stringify(page).toBytes());
+        db.get("page/1", &gotValue);
+    }
+
+    def gotValue(Blob value, uint8 found) : void {
+        string text = string.fromBytes(value.take());
+        match (Json.parse(Page, text)) {
+            Success(Page p, PageMeta meta) => {
+                result = same(p) ? "same" : `differs: ${Json.stringify(p)}`;
+            };
+            Error(string message) => {
+                result = `error ${message}`;
+            };
+        };
+    }
+
+    def same(Page p) : bool {
+        if (p.title != page.title || p.modified != page.modified || p.pinned != page.pinned) return false;
+        if (p.tags.size() != page.tags.size() || p.strokes.size() != page.strokes.size()) return false;
+        for i in 0:p.strokes.size() {
+            Stroke a = p.strokes[i];
+            Stroke b = page.strokes[i];
+            if (a.tool != b.tool || a.color != b.color || a.width != b.width || a.points.size() != b.points.size()) return false;
+            for j in 0:a.points.size() {
+                if (a.points[j].x != b.points[j].x || a.points[j].y != b.points[j].y || a.points[j].pressure != b.points[j].pressure) return false;
+            }
+        }
+        return p.tags[1] == page.tags[1];
+    }
+
+    mount {
+        page = Page{
+            title = "Lecture \"4\": Faraday\nline two \\ ünïcode ✓",
+            modified = 1760000000123,
+            pinned = true,
+            tags = ["physics", "tab\there"],
+            strokes = [
+                Stroke{tool = Tool::Marker, color = 0xFF3366CC, width = 2.5,
+                       points = [Point{x = 0.1, y = 1.0 / 3.0, pressure = 0.5}, Point{x = 1e-7, y = 123456.789, pressure = 1.0}]},
+                Stroke{tool = Tool::Eraser, color = 0, width = 12.0, points = []}
+            ]
+        };
+        json = Json.stringify(page.strokes[0].points[0]);
+        math = `${Math.round(Math.sin(10.0) * 1000000.0)} ${Math.round(Math.atan2(1.0, -1.0) * 1000000.0)} ${Math.pow(2.0, 10.0)} ${Math.floor(-1.5)} ${Math.ceil(2.0)} ${Math.round(-2.5)} ${Math.log10(1000.0)} ${Math.hypot(3.0, 4.0)}`;
+        numbers = `${0.1 + 0.2} ${-0.5} ${3.0} ${1234567.89} ${"Hello".at(1)} ${(2 + 3).toString()} ${1760000000123}`;
+        db = Idb.open("coi-data", &onOpened);
+    }
+
+    view {
+        <div>
+            <p class="json">{json}</p>
+            <p class="result">{result}</p>
+            <p class="math">{math}</p>
+            <p class="numbers">{numbers}</p>
+        </div>
+    }
+}
+
+app { root = DataRoundtrip; }

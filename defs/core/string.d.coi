@@ -45,4 +45,11 @@ type string {
 
     @inline("${this} += ${0}")
     def append(string suffix): void
+
+    // UTF-8
+    @inline("coi::string_to_bytes(${this})")
+    def toBytes(): uint8[]
+
+    @inline("coi::string_from_bytes(${0})")
+    shared def fromBytes(uint8[] bytes): string
 }

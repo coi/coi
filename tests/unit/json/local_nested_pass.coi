@@ -1,0 +1,16 @@
+// Test: component-local pods nested in each other round trip
+component App {
+    pod Pt { float x; float y; }
+    pod Line { string name; Pt[] pts; Pt start; }
+    mut int n = 0;
+    init {
+        Line l = Line{name = "a", pts = [Pt{x = 1.0, y = 2.0}], start = Pt{x = 3.0, y = 4.0}};
+        match (Json.parse(Line, Json.stringify(l))) {
+            Success(Line v, LineMeta m) => { n = v.pts.size(); };
+            Error(string e) => { n = -1; };
+        };
+    }
+    view { <p>{n}</p> }
+}
+
+app { root = App; }

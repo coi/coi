@@ -286,6 +286,14 @@ bool has = text.contains("World"); // Check if substring exists
 string trimmed = text.trim();       // Remove whitespace from both ends
 string left = text.trimStart();     // Remove leading whitespace
 string right = text.trimEnd();      // Remove trailing whitespace
+
+// Bytes (UTF-8)
+uint8[] bytes = text.toBytes();
+string back = string.fromBytes(bytes);
+
+// Methods work on any expression
+int n = "abc".length();
+string s = (count + 1).toString();
 ```
 
 ### String Interpolation
@@ -346,6 +354,8 @@ string example = `Use \` for backticks`;
 - Template strings: Preserve whitespace/newlines, only escape `` \` ``
 - Both: Support `${variable}` interpolation and `\$` escaping
 
+`${...}` takes any expression: `${items.size()}`, `${Math.PI * 2.0}`, `${done ? "yes" : "no"}`, even another template. Numbers, strings, bools and enums can go in; an array or a pod is an error. Floats print like JavaScript: `3.0` prints `3`, `0.1 + 0.2` prints `0.30000000000000004`.
+
 ## Math Library
 
 Coi provides a built-in `Math` type with mathematical constants and functions. All members are accessed using `Math.name` syntax.
@@ -358,6 +368,7 @@ float halfPi = Math.HALF_PI; // π/2 ≈ 1.57079
 float tau = Math.TAU;        // 2π ≈ 6.28318
 float d2r = Math.DEG2RAD;    // Degrees to radians multiplier
 float r2d = Math.RAD2DEG;    // Radians to degrees multiplier
+float e = Math.E;            // ≈ 2.71828
 ```
 
 ### Basic Functions
@@ -365,6 +376,10 @@ float r2d = Math.RAD2DEG;    // Radians to degrees multiplier
 ```tsx
 float absolute = Math.abs(-5.0);      // 5.0
 float squareRoot = Math.sqrt(16.0);   // 4.0
+float power = Math.pow(2.0, 10.0);    // 1024.0
+float length = Math.hypot(3.0, 4.0);  // 5.0
+float grow = Math.exp(1.0);           // e
+float ln = Math.log(Math.E);          // 1.0, also log2 and log10
 ```
 
 ### Trigonometric Functions
@@ -375,6 +390,8 @@ All trig functions use radians:
 float sineValue = Math.sin(Math.PI / 2.0);     // 1.0
 float cosineValue = Math.cos(0.0);              // 1.0
 float tangentValue = Math.tan(Math.PI / 4.0);  // 1.0
+float angle = Math.atan2(dy, dx);               // direction of (dx, dy)
+float back = Math.asin(1.0);                    // also acos, atan
 
 // Convert degrees to radians
 float angleRad = 90.0 * Math.DEG2RAD;
@@ -407,7 +424,8 @@ float mid = Math.lerp(0.0, 100.0, 0.5);  // 50.0 (t=0.5 is halfway)
 // Rounding
 float down = Math.floor(3.7);   // 3.0
 float up = Math.ceil(3.2);      // 4.0
-float nearest = Math.round(3.5); // 4.0
+float nearest = Math.round(3.5); // 4.0, halves round away from zero
+float cut = Math.trunc(-3.7);    // -3.0
 ```
 
 ### Example Usage

@@ -627,7 +627,7 @@ Type-safe JSON parsing with compile-time schema validation and presence tracking
 |--------|-------------|
 | `Json.parse(Type, json)` | Parse JSON object and return a result for `match` |
 | `Json.parse(Type[], json)` | Parse JSON array and return a result for `match` |
-| `Json.stringify(value)` | Convert pod type to JSON string (static) |
+| `Json.stringify(value)` | Write a pod, an array or a map as a JSON string |
 
 ### Defining Pod Types
 
@@ -791,14 +791,40 @@ component ShowList {
 
 | Type | JSON | Notes |
 |------|------|-------|
-| `string` | `"text"` | Handles escape sequences |
-| `int` | `123` | 32-bit signed integer |
-| `float` | `3.14` | 64-bit double |
+| `string` | `"text"` | All escapes, `\uXXXX` included |
+| `int`, `int64`, `uint8`, ... | `123` | Every integer width |
+| `float`, `float32` | `3.14` | Exponents like `1e-7` too |
 | `bool` | `true`/`false` | |
+| enums | `2` | The value's index |
 | `Type` | `{...}` | Nested pod types |
-| `string[]` | `[...]` | Array of strings |
-| `int[]` | `[...]` | Array of integers |
-| `Type[]` | `[...]` | Array of nested objects |
+| `T[]` | `[...]` | Arrays of any of these |
+
+### Writing JSON
+
+`Json.stringify(value)` takes a pod, an array or a map (`int[string]` becomes an object) and returns compact JSON, fields in declaration order. Numbers are written in the shortest form that reads back to the same value, so a stringify/parse round trip keeps every float exactly. NaN and infinity become `null`, enums are written as their index.
+
+```tsx
+pod Point { float x; float y; }
+pod Stroke { uint32 color; Point[] points; }
+
+Stroke s = Stroke{color = 0xFF3366CC, points = [Point{x = 0.1, y = 2.0}]};
+string json = Json.stringify(s);  // {"color":4281558732,"points":[{"x":0.1,"y":2}]}
+```
+
+### Saving to IndexedDB
+
+IndexedDB stores bytes, so convert with `toBytes()` and `string.fromBytes(...)` (UTF-8):
+
+```tsx
+db.put("page/1", Json.stringify(page).toBytes());
+
+def gotValue(Blob value, uint8 found) : void {
+    match (Json.parse(Page, string.fromBytes(value.take()))) {
+        Success(Page p, PageMeta meta) => { page = p; };
+        Error(string message) => { System.error(message); };
+    };
+}
+```
 
 ### Null Handling
 

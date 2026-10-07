@@ -115,6 +115,38 @@ Token Lexer::read_string(){
     return Token{TokenType::STRING_LITERAL, str, start_line, start_column};
 }
 
+// copy ${...} whole, nested strings and templates included
+void Lexer::read_template_expr(std::string& out){
+    int depth = 0;
+    while(current() != '\0'){
+        char c = current();
+        if(c == '"' || c == '\''){
+            out += c;
+            advance();
+            while(current() != c && current() != '\0'){
+                if(current() == '\\'){ out += current(); advance(); }
+                out += current();
+                advance();
+            }
+        }else if(c == '`'){
+            out += c;
+            advance();
+            while(current() != '`' && current() != '\0'){
+                if(current() == '$' && peek() == '{') read_template_expr(out);
+                else { out += current(); advance(); }
+            }
+        }else if(c == '{'){
+            depth++;
+        }else if(c == '}' && --depth == 0){
+            out += c;
+            advance();
+            return;
+        }
+        out += current();
+        advance();
+    }
+}
+
 Token Lexer::read_template_string(){
     int start_line = line;
     int start_column = column;
@@ -122,11 +154,13 @@ Token Lexer::read_template_string(){
     advance(); // skip opening backtick
 
     while(current() != '`' && current() != '\0'){
-        // Template strings support raw content - no escape sequences except for backtick
+        // raw content, only \` is an escape
         if(current() == '\\' && peek() == '`'){
-            advance(); // skip backslash
-            str += '`'; // add literal backtick
             advance();
+            str += '`';
+            advance();
+        }else if(current() == '$' && peek() == '{'){
+            read_template_expr(str);
         }else{
             str += current();
             advance();

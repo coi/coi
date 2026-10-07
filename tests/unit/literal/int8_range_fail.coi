@@ -1,0 +1,7 @@
+// Test: a literal out of int8 range
+component App {
+    mut int8 x = 300;
+    view { <p>{x}</p> }
+}
+
+app { root = App; }

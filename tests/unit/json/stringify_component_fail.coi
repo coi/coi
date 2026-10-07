@@ -1,0 +1,11 @@
+// Test: Json.stringify on a component
+component Child { view { <p>c</p> } }
+
+component App {
+    mut Child c;
+    mut string out = "";
+    init { out = Json.stringify(c); }
+    view { <p>{out}</p> }
+}
+
+app { root = App; }

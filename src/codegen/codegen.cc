@@ -75,16 +75,16 @@ void generate_cpp_code(
     out << "using webcc::move;\n";
     out << "using webcc::malloc;\n";
     out << "namespace math {\n";
-    out << "inline constexpr float PI = webcc::PI;\n";
-    out << "inline constexpr float HALF_PI = webcc::HALF_PI;\n";
-    out << "inline constexpr float TAU = webcc::TAU;\n";
-    out << "inline constexpr float DEG2RAD = webcc::DEG2RAD;\n";
-    out << "inline constexpr float RAD2DEG = webcc::RAD2DEG;\n";
-    out << "inline float abs(float x) { return webcc::abs(x); }\n";
-    out << "inline float sqrt(float x) { return webcc::sqrt(x); }\n";
-    out << "inline float sin(float x) { return webcc::sin(x); }\n";
-    out << "inline float cos(float x) { return webcc::cos(x); }\n";
-    out << "inline float tan(float x) { return webcc::tan(x); }\n";
+    out << "inline constexpr double PI = 3.14159265358979323846;\n";
+    out << "inline constexpr double HALF_PI = PI / 2;\n";
+    out << "inline constexpr double TAU = PI * 2;\n";
+    out << "inline constexpr double DEG2RAD = PI / 180;\n";
+    out << "inline constexpr double RAD2DEG = 180 / PI;\n";
+    out << "inline constexpr double E = 2.71828182845904523536;\n";
+    out << "using webcc::abs; using webcc::sqrt; using webcc::floor; using webcc::ceil; using webcc::round; using webcc::trunc;\n";
+    out << "using webcc::min; using webcc::max; using webcc::clamp; using webcc::lerp; using webcc::hypot;\n";
+    out << "using webcc::sin; using webcc::cos; using webcc::tan; using webcc::asin; using webcc::acos; using webcc::atan; using webcc::atan2;\n";
+    out << "using webcc::exp; using webcc::log; using webcc::log2; using webcc::log10; using webcc::pow;\n";
     out << "}\n";
     out << "// Cast helpers backing the builtin toInt/toFloat/toString methods.\n";
     out << "// Overloaded so one inline template stays valid for any receiver type.\n";
@@ -106,6 +106,8 @@ void generate_cpp_code(
     out << "inline double to_float(unsigned long v) { return (double)v; }\n";
     out << "inline double to_float(long long v) { return (double)v; }\n";
     out << "inline double to_float(unsigned long long v) { return (double)v; }\n";
+    out << "inline vector<uint8_t> string_to_bytes(const string& s) { vector<uint8_t> v; v.reserve(s.length()); for (uint32_t i = 0; i < s.length(); i++) v.push_back((uint8_t)s.data()[i]); return v; }\n";
+    out << "inline string string_from_bytes(const vector<uint8_t>& b) { return b.size() ? string((const char*)&b[0], (uint32_t)b.size()) : string(); }\n";
     out << "inline string to_string(const string& s) { return s; }\n";
     out << "inline string to_string(bool v) { return string(v ? \"true\" : \"false\"); }\n";
     out << "template<typename T> inline string to_string(T v) { webcc::formatter<32> f; f << v; return string(f.c_str()); }\n";
@@ -178,10 +180,22 @@ void generate_cpp_code(
     }
     for (const auto &comp : all_components)
     {
+        std::string prefix = qualified_name(comp.module_name, comp.name) + "_";
+        std::set<std::string> local;
+        for (const auto &data_def : comp.data)
+            local.insert(data_def->name);
         for (const auto &data_def : comp.data)
         {
-            // Prefix component-local data types
-            DataTypeRegistry::instance().register_type(qualified_name(comp.module_name, comp.name) + "_" + data_def->name, data_def->fields);
+            // fields naming a sibling local pod get its C++ name
+            std::vector<DataField> fields = data_def->fields;
+            for (auto &f : fields)
+            {
+                bool arr = f.type.ends_with("[]");
+                std::string base = arr ? f.type.substr(0, f.type.size() - 2) : f.type;
+                if (local.count(base))
+                    f.type = prefix + base + (arr ? "[]" : "");
+            }
+            DataTypeRegistry::instance().register_type(prefix + data_def->name, fields);
         }
     }
 
@@ -363,6 +377,18 @@ void generate_cpp_code(
         ComponentTypeContext::instance().clear();
     }
     out << "\n";
+
+    {
+        std::vector<JsonPod> pods;
+        for (const auto &data_def : all_global_data)
+            if (!data_def->source_file.empty())
+                pods.push_back({qualified_name(data_def->module_name, data_def->name), data_def->type_params, data_def->fields});
+        for (const auto &comp : all_components)
+            for (const auto &data_def : comp.data)
+                pods.push_back({qualified_name(comp.module_name, comp.name) + "_" + data_def->name, data_def->type_params, data_def->fields});
+        emit_json_writer_runtime(out);
+        out << generate_json_writers(pods) << "\n";
+    }
 
     // Output field token constants for Meta.has(Type.field)
     if (features.json)
