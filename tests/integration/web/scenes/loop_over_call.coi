@@ -1,0 +1,18 @@
+// a <for> over a method's result: the items must not dangle
+component LoopOverCall {
+    mut int extra = 0;
+    def names() : string[] {
+        mut string[] out = ["alpha", "beta"];
+        for i in 0:extra { out.push(`more${i}`); }
+        return out;
+    }
+    def add() : void { extra++; }
+    view {
+        <div>
+            <button class="add" onclick={add}>add</button>
+            <for n in names() key={n}><span class="n" title={n}>{n}</span></for>
+        </div>
+    }
+}
+
+app { root = LoopOverCall; }

@@ -1221,7 +1221,9 @@ std::string Component::to_webcc(CompilerSession &session)
         ss << "            webcc::dom::remove_element(_old);\n";
         ss << "            _ref = (_idx + 1 < (int)" << elements_vec << ".size()) ? " << elements_vec << "[_idx + 1] : " << anchor_var << ";\n";
         ss << "        }\n";
-        ss << "        auto& " << region.var_name << " = " << region.iterable_expr << "[_idx];\n";
+        // a call like colors() is a temporary: take the item by value
+        bool temp = region.iterable_expr.find('(') != std::string::npos;
+        ss << "        " << (temp ? "auto " : "auto& ") << region.var_name << " = " << region.iterable_expr << "[_idx];\n";
 
         std::string item_code = transform_to_insert_before(region.item_creation_code, parent_var, "_ref");
         ss << indent_code(item_code, "        ");
