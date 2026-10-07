@@ -34,11 +34,12 @@ std::string FunctionDef::to_webcc(const std::string& injected_code) {
     ComponentTypeContext::instance().begin_method_scope();
 
     std::string result = function_signature(*this, name) + " {\n";
+    // the updates run when the method leaves, early returns included
+    if(!injected_code.empty()) {
+        result += "    auto _coi_after = coi::on_exit([&]() {\n" + injected_code + "    });\n";
+    }
     for(auto& stmt : body){
         result += "    " + stmt->to_webcc() + "\n";
-    }
-    if(!injected_code.empty()) {
-        result += injected_code;
     }
     result += "}\n";
 

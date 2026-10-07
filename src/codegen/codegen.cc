@@ -73,6 +73,9 @@ void generate_cpp_code(
     out << "template<typename K, typename V> using map = webcc::unordered_map<K, V>;\n";
     out << "template<typename Signature> using function = webcc::function<Signature>;\n";
     out << "using webcc::move;\n";
+    // view updates after a method, on every return
+    out << "template<typename F> struct OnExit { F f; ~OnExit() { f(); } };\n";
+    out << "template<typename F> OnExit<F> on_exit(F f) { return OnExit<F>{f}; }\n";
     out << "using webcc::malloc;\n";
     out << "namespace math {\n";
     out << "inline constexpr double PI = 3.14159265358979323846;\n";

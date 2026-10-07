@@ -1,0 +1,27 @@
+// a method that returns early still updates the view
+component EarlyReturn {
+    mut int n = 0;
+    mut bool open = false;
+
+    def bump() : void {
+        n++;
+        if (n > 0) return;
+        n = 100;
+    }
+
+    def toggle() : void {
+        open = !open;
+        return;
+    }
+
+    view {
+        <div>
+            <button class="bump" onclick={bump}>bump</button>
+            <button class="toggle" onclick={toggle}>toggle</button>
+            <p class="n">{n}</p>
+            <if open><p class="open">open</p></if>
+        </div>
+    }
+}
+
+app { root = EarlyReturn; }

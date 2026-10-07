@@ -27,6 +27,7 @@ get_property
 request_fullscreen
 request_pointer_lock
 scroll_to_top
+exec_command
 
 [canvas]
 create_canvas
