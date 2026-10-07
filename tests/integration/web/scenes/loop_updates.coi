@@ -1,4 +1,4 @@
-// pop, two loops over one array, component array assigned inside an open <if>
+// pop, index assign, remove, two loops over one array, component array assigned inside an open <if>
 component Chip(pub string label) {
     view { <span class="chip">{label}</span> }
 }
@@ -12,6 +12,9 @@ component LoopUpdates {
     def pop() : void { words.pop(); }
     def push() : void { next++; words.push(`n${next}`); }
     def replace() : void { words = ["x", "y"]; }
+    def rename() : void { words[0] = "r"; }
+    def dropFirst() : void { words.remove(0); }
+    def dropChip() : void { chips.remove(1); }
     def setChips() : void { chips = [Chip("one"), Chip("two"), Chip("three")]; }
     def toggle() : void { open = !open; }
 
@@ -20,6 +23,9 @@ component LoopUpdates {
             <button class="pop" onclick={pop}>pop</button>
             <button class="push" onclick={push}>push</button>
             <button class="replace" onclick={replace}>replace</button>
+            <button class="rename" onclick={rename}>rename</button>
+            <button class="dropfirst" onclick={dropFirst}>drop</button>
+            <button class="dropchip" onclick={dropChip}>dropchip</button>
             <button class="chips" onclick={setChips}>chips</button>
             <button class="toggle" onclick={toggle}>toggle</button>
             <p class="first"><for w in words key={w}><i>{w}</i></for></p>

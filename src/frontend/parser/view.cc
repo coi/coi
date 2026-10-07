@@ -206,6 +206,8 @@ std::unique_ptr<ASTNode> Parser::parse_html_element()
 
     std::string tag = current().value;
     expect(TokenType::IDENTIFIER, "Expected tag name");
+    if (component_member_types.count(tag) && !DefSchema::instance().is_handle(component_member_types.at(tag)))
+        throw std::runtime_error("'" + tag + "' is a component member: write <{" + tag + "} /> at line " + std::to_string(start_line));
     // Special tag: <raw> - raw HTML injection
     if (tag == "raw")
     {

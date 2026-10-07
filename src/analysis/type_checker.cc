@@ -3482,10 +3482,16 @@ void validate_view_hierarchy(const std::vector<Component> &components,
                     }
                 }
 
+                // a member built in code (mut Board board = Board(&page)) got its refs there
+                bool constructed = false;
+                if (comp_inst->is_member_reference && parent_comp)
+                    for (const auto &var : parent_comp->state)
+                        if (var->name == comp_inst->member_name && var->initializer)
+                            constructed = true;
                 // Check for missing required reference params
                 for (const auto &declared_param : target_comp->params)
                 {
-                    if (declared_param->is_reference && passed_param_names.find(declared_param->name) == passed_param_names.end())
+                    if (!constructed && declared_param->is_reference && passed_param_names.find(declared_param->name) == passed_param_names.end())
                     {
                         throw std::runtime_error("Missing required reference parameter '&" + declared_param->name + "' for component '" + comp_inst->component_name + "' at line " + std::to_string(comp_inst->line));
                     }

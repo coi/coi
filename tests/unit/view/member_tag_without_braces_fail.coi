@@ -1,0 +1,9 @@
+// Test: a member component needs <{name} />, a bare <name /> is an error
+component Child { view { <p>c</p> } }
+
+component App {
+    mut Child child;
+    view { <div><child /></div> }
+}
+
+app { root = App; }

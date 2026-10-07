@@ -17,6 +17,10 @@ export async function run({ page }) {
   await expectBoth(page, "abn1");
   await page.locator(".replace").click();
   await expectBoth(page, "xy");
+  await page.locator(".rename").click();
+  await expectBoth(page, "ry");
+  await page.locator(".dropfirst").click();
+  await expectBoth(page, "y");
 
   await page.locator(".chips").click();
   await page.waitForFunction(() => document.querySelectorAll(".chipbox .chip").length === 3)
@@ -25,6 +29,9 @@ export async function run({ page }) {
   await page.locator(".toggle").click();
   await page.waitForFunction(() => document.querySelectorAll(".chipbox .chip").length === 3)
     .catch(async () => { throw new Error(`chips after reopening: ${await page.locator(".chipbox .chip").count()}`); });
+  await page.locator(".dropchip").click();
+  await page.waitForFunction(() => Array.from(document.querySelectorAll(".chipbox .chip")).map((c) => c.textContent).join(",") === "one,three")
+    .catch(async () => { throw new Error(`chips after remove: ${await page.locator(".chipbox").textContent()}`); });
   await page.locator(".chips").click();
   await page.waitForFunction(() => document.querySelectorAll(".chipbox .chip").length === 3)
     .catch(async () => { throw new Error(`chips after second assign: ${await page.locator(".chipbox .chip").count()}`); });

@@ -1,0 +1,18 @@
+// Test: a member built with its refs in code is projected without repeating them
+pod Doc { string title; }
+
+component Board(mut Doc& doc, def onChanged : void) {
+    pub def reload() : void { onChanged(); }
+    view { <p>{doc.title}</p> }
+}
+
+component App {
+    mut Doc doc = Doc{title = "t"};
+    mut Board board = Board(&doc, &changed);
+    mut int n = 0;
+    def changed() : void { n++; }
+    def load() : void { doc = Doc{title = "b"}; board.reload(); }
+    view { <div><button onclick={load}>load</button><{board} /><p>{n}</p></div> }
+}
+
+app { root = App; }

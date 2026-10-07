@@ -261,16 +261,19 @@ std::string IndexAssignment::to_webcc()
         }
     }
 
-    if (compound_op.empty())
+    std::string arr = array->to_webcc();
+    std::string idx = index->to_webcc();
+    std::string result = compound_op.empty() ? arr + "[" + idx + "] = " + val + ";"
+                                             : arr + "[" + idx + "] = " + arr + "[" + idx + "] " + compound_op + " " + val + ";";
+    // pages[i] = info: the <for> over pages shows the new item
+    if (auto id = dynamic_cast<Identifier *>(array.get()))
     {
-        return array->to_webcc() + "[" + index->to_webcc() + "] = " + val + ";";
+        auto hl = g_array_loops.find(id->name);
+        if (hl != g_array_loops.end())
+            for (const auto &loop : hl->second)
+                result += "\n_sync_loop_" + std::to_string(loop.loop_id) + "();";
     }
-    else
-    {
-        std::string arr = array->to_webcc();
-        std::string idx = index->to_webcc();
-        return arr + "[" + idx + "] = " + arr + "[" + idx + "] " + compound_op + " " + val + ";";
-    }
+    return result;
 }
 
 void IndexAssignment::collect_dependencies(std::set<std::string> &deps)
@@ -439,6 +442,19 @@ std::string ExpressionStatement::to_webcc()
                     result += "}\n";
                     return result;
                 }
+                else if (method == "remove" && call->args.size() == 1)
+                {
+                    // items after the hole move, their handlers point at the old slots
+                    std::string count_var = "_loop_" + std::to_string(info.loop_id) + "_count";
+                    result = "{ int _at = " + call->args[0].value->to_webcc() + ";\n";
+                    result += "if (_at >= 0 && _at < (int)" + arr_name + ".size()) {\n";
+                    result += "    " + arr_name + "[_at]._remove_view();\n";
+                    result += "    " + arr_name + ".remove(_at);\n";
+                    result += "    for (int _i = _at; _i < (int)" + arr_name + ".size(); _i++) " + arr_name + "[_i]._rebind();\n";
+                    result += "    if (" + count_var + " > 0) " + count_var + "--;\n";
+                    result += "} }\n";
+                    return result;
+                }
                 else if (method == "clear" && call->args.empty())
                 {
                     // arr.clear() -> unregister handlers then clear DOM and array
@@ -484,6 +500,13 @@ std::string ExpressionStatement::to_webcc()
                         result += "}\n";
                     }
                     result += "}\n";
+                    return result;
+                }
+                else if (method == "remove" && call->args.size() == 1)
+                {
+                    result = arr_name + ".remove(" + call->args[0].value->to_webcc() + ");";
+                    for (const auto &info : loops)
+                        result += "\n_sync_loop_" + std::to_string(info.loop_id) + "();";
                     return result;
                 }
                 else if (method == "pop" && call->args.empty())
