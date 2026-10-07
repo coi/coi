@@ -1,0 +1,11 @@
+// Test: charAt gives the byte 0-255, so UTF-8 lead bytes compare as positive
+component App {
+    mut bool nb = false;
+    init {
+        string s = "a b";
+        nb = s.charAt(1) == 194 && s.charAt(2) == 160;
+    }
+    view { <p>{nb}</p> }
+}
+
+app { root = App; }
