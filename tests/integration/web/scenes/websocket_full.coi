@@ -1,0 +1,52 @@
+// WebSocket against a real server (started by the test, its address in ?ws=): subprotocol
+// negotiation, text and binary both ways, state getters, and a close with code and reason.
+component WebSocketFull {
+    mut WebSocket ws;
+    mut string opened = "-";
+    mut string echoed = "-";
+    mut string binary = "-";
+    mut string closed = "-";
+    mut string stateAfter = "-";
+
+    def onOpen() : void {
+        bool open = ws.getReadyState() == ReadyState::Open;
+        opened = `${open.toString()} ${ws.getProtocol()}`;
+        ws.send("hello");
+        ws.sendBinary([1, 2, 250]);
+    }
+
+    def onText(string msg) : void {
+        echoed = msg;
+        ws.send("close please");
+    }
+
+    def onBinary(uint8[] data) : void {
+        mut int sum = 0;
+        for b in data { sum += b; }
+        binary = `${data.size()} bytes, sum ${sum}`;
+    }
+
+    def onClosed(CloseEvent e) : void {
+        closed = `${e.code} ${e.reason} ${e.wasClean}`;
+        stateAfter = ws.isConnected() ? "connected" : "not connected";
+    }
+
+    mount {
+        string url = System.getQueryParam("ws");
+        if (url.isEmpty()) return;
+        ws = WebSocket.connect(url, "chat, other", &onOpen = onOpen, &onMessage = onText,
+                               &onBinaryMessage = onBinary, &onClose = onClosed);
+    }
+
+    view {
+        <div>
+            <p class="opened">{opened}</p>
+            <p class="echoed">{echoed}</p>
+            <p class="binary">{binary}</p>
+            <p class="closed">{closed}</p>
+            <p class="after">{stateAfter}</p>
+        </div>
+    }
+}
+
+app { root = WebSocketFull; }

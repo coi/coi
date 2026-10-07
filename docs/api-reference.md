@@ -826,16 +826,22 @@ Real-time bidirectional communication with WebSocket servers. An owned `WebSocke
 | Method | Description |
 |--------|-------------|
 | `WebSocket.connect(url, protocols="", &onMessage=..., &onOpen=..., &onClose=..., &onError=...)` | Create connection with callback handlers |
-| `send(string msg)` | Send message (dropped unless the socket is open) |
-| `close()` | Close connection |
+| `send(string msg)` | Send a text message (dropped unless the socket is open) |
+| `sendBinary(uint8[] data)` | Send a binary message; returns 1 if the socket was open |
+| `close()`, `closeWithCode(int code, string reason)` | Close; the code is 1000 or 3000-4999 |
 | `isConnected()` | True while the socket is open (not connecting, closing or closed) |
-| `onMessage(&h)`, `onOpen(&h)`, `onClose(&h)`, `onError(&h)` | Bind a callback after connecting |
+| `getReadyState()` | `ReadyState::Connecting`, `Open`, `Closing` or `Closed` |
+| `getProtocol()`, `getExtensions()`, `getUrl()`, `getBufferedAmount()` | What the server picked, the resolved URL, bytes queued by sends |
+| `onMessage(&h)`, `onBinaryMessage(&h)`, `onOpen(&h)`, `onClose(&h)`, `onError(&h)` | Bind a callback after connecting |
+
+`protocols` is a comma-separated list of subprotocols to offer (`"chat, superchat"`); `getProtocol()` tells which one the server chose.
 
 ### Events
 
 | Event | Handler parameters | When |
 |-------|--------------------|------|
 | `onMessage` | `string msg` | A text message arrived |
+| `onBinaryMessage` | `uint8[] data` | A binary message arrived |
 | `onOpen` | none | The connection is open |
 | `onClose` | `int code, string reason, uint8 wasClean` | The connection closed. Always the last event, also after an error; afterwards the socket's callbacks are released |
 | `onError` | none | The connection failed. The browser sends `onClose` right after |
