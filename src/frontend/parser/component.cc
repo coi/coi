@@ -118,7 +118,9 @@ std::unique_ptr<DataDef> Parser::parse_data()
         }
 
         std::string fieldName = current().value;
-        expect(TokenType::IDENTIFIER, "Expected field name");
+        if (!is_identifier_token())
+            expect(TokenType::IDENTIFIER, "Expected field name");
+        advance();
         expect(TokenType::SEMICOLON, "Expected ';'");
 
         def->fields.push_back({type, fieldName});
@@ -1198,7 +1200,9 @@ FunctionDef Parser::parse_function_def(bool is_public)
     func.is_public = is_public;
     func.name = current().value;
     int func_line = current().line;
-    expect(TokenType::IDENTIFIER, "Expected function name");
+    if (!is_identifier_token())
+        expect(TokenType::IDENTIFIER, "Expected function name");
+    advance();
 
     // Method names must start with lowercase (to distinguish from component/type construction)
     if (!func.name.empty() && std::isupper(func.name[0]))

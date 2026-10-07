@@ -1,0 +1,11 @@
+// Test: key and data are usable as method names
+component App {
+    mut int n = 0;
+    def key(int k) : void { n = k; }
+    def data() : int { return n; }
+    pod Row { int key; string data; }
+    def go() : void { key(3); n = data(); Row r = Row{key = 1, data = "d"}; n = r.key + r.data.length(); }
+    view { <button onclick={go}>{n}</button> }
+}
+
+app { root = App; }

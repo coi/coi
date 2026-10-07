@@ -190,7 +190,7 @@ std::unique_ptr<Expression> Parser::parse_postfix()
             advance();
             expr = std::make_unique<PostfixOp>(std::move(expr), "--");
         }
-        else if (current().type == TokenType::DOT && peek().type == TokenType::IDENTIFIER)
+        else if (current().type == TokenType::DOT && (peek().type == TokenType::IDENTIFIER || peek().type == TokenType::KEY))
         {
             // "abc".at(0), (a + b).x; names chain in parse_primary
             advance();
@@ -465,7 +465,9 @@ std::unique_ptr<Expression> Parser::parse_primary()
             {
                 advance();
                 std::string member = current().value;
-                expect(TokenType::IDENTIFIER, "Expected member name");
+                if (!is_identifier_token())
+                    expect(TokenType::IDENTIFIER, "Expected member name");
+                advance();
 
                 // Check for Component.EnumName::Value syntax for shared enums
                 if (current().type == TokenType::DOUBLE_COLON)
