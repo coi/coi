@@ -19,8 +19,8 @@ component DataRoundtrip {
     }
 
     def gotValue(Blob value, uint8 found) : void {
-        string text = string.fromBytes(value.take());
-        match (Json.parse(Page, text)) {
+        // the argument is a temporary: the parser must keep it alive
+        match (Json.parse(Page, string.fromBytes(value.take()))) {
             Success(Page p, PageMeta meta) => {
                 result = same(p) ? "same" : `differs: ${Json.stringify(p)}`;
             };

@@ -278,7 +278,8 @@ static std::string generate_json_parse_array(
     
     std::stringstream ss;
     ss << "[&]() {\n";
-    ss << "            coi::string_view _json = " << json_expr << ";\n";
+    ss << "            const coi::string& _json_str = (" << json_expr << ");\n"
+       << "            coi::string_view _json = _json_str;\n";
     ss << "            const char* _s = _json.data();\n";
     ss << "            uint32_t _len = _json.length();\n";
     ss << "            struct __JsonParseResult {\n";
@@ -341,7 +342,8 @@ std::string generate_json_parse(
     
     std::stringstream ss;
     ss << "[&]() {\n";
-    ss << "            coi::string_view _json = " << json_expr << ";\n";
+    ss << "            const coi::string& _json_str = (" << json_expr << ");\n"
+       << "            coi::string_view _json = _json_str;\n";
     ss << "            const char* _s = _json.data();\n";
     ss << "            uint32_t _len = _json.length();\n";
     ss << "            struct __JsonParseResult {\n";
