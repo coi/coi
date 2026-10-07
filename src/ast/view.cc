@@ -528,6 +528,7 @@ void HTMLElement::generate_code(ViewCodegenContext& ctx)
 {
     int my_id = ctx.counter++;
     std::string var;
+    std::string select_value;
 
     bool has_scoped_css = g_components_with_scoped_css.count(ctx.parent_component_name) > 0;
 
@@ -703,7 +704,11 @@ void HTMLElement::generate_code(ViewCodegenContext& ctx)
         else
         {
             std::string val = attr.value->to_webcc();
-            ctx.ss << "        webcc::dom::set_attribute(" << var << ", \"" << attr.name << "\", " << val << ");\n";
+            // a select's value only takes once its options exist, and only as a property
+            if (tag == "select" && attr.name == "value")
+                select_value = val;
+            else
+                ctx.ss << "        webcc::dom::set_attribute(" << var << ", \"" << attr.name << "\", " << val << ");\n";
 
             if (!attr.value->is_static() && !ctx.in_loop)
             {
@@ -750,6 +755,8 @@ void HTMLElement::generate_code(ViewCodegenContext& ctx)
             auto child_ctx = ctx.with_parent(var);
             generate_view_child(child.get(), child_ctx);
         }
+        if (!select_value.empty())
+            ctx.ss << "        webcc::dom::set_property(" << var << ", \"value\", " << select_value << ");\n";
     }
     else
     {

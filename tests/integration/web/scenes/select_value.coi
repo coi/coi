@@ -1,0 +1,17 @@
+// a select shows its bound value from the first render
+component SelectValue {
+    mut string size = "16";
+    def pick(string v) : void { size = v; }
+    def bump() : void { size = "24"; }
+    view {
+        <div>
+            <select value={size} onchange={pick}>
+                <option value="12">12</option><option value="16">16</option><option value="24">24</option>
+            </select>
+            <button class="bump" onclick={bump}>bump</button>
+            <p class="size">{size}</p>
+        </div>
+    }
+}
+
+app { root = SelectValue; }
