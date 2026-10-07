@@ -20,6 +20,7 @@ add_focus_listener +listen(FOCUS, BLUR)
 add_drop_listener +listen(DROP)
 # text boxes over a canvas
 set_style
+set_inner_html
 focus
 blur
 get_property
