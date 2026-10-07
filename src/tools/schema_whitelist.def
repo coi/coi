@@ -204,6 +204,8 @@ close
 write_text
 # pastes outside text fields
 init_paste +listen(PASTE_TEXT, PASTE_IMAGE) prevent_default=1
+# every paste, editors too, as html and text
+init_paste_rich +listen(PASTE_RICH)
 
 [files]
 # needs a click or key handler, one OPENED per file
