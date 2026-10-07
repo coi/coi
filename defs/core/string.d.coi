@@ -10,6 +10,9 @@ type string {
     @inline("(int32_t)(${this}[${0}])")
     def charAt(int index): int
 
+    @inline("${this}.at(${0})")
+    def at(int index): string
+
     @inline("${this}.substr(${0})")
     def subStr(int start): string
 

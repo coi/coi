@@ -1,0 +1,9 @@
+// Test: string.at(i)
+component App {
+    mut string word = "Hello";
+    mut string first = "";
+    init { first = word.at(0); }
+    view { <p>{first}</p> }
+}
+
+app { root = App; }

@@ -176,6 +176,7 @@ string t = "Hello, World!";
 int len   = t.length();       // length (NOTE: arrays use .size())
 bool empty= t.isEmpty();
 int ch    = t.charAt(0);      // character CODE (int) at index
+string c  = t.at(0);          // "H", one-char string ("" past the end)
 string a  = t.subStr(7);      // from index to end
 string b  = t.subStr(0, 5);   // from index, given length -> "Hello"
 bool has  = t.contains("World");

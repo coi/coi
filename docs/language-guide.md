@@ -273,6 +273,7 @@ bool empty = text.isEmpty();  // Check if empty
 
 // Access
 int ch = text.charAt(0);      // Get character code at index
+string c = text.at(0);        // "H" - one-character string, "" past the end
 
 // Substrings
 string sub = text.subStr(7);      // "World!" - from index to end

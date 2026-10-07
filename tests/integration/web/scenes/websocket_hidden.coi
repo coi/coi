@@ -1,0 +1,32 @@
+// socket messages in a hidden tab, address in ?ws=
+component WebSocketHidden {
+    mut WebSocket ws;
+    mut int count = 0;
+    mut int bytes = 0;
+
+    def onOpen() : void { ws.send("burst 3 10"); }
+
+    def onText(string msg) : void {
+        count++;
+        bytes += msg.length();
+    }
+
+    def connect() : void {
+        ws = WebSocket.connect(System.getQueryParam("ws"), &onOpen = onOpen, &onMessage = onText);
+    }
+
+    def burst() : void { ws.send("burst 30 60000"); }
+    def poke() : void {}
+
+    view {
+        <div>
+            <button class="connect" onclick={connect}>connect</button>
+            <button class="burst" onclick={burst}>burst</button>
+            <button class="poke" onclick={poke}>poke</button>
+            <p class="count">{count}</p>
+            <p class="bytes">{bytes}</p>
+        </div>
+    }
+}
+
+app { root = WebSocketHidden; }
