@@ -1235,6 +1235,9 @@ void ViewForRangeStatement::generate_code(ViewCodegenContext& ctx)
 
     start->collect_dependencies(region.dependencies);
     end->collect_dependencies(region.dependencies);
+    for (auto &child : children)
+        child->collect_dependencies(region.dependencies);
+    region.dependencies.erase(var_name);
 
     ComponentInstantiation *loop_component = nullptr;
     HTMLElement *loop_html_element = nullptr;
@@ -1346,7 +1349,9 @@ void ViewForEachStatement::generate_code(ViewCodegenContext& ctx)
     region.var_name = var_name;
     region.iterable_expr = iterable->to_webcc();
 
-    iterable->collect_dependencies(region.dependencies);
+    // the body's values too (class={p.id == active}), not just the array
+    collect_dependencies(region.dependencies);
+    region.dependencies.erase(var_name);
 
     ComponentInstantiation *loop_component = nullptr;
     HTMLElement *loop_html_element = nullptr;

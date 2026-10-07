@@ -686,18 +686,16 @@ Component Parser::parse_component()
                     throw std::runtime_error("Expected param type");
                 }
 
-                // Handle reference type
-                if (current().type == TokenType::AMPERSAND)
-                {
-                    param->is_reference = true;
-                    advance();
-                }
-
-                // Handle array type or map type
+                // Info[]& pages, Info& p
                 if (current().type == TokenType::LBRACKET)
                 {
                     advance();
                     param->type += parse_type_bracket_suffix();
+                }
+                if (current().type == TokenType::AMPERSAND)
+                {
+                    param->is_reference = true;
+                    advance();
                 }
 
                 param->name = current().value;

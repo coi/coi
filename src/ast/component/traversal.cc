@@ -45,14 +45,15 @@ void Component::collect_child_updates(ASTNode *node, std::map<std::string, std::
 
         for (const auto &prop : comp->props)
         {
-            if (prop.is_reference)
+            if (prop.is_callback || prop.is_move || !prop.value)
+                continue;
+            std::set<std::string> deps;
+            prop.value->collect_dependencies(deps);
+            // a reference already points at the parent's value; a value prop is copied again
+            std::string assign = prop.is_reference ? "" : instance_name + "." + prop.name + " = " + prop.value->to_webcc() + "; ";
+            for (const auto &dep : deps)
             {
-                std::set<std::string> deps;
-                prop.value->collect_dependencies(deps);
-                for (const auto &dep : deps)
-                {
-                    updates[dep].push_back("        " + instance_name + "._update_" + prop.name + "();\n");
-                }
+                updates[dep].push_back("        " + assign + instance_name + "._refresh_" + prop.name + "();\n");
             }
         }
     }

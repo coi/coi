@@ -1,0 +1,31 @@
+// a child's props follow the parent: array by reference, a value prop used inside its <for>
+pod Info { string id; string title; }
+
+component Sidebar(mut Info[]& pages, string active, def onOpen(string) : void) {
+    view {
+        <nav>
+            <for p in pages key={p.id}>
+                <button class={p.id == active ? "item on" : "item"} onclick={onOpen(p.id)}>{p.title}</button>
+            </for>
+        </nav>
+    }
+}
+
+component App {
+    mut Info[] pages = [Info{id = "a", title = "A"}];
+    mut string active = "a";
+    def open(string id) : void { active = id; }
+    def add() : void { pages.push(Info{id = `p${pages.size()}`, title = `P${pages.size()}`}); }
+    def rename() : void { mut Info i = pages[0]; i.title = "Renamed"; pages[0] = i; }
+    def reset() : void { pages = [Info{id = "z", title = "Z"}]; }
+    view {
+        <div>
+            <button class="add" onclick={add}>add</button>
+            <button class="rename" onclick={rename}>rename</button>
+            <button class="reset" onclick={reset}>reset</button>
+            <Sidebar &pages={pages} active={active} &onOpen={open} />
+            <p class="active">{active}</p>
+        </div>
+    }
+}
+app { root = App; }

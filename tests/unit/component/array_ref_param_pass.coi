@@ -1,0 +1,16 @@
+// Test: an array passed by reference
+pod Info { string id; }
+
+component List(mut Info[]& items, def onPick(string) : void) {
+    def add() : void { items.push(Info{id = "n"}); }
+    view { <div><for i in items key={i.id}><button onclick={onPick(i.id)}>{i.id}</button></for><button onclick={add}>+</button></div> }
+}
+
+component App {
+    mut Info[] items = [Info{id = "a"}];
+    mut string picked = "";
+    def pick(string id) : void { picked = id; }
+    view { <div><List &items={items} &onPick={pick} /><p>{picked}</p></div> }
+}
+
+app { root = App; }

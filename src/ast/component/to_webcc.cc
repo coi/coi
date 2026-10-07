@@ -1421,6 +1421,22 @@ std::string Component::to_webcc(CompilerSession &session)
         ss << "    }\n";
     }
 
+    // _refresh_<param>: what a parent calls after changing something the param refers to.
+    // _update_ only redoes bindings; regions are synced by the method epilogue, which the
+    // parent's change never runs here.
+    for (const auto &param : params)
+    {
+        const std::string &v = param->name;
+        ss << "    void _refresh_" << v << "() {";
+        if (generated_updaters.count(v))
+            ss << " _update_" << v << "();";
+        for (int if_id : var_to_if_ids[v])
+            ss << " _sync_if_" << if_id << "();";
+        for (int loop_id : var_to_loop_ids[v])
+            ss << " _sync_loop_" << loop_id << "();";
+        ss << " }\n";
+    }
+
     // Build child updates map
     std::map<std::string, std::vector<std::string>> child_updates;
     std::map<std::string, int> update_counters;
@@ -1446,7 +1462,7 @@ std::string Component::to_webcc(CompilerSession &session)
             if (!ctor->args[i].is_reference || !id || !it->second.ref_params.count(param))
                 continue;
             member_refs.push_back({var->name, param, id->name});
-            child_updates[id->name].push_back("        " + var->name + "._update_" + param + "();\n");
+            child_updates[id->name].push_back("        " + var->name + "._refresh_" + param + "();\n");
         }
     }
 
