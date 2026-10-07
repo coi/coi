@@ -4,7 +4,7 @@ component ArrayFunctionTest {
     mut int total = 0;
 
     def sumArray() : int {
-        int result = 0;
+        mut int result = 0;
         for val in data {
             result = result + val;
         }

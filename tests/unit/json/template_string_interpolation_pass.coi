@@ -11,7 +11,7 @@ component TemplateStringTest {
     mut int count = 0;
 
     def handleSuccess(Show[] shows, ShowMeta[] metas) : void {
-        count = shows.length();
+        count = shows.size();
         if (count > 0) {
             result = "Parsed ${count} shows: ${shows[0].title}";
         } else {

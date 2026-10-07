@@ -762,9 +762,9 @@ component ShowList {
         match (Json.parse(Show[], jsonData)) {
             Success(Show[] parsedShows, ShowMeta[] metas) => {
                 shows = parsedShows;
-                status = "Loaded {parsedShows.length()} shows";
+                status = "Loaded {parsedShows.size()} shows";
                 // Each element has its own meta
-                for (int i = 0; i < metas.length(); i++) {
+                for i in 0:metas.size() {
                     if (metas[i].has_title()) {
                         // shows[i].title was present
                     }

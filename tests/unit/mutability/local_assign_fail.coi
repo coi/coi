@@ -1,0 +1,12 @@
+// Test: a local without mut can't be assigned or compound-assigned (it's const in C++)
+component LocalAssignFail {
+    mut int[] xs;
+    mut int out = 0;
+    def sum() : void {
+        int total = 0;
+        for x in xs { total += x; }
+        out = total;
+    }
+    view { <p>{out}</p> }
+}
+app { root = LocalAssignFail; }

@@ -1,0 +1,8 @@
+// Test: arrays have size(), not length()
+component ArrayMissingMethodFail {
+    mut int[] xs;
+    mut int n = 0;
+    def f() : void { n = xs.length(); }
+    view { <p>{n}</p> }
+}
+app { root = ArrayMissingMethodFail; }

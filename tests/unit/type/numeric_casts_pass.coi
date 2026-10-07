@@ -8,7 +8,7 @@ component NumericCasts {
         int i = 42;
         float widened = i.toFloat();
 
-        string s = "123";
+        mut string s = "123";
         int parsed = s.toInt();
         s = "4.5";
         float parsedFloat = s.toFloat();

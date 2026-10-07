@@ -1102,6 +1102,27 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                 }
             }
             
+            // Strings and arrays only have the methods their core defs declare; anything
+            // else would only fail later, in the C++ build
+            auto builtin_method_error = [&](const std::string &kind) {
+                const TypeDef *td = DefSchema::instance().lookup_type(kind);
+                std::set<std::string> names;
+                if (td)
+                    for (const auto &m : td->methods)
+                        if (!m.is_shared)
+                            names.insert(m.name);
+                std::string list;
+                for (const auto &n : names)
+                    list += (list.empty() ? "" : ", ") + n;
+                std::string what = kind == "array" ? "An array" : "A string";
+                if (!names.count(method_name))
+                    ErrorHandler::type_error(what + " has no method '" + method_name + "' (available: " + list + ")", func->line);
+                else
+                    ErrorHandler::type_error("'" + method_name + "' on " + (kind == "array" ? "an array" : "a string") +
+                                             " doesn't take " + std::to_string(func->args.size()) + " argument(s)", func->line);
+                exit(1);
+            };
+
             // Use DefSchema for array method lookups
             if (is_dynamic_array || is_fixed_array)
             {
@@ -1110,10 +1131,12 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                         return method_def->return_type.empty() ? "void" : normalize_type(method_def->return_type);
                     }
                 }
+                if (!DefSchema::instance().lookup_method("array", method_name, func->args.size()))
+                    builtin_method_error("array");
             }
             
             // Use DefSchema for string method lookups
-            if (obj_type == "string")
+            if (normalize_type(obj_type) == "string")
             {
                 if (auto* method_def = DefSchema::instance().lookup_method("string", method_name)) {
                     if (method_def->params.size() == func->args.size() ||
@@ -1122,6 +1145,9 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                         return method_def->return_type.empty() ? "void" : normalize_type(method_def->return_type);
                     }
                 }
+                if (auto *m = DefSchema::instance().lookup_method("string", method_name, func->args.size()))
+                    return m->return_type.empty() ? "void" : normalize_type(m->return_type);
+                builtin_method_error("string");
             }
 
             // Use DefSchema for other builtin-type instance methods
@@ -1731,6 +1757,24 @@ static void check_function_body(const FunctionDef &method, const Component *comp
         }
         else if (auto assign = dynamic_cast<Assignment *>(stmt.get()))
         {
+            // A local or parameter declared without mut is const in C++, so `t = 1` and
+            // `t += 1` must be stopped here (component state has its own check)
+            bool is_state = false;
+            if (comp)
+            {
+                for (const auto &v : comp->state) if (v->name == assign->name) is_state = true;
+                for (const auto &v : comp->params) if (v->name == assign->name) is_state = true;
+            }
+            bool is_ref_param = false;
+            for (const auto &p : method.params) if (p.name == assign->name && p.is_reference) is_ref_param = true;
+            if (!is_state && !is_ref_param && current_scope.count(assign->name) && !mutable_vars.count(assign->name))
+            {
+                ErrorHandler::type_error(
+                    "Cannot modify immutable variable '" + assign->name + "'. Declare it as 'mut' to modify it",
+                    assign->line);
+                exit(1);
+            }
+
             // Check if the target variable itself was moved
             if (moved_vars.count(assign->name)) {
                 ErrorHandler::type_error(

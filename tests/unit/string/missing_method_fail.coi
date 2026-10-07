@@ -1,0 +1,7 @@
+// Test: a string method that doesn't exist is a type error, not a C++ build error
+component StringMissingMethodFail {
+    mut string s = "a-b";
+    def f() : void { s = s.replace("-", "+"); }
+    view { <p>{s}</p> }
+}
+app { root = StringMissingMethodFail; }

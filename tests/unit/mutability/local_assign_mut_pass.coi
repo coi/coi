@@ -1,0 +1,13 @@
+// Test: a mut local can be assigned and compound-assigned, also in nested blocks
+component LocalAssignMutPass {
+    mut int[] xs;
+    mut int out = 0;
+    def sum(int start) : void {
+        mut int total = start;
+        for x in xs { total += x; }
+        if (total > 10) { total = 10; }
+        out = total;
+    }
+    view { <p>{out}</p> }
+}
+app { root = LocalAssignMutPass; }
