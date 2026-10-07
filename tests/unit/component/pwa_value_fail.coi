@@ -1,0 +1,11 @@
+// Test: app.pwa only takes true or false
+component PwaValueFail {
+    view {
+        <div></div>
+    }
+}
+
+app {
+    root = PwaValueFail;
+    pwa = "yes";
+}

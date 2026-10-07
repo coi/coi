@@ -99,6 +99,12 @@ struct AppConfig {
     // app { tick = demand; }: no frame loop. tick runs once per frame the app
     // asked for (an event arrived or System.requestFrame() was called).
     bool tick_on_demand = false;
+    // app { pwa = true; }: manifest.webmanifest + sw.js for offline use and install
+    bool pwa = false;
+    // Path in the output dir (e.g. "assets/icon.png"): favicon and manifest icon
+    std::string icon;
+    // CSS color for the browser UI (theme-color, manifest theme/background)
+    std::string theme;
 };
 
 // Per-event bitmask over element ids, stored as 64-bit words (word el>>6,

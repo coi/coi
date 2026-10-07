@@ -485,6 +485,26 @@ void Parser::parse_app()
             app_config.base = current().value;
             expect(TokenType::STRING_LITERAL, "Expected string");
         }
+        else if (key == "pwa")
+        {
+            if (current().type == TokenType::TRUE)
+                app_config.pwa = true;
+            else if (current().type == TokenType::FALSE)
+                app_config.pwa = false;
+            else
+                ErrorHandler::compiler_error("app.pwa must be true or false", current().line);
+            advance();
+        }
+        else if (key == "icon")
+        {
+            app_config.icon = current().value;
+            expect(TokenType::STRING_LITERAL, "Expected string");
+        }
+        else if (key == "theme")
+        {
+            app_config.theme = current().value;
+            expect(TokenType::STRING_LITERAL, "Expected string");
+        }
         else if (key == "tick")
         {
             std::string mode = current().value;

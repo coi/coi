@@ -1,0 +1,14 @@
+// Test: app block accepts pwa, icon and theme
+component PwaPass {
+    view {
+        <div>offline</div>
+    }
+}
+
+app {
+    root = PwaPass;
+    title = "Notes";
+    pwa = true;
+    icon = "assets/icon.png";
+    theme = "#0b3d2e";
+}

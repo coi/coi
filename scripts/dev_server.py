@@ -27,6 +27,14 @@ sse_lock = threading.Lock()
 reload_event = threading.Event()
 
 
+DEV_SERVICE_WORKER = b"""// coi dev: removes the service worker of a PWA build and its caches
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', (e) => e.waitUntil(caches.keys()
+    .then((keys) => Promise.all(keys.filter((k) => k.startsWith('coi-')).map((k) => caches.delete(k))))
+    .then(() => self.registration.unregister())));
+"""
+
+
 class DevHandler(http.server.SimpleHTTPRequestHandler):
     """HTTP handler with SPA routing and optional hot reload support."""
     
@@ -41,10 +49,16 @@ class DevHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_sse()
             return
         
+        # A PWA build's service worker would serve cached files and hide your edits.
+        # Answer with one that removes itself (and any worker left from a real build).
+        if self.path.split('?')[0].endswith('/sw.js'):
+            self.serve_bytes(DEV_SERVICE_WORKER, 'text/javascript')
+            return
+
         path = self.translate_path(self.path)
         
         if os.path.isfile(path):
-            if path.endswith('.html') and hot_reload_enabled:
+            if path.endswith('.html'):
                 self.serve_html_with_reload(path)
             else:
                 super().do_GET()
@@ -54,18 +68,27 @@ class DevHandler(http.server.SimpleHTTPRequestHandler):
         self.path = '/index.html'
         index_path = self.translate_path(self.path)
         if os.path.isfile(index_path):
-            if hot_reload_enabled:
-                self.serve_html_with_reload(index_path)
-            else:
-                super().do_GET()
+            self.serve_html_with_reload(index_path)
         else:
             self.send_error(404)
+
+    def serve_bytes(self, content, content_type):
+        self.send_response(200)
+        self.send_header('Content-Type', content_type)
+        self.send_header('Content-Length', len(content))
+        self.send_header('Cache-Control', 'no-cache')
+        self.end_headers()
+        self.wfile.write(content)
     
     def serve_html_with_reload(self, path):
-        """Inject hot reload script into HTML."""
+        """Mark the page as dev (no service worker) and inject the hot reload script."""
         try:
             with open(path, 'rb') as f:
                 content = f.read()
+            content = content.replace(b'<head>', b'<head><script>window.__coi_dev=1</script>', 1)
+            if not hot_reload_enabled:
+                self.serve_bytes(content, 'text/html; charset=utf-8')
+                return
             
             script = b'''<script>(function(){var k='__coi_scroll';if('scrollRestoration' in history)history.scrollRestoration='manual';var s=sessionStorage.getItem(k);if(s){sessionStorage.removeItem(k);var y=parseInt(s);var n=0;function r(){if(n++>30)return;window.scrollTo(0,y);if(Math.abs(window.scrollY-y)>1)setTimeout(r,60)}window.addEventListener('load',function(){requestAnimationFrame(r)});document.addEventListener('DOMContentLoaded',function(){requestAnimationFrame(r)})}var e=new EventSource('/__hot_reload');e.onmessage=function(m){if(m.data==='reload'){sessionStorage.setItem(k,window.scrollY||document.documentElement.scrollTop);location.reload()}};e.onerror=function(){console.log('[Coi] Reconnecting...')}})();</script></body>'''
             content = content.replace(b'</body>', script)

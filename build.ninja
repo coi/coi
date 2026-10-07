@@ -63,6 +63,7 @@ build build/obj/defs/def_loader.o: cxx src/defs/def_loader.cc
 build build/obj/codegen/codegen.o: cxx src/codegen/codegen.cc
 build build/obj/codegen/json_codegen.o: cxx src/codegen/json_codegen.cc
 build build/obj/codegen/css_generator.o: cxx src/codegen/css_generator.cc
+build build/obj/codegen/pwa_generator.o: cxx src/codegen/pwa_generator.cc
 
 # Generate version header
 # Depend on .git/logs/HEAD so it updates whenever HEAD moves (pull/reset/checkout)
@@ -87,7 +88,7 @@ build build/obj/ast/component/emit_router.o: cxx src/ast/component/emit_router.c
 build build/obj/ast/component/emit_lifecycle.o: cxx src/ast/component/emit_lifecycle.cc
 
 # Link Coi
-build coi: link build/obj/main.o build/obj/frontend/lexer.o build/obj/frontend/parser/core.o build/obj/frontend/parser/expr.o build/obj/frontend/parser/stmt.o build/obj/frontend/parser/view.o build/obj/frontend/parser/component.o build/obj/analysis/type_checker.o build/obj/cli/cli.o build/obj/cli/package_manager.o build/obj/defs/def_parser.o build/obj/codegen/json_codegen.o build/obj/analysis/include_detector.o build/obj/analysis/feature_detector.o build/obj/analysis/dependency_resolver.o build/obj/defs/def_loader.o build/obj/codegen/codegen.o build/obj/codegen/css_generator.o build/obj/ast/node.o build/obj/ast/expressions.o build/obj/ast/formatter.o build/obj/ast/statements.o build/obj/ast/definitions.o build/obj/ast/view.o build/obj/ast/codegen_state.o build/obj/ast/component/to_webcc.o build/obj/ast/component/traversal.o build/obj/ast/component/emit_events.o build/obj/ast/component/emit_router.o build/obj/ast/component/emit_lifecycle.o
+build coi: link build/obj/main.o build/obj/frontend/lexer.o build/obj/frontend/parser/core.o build/obj/frontend/parser/expr.o build/obj/frontend/parser/stmt.o build/obj/frontend/parser/view.o build/obj/frontend/parser/component.o build/obj/analysis/type_checker.o build/obj/cli/cli.o build/obj/cli/package_manager.o build/obj/defs/def_parser.o build/obj/codegen/json_codegen.o build/obj/analysis/include_detector.o build/obj/analysis/feature_detector.o build/obj/analysis/dependency_resolver.o build/obj/defs/def_loader.o build/obj/codegen/codegen.o build/obj/codegen/css_generator.o build/obj/codegen/pwa_generator.o build/obj/ast/node.o build/obj/ast/expressions.o build/obj/ast/formatter.o build/obj/ast/statements.o build/obj/ast/definitions.o build/obj/ast/view.o build/obj/ast/codegen_state.o build/obj/ast/component/to_webcc.o build/obj/ast/component/traversal.o build/obj/ast/component/emit_events.o build/obj/ast/component/emit_router.o build/obj/ast/component/emit_lifecycle.o
 
 # Generate def cache at build time
 rule gen_def_cache

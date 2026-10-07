@@ -12,6 +12,7 @@
 #include "defs/def_loader.h"
 #include "codegen/codegen.h"
 #include "codegen/css_generator.h"
+#include "codegen/pwa_generator.h"
 #include <iostream>
 #include <chrono>
 #include <fstream>
@@ -558,7 +559,7 @@ int main(int argc, char **argv)
                     }
                     // Auto-include generated CSS using deploy-path-safe relative URL
                     tmpl_out << "    <link rel=\"stylesheet\" href=\"./app.css\">\n";
-                    tmpl_out << "    <link rel=\"icon\" href=\"data:,\">\n";
+                    tmpl_out << pwa_head_tags(final_app_config);
                     tmpl_out << "</head>\n";
                     tmpl_out << "<body>\n";
                     tmpl_out << "{{script}}\n";
@@ -601,6 +602,8 @@ int main(int argc, char **argv)
                 std::cerr << "Error: webcc compilation failed." << std::endl;
                 return 1;
             }
+            if (final_app_config.pwa)
+                generate_pwa_files(final_output_dir, final_app_config);
         }
     }
     catch (const std::exception &e)

@@ -91,6 +91,9 @@ app {
     lang = "en";                       // optional: <html lang>, default "en"
     base = "/";                        // optional: deploy base path, <base href>, default "/"
     tick = always;                     // optional: always (default) or demand, see tick below
+    pwa = true;                        // optional: manifest + service worker (installable, offline)
+    icon = "assets/icon.png";          // optional: favicon and app icon (square PNG >= 512px or SVG)
+    theme = "#0b3d2e";                 // optional: browser UI color
 }
 ```
 `base` sets the `<base href>` all assets and routes resolve against. Use the domain

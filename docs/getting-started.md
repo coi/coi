@@ -236,6 +236,9 @@ app {
     lang = "en";                                   // HTML lang attribute (default: "en")
     base = "/";                                     // Deploy base path (default: "/")
     tick = always;                                 // Frame loop: always (default) or demand
+    pwa = true;                                    // Installable, works offline
+    icon = "assets/icon.png";                      // Favicon and app icon
+    theme = "#0b3d2e";                             // Browser UI color
 }
 ```
 
@@ -246,6 +249,9 @@ app {
 | `description` | String | No | Sets `<meta name="description">` for SEO |
 | `lang` | String | No | Sets the `<html lang="">` attribute (default: `"en"`) |
 | `base` | String | No | Deploy base path, emitted as `<base href="">` (default: `"/"`) |
+| `pwa` | `true` / `false` | No | Generates a manifest and a service worker so the app can be installed and starts offline, see [Installable and offline](#installable-and-offline) |
+| `icon` | String | No | Path in the build output, e.g. `"assets/icon.png"`. Used as favicon and app icon |
+| `theme` | String | No | CSS color for the browser's UI (address bar, title bar of the installed app) |
 | `tick` | `always` / `demand` | No | `demand` runs `tick` only on requested frames, see [Frames on demand](components.md#frames-on-demand) |
 
 **Note:** If you have a `styles/` folder at the project root (next to `src/`), all `.css` files in it are automatically bundled into `app.css`.
@@ -260,6 +266,17 @@ app {
 ```
 
 Leave `base` as `"/"` (the default) for root deploys and local development.
+
+### Installable and offline
+
+With `pwa = true`, `coi build` also writes `manifest.webmanifest` and `sw.js` next to `index.html`:
+
+- **Installable.** Browsers offer to install the app (Chrome's install button, "Add to Home Screen" on phones). It then opens in its own window with `title` as its name and `icon` as its icon. Use a square PNG of at least 512×512 in `assets/`; SVG works too.
+- **Offline.** The service worker caches every file of the build and serves them from the cache first, so the app starts without a connection, on any route. Requests to your API are not cached: they go to the network as usual.
+- **Updates.** Each build gets a new version. An open app checks for it when it loads, downloads it in the background, and the next start runs the new build.
+- **Development.** `coi dev` never uses the service worker, and removes one left over from a `coi build` on the same address, so you always see your latest edits.
+
+Service workers need HTTPS (or `localhost`). Keep data the user creates in IndexedDB, not in the build: the cache is replaced on every update.
 
 For client-side routing, use the `router {}` block inside your root component. See [Components](components.md#client-side-routing) for details.
 
