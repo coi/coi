@@ -28,6 +28,7 @@ request_fullscreen
 request_pointer_lock
 scroll_to_top
 exec_command
+focus_end
 
 [canvas]
 create_canvas
