@@ -235,6 +235,7 @@ app {
     description = "A description for SEO";         // Meta description
     lang = "en";                                   // HTML lang attribute (default: "en")
     base = "/";                                     // Deploy base path (default: "/")
+    tick = always;                                 // Frame loop: always (default) or demand
 }
 ```
 
@@ -245,6 +246,7 @@ app {
 | `description` | String | No | Sets `<meta name="description">` for SEO |
 | `lang` | String | No | Sets the `<html lang="">` attribute (default: `"en"`) |
 | `base` | String | No | Deploy base path, emitted as `<base href="">` (default: `"/"`) |
+| `tick` | `always` / `demand` | No | `demand` runs `tick` only on requested frames, see [Frames on demand](components.md#frames-on-demand) |
 
 **Note:** If you have a `styles/` folder at the project root (next to `src/`), all `.css` files in it are automatically bundled into `app.css`.
 

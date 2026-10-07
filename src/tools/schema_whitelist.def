@@ -113,6 +113,8 @@ get_pathname
 get_search
 get_query_param
 get_visibility_state
+# Frames on demand: with app { tick = demand; } tick runs once per requested frame
+request_frame
 @intrinsic("is_hidden") shared def isHidden(): bool
 // Router navigation (compiler intrinsics)
 @intrinsic("navigate") shared def navigate(string route): void

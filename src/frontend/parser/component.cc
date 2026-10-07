@@ -454,7 +454,10 @@ void Parser::parse_app()
     while (current().type != TokenType::RBRACE && current().type != TokenType::END_OF_FILE)
     {
         std::string key = current().value;
-        expect(TokenType::IDENTIFIER, "Expected key");
+        if (current().type == TokenType::TICK) // keyword, so not an IDENTIFIER
+            advance();
+        else
+            expect(TokenType::IDENTIFIER, "Expected key");
         expect(TokenType::ASSIGN, "Expected '='");
 
         if (key == "root")
@@ -481,6 +484,17 @@ void Parser::parse_app()
         {
             app_config.base = current().value;
             expect(TokenType::STRING_LITERAL, "Expected string");
+        }
+        else if (key == "tick")
+        {
+            std::string mode = current().value;
+            expect(TokenType::IDENTIFIER, "Expected 'always' or 'demand'");
+            if (mode == "demand")
+                app_config.tick_on_demand = true;
+            else if (mode == "always")
+                app_config.tick_on_demand = false;
+            else
+                ErrorHandler::compiler_error("app.tick must be 'always' or 'demand', got '" + mode + "'", current().line);
         }
         else if (key == "routes")
         {

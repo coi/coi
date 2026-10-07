@@ -281,6 +281,46 @@ component AnimatedBall {
 }
 ```
 
+### Frames on demand
+
+An app without any `tick` does no work between events: the compiler skips the frame loop, and every event (click, pointer move, fetch result) schedules one frame to handle it. Idle, the app runs no code at all.
+
+An app with a `tick` runs it every frame by default. A notes or drawing app that only animates now and then can opt into frames on demand instead:
+
+```tsx
+app {
+    root = App;
+    tick = demand;
+}
+```
+
+Now `tick` runs once per frame the app asked for: after an event, and after `System.requestFrame()`. To animate, request the next frame from inside `tick` while the animation is running:
+
+```tsx
+component Fade {
+    mut float alpha = 1.0;
+    mut bool fading = false;
+
+    def start() : void {
+        fading = true;
+        System.requestFrame();
+    }
+
+    tick(float dt) {
+        if (!fading) return;
+        alpha -= dt;
+        if (alpha <= 0.0) { alpha = 0.0; fading = false; }
+        else System.requestFrame();
+    }
+
+    view {
+        <button onclick={start} style="opacity: {alpha};">Fade</button>
+    }
+}
+```
+
+Several `System.requestFrame()` calls before a frame produce one frame. With `tick = always` (the default) the call does nothing, since a frame is always coming.
+
 ### Lifecycle Summary
 
 | Block | When it runs | DOM available? | Use for |
@@ -288,7 +328,7 @@ component AnimatedBall {
 | `init {}` | Before view | ❌ No | State setup, calculations |
 | `view {}` | Creates DOM | Being created | Define HTML structure |
 | `mount {}` | After view | ✅ Yes | Canvas setup, DOM measurements |
-| `tick(dt) {}` | Every frame | ✅ Yes | Animations, physics, updates |
+| `tick(dt) {}` | Every frame (or [on demand](#frames-on-demand)) | ✅ Yes | Animations, physics, updates |
 
 ## Logic-Only Components
 

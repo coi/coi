@@ -1,0 +1,11 @@
+// Test: app.tick only accepts 'always' or 'demand'
+component TickModeFail {
+    view {
+        <div></div>
+    }
+}
+
+app {
+    root = TickModeFail;
+    tick = sometimes;
+}

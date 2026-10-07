@@ -90,6 +90,7 @@ app {
     description = "For SEO";            // optional: <meta name="description">
     lang = "en";                       // optional: <html lang>, default "en"
     base = "/";                        // optional: deploy base path, <base href>, default "/"
+    tick = always;                     // optional: always (default) or demand, see tick below
 }
 ```
 `base` sets the `<base href>` all assets and routes resolve against. Use the domain
@@ -485,6 +486,9 @@ init {}     runs BEFORE the view; no DOM yet; set up state
 view {}     declares the DOM
 mount {}    runs AFTER the view; DOM ready; do Canvas/measurements here
 tick(float dt) {}  runs every frame; dt is seconds; animations/physics
+  An app with no tick anywhere skips the frame loop: events schedule their own frame, idle = no code runs.
+  With `app { tick = demand; }` tick runs only on requested frames: after an event, and after
+  System.requestFrame(). Call System.requestFrame() inside tick while animating, stop when done.
 ```
 ```coi
 component App {
@@ -733,6 +737,7 @@ System.getDateNow()         // ms since epoch, UTC (float64)
 System.getTimezoneOffsetMs()// local offset from UTC in ms; add to a UTC epoch ms for local
 System.getVisibilityState() // "visible" / "hidden" / ...
 System.isHidden()           // bool
+System.requestFrame()       // run tick on the next frame (app { tick = demand; } only, else no-op)
 System.random()  System.random(seed)   // [0.0, 1.0)
 ```
 Note: use `System.log(...)`. There is no bare `print(...)`.

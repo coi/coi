@@ -96,6 +96,9 @@ struct AppConfig {
     // Deploy base, emitted as <base href>. Set to a subpath (e.g. "/coi/") for
     // subpath deploys like GitHub project pages.
     std::string base = "/";
+    // app { tick = demand; }: no frame loop. tick runs once per frame the app
+    // asked for (an event arrived or System.requestFrame() was called).
+    bool tick_on_demand = false;
 };
 
 // Per-event bitmask over element ids, stored as 64-bit words (word el>>6,

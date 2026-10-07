@@ -1,0 +1,32 @@
+// Test: app { tick = demand; } runs tick only on requested frames.
+// A fade keeps requesting frames while it runs and stops when it is done.
+component TickDemandPass {
+    mut float alpha = 1.0;
+    mut bool fading = false;
+
+    def startFade() : void {
+        fading = true;
+        System.requestFrame();
+    }
+
+    tick(float dt) {
+        if (fading) {
+            alpha -= dt;
+            if (alpha <= 0.0) {
+                alpha = 0.0;
+                fading = false;
+            } else {
+                System.requestFrame();
+            }
+        }
+    }
+
+    view {
+        <button onclick={startFade}>{alpha}</button>
+    }
+}
+
+app {
+    root = TickDemandPass;
+    tick = demand;
+}

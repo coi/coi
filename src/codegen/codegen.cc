@@ -481,7 +481,17 @@ void generate_cpp_code(
     out << "    app = new (app_mem) " << root_qualified << "();\n";
     emit_feature_init(out, features, root_qualified);
     out << "    app->view();\n";
-    out << "    webcc::system::set_main_loop(update_wrapper);\n";
+    // Without a tick nothing runs per frame but event dispatch, and every event
+    // requests a frame on its own, so the app can skip the rAF loop. With a
+    // tick the loop stays on unless the app opted into frames on demand.
+    bool has_tick = session.components_with_tick.count(root_qualified) > 0;
+    if (!has_tick || final_app_config.tick_on_demand)
+    {
+        out << "    webcc::system::set_update(update_wrapper);\n";
+        out << "    webcc::system::request_frame(); // first frame\n";
+    }
+    else
+        out << "    webcc::system::set_main_loop(update_wrapper);\n";
     out << "    webcc::flush();\n";
     out << "    return 0;\n";
     out << "}\n";
