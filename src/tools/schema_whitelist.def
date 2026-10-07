@@ -11,6 +11,9 @@
 //   @inline("x") def ...       - Raw inline definition (emitted as-is)
 
 [dom]
+# Pointer input; events arrive through onPointer(&handler)
+add_pointer_listener
+remove_pointer_listener
 request_fullscreen
 request_pointer_lock
 scroll_to_top
@@ -142,7 +145,7 @@ draw_arrays
 [Canvas]
 // 2D context. lowLatency: the canvas may reach the screen without waiting for the page (less pen lag), opaque: no transparency, a bit faster
 @inline("webcc::canvas::get_context_2d(${this})") def getContext2d(): CanvasContext2D
-@inline("webcc::canvas::get_context_2d(${this}, (${0} ? webcc::canvas::CONTEXT_LOW_LATENCY : 0) | (${1} ? webcc::canvas::CONTEXT_OPAQUE : 0))") def getContext2d(bool lowLatency, bool opaque): CanvasContext2D
+@inline("webcc::canvas::get_context_2d(${this}, webcc::canvas::ContextFlags((${0} ? 1 : 0) | (${1} ? 2 : 0)))") def getContext2d(bool lowLatency, bool opaque): CanvasContext2D
 
 [websocket]
 # An owned socket member is closed when its component is destroyed
@@ -150,8 +153,9 @@ draw_arrays
 connect +events
 send
 close
+get_ready_state
 // True while the socket is open (not connecting, closing or closed)
-@inline("(webcc::websocket::get_ready_state($self) == webcc::websocket::STATE_OPEN)") def isConnected(): bool
+@inline("(webcc::websocket::get_ready_state($self) == webcc::websocket::ReadyState::OPEN)") def isConnected(): bool
 
 [wgpu]
 request_adapter

@@ -464,6 +464,21 @@ std::string FunctionCall::args_to_string() {
     return result;
 }
 
+// A value of a platform enum or flags type goes to webcc as its enum class
+static std::string to_webcc_arg(const std::string& code, const std::string& coi_type) {
+    std::string cpp = DefSchema::instance().webcc_cast_type(coi_type);
+    return cpp.empty() ? code : "static_cast<" + cpp + ">(" + code + ")";
+}
+
+// And comes back as the Coi enum, or the flags' integer
+static std::string from_webcc_value(const std::string& code, const std::string& coi_type) {
+    const TypeDef* td = DefSchema::instance().lookup_type(coi_type);
+    if (!td) return code;
+    if (!td->enum_cpp.empty()) return "static_cast<" + coi_type + ">(" + code + ")";
+    if (!td->flags_cpp.empty()) return "static_cast<" + convert_type(td->alias_of) + ">(" + code + ")";
+    return code;
+}
+
 // Parts of a call's argument list a schema method can take: plain values in order,
 // and callbacks (`&handler` or `&onX = handler`) that bind the handle the call returns
 struct SplitArgs {
@@ -517,8 +532,9 @@ static std::string generate_event_registration(const MethodDef& event_method, co
     code += "(void)_e; this->" + callback + "(";
     for (int i = 0; i < n; i++) {
         if (i) code += ", ";
-        bool is_string = i < (int)field_types.size() && field_types[i] == "string";
-        code += is_string ? "coi::string(_e." + spec.fields[i] + ")" : "_e." + spec.fields[i];
+        std::string ft = i < (int)field_types.size() ? field_types[i] : "";
+        if (ft == "string") code += "coi::string(_e." + spec.fields[i] + ")";
+        else code += from_webcc_value("_e." + spec.fields[i], ft);
     }
     code += "); }, this)";
     g_used_events[spec.ns + "::" + spec.name] = {spec.ns, spec.name, spec.key, full, handle_type, spec.last};
@@ -713,9 +729,12 @@ std::string FunctionCall::to_webcc() {
             std::string call = "webcc::" + map_ns + "::" + map_func + "(";
             bool first_arg = true;
             if (pass_obj) { call += obj_arg; first_arg = false; }
-            for (const auto* arg : split.values) {
+            std::vector<const MethodParam*> value_params;
+            for (const auto& p : map_method->params) if (!is_callback_param(p)) value_params.push_back(&p);
+            for (size_t vi = 0; vi < split.values.size(); vi++) {
                 if (!first_arg) call += ", ";
-                call += arg->value->to_webcc();
+                std::string v = split.values[vi]->value->to_webcc();
+                call += vi < value_params.size() ? to_webcc_arg(v, value_params[vi]->type) : v;
                 first_arg = false;
             }
             call += ")";
@@ -806,6 +825,8 @@ std::string FunctionCall::to_webcc() {
             }
             if (!wrapped) {
                 arg_code = args[i].value->to_webcc();
+                if (i < map_method->params.size())
+                    arg_code = to_webcc_arg(arg_code, map_method->params[i].type);
             }
             code += arg_code;
             first_arg = false;
@@ -816,6 +837,7 @@ std::string FunctionCall::to_webcc() {
         if (map_method->return_type == "int") {
             code = "(int32_t)(" + code + ")";
         }
+        code = from_webcc_value(code, map_method->return_type);
 
         return code;
     }

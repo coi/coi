@@ -1,0 +1,6 @@
+// Test: one enum can't be assigned to another
+component EnumAssignFail {
+    mut PointerPhase phase = PointerType::Pen;
+    view { <p></p> }
+}
+app { root = EnumAssignFail; }

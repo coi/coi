@@ -917,6 +917,45 @@ The rules:
 
 The generated definitions in `defs/web/*.d.coi` list every handle type's events with their parameters.
 
+## Platform enums and flags
+
+Values the browser picks from a fixed set come in two kinds.
+
+**Enums** are choices: exactly one applies. They are ordinary Coi enums, so `::`, `match` and the enum type checks all work:
+
+```tsx
+def onPtr(PointerPhase phase, int id, PointerType type) : void {
+    if (phase == PointerPhase::Down && type == PointerType::Pen) { ... }
+}
+
+bool open = ws.getReadyState() == ReadyState::Open;
+```
+
+Comparing two different enums is a compile error, even where the numbers would match (`PointerPhase::Down` and `PointerType::Mouse` are both 0).
+
+**Flags** are bits that combine. A flags type behaves as its integer, with each bit as a constant:
+
+```tsx
+surface.addPointerListener(PointerFlags.Capture | PointerFlags.Coalesced | PointerFlags.NoScroll);
+
+def onKey(..., Mods mods, ...) : void {
+    bool shortcut = (mods & (Mods.Ctrl | Mods.Meta)) != 0;
+}
+```
+
+| Type | Kind | Values |
+|------|------|--------|
+| `PointerPhase` | enum | `Down`, `Move`, `Up`, `Cancel`, `Predicted` |
+| `PointerType` | enum | `Mouse`, `Pen`, `Touch` |
+| `ReadyState` | enum | `Connecting`, `Open`, `Closing`, `Closed` |
+| `LineCap`, `LineJoin` | enum | `Butt`, `Round`, `Square` / `Miter`, `Round`, `Bevel` |
+| `PointerFlags` | flags | `Capture`, `Coalesced`, `NoScroll`, `Predict` |
+| `Buttons` | flags | `Primary`, `Secondary`, `Auxiliary`, `Back`, `Forward`, `Eraser` |
+| `Mods` | flags | `Shift`, `Ctrl`, `Alt`, `Meta` |
+| `ContextFlags` | flags | `LowLatency`, `Opaque` |
+
+These names are taken: an enum of your own can't be called `ReadyState`. An unknown value is a compile error that lists the real ones.
+
 ## Available APIs
 
 | Module       | Description                                      |

@@ -1,0 +1,6 @@
+// Test: a user enum can't take the name of a platform enum
+enum ReadyState { Waiting, Done }
+component EnumNameClashFail {
+    view { <p></p> }
+}
+app { root = EnumNameClashFail; }

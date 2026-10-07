@@ -1,0 +1,43 @@
+// Pointer events through the generated onPointer callback: phase and type arrive as
+// Coi enums, buttons as flags, and the listener flags go in as PointerFlags.
+component PointerGroupsClick {
+    mut Canvas surface;
+    mut string log = "";
+    mut string kind = "-";
+    mut string tip = "-";
+
+    def onPtr(PointerPhase phase, int id, PointerType type, Buttons buttons, float x, float y) : void {
+        if (phase == PointerPhase::Move) return;
+        string name = match (phase) {
+            PointerPhase::Down => "down";
+            PointerPhase::Up => "up";
+            PointerPhase::Cancel => "cancel";
+            else => "other";
+        };
+        log = log + name + " ";
+        kind = match (type) {
+            PointerType::Mouse => "mouse";
+            PointerType::Pen => "pen";
+            PointerType::Touch => "touch";
+        };
+        if (phase == PointerPhase::Down) {
+            tip = (buttons & Buttons.Primary) != 0 ? "primary" : "none";
+        }
+    }
+
+    mount {
+        surface.addPointerListener(PointerFlags.Capture | PointerFlags.NoScroll);
+        surface.onPointer(&onPtr);
+    }
+
+    view {
+        <div>
+            <canvas class="surface" &={surface} width="200" height="100"></canvas>
+            <p class="log">{log}</p>
+            <p class="kind">{kind}</p>
+            <p class="tip">{tip}</p>
+        </div>
+    }
+}
+
+app { root = PointerGroupsClick; }

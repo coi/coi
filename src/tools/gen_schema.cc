@@ -146,7 +146,7 @@ bool load_whitelist(const std::string &path)
     return true;
 }
 
-std::string to_coi_type(const std::string &type, const std::string &handle_type);
+std::string to_coi_type(const std::string &type, const std::string &handle_type, const std::string &enum_type = "");
 
 // MESSAGE -> Message, PAGE_HIDE -> PageHide (webcc's struct naming, minus "Event")
 std::string to_pascal_case(const std::string &upper_snake)
@@ -195,7 +195,7 @@ std::string event_callback_type(const webcc::SchemaEvent &e, const std::string &
         for (size_t i = 1; i < e.params.size(); i++)
         {
             if (i > 1) out += ", ";
-            out += to_coi_type(e.params[i].type, e.params[i].handle_type);
+            out += to_coi_type(e.params[i].type, e.params[i].handle_type, e.params[i].enum_type);
         }
         out += ")";
     }
@@ -226,12 +226,47 @@ void emit_param_list(std::ostream &out, const webcc::SchemaDefs &defs, const web
     {
         const auto &p = cmd.params[i];
         if (!list.empty()) list += ", ";
-        list += to_coi_type(p.type, p.handle_type) + " " + (p.name.empty() ? "arg" : p.name);
+        list += to_coi_type(p.type, p.handle_type, p.enum_type) + " " + (p.name.empty() ? "arg" : p.name);
         if (!p.default_value.empty()) list += " = " + p.default_value;
     }
     std::string events = factory_event_params(defs, cmd);
     if (list.empty() && events.rfind(", ", 0) == 0) events = events.substr(2);
     out << list << events;
+}
+
+// Enum and flags groups of a namespace. An enum is a Coi enum (PointerPhase::Down),
+// flags are a type that behaves as its integer, with its bits as shared constants
+// (PointerFlags.Capture | PointerFlags.NoScroll).
+void emit_groups(std::ostream &out, const webcc::SchemaDefs &defs, const std::string &ns)
+{
+    for (const auto &g : defs.groups)
+    {
+        if (g.ns != ns)
+            continue;
+        std::string cpp = "webcc::" + g.ns + "::" + g.name;
+        if (!g.flags)
+        {
+            out << "// " << g.name << " (choices)\n";
+            out << "@enum(\"" << cpp << "\")\n";
+            out << "type " << g.name << " {\n";
+            for (size_t i = 0; i < g.values.size(); i++)
+                out << "    " << to_pascal_case(g.values[i].first) << (i + 1 < g.values.size() ? "," : "") << "\n";
+            out << "}\n\n";
+        }
+        else
+        {
+            out << "// " << g.name << " (flags, combine with |)\n";
+            out << "@flags(\"" << cpp << "\")\n";
+            out << "@alias(\"" << g.wire << "\")\n";
+            out << "type " << g.name << " {\n";
+            for (const auto &[name, value] : g.values)
+            {
+                out << "    @inline(\"(" << value << ")\")\n";
+                out << "    shared " << g.wire << " " << to_pascal_case(name) << ";\n";
+            }
+            out << "}\n\n";
+        }
+    }
 }
 
 // Callback methods for the events of a handle type
@@ -294,8 +329,11 @@ std::string to_camel_case(const std::string &snake)
 }
 
 // Convert webcc type to Coi type
-std::string to_coi_type(const std::string &type, const std::string &handle_type)
+std::string to_coi_type(const std::string &type, const std::string &handle_type, const std::string &enum_type)
 {
+    // Groups are Coi types named like the group (PointerPhase, Mods)
+    if (!enum_type.empty())
+        return enum_type.substr(enum_type.find("::") + 2);
     if (type == "handle" && !handle_type.empty())
     {
         return handle_type;
@@ -524,6 +562,7 @@ int main()
         out << "// Coi definitions for " << ns << " namespace\n";
         out << "// Maps to: " << header_file << "\n";
         out << "\n";
+        emit_groups(out, defs, ns);
 
         // Categorize functions:
         // 1. Methods on handle types (first param is handle)
@@ -630,7 +669,7 @@ int main()
                 for (const auto *cmd : factories_by_type[handle_type])
                 {
                     std::string coi_name = to_camel_case(cmd->func_name);
-                    std::string return_type = to_coi_type(cmd->return_type, cmd->return_handle_type);
+                    std::string return_type = to_coi_type(cmd->return_type, cmd->return_handle_type, cmd->return_enum_type);
 
                     out << "    @map(\"" << ns << "::" << cmd->func_name << "\")\n";
                     out << "    shared def " << coi_name << "(";
@@ -646,7 +685,7 @@ int main()
                 for (const auto *cmd : methods_by_handle[handle_type])
                 {
                     std::string coi_name = to_camel_case(cmd->func_name);
-                    std::string return_type = to_coi_type(cmd->return_type, cmd->return_handle_type);
+                    std::string return_type = to_coi_type(cmd->return_type, cmd->return_handle_type, cmd->return_enum_type);
                     if (return_type.empty())
                         return_type = "void";
 
@@ -714,7 +753,7 @@ int main()
             for (const auto *cmd : namespace_utils)
             {
                 std::string coi_name = to_camel_case(cmd->func_name);
-                std::string return_type = to_coi_type(cmd->return_type, cmd->return_handle_type);
+                std::string return_type = to_coi_type(cmd->return_type, cmd->return_handle_type, cmd->return_enum_type);
                 if (return_type.empty())
                     return_type = "void";
 

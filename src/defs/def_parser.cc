@@ -567,11 +567,32 @@ std::optional<TypeDef> DefParser::parse_type()
         {
             type_def.cleanup = value;
         }
+        else if (name == "enum")
+        {
+            type_def.enum_cpp = value;
+        }
+        else if (name == "flags")
+        {
+            type_def.flags_cpp = value;
+        }
     }
 
     // Parse body
     if (!expect(Token::LBrace, "expected '{'"))
         return std::nullopt;
+
+    // An enum's body is its value list: { A, B, C }
+    if (!type_def.enum_cpp.empty())
+    {
+        while (current_.type != Token::RBrace && current_.type != Token::Eof)
+        {
+            if (current_.type == Token::Identifier)
+                type_def.enum_values.push_back(current_.value);
+            advance();
+        }
+        expect(Token::RBrace, "expected '}'");
+        return type_def;
+    }
 
     while (current_.type != Token::RBrace && current_.type != Token::Eof)
     {
@@ -685,7 +706,7 @@ std::vector<DefFile> DefParser::parse_directory(const std::string &dir_path)
 // ============================================================
 
 static constexpr uint32_t DEF_CACHE_MAGIC = 0x44494f43; // "COID"
-static constexpr uint32_t DEF_CACHE_VERSION = 2;
+static constexpr uint32_t DEF_CACHE_VERSION = 3;
 
 DefSchema &DefSchema::instance()
 {
@@ -830,6 +851,13 @@ bool DefSchema::load(const std::string &def_dir)
                 }
                 if (type_def.is_handle)
                     it->second.is_handle = true;
+                if (!type_def.enum_cpp.empty())
+                {
+                    it->second.enum_cpp = type_def.enum_cpp;
+                    it->second.enum_values = type_def.enum_values;
+                }
+                if (!type_def.flags_cpp.empty())
+                    it->second.flags_cpp = type_def.flags_cpp;
                 if (!type_def.cleanup.empty() && it->second.cleanup.empty())
                     it->second.cleanup = type_def.cleanup;
             }
@@ -883,6 +911,12 @@ bool DefSchema::load_cache(const std::string &cache_path)
         type_def.extends = read_string();
         type_def.alias_of = read_string();
         type_def.cleanup = read_string();
+        type_def.enum_cpp = read_string();
+        type_def.flags_cpp = read_string();
+        uint32_t value_count = 0;
+        file.read(reinterpret_cast<char *>(&value_count), sizeof(value_count));
+        for (uint32_t v = 0; v < value_count; ++v)
+            type_def.enum_values.push_back(read_string());
 
         uint32_t method_count;
         file.read(reinterpret_cast<char *>(&method_count), sizeof(method_count));
@@ -948,6 +982,12 @@ bool DefSchema::save_cache(const std::string &cache_path)
         write_string(type_def.extends);
         write_string(type_def.alias_of);
         write_string(type_def.cleanup);
+        write_string(type_def.enum_cpp);
+        write_string(type_def.flags_cpp);
+        uint32_t value_count = type_def.enum_values.size();
+        file.write(reinterpret_cast<const char *>(&value_count), sizeof(value_count));
+        for (const auto &v : type_def.enum_values)
+            write_string(v);
 
         uint32_t method_count = type_def.methods.size();
         file.write(reinterpret_cast<const char *>(&method_count), sizeof(method_count));
@@ -1118,6 +1158,16 @@ bool DefSchema::is_nocopy(const std::string &type_name) const
     }
 
     return false;
+}
+
+std::string DefSchema::webcc_cast_type(const std::string &type_name) const
+{
+    auto it = types_.find(type_name);
+    if (it == types_.end())
+        return "";
+    if (!it->second.enum_cpp.empty())
+        return it->second.enum_cpp;
+    return it->second.flags_cpp;
 }
 
 std::string DefSchema::resolve_alias(const std::string &type_name) const

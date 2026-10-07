@@ -1,0 +1,8 @@
+// Test: a pointer handler's first parameter is a PointerPhase, not a PointerType
+component HandlerEnumFail {
+    mut Canvas surface;
+    def onPtr(PointerType type) : void {}
+    mount { surface.onPointer(&onPtr); }
+    view { <canvas &={surface}></canvas> }
+}
+app { root = HandlerEnumFail; }

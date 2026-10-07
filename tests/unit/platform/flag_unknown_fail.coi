@@ -1,0 +1,7 @@
+// Test: an unknown flag is an error that lists the real ones
+component FlagUnknownFail {
+    mut int f = 0;
+    mount { f = PointerFlags.Hover; }
+    view { <p>{f}</p> }
+}
+app { root = FlagUnknownFail; }

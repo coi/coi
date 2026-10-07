@@ -1,0 +1,35 @@
+// Test: platform enums are Coi enums, flags combine with |, both cross into webcc
+// (params, returns, event fields) with casts the compiler adds
+component GroupsPass {
+    mut Canvas surface;
+    mut WebSocket ws;
+    mut PointerPhase lastPhase = PointerPhase::Cancel;
+    mut string lastType = "";
+    mut bool penTip = false;
+
+    def onPtr(PointerPhase phase, int id, PointerType type, Buttons buttons) : void {
+        lastPhase = phase;
+        lastType = match (type) {
+            PointerType::Mouse => "mouse";
+            PointerType::Pen => "pen";
+            PointerType::Touch => "touch";
+        };
+        penTip = (buttons & Buttons.Primary) != 0;
+    }
+
+    def isOpen() : bool {
+        return ws.getReadyState() == ReadyState::Open;
+    }
+
+    mount {
+        surface.addPointerListener(PointerFlags.Capture | PointerFlags.Coalesced | PointerFlags.NoScroll);
+        surface.onPointer(&onPtr);
+        ws = WebSocket.connect("ws://localhost:1/");
+    }
+
+    view {
+        <canvas &={surface}></canvas>
+    }
+}
+
+app { root = GroupsPass; }

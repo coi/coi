@@ -74,6 +74,13 @@ struct TypeDef
     std::string extends;     // Parent type (for handle inheritance)
     std::string alias_of;    // @alias("target") - this type is an alias for another
     std::string cleanup;     // @cleanup("ns::func") - called on owned members when the component is destroyed
+    // @enum("webcc::ns::Name") type Name { A, B }: a platform enum. The compiler adds it
+    // as a Coi enum; the values match the C++ enum class 1:1, so values convert by cast.
+    std::string enum_cpp;
+    std::vector<std::string> enum_values;
+    // @flags("webcc::ns::Name") @alias("uint8"): platform bit flags. Values are shared
+    // constants combined with |; the alias makes the type behave as its integer.
+    std::string flags_cpp;
     std::vector<MethodDef> methods;
 };
 
@@ -169,6 +176,10 @@ public:
 
     // Lookup methods
     const MethodDef *lookup_method(const std::string &type_name, const std::string &method_name) const;
+    // C++ type a value of this Coi type must be cast to when passed to webcc (platform
+    // enums and flags), or "" for anything else
+    std::string webcc_cast_type(const std::string &type_name) const;
+
     // With arg_count: an exact match first, then a method whose trailing params have defaults
     const MethodDef *lookup_method(const std::string &type_name, const std::string &method_name, size_t arg_count) const;
     const TypeDef *lookup_type(const std::string &type_name) const;

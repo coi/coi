@@ -829,6 +829,18 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                         return normalize_type(method->return_type);
                     }
                 }
+                // Not a variable, enum or pod: the member has to exist on the type
+                else if (scope.find(id->name) == scope.end() && !is_enum_type(id->name) && !is_data_type(id->name))
+                {
+                    std::string known;
+                    for (const auto &m : type_def->methods)
+                        if (m.is_shared && m.is_constant)
+                            known += (known.empty() ? "" : ", ") + m.name;
+                    ErrorHandler::type_error(
+                        "'" + id->name + "' has no constant '" + member->member + "'" +
+                        (known.empty() ? "" : " (available: " + known + ")"), member->line);
+                    exit(1);
+                }
             }
         }
         
@@ -1366,6 +1378,18 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
         // Comparison operators return bool
         if (op == "==" || op == "!=" || op == "<" || op == ">" || op == "<=" || op == ">=")
         {
+            // Two different enums can share numbers (PointerPhase::Down and PointerType::Mouse
+            // are both 0), so comparing them is a mistake even though it would compile
+            std::string ln = normalize_type(l), rn = normalize_type(r);
+            if (is_enum_type(ln) && is_enum_type(rn))
+            {
+                auto base = [](const std::string &t) { size_t d = t.rfind('.'); return d == std::string::npos ? t : t.substr(d + 1); };
+                if (base(ln) != base(rn))
+                {
+                    ErrorHandler::type_error("Comparing a '" + l + "' with a '" + r + "': values of different enums are never equal in meaning", 0);
+                    exit(1);
+                }
+            }
             return "bool";
         }
         // Logical operators return bool
@@ -3389,6 +3413,8 @@ void validate_type_imports(const std::vector<Component> &components,
                                   const std::string& type_source_file) -> bool {
         // Same file - always accessible
         if (user_file == type_source_file) return true;
+        // Platform types (enums from the web defs) have no source file
+        if (type_source_file.empty()) return true;
         
         // Directly imported
         auto it = file_imports.find(user_file);

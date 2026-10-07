@@ -450,6 +450,29 @@ int main(int argc, char **argv)
 
         register_free_functions(all_global_functions);
 
+        // Platform enums from the web defs (PointerPhase, ReadyState...) are Coi enums in
+        // every program. Their values are in the same order as webcc's enum class, so the
+        // two convert by cast where a value crosses into or out of webcc.
+        for (const auto &[type_name, type_def] : DefSchema::instance().types())
+        {
+            if (type_def.enum_cpp.empty())
+                continue;
+            for (const auto &e : all_global_enums)
+            {
+                if (e->name == type_name)
+                {
+                    std::cerr << colors::RED << "Error:" << colors::RESET << " enum '" << type_name << "' in " << e->source_file
+                              << " has the name of a platform type. Rename it." << std::endl;
+                    return 1;
+                }
+            }
+            auto platform = std::make_unique<EnumDef>();
+            platform->name = type_name;
+            platform->values = type_def.enum_values;
+            platform->is_public = true;
+            all_global_enums.push_back(std::move(platform));
+        }
+
         validate_view_hierarchy(all_components, file_imports);
         validate_type_imports(all_components, all_global_enums, all_global_data, file_imports);
         validate_mutability(all_components);

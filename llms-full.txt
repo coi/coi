@@ -783,6 +783,10 @@ mount { ws = WebSocket.connect("wss://host", &onMessage = onMsg, &onOpen = onOpe
 // onClose always comes last (also after onError). Handlers may take fewer params than the event has.
 // Every handle type has on<Event>(&handler) methods for its browser events (e.g. img.onLoaded(&h) with (int w, int h)).
 // An owned WebSocket member is closed when its component is destroyed.
+// Platform enums (Coi enums, ::): PointerPhase::Down, PointerType::Pen, ReadyState::Open, LineCap::Round
+// Platform flags (ints, combine with | and test with &): PointerFlags.Capture | PointerFlags.NoScroll, Buttons.Primary, Mods.Ctrl
+// Comparing two different enums is a compile error. surface.addPointerListener(flags); surface.onPointer(&h)
+// h: def h(PointerPhase phase, int id, PointerType type, Buttons buttons, float x, float y, ...) : void
 ```
 
 ### Json (type-safe parsing against a pod schema)

@@ -1,0 +1,9 @@
+// Test: values of two different enums can't be compared (both are 0 here)
+component EnumCompareFail {
+    mut bool same = false;
+    mount {
+        same = PointerPhase::Down == PointerType::Mouse;
+    }
+    view { <p>{same}</p> }
+}
+app { root = EnumCompareFail; }
