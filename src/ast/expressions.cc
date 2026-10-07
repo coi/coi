@@ -763,6 +763,9 @@ void FunctionCall::collect_dependencies(std::set<std::string>& deps) {
     if (dot_pos != std::string::npos) {
         deps.insert(name.substr(0, dot_pos));
     }
+    else if (auto it = g_method_reads.find(name); it != g_method_reads.end()) {
+        deps.insert(it->second.begin(), it->second.end());
+    }
     // Also traverse children via get_children()
     for (auto* child : get_children()) {
         if (child) child->collect_dependencies(deps);

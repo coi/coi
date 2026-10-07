@@ -307,6 +307,41 @@ std::string Component::to_webcc(CompilerSession &session)
         ComponentTypeContext::instance().register_method_signature(m.name, m.return_type, param_types);
     }
 
+    // what each method reads of the component's state, closed over the methods it calls
+    g_method_reads.clear();
+    std::set<std::string> member_names;
+    for (const auto &v : state) member_names.insert(v->name);
+    for (const auto &p : params) member_names.insert(p->name);
+    std::map<std::string, std::set<std::string>> direct;
+    for (const auto &m : methods)
+    {
+        std::set<std::string> reads, kept;
+        for (const auto &stmt : m.body)
+            stmt->collect_dependencies(reads);
+        for (const auto &r : reads)
+            if (member_names.count(r) || std::any_of(methods.begin(), methods.end(), [&](const FunctionDef &o) { return o.name == r; }))
+                kept.insert(r);
+        direct[m.name] = kept;
+    }
+    for (const auto &m : methods)
+    {
+        std::set<std::string> seen, out;
+        std::vector<std::string> todo{m.name};
+        while (!todo.empty())
+        {
+            std::string cur = todo.back();
+            todo.pop_back();
+            if (!seen.insert(cur).second || !direct.count(cur))
+                continue;
+            for (const auto &d : direct[cur])
+            {
+                if (direct.count(d)) todo.push_back(d);
+                else out.insert(d);
+            }
+        }
+        g_method_reads[m.name] = out;
+    }
+
     // Populate global context for reference params
     g_ref_props.clear();
     for (auto &param : params)

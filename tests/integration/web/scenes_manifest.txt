@@ -24,3 +24,4 @@ data_roundtrip|tests/integration/web/scenes/data_roundtrip.coi|web
 member_ref_reactive|tests/integration/web/scenes/member_ref_reactive.coi|web
 child_props_reactive|tests/integration/web/scenes/child_props_reactive.coi|web
 early_return_reactive|tests/integration/web/scenes/early_return_reactive.coi|web
+method_binding_reactive|tests/integration/web/scenes/method_binding_reactive.coi|web

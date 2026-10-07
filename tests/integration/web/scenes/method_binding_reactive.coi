@@ -1,0 +1,21 @@
+// a binding that calls a method refreshes when the state the method reads changes
+component MethodBinding {
+    mut int pick = 0;
+    mut string name = "a";
+
+    def isOn(int i) : bool { return i == pick; }
+    def label() : string { return `name:${name}`; }
+    def choose(int i) : void { pick = i; }
+    def rename() : void { name = "b"; }
+
+    view {
+        <div>
+            <button class={isOn(0) ? "opt on" : "opt"} onclick={choose(0)}>0</button>
+            <button class={isOn(1) ? "opt on" : "opt"} onclick={choose(1)}>1</button>
+            <button class="rename" onclick={rename}>rename</button>
+            <p class="label">{label()}</p>
+        </div>
+    }
+}
+
+app { root = MethodBinding; }
