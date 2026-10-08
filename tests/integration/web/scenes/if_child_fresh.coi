@@ -1,0 +1,32 @@
+// a component inside <if> starts over each time the region comes back: its state and mount run again
+component Draft(def onDone(string) : void) {
+    mut DOMElement box;
+    mut string text = "";
+    mut int mounts = 0;
+    mount { mounts++; box.focus(); }
+    def typed(string v) : void { text = v; }
+    def done() : void { onDone(text); }
+    view {
+        <div class="draft">
+            <input &={box} value={text} oninput={typed} />
+            <span class="mounts">{mounts}</span>
+            <button class="done" onclick={done}>done</button>
+        </div>
+    }
+}
+
+component App {
+    mut bool open = false;
+    mut string last = "";
+    def show() : void { open = true; }
+    def finished(string t) : void { last = t; open = false; }
+    view {
+        <div>
+            <button class="show" onclick={show}>show</button>
+            <if open><Draft &onDone={finished} /></if>
+            <if !open><p class="closed">closed</p></if>
+            <p class="last">{last}</p>
+        </div>
+    }
+}
+app { root = App; }

@@ -1399,6 +1399,9 @@ std::string Component::to_webcc(CompilerSession &session)
                 }
             }
         }
+        // a child coming back gets a fresh instance, not the state it had last time
+        for (const auto &[comp_name, inst_id] : region.then_components)
+            ss << "            " << comp_name << "_" << inst_id << ".~" << comp_name << "(); new (&" << comp_name << "_" << inst_id << ") " << comp_name << "();\n";
         ss << region.then_creation_code;
 
         ss << "        } else {\n";
@@ -1447,6 +1450,8 @@ std::string Component::to_webcc(CompilerSession &session)
         }
         if (!region.else_creation_code.empty())
         {
+            for (const auto &[comp_name, inst_id] : region.else_components)
+                ss << "            " << comp_name << "_" << inst_id << ".~" << comp_name << "(); new (&" << comp_name << "_" << inst_id << ") " << comp_name << "();\n";
             ss << region.else_creation_code;
         }
 

@@ -1,0 +1,18 @@
+// spaces between inline children on one line survive; newline-indented children add none
+component App {
+    mut int n = 1;
+    mut string unit = "page";
+    view {
+        <div>
+            <p class="a">{n} {unit}</p>
+            <p class="b">{n} <b>{unit}</b> left</p>
+            <p class="c">{n}{unit}</p>
+            <p class="d">
+                {n}
+                {unit}
+            </p>
+            <p class="e"><i>x</i> <i>y</i></p>
+        </div>
+    }
+}
+app { root = App; }

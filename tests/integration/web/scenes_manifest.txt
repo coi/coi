@@ -27,3 +27,5 @@ early_return_reactive|tests/integration/web/scenes/early_return_reactive.coi|web
 method_binding_reactive|tests/integration/web/scenes/method_binding_reactive.coi|web
 loop_over_call|tests/integration/web/scenes/loop_over_call.coi|web
 select_value|tests/integration/web/scenes/select_value.coi|web
+if_child_fresh|tests/integration/web/scenes/if_child_fresh.coi|web
+inline_spacing|tests/integration/web/scenes/inline_spacing.coi|web

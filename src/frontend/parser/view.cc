@@ -402,6 +402,16 @@ std::unique_ptr<ASTNode> Parser::parse_html_element()
     // Children
     // Track the last token position to detect leading whitespace for text nodes
     Token last_non_text_token = tokens[pos - 1];  // The '>' we just consumed
+    // a space written between two inline children on one line is content: {a} {b}, {a} <b>..
+    bool after_text = false;  // a text run already keeps its own trailing space
+    auto keep_inline_gap = [&]() {
+        if (after_text) return;
+        int len = last_non_text_token.value.length();
+        if (last_non_text_token.type == TokenType::STRING_LITERAL)
+            len += 2;
+        if (last_non_text_token.line == current().line && last_non_text_token.column + len != current().column)
+            el->children.push_back(std::make_unique<TextNode>(" "));
+    };
     while (true)
     {
         if (current().type == TokenType::LT)
@@ -411,6 +421,7 @@ std::unique_ptr<ASTNode> Parser::parse_html_element()
                 // Closing tag
                 break;
             }
+            keep_inline_gap();
             // Check for special tags: <if>, <for>
             if (peek().type == TokenType::IF)
             {
@@ -426,14 +437,17 @@ std::unique_ptr<ASTNode> Parser::parse_html_element()
                 el->children.push_back(parse_html_element());
             }
             last_non_text_token = tokens[pos - 1];  // Update after parsing element
+            after_text = false;
         }
         else if (current().type == TokenType::LBRACE)
         {
             // Expression
+            keep_inline_gap();
             advance();
             el->children.push_back(parse_expression());
             expect(TokenType::RBRACE, "Expected '}'");
             last_non_text_token = tokens[pos - 1];  // The '}' we just consumed
+            after_text = false;
         }
         else
         {
@@ -490,6 +504,7 @@ std::unique_ptr<ASTNode> Parser::parse_html_element()
                     }
                 }
                 el->children.push_back(std::make_unique<TextNode>(text));
+                after_text = true;
             }
 
             if (current().type == TokenType::END_OF_FILE)
