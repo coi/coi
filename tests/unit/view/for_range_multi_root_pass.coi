@@ -1,0 +1,29 @@
+// Test: a range loop whose body has several top-level nodes and <if>s around them; every one of
+// them is a row the next sync removes (only the first used to be, the rest piled up)
+component Test {
+    mut int n = 2;
+    mut int ask = -1;
+
+    def more() : void { n++; }
+    def askFor(int i) : void { ask = i; }
+    def no() : void { ask = -1; }
+
+    view {
+        <div>
+            <button class="more" onclick={more}>more</button>
+            <for i in 0:n>
+                <div class="p">{i}</div>
+                <if n > 1>
+                    <button class="b" onclick={askFor(i)}>x</button>
+                </if>
+                <if ask == i>
+                    <div class="ask">ask {i}<button class="no" onclick={no}>keep</button></div>
+                </if>
+            </for>
+        </div>
+    }
+}
+
+app {
+    root = Test;
+}

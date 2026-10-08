@@ -23,6 +23,37 @@ static std::string make_callback_name(const std::string &var_name)
 // To:         webcc::dom::insert_before(parent_var, _el[N], anchor_var);
 // Also rewrites child component renders (which append their roots internally)
 // to the anchor-aware form: X.view(parent_var); -> X.view(parent_var, anchor_var);
+// every node a loop body puts straight into the loop's parent goes on the row list, so the next
+// sync removes all of them: a body with several top-level nodes, or an <if> around one, makes more
+// than the one root element
+static std::string track_top_level_inserts(const std::string &code, const std::string &parent_var, const std::string &vec_name)
+{
+    std::string result;
+    const std::string patterns[2] = {"webcc::dom::append_child(" + parent_var + ", ", "webcc::dom::insert_before(" + parent_var + ", "};
+    size_t last_pos = 0;
+    while (true)
+    {
+        size_t pos = std::string::npos;
+        size_t plen = 0;
+        for (const auto &pat : patterns)
+        {
+            size_t p = code.find(pat, last_pos);
+            if (p != std::string::npos && p < pos) { pos = p; plen = pat.length(); }
+        }
+        if (pos == std::string::npos) break;
+        size_t end_pos = code.find(");", pos);
+        if (end_pos == std::string::npos) break;
+        size_t elem_start = pos + plen;
+        size_t elem_end = code.find_first_of(",)", elem_start);
+        std::string elem = code.substr(elem_start, elem_end - elem_start);
+        result += code.substr(last_pos, end_pos + 2 - last_pos);
+        result += " " + vec_name + ".push_back(" + elem + ");";
+        last_pos = end_pos + 2;
+    }
+    result += code.substr(last_pos);
+    return result;
+}
+
 static std::string transform_to_insert_before(const std::string &code, const std::string &parent_var, const std::string &anchor_var)
 {
     std::string result;
@@ -1193,12 +1224,8 @@ std::string Component::to_webcc(CompilerSession &session)
 
                 std::string item_code = region.item_creation_code;
                 item_code = transform_to_insert_before(item_code, region.parent_element, anchor_var);
+                item_code = track_top_level_inserts(item_code, "_loop_" + std::to_string(region.loop_id) + "_parent", vec_name);
                 ss << indent_code(item_code, "    ");
-
-                if (!region.root_element_var.empty())
-                {
-                    ss << "            " << vec_name << ".push_back(" << region.root_element_var << ");\n";
-                }
                 ss << "        }\n";
                 ss << "        if (--g_view_depth == 0) webcc::flush();\n";
             }
