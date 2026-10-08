@@ -15,7 +15,7 @@ component App {
                 <div class="row">
                     <Tag text={r.id} />
                     <Tag text="sep" />
-                    <for t in r.tags>
+                    <for t in r.tags key={t}>
                         <button onclick={pick(r.id, t)}>{t}</button>
                     </for>
                 </div>
