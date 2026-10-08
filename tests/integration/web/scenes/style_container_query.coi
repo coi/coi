@@ -1,0 +1,11 @@
+// @container and @supports blocks in a component style: the rules inside are scoped like the rest
+component App {
+    style {
+        .wrap { container-type: inline-size; width: 300px; }
+        .box { width: 200px; height: 20px; background: #825fff; }
+        @container (max-width: 400px) { .box { width: 50px; } }
+        @supports (display: grid) { .box { height: 30px; } }
+    }
+    view { <div class="wrap"><div class="box"></div></div> }
+}
+app { root = App; }

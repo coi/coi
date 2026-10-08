@@ -165,8 +165,8 @@ void generate_css_file(
                     continue;
                 }
 
-                // Check for @media
-                if (raw.substr(pos, 6) == "@media")
+                // @media, @container and @supports: the query stays, the rules inside get scoped
+                if (raw.substr(pos, 6) == "@media" || raw.substr(pos, 10) == "@container" || raw.substr(pos, 9) == "@supports")
                 {
                     size_t media_brace = raw.find('{', pos);
                     if (media_brace == std::string::npos)
