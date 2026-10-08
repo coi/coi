@@ -1,0 +1,11 @@
+// string literals picked by a ternary still concatenate with +
+component App {
+    mut bool dark = true;
+    mut bool menu = false;
+    def cls() : string { return (dark ? "app dark" : "app") + (menu ? " menu" : ""); }
+    def toggle() : void { menu = !menu; }
+    view {
+        <div class={cls()} onclick={toggle}>{(menu ? "open" : "closed") + "!"}</div>
+    }
+}
+app { root = App; }

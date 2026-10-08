@@ -6,6 +6,10 @@ bool is_string_expr(Expression* expr) {
     if (auto* bin = dynamic_cast<BinaryOp*>(expr)) {
         if (bin->op == "+" && is_string_expr(bin->left.get())) return true;
     }
+    // (a ? "x" : "y") + ... : two literals would be char pointers in C++
+    if (auto* tern = dynamic_cast<TernaryOp*>(expr)) {
+        if (is_string_expr(tern->true_expr.get()) || is_string_expr(tern->false_expr.get())) return true;
+    }
     return false;
 }
 
