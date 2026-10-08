@@ -141,6 +141,7 @@ int bitMask = 0b11110000;          // Bit mask pattern
 // Floating point
 float32 precise = 3.14;    // 32-bit float (single precision)
 float64 speed = 3.14159;   // 64-bit float (double precision)
+float far = 1.0e9;         // exponent notation is always a float
 float ratio = 0.5;         // Alias for float64
 
 // Other primitives

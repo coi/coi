@@ -15,6 +15,9 @@ component App {
         int bitMask = 0b11110000;
         float32 precise = 3.14;
         float64 speed = 3.14159;
+        float far = 1.0e9;
+        float32 minute = 2.5E-3;
+        float grown = 3e2;
     }
     view { <p>x</p> }
 }

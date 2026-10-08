@@ -81,6 +81,16 @@ Token Lexer::read_number(){
         advance();
     }
 
+    // exponent: 1e9, 2.5E-3; always a float. A bare 'e' stays for the parser
+    if((current() == 'e' || current() == 'E') &&
+       (std::isdigit(peek()) || ((peek() == '+' || peek() == '-') && std::isdigit(peek(2))))){
+        is_float = true;
+        num += current();
+        advance();
+        if(current() == '+' || current() == '-'){ num += current(); advance(); }
+        while(std::isdigit(current())){ num += current(); advance(); }
+    }
+
     return Token{is_float ? TokenType::FLOAT_LITERAL : TokenType::INT_LITERAL, num, start_line, start_column};
 }
 
