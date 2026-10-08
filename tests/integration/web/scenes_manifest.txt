@@ -29,3 +29,4 @@ loop_over_call|tests/integration/web/scenes/loop_over_call.coi|web
 select_value|tests/integration/web/scenes/select_value.coi|web
 if_child_fresh|tests/integration/web/scenes/if_child_fresh.coi|web
 inline_spacing|tests/integration/web/scenes/inline_spacing.coi|web
+style_comment_media|tests/integration/web/scenes/style_comment_media.coi|web

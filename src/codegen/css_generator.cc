@@ -89,7 +89,18 @@ void generate_css_file(
         // Handle @keyframes and @media specially
         if (!comp.css.empty())
         {
-            std::string raw = comp.css;
+            // comments go first: the scoper would read "/* note: x */" as a selector
+            std::string raw;
+            for (size_t i = 0; i < comp.css.size();)
+            {
+                if (comp.css.compare(i, 2, "/*") == 0)
+                {
+                    size_t close = comp.css.find("*/", i + 2);
+                    i = close == std::string::npos ? comp.css.size() : close + 2;
+                    continue;
+                }
+                raw += comp.css[i++];
+            }
             std::string scope_name = qualified_name(comp.module_name, comp.name);
             size_t pos = 0;
 

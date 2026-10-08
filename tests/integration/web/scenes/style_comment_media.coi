@@ -1,0 +1,12 @@
+// a comment before @media or a rule must not end up in the selector
+component App {
+    style {
+        /* the box: a note with a colon in it */
+        .box { width: 200px; height: 20px; background: #825fff; }
+        /* phones: narrower, every viewport in the test counts */
+        @media (max-width: 99999px) { .box { width: 50px; } }
+        /* trailing note */
+    }
+    view { <div class="box"></div> }
+}
+app { root = App; }
