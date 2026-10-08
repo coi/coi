@@ -543,7 +543,10 @@ int main(int argc, char **argv)
 
         std::string output_cc = output_path.string();
 
-        std::ofstream out(output_cc);
+        // temp file + rename: a concurrent build (coi dev) may have app.cc mmapped in clang, truncating it in place is a SIGBUS
+        fs::path tmp_path = output_path;
+        tmp_path += "." + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + ".tmp";
+        std::ofstream out(tmp_path.string());
         if (!out)
         {
             std::cerr << "Error: Could not open output file " << output_cc << std::endl;
@@ -559,6 +562,14 @@ int main(int argc, char **argv)
                           final_app_config, required_headers, features);
 
         out.close();
+        std::error_code rename_err;
+        fs::rename(tmp_path, output_path, rename_err);
+        if (rename_err)
+        {
+            std::cerr << "Error: Could not write " << output_cc << ": " << rename_err.message() << std::endl;
+            fs::remove(tmp_path);
+            return 1;
+        }
         if (keep_cc)
         {
             std::cerr << "Generated " << output_cc << std::endl;
