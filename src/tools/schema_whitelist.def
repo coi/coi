@@ -35,6 +35,8 @@ focus_end
 
 [canvas]
 create_canvas
+# the canvas as a data: URL, for thumbnails
+to_data_url
 get_context_webgl
 get_context_webgpu
 set_size
@@ -149,6 +151,9 @@ open_url
 get_time
 get_date_now
 get_timezone_offset_ms
+# one-shot timer: System.setTimeout(ms, &fired) returns a Timeout, timeout.clearTimeout() cancels
+set_timeout +events(TIMER)
+clear_timeout
 get_pathname
 get_search
 get_query_param

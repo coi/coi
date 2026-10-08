@@ -1,0 +1,24 @@
+// a one-shot timer fires once and runs an update; a cleared one never fires;
+// a canvas exports itself as a data URL
+component TimerDataUrl {
+    mut string fired = "-";
+    mut string wrong = "-";
+    mut string url = "-";
+    mut Timeout keep;
+    mut Timeout dropped;
+
+    mount {
+        Canvas c = Canvas.createCanvas("thumb", 8.0, 8.0);
+        url = c.toDataUrl("image/png", 0.9).subStr(0, 14);
+        dropped = System.setTimeout(30.0, &neverHere);
+        dropped.clearTimeout();
+        keep = System.setTimeout(80.0, &here);
+    }
+
+    def here() : void { fired = "fired"; }
+    def neverHere() : void { wrong = "fired"; }
+
+    view { <div><p class="fired">{fired}</p><p class="wrong">{wrong}</p><p class="url">{url}</p></div> }
+}
+
+app { root = TimerDataUrl; }

@@ -1,0 +1,14 @@
+// Test: a method call on an element of a reference array (items[i].name.isEmpty())
+pod Item { string name; }
+
+component List(mut Item[]& items) {
+    def first() : string { return items[0].name.isEmpty() ? "none" : items[0].name.trim(); }
+    view { <div><p>{first()}</p><p>{items[0].name.isEmpty() ? "none" : items[0].name}</p></div> }
+}
+
+component App {
+    mut Item[] items = [Item{name = " a "}];
+    view { <List &items={items} /> }
+}
+
+app { root = App; }
