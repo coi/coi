@@ -758,13 +758,21 @@ std::vector<Expression*> FunctionCall::get_children() {
 }
 
 void FunctionCall::collect_dependencies(std::set<std::string>& deps) {
-    // Handle object.method() calls - extract the object name
+    // Handle object.method() calls - the receiver's leading variable is the dependency
+    // (items.size(), items[i].name.isEmpty() both read items)
     size_t dot_pos = name.find('.');
     if (dot_pos != std::string::npos) {
-        deps.insert(name.substr(0, dot_pos));
+        size_t k = 0;
+        while (k < name.size() && (std::isalnum(static_cast<unsigned char>(name[k])) || name[k] == '_')) k++;
+        deps.insert(name.substr(0, k > 0 ? k : dot_pos));
     }
     else if (auto it = g_method_reads.find(name); it != g_method_reads.end()) {
         deps.insert(it->second.begin(), it->second.end());
+    }
+    else if (g_method_reads_building && name.find("::") == std::string::npos) {
+        // a plain call while the method reads are being computed: the callee's name,
+        // so a() -> b() -> member closes over every level
+        deps.insert(name);
     }
     // Also traverse children via get_children()
     for (auto* child : get_children()) {

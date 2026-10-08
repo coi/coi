@@ -1,0 +1,20 @@
+// a view binding that reads state through two method calls (a() -> b() -> query) follows it,
+// in a plain binding, an if region and a loop body
+component MethodDepChain {
+    mut string query = "";
+    mut int[] items = [1, 2, 3];
+    def searching() : bool { return !query.isEmpty(); }
+    def label() : string { return searching() ? "on" : "off"; }
+    def shown(int i) : bool { return !searching() || i == 2; }
+    def typed(string v) : void { query = v; }
+    view {
+        <div>
+            <input class="q" value={query} oninput={typed} />
+            <p class="label">{label()}</p>
+            <if searching()><p class="hit">searching</p></if>
+            <for i in items key={i}><span class={shown(i) ? "item" : "item hidden"} style={shown(i) ? "" : "display:none"}>{i}</span></for>
+        </div>
+    }
+}
+
+app { root = MethodDepChain; }

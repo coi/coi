@@ -34,3 +34,4 @@ style_container_query|tests/integration/web/scenes/style_container_query.coi|web
 ref_chain_refresh|tests/integration/web/scenes/ref_chain_refresh.coi|web
 range_loop_rebuild|tests/integration/web/scenes/range_loop_rebuild.coi|web
 timer_data_url|tests/integration/web/scenes/timer_data_url.coi|web
+method_dep_chain|tests/integration/web/scenes/method_dep_chain.coi|web

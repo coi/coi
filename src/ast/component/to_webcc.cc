@@ -313,6 +313,7 @@ std::string Component::to_webcc(CompilerSession &session)
     for (const auto &v : state) member_names.insert(v->name);
     for (const auto &p : params) member_names.insert(p->name);
     std::map<std::string, std::set<std::string>> direct;
+    g_method_reads_building = true;
     for (const auto &m : methods)
     {
         std::set<std::string> reads, kept;
@@ -323,6 +324,7 @@ std::string Component::to_webcc(CompilerSession &session)
                 kept.insert(r);
         direct[m.name] = kept;
     }
+    g_method_reads_building = false;
     for (const auto &m : methods)
     {
         std::set<std::string> seen, out;

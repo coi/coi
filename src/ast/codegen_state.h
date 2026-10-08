@@ -54,3 +54,5 @@ extern std::map<std::string, HtmlLoopVarInfo> g_html_loop_var_infos;
 // state each method of the current component reads, so a binding that calls it
 // (class={isOn(i)}) refreshes when that state changes
 extern std::map<std::string, std::set<std::string>> g_method_reads;
+// true while g_method_reads is being computed: a plain call then counts as a dependency on the callee
+extern bool g_method_reads_building;
