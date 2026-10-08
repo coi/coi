@@ -353,9 +353,19 @@ std::unique_ptr<Expression> Parser::parse_primary()
 
     // Identifer or function call (also allow 'key' and 'data' keywords as identifier)
     // string.fromBytes(...): a type keyword names the type for a static call
-    bool type_static = (current().type == TokenType::STRING || current().type == TokenType::INT ||
+    bool type_keyword = current().type == TokenType::STRING || current().type == TokenType::INT ||
                         current().type == TokenType::FLOAT || current().type == TokenType::FLOAT32 ||
-                        current().type == TokenType::BOOL) && peek().type == TokenType::DOT;
+                        current().type == TokenType::BOOL;
+    bool type_static = type_keyword && peek().type == TokenType::DOT;
+    // Json.parse(string[], json): a primitive array as a type argument
+    if (type_keyword && peek().type == TokenType::LBRACKET && peek(2).type == TokenType::RBRACKET)
+    {
+        std::string t = current().value;
+        advance();
+        advance();
+        advance();
+        return std::make_unique<TypeLiteral>(t + "[]");
+    }
     if (is_identifier_token() || type_static)
     {
         std::string name = current().value;

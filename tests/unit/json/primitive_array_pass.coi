@@ -1,0 +1,18 @@
+// Test: Json.parse of a primitive array
+component App {
+    mut int n = 0;
+    mut string s = "[\"a\", \"b\"]";
+    init {
+        match (Json.parse(string[], s)) {
+            Success(string[] list, Meta m) => { n = list.size(); };
+            Error(string e) => { n = -1; };
+        };
+        match (Json.parse(int[], "[1, 2, 3]")) {
+            Success(int[] xs, Meta m) => { n += xs.size(); };
+            Error(string e) => { n = -1; };
+        };
+    }
+    view { <p>{n}</p> }
+}
+
+app { root = App; }

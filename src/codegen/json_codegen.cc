@@ -5,6 +5,7 @@
 #include "json_codegen.h"
 #include <cstdint>
 #include <sstream>
+#include <set>
 #include <cctype>
 
 // ============================================================================
@@ -273,7 +274,49 @@ static std::string generate_json_parse_array(
 {
     std::string elem_type = get_array_element_type(array_type);
     if (!DataTypeRegistry::instance().lookup(elem_type)) {
-        return "/* Error: Unknown element type '" + elem_type + "' for Json.parse */";
+        // Json.parse(string[], json): a list of scalars, the meta has nothing to say
+        static const std::set<std::string> scalars = {"string", "bool", "int", "int8", "int16", "int32", "int64",
+                                                       "uint8", "uint16", "uint32", "uint64", "float", "float32", "float64"};
+        if (!scalars.count(elem_type))
+            return "/* Error: Unknown element type '" + elem_type + "' for Json.parse */";
+        std::string cpp = convert_type(elem_type);
+        std::stringstream ss;
+        ss << "[&]() {\n";
+        ss << "            const coi::string& _json_str = (" << json_expr << ");\n"
+           << "            coi::string_view _json = _json_str;\n";
+        ss << "            const char* _s = _json.data();\n";
+        ss << "            uint32_t _len = _json.length();\n";
+        ss << "            struct __JsonParseResult {\n";
+        ss << "                struct __SuccessPayload { coi::vector<" << cpp << "> _0; __coi_json::MetaBase _1; };\n";
+        ss << "                struct __ErrorPayload { coi::string _0; };\n";
+        ss << "                bool ok;\n";
+        ss << "                coi::vector<" << cpp << "> value;\n";
+        ss << "                __coi_json::MetaBase meta;\n";
+        ss << "                coi::string error;\n";
+        ss << "                __SuccessPayload success;\n";
+        ss << "                __ErrorPayload error_payload;\n";
+        ss << "                bool is_Success() const { return ok; }\n";
+        ss << "                bool is_Error() const { return !ok; }\n";
+        ss << "                const __SuccessPayload& as_Success() const { return success; }\n";
+        ss << "                const __ErrorPayload& as_Error() const { return error_payload; }\n";
+        ss << "            } _r{};\n";
+        ss << "            uint32_t _p = __coi_json::skip_ws(_s, 0, _len);\n";
+        ss << "            if (_p >= _len || _s[_p] != '[') {\n";
+        ss << "                _r.ok = false;\n";
+        ss << "                _r.error = \"Expected JSON array\";\n";
+        ss << "                _r.error_payload._0 = _r.error;\n";
+        ss << "                return _r;\n";
+        ss << "            }\n";
+        ss << "            _r.ok = true;\n";
+        ss << "            __coi_json::for_each(_s, _p, _len, [&](const char* _es, uint32_t _ep, uint32_t _elen) {\n";
+        ss << "                bool _ok;\n";
+        ss << "                _r.value.push_back(" << extract_scalar(scalar_kind(elem_type), cpp, "_es", "_ep", "_elen", "_ok") << ");\n";
+        ss << "                (void)_ok;\n";
+        ss << "            });\n";
+        ss << "            _r.success._0 = _r.value;\n";
+        ss << "            return _r;\n";
+        ss << "        }()";
+        return ss.str();
     }
     
     std::stringstream ss;
