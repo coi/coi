@@ -1604,6 +1604,12 @@ std::string Component::to_webcc(CompilerSession &session)
         return it->second.pub_mut_members.count(mem_dep.member) > 0;
     };
 
+    // a pub member component counts as changed when one of its own pub members changes, so
+    // an owner further up that reads a.b.c hears about it through a.onBChange
+    auto relays_child = [&](const std::string &var_name) {
+        return pub_mut_vars.count(var_name) && generated_updaters.count(var_name);
+    };
+
     auto emit_member_dependency_callbacks = [&]() {
         for (const auto &[mem_dep, methods] : member_dep_update_methods)
         {
@@ -1615,7 +1621,27 @@ std::string Component::to_webcc(CompilerSession &session)
             {
                 ss << " " << method_name << "();";
             }
+            if (relays_child(mem_dep.object))
+                ss << " _update_" << mem_dep.object << "();";
             ss << " };\n";
+        }
+    };
+
+    // pub member components this view doesn't read itself still relay their changes up
+    auto emit_pub_member_relays = [&]() {
+        for (const auto &var : state)
+        {
+            if (!relays_child(var->name))
+                continue;
+            auto it = session.component_info.find(resolve_component_type(var->type));
+            if (it == session.component_info.end())
+                continue;
+            for (const auto &member : it->second.pub_mut_members)
+            {
+                if (member_dep_update_methods.count(MemberDependency{var->name, member}))
+                    continue;
+                ss << "        " << var->name << "." << make_callback_name(member) << " = [this]() { _update_" << var->name << "(); };\n";
+            }
         }
     };
 
@@ -1753,6 +1779,7 @@ std::string Component::to_webcc(CompilerSession &session)
 
     // Wire up nested component reactivity (e.g., Vector.x/y -> Ball._update_x/y)
     emit_nested_component_reactivity();
+    emit_pub_member_relays();
     emit_constructed_member_refs();
 
     // Wire signal listeners declared in listen { ... }
@@ -1778,6 +1805,7 @@ std::string Component::to_webcc(CompilerSession &session)
 
     // Re-wire nested component reactivity after reallocation
     emit_nested_component_reactivity();
+    emit_pub_member_relays();
     emit_constructed_member_refs();
 
     // Re-wire listen block signal handlers after reallocation

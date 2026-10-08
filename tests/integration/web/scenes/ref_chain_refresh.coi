@@ -1,9 +1,11 @@
 // a shared pod by reference through three levels: a write at the top (from a click and from
-// a key) must reach the bottom view; a write at the bottom must reach the top
+// a key) must reach the bottom view; a write at the bottom must reach the top. Also a pub
+// member two levels down (mid.leaf.status) read by the top view
 pod Shared { int n; string mode; }
 
 component Leaf(mut Shared& common, def onBump : void) {
-    def bump() : void { common.n++; onBump(); }
+    pub mut string status = "idle";
+    def bump() : void { common.n++; status = `bumped ${common.n}`; onBump(); }
     def label() : string { return common.mode == "on" ? "leaf on" : "leaf off"; }
     view { <div><p class="leaf-n">{common.n}</p><p class="leaf-mode">{label()}</p><button class="leaf-bump" onclick={bump}>bump</button></div> }
 }
@@ -21,7 +23,7 @@ component App {
     mount { Input.onKeyDown(&key); }
     def key(KeyDownEvent e) : void { if (e.key == "m") common.mode = common.mode == "on" ? "off" : "on"; }
     def add() : void { common.n++; }
-    view { <div><p class="top-n">{common.n}</p><button class="top-add" onclick={add}>add</button><{mid} /></div> }
+    view { <div><p class="top-n">{common.n}</p><p class="top-status">{mid.leaf.status}</p><button class="top-add" onclick={add}>add</button><{mid} /></div> }
 }
 
 app { root = App; }

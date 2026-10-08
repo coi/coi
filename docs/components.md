@@ -128,7 +128,7 @@ component App {
 
 ### Reference Parameters (`&`)
 
-Reference parameters allow child components to modify the parent's state directly:
+Reference parameters allow child components to modify the parent's state directly. A change made through the reference updates every component that holds it, however many levels apart: a write at the top refreshes the children built with `&value` and their children, and a write at the bottom refreshes the owner and its other children.
 
 ```tsx
 // Declaration

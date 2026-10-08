@@ -14,4 +14,6 @@ export async function run({ page, expect }) {
   await page.locator(".leaf-bump").click();
   await page.waitForFunction(() => document.querySelector(".top-n")?.textContent === "3");
   await expect.textContains(page.locator(".mid-n"), "3");
+  // a pub member two levels down, read by the top view
+  await expect.textContains(page.locator(".top-status"), "bumped 3");
 }

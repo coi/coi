@@ -316,6 +316,10 @@ void generate_cpp_code(
             if (param->is_reference)
                 info.ref_params.insert(param->name);
         }
+        // pub mut state has the same onXChange hook as a pub mut param
+        for (const auto &var : comp->state)
+            if (var->is_public && var->is_mutable)
+                info.pub_mut_members.insert(var->name);
         session.component_info[qualified_name(comp->module_name, comp->name)] = info;
     }
 
