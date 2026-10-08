@@ -1173,6 +1173,14 @@ std::string MethodCall::to_webcc() {
         else if (dynamic_cast<IntLiteral*>(receiver.get())) type = "int32";
         else if (dynamic_cast<FloatLiteral*>(receiver.get())) type = "float64";
         else if (dynamic_cast<BoolLiteral*>(receiver.get())) type = "bool";
+        else if (auto* call = dynamic_cast<FunctionCall*>(receiver.get())) {
+            // System.getDateNow().toInt64() in a view: the checker didn't type it, the def says
+            size_t dot = call->name.rfind('.');
+            if (dot != std::string::npos) {
+                const auto* m = DefSchema::instance().lookup_method(call->name.substr(0, dot), call->name.substr(dot + 1));
+                if (m && !m->return_type.empty()) type = m->return_type;
+            }
+        }
     }
     std::string def_type = !type.empty() && type.back() == ']' ? "array" : DefSchema::instance().resolve_alias(type);
     std::string recv = receiver->to_webcc();
