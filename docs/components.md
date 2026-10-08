@@ -362,6 +362,8 @@ component App {
 }
 ```
 
+A parent can also read a child's `pub mut` state in its view, as `{timer.elapsed}` above, and through a chain of members (`{clock.timer.elapsed}` when `Clock` has a `pub mut Timer timer`): a change anywhere down the chain updates the binding.
+
 ## Persisting Component State
 
 Components inside `<if>` branches are destroyed when the condition changes. To persist state, declare as a member:
