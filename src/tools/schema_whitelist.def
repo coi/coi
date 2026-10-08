@@ -37,6 +37,7 @@ focus_end
 create_canvas
 # the canvas as a data: URL, for thumbnails
 to_data_url
+to_bytes
 get_context_webgl
 get_context_webgpu
 set_size
@@ -125,6 +126,8 @@ set_item
 get_item
 remove_item
 clear
+# the answer arrives as PERSISTED; subscribing asks
+persist +listen(PERSISTED)
 
 [fetch]
 # DONE needs bytes, only on request()
