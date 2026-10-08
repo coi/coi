@@ -650,6 +650,18 @@ void EmitStatement::collect_dependencies(std::set<std::string> &deps)
     }
 }
 
+// the variable an lvalue chain starts from: a.b[i].c -> a
+static Identifier *root_identifier(Expression *expr)
+{
+    while (true)
+    {
+        if (auto member = dynamic_cast<MemberAccess *>(expr)) expr = member->object.get();
+        else if (auto idx = dynamic_cast<IndexAccess *>(expr)) expr = idx->array.get();
+        else break;
+    }
+    return dynamic_cast<Identifier *>(expr);
+}
+
 void collect_mods_recursive(ASTNode *node, std::set<std::string> &mods)
 {
     if (!node)
@@ -686,7 +698,8 @@ void collect_mods_recursive(ASTNode *node, std::set<std::string> &mods)
     }
     else if (auto postfix = dynamic_cast<PostfixOp *>(node))
     {
-        if (auto id = dynamic_cast<Identifier *>(postfix->operand.get()))
+        // page.sheets++ and items[i]++ modify page and items, like an assignment would
+        if (auto id = root_identifier(postfix->operand.get()))
         {
             mods.insert(id->name);
         }
@@ -695,7 +708,7 @@ void collect_mods_recursive(ASTNode *node, std::set<std::string> &mods)
     {
         if (unary->op == "++" || unary->op == "--")
         {
-            if (auto id = dynamic_cast<Identifier *>(unary->operand.get()))
+            if (auto id = root_identifier(unary->operand.get()))
             {
                 mods.insert(id->name);
             }

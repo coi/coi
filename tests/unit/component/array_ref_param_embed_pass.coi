@@ -1,0 +1,24 @@
+// Test: a component with a reference parameter, built in code and embedded from an array
+pod Shared { int zoom; }
+
+component Box(pub int id, mut Shared& common, def onPick(int) : void) {
+    def go() : void { common.zoom++; onPick(id); }
+    view { <button onclick={go}>{id} {common.zoom}</button> }
+}
+
+component App {
+    mut Shared common = Shared{zoom = 1};
+    mut Box[] boxes;
+    mut int picked = 0;
+    def pick(int id) : void { picked = id; }
+    def add() : void { boxes.push(Box(boxes.size() + 1, &common, &pick)); }
+    view {
+        <div>
+            <button onclick={add}>add</button>
+            <for b in boxes key={b.id}><{b} /></for>
+            <p>{picked}</p>
+        </div>
+    }
+}
+
+app { root = App; }

@@ -1463,22 +1463,6 @@ std::string Component::to_webcc(CompilerSession &session)
         ss << "    }\n";
     }
 
-    // _refresh_<param>: what a parent calls after changing something the param refers to.
-    // _update_ only redoes bindings; regions are synced by the method epilogue, which the
-    // parent's change never runs here.
-    for (const auto &param : params)
-    {
-        const std::string &v = param->name;
-        ss << "    void _refresh_" << v << "() { if (!_coi_alive) return;";
-        if (generated_updaters.count(v))
-            ss << " _update_" << v << "();";
-        for (int if_id : var_to_if_ids[v])
-            ss << " _sync_if_" << if_id << "();";
-        for (int loop_id : var_to_loop_ids[v])
-            ss << " _sync_loop_" << loop_id << "();";
-        ss << " }\n";
-    }
-
     // Build child updates map
     std::map<std::string, std::vector<std::string>> child_updates;
     std::map<std::string, int> update_counters;
@@ -1506,6 +1490,26 @@ std::string Component::to_webcc(CompilerSession &session)
             member_refs.push_back({var->name, param, id->name});
             child_updates[id->name].push_back("        " + var->name + "._refresh_" + param + "();\n");
         }
+    }
+
+    // _refresh_<param>: what a parent calls after changing something the param refers to.
+    // _update_ only redoes bindings; regions are synced by the method epilogue, which the
+    // parent's change never runs here. Children that got the same reference (or a prop
+    // computed from it) are refreshed too, so a change two levels up still reaches them.
+    for (const auto &param : params)
+    {
+        const std::string &v = param->name;
+        ss << "    void _refresh_" << v << "() { if (!_coi_alive) return;";
+        if (generated_updaters.count(v))
+            ss << " _update_" << v << "();";
+        for (int if_id : var_to_if_ids[v])
+            ss << " _sync_if_" << if_id << "();";
+        for (int loop_id : var_to_loop_ids[v])
+            ss << " _sync_loop_" << loop_id << "();";
+        ss << "\n";
+        for (const auto &call : child_updates[v])
+            ss << call;
+        ss << "    }\n";
     }
 
     // Helper lambda for method generation
@@ -1630,6 +1634,9 @@ std::string Component::to_webcc(CompilerSession &session)
         }
     };
 
+    // a child wrote through a reference it was built with: redo this component's bindings,
+    // refresh the other children sharing the value, and pass the change up when the value
+    // is itself a reference from above
     auto emit_constructed_member_refs = [&]() {
         for (const auto &ref : member_refs)
         {
@@ -1641,6 +1648,12 @@ std::string Component::to_webcc(CompilerSession &session)
             if (!g_component_array_loops.count(ref.var) && !g_array_loops.count(ref.var))
                 for (int loop_id : var_to_loop_ids[ref.var])
                     ss << " _sync_loop_" << loop_id << "();";
+            std::string own = "        " + ref.member + "._refresh_" + ref.param + "();\n";
+            for (const auto &call : child_updates[ref.var])
+                if (call != own)
+                    ss << " " << call.substr(8, call.size() - 10) << ";";
+            if (g_ref_props.count(ref.var) && !pub_mut_vars.count(ref.var))
+                ss << " if(" << make_callback_name(ref.var) << ") " << make_callback_name(ref.var) << "();";
             ss << " };\n";
         }
     };
