@@ -492,7 +492,7 @@ int main(int argc, char **argv)
             all_global_data.push_back(std::move(pod));
         }
 
-        validate_view_hierarchy(all_components, file_imports);
+        validate_view_hierarchy(all_components, all_global_functions, file_imports);
         validate_type_imports(all_components, all_global_enums, all_global_data, file_imports);
         validate_mutability(all_components);
         validate_types(all_components, all_global_enums, all_global_data, all_global_functions, file_imports);

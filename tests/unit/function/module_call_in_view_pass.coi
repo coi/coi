@@ -1,0 +1,10 @@
+// Test: a module function called inside a view expression
+import "modules/Geometry.coi";
+
+component App {
+    mut Geometry::Point a = Geometry::Point(0.0, 0.0);
+    mut Geometry::Point b = Geometry::Point(3.0, 4.0);
+    view { <p class={Geometry::dist2(a, b) > 1.0 ? "far" : "near"}>{Geometry::dist2(a, b)}</p> }
+}
+
+app { root = App; }

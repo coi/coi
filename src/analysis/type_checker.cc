@@ -3239,8 +3239,15 @@ void validate_mutability(const std::vector<Component> &components)
 }
 
 void validate_view_hierarchy(const std::vector<Component> &components,
+                             const std::vector<std::unique_ptr<FunctionDef>> &functions,
                              const std::map<std::string, std::set<std::string>> &file_imports)
 {
+    // module functions can be called from a view too: Ink::presetOf(ink)
+    g_free_functions.clear();
+    for (const auto &fn : functions)
+        g_free_functions.push_back(fn.get());
+    g_file_imports = &file_imports;
+
     // Map from qualified name (Module_Name or just Name) to component
     std::map<std::string, const Component *> component_map;
     // Also map from just name to all matching components (for ambiguity detection)
@@ -3694,6 +3701,9 @@ void validate_view_hierarchy(const std::vector<Component> &components,
 
     for (const auto &comp : components)
     {
+        g_ctx_module = comp.module_name;
+        g_ctx_file = comp.source_file;
+        g_ctx_component = &comp;
         std::map<std::string, std::string> scope = build_scope(&comp);
         for (const auto &root : comp.render_roots)
         {
@@ -3821,6 +3831,10 @@ void validate_view_hierarchy(const std::vector<Component> &components,
             }
         }
     }
+    g_ctx_module.clear();
+    g_ctx_file.clear();
+    g_ctx_component = nullptr;
+    g_file_imports = nullptr;
 }
 
 void validate_type_imports(const std::vector<Component> &components,

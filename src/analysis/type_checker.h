@@ -38,6 +38,7 @@ void validate_mutability(const std::vector<Component> &components);
 // - Callback argument types match
 // - Import visibility (no transitive imports)
 void validate_view_hierarchy(const std::vector<Component> &components,
+                             const std::vector<std::unique_ptr<FunctionDef>> &functions,
                              const std::map<std::string, std::set<std::string>> &file_imports = {});
 
 // Validate import visibility for types:
