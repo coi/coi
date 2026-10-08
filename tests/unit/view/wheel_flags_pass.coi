@@ -1,0 +1,11 @@
+// wheelflags: only ctrl/meta wheel and pinches are taken, the page still scrolls
+component App {
+    mut float zoom = 1.0;
+    def wheel(WheelEvent e) : void { if ((e.mods & Mods.Ctrl) != 0) zoom *= 1.0 - e.deltaY * 0.001; }
+    view {
+        <div class="stage" onwheel={wheel} wheelflags={WheelFlags.ZoomOnly}>
+            <p>{zoom}</p>
+        </div>
+    }
+}
+app { root = App; }
