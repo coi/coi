@@ -345,8 +345,10 @@ void ComponentInstantiation::generate_code(ViewCodegenContext& ctx)
         std::string vector_name = "_loop_" + qname + "s";
         instance_name = vector_name + "[" + vector_name + ".size() - 1]";
         ctx.ss << "        " << vector_name << ".push_back(" << qname << "());\n";
-        ctx.ss << "        auto& _inst = " << instance_name << ";\n";
-        instance_name = "_inst";
+        // one alias per instance: two components in the same loop body share a scope
+        std::string alias = "_inst_" + qname + "_" + std::to_string(id);
+        ctx.ss << "        auto& " << alias << " = " << instance_name << ";\n";
+        instance_name = alias;
     }
     else
     {

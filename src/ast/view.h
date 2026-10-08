@@ -127,11 +127,12 @@ struct ViewCodegenContext {
     }
 
     // loop body context, writes to its own snippet
+    // a nested loop's handlers capture every enclosing loop variable: "p, nb"
     ViewCodegenContext for_loop(std::stringstream& body_ss, HandleBlock& body_handles,
                                 const std::string& new_parent, const std::string& var_name) const {
         return ViewCodegenContext{body_ss, new_parent, counter, event_handlers, bindings,
             component_counters, method_names, parent_component_name, true,
-            nullptr, nullptr, nullptr, nullptr, var_name, &body_handles};
+            nullptr, nullptr, nullptr, nullptr, loop_var_name.empty() ? var_name : loop_var_name + ", " + var_name, &body_handles};
     }
 
     std::string next_handle() { return handles->next(); }

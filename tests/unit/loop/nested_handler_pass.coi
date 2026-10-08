@@ -1,0 +1,28 @@
+// Test: a handler in a nested loop sees both loop variables; two components in one loop body
+pod Row { string id; string[] tags; }
+
+component Tag(string text) {
+    view { <span class="tag">{text}</span> }
+}
+
+component App {
+    mut Row[] rows = [Row{id = "a", tags = ["x", "y"]}, Row{id = "b", tags = ["z"]}];
+    mut string picked = "";
+    def pick(string row, string tag) : void { picked = `${row}:${tag}`; }
+    view {
+        <div>
+            <for r in rows key={r.id}>
+                <div class="row">
+                    <Tag text={r.id} />
+                    <Tag text="sep" />
+                    <for t in r.tags>
+                        <button onclick={pick(r.id, t)}>{t}</button>
+                    </for>
+                </div>
+            </for>
+            <p>{picked}</p>
+        </div>
+    }
+}
+
+app { root = App; }
