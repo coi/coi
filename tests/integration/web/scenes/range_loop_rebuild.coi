@@ -1,0 +1,23 @@
+// elements over a range: a body binding that reads outer state follows that state even when
+// the range is unchanged; the loop variable starts at the start expression; clicks still work
+component RangeLoopRebuild {
+    mut int count = 3;
+    mut string mode = "a";
+    mut int picked = -1;
+
+    def cls() : string { return mode == "a" ? "item a" : "item b"; }
+    def flip() : void { mode = mode == "a" ? "b" : "a"; }
+    def more() : void { count++; }
+    def pick(int i) : void { picked = i; }
+
+    view {
+        <div>
+            <button class="flip" onclick={flip}>flip</button>
+            <button class="more" onclick={more}>more</button>
+            <div class="list"><for i in 1:count><span class={cls()} onclick={pick(i)}>{i}</span></for></div>
+            <p class="picked">{picked}</p>
+        </div>
+    }
+}
+
+app { root = RangeLoopRebuild; }

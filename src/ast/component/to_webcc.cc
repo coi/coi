@@ -1134,8 +1134,9 @@ std::string Component::to_webcc(CompilerSession &session)
         {
             ss << "        int new_count = " << region.end_expr << " - " << region.start_expr << ";\n";
             ss << "        int old_count = _loop_" << region.loop_id << "_count;\n";
-            ss << "        if (new_count == old_count) return;\n";
-            ss << "        \n";
+            if (!(region.is_html_loop && region.component_type.empty()))
+                ss << "        if (new_count == old_count) return;\n";
+            ss << "        (void)old_count;\n";
 
             if (!region.component_type.empty())
             {
@@ -1168,11 +1169,25 @@ std::string Component::to_webcc(CompilerSession &session)
             }
             else if (region.is_html_loop)
             {
+                // elements over a range: a sync runs when the range or anything the body reads
+                // changed, so the items are rebuilt in full, like a keyed loop's. The loop variable
+                // runs from the start expression, not from zero
                 std::string vec_name = "_loop_" + std::to_string(region.loop_id) + "_elements";
                 std::string anchor_var = "_loop_" + std::to_string(region.loop_id) + "_anchor";
 
-                ss << "        if (new_count > old_count) {\n";
-                ss << "            for (int " << region.var_name << " = old_count; " << region.var_name << " < new_count; " << region.var_name << "++) {\n";
+                ss << "        for (auto& _el : " << vec_name << ") {\n";
+                for (const auto &spec : get_event_specs())
+                {
+                    if (loop_region_uses_dispatcher(region, spec.dispatcher_name))
+                    {
+                        ss << "            " << spec.dispatcher_name << ".remove(_el);\n";
+                    }
+                }
+                ss << "            webcc::dom::remove_element(_el);\n";
+                ss << "        }\n";
+                ss << "        " << vec_name << ".clear();\n";
+                ss << "        g_view_depth++;\n";
+                ss << "        for (int " << region.var_name << " = " << region.start_expr << "; " << region.var_name << " < " << region.end_expr << "; " << region.var_name << "++) {\n";
 
                 std::string item_code = region.item_creation_code;
                 item_code = transform_to_insert_before(item_code, region.parent_element, anchor_var);
@@ -1182,13 +1197,8 @@ std::string Component::to_webcc(CompilerSession &session)
                 {
                     ss << "            " << vec_name << ".push_back(" << region.root_element_var << ");\n";
                 }
-                ss << "            }\n";
-                ss << "        } else {\n";
-                ss << "            while ((int)" << vec_name << ".size() > new_count) {\n";
-                ss << "                webcc::dom::remove_element(" << vec_name << "[" << vec_name << ".size() - 1]);\n";
-                ss << "                " << vec_name << ".pop_back();\n";
-                ss << "            }\n";
                 ss << "        }\n";
+                ss << "        if (--g_view_depth == 0) webcc::flush();\n";
             }
             ss << "        _loop_" << region.loop_id << "_count = new_count;\n";
         }
