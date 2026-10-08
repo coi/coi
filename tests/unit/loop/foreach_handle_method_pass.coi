@@ -1,0 +1,20 @@
+// Test: a mapped method on a for-each variable of a handle type (im.free -> webcc::image::free)
+component Test {
+    mut Image[] images;
+    mut Blob[] blobs;
+
+    def clear() : void {
+        for im in images { im.free(); }
+        for b in blobs { b.free(); }
+        images = [];
+        blobs = [];
+    }
+
+    view {
+        <div onclick={clear}>clear</div>
+    }
+}
+
+app {
+    root = Test;
+}

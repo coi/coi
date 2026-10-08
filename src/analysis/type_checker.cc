@@ -1233,6 +1233,8 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
             
             // `r.servers.size()` on a local pod: the variable to look up is `r`
             std::string obj_base = obj_name.substr(0, obj_name.find('.'));
+            if (is_simple_identifier && scope.count(obj_name))
+                func->receiver_type = scope.at(obj_name);
             if (is_simple_identifier && !obj_name.empty() && scope.find(obj_base) == scope.end())
             {
                 // Check if it's a handle type or enum - those are validated by schema lookup below

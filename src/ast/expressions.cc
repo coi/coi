@@ -516,7 +516,7 @@ std::string FunctionCall::to_webcc() {
             // Instance call: obj.method() - resolve using known symbol type only.
             // This avoids false-positive remapping based solely on method name
             // (e.g., auth.configure() incorrectly mapping to wgpu::configure).
-            std::string obj_type = ComponentTypeContext::instance().get_symbol_type(lookup_obj);
+            std::string obj_type = receiver_type.empty() ? ComponentTypeContext::instance().get_symbol_type(lookup_obj) : receiver_type;
             if (!obj_type.empty()) {
                 // Array and fixed-size array variables do not have @map instance methods.
                 if (obj_type.ends_with("[]")) {
