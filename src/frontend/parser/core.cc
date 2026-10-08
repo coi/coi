@@ -1,3 +1,4 @@
+#include <unordered_set>
 #include "parser.h"
 #include "defs/def_parser.h"
 #include "cli/error.h"
@@ -60,6 +61,21 @@ void Parser::expect(TokenType type, const std::string &msg)
     {
         ErrorHandler::compiler_error(msg, current().line);
     }
+}
+
+// names go into the generated C++ as they are, so C++ keywords and alternative tokens can't be names
+void Parser::check_name(const std::string &name, int line)
+{
+    static const std::unordered_set<std::string> cpp = {
+        "alignas", "alignof", "and", "and_eq", "asm", "auto", "bitand", "bitor", "case", "catch", "char", "char8_t", "char16_t",
+        "char32_t", "class", "compl", "concept", "const", "consteval", "constexpr", "constinit", "const_cast", "co_await",
+        "co_return", "co_yield", "decltype", "default", "delete", "do", "double", "dynamic_cast", "explicit", "export", "extern",
+        "friend", "goto", "inline", "long", "mutable", "namespace", "new", "noexcept", "not", "not_eq", "nullptr", "operator",
+        "or", "or_eq", "private", "protected", "public", "register", "reinterpret_cast", "requires", "short", "signed", "sizeof",
+        "static", "static_assert", "static_cast", "struct", "switch", "template", "this", "thread_local", "throw", "try", "typedef",
+        "typeid", "typename", "union", "unsigned", "using", "virtual", "volatile", "wchar_t", "xor", "xor_eq"};
+    if (cpp.count(name))
+        ErrorHandler::compiler_error("'" + name + "' can't be a name: it is a keyword in the C++ the compiler writes", line);
 }
 
 // Check if current token is a type keyword (INT, STRING, FLOAT, etc.) or identifier
