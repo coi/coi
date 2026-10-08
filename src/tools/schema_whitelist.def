@@ -17,6 +17,8 @@ remove_pointer_listener
 add_pointer_listener +listen(POINTER) flags=1
 add_wheel_listener +listen(WHEEL) flags=1
 observe_resize +listen(RESIZE)
+add_scroll_listener +listen(SCROLL)
+remove_scroll_listener
 add_focus_listener +listen(FOCUS, BLUR)
 add_drop_listener +listen(DROP)
 # text boxes over a canvas

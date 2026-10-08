@@ -8,6 +8,7 @@ component EventAttrsPass {
     mut int[] items = [1, 2, 3];
     mut int picked = 0;
     mut string dropped = "";
+    mut float top = 0.0;
 
     def down(PointerEvent e) : void { x = e.x; }
     def move(PointerPhase phase, int id, PointerType type) : void { moves++; }
@@ -20,9 +21,10 @@ component EventAttrsPass {
     def lostFocus() : void { focused = false; }
     def pick(int i) : void { picked = i; }
     def drop(Blob data, string name) : void { dropped = name; data.free(); }
+    def scrolled(ScrollEvent e) : void { top = e.top; }
 
     view {
-        <div onresize={sized} ondrop={drop}>
+        <div onresize={sized} ondrop={drop} onscroll={scrolled}>
             <canvas onpointerdown={down} onpointermove={move} onpointerup={up} onwheel={zoom}
                     pointerflags={PointerFlags.Capture | PointerFlags.Coalesced | PointerFlags.NoScroll | PointerFlags.Predict}></canvas>
             <input onfocus={gotFocus} onblur={lostFocus} />

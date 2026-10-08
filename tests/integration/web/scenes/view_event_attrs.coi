@@ -1,4 +1,4 @@
-// view event attributes: drag, focus/blur, loop item, if region
+// view event attributes: drag, focus/blur, loop item, if region, scroll
 component ViewEventAttrs {
     mut string drag = "-";
     mut int moves = 0;
@@ -7,6 +7,7 @@ component ViewEventAttrs {
     mut int toggledHits = 0;
     mut int picked = 0;
     mut int[] items = [1, 2, 3];
+    mut int scrollTop = -1;
 
     def down(PointerEvent e) : void { moves = 0; drag = `down ${e.x.toInt()}`; }
     def move() : void { moves++; }
@@ -16,6 +17,7 @@ component ViewEventAttrs {
     def hit() : void { toggledHits++; }
     def flip() : void { show = !show; }
     def pick(int i) : void { picked = i; }
+    def scrolled(ScrollEvent e) : void { scrollTop = e.top.toInt(); }
 
     view {
         <div>
@@ -35,6 +37,8 @@ component ViewEventAttrs {
                 <span class={`item item${item}`} onpointerdown={pick(item)}>[{item}]</span>
             </for>
             <p class="picked">{picked}</p>
+            <div class="scroller" onscroll={scrolled} style="height:50px;overflow:auto"><div style="height:400px"></div></div>
+            <p class="scrolltop">{scrollTop}</p>
         </div>
     }
 }

@@ -21,4 +21,9 @@ export async function run({ page, expect }) {
 
   await page.locator(".item2").click();
   await expect.textContains(page.locator(".picked"), "2");
+
+  // scroll: one event with the offset, nothing before the user scrolls
+  await expect.textContains(page.locator(".scrolltop"), "-1");
+  await page.locator(".scroller").evaluate((el) => { el.scrollTop = 120; });
+  await page.waitForFunction(() => document.querySelector(".scrolltop")?.textContent === "120");
 }

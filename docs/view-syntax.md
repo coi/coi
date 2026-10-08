@@ -180,6 +180,7 @@ component Sketch {
 | `onpointerdown`, `onpointermove`, `onpointerup`, `onpointercancel`, `onpointerpredicted` | `PointerEvent` | One phase each. Cancel means the browser took over (e.g. a touch became a scroll): not a finished stroke |
 | `onwheel` | `WheelEvent` | The page doesn't scroll or zoom while over the element. A trackpad pinch has `Mods.Ctrl` set. `wheelflags={WheelFlags.ZoomOnly}` keeps normal scrolling and only takes ctrl/meta wheel and pinches |
 | `onresize` | `ResizeEvent` | Once when the element appears, then on every size or pixel-ratio change |
+| `onscroll` | `ScrollEvent` | The element's `left` and `top` scroll offsets, at most once per frame; scrolling itself is never delayed |
 | `onfocus`, `onblur` | nothing | |
 | `ondrop` | `(Blob data, string name, string mime, float x, float y, int index, int count)` | One call per dropped file. No pod, since `Blob` is a handle |
 
