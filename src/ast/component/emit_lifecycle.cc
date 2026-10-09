@@ -1,3 +1,4 @@
+#include "../../codegen/codegen_utils.h"
 #include "defs/def_parser.h"
 #include "component.h"
 
@@ -34,7 +35,7 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
         for (size_t i = 0; i < component.listen_entries.size(); ++i)
         {
             const auto &entry = component.listen_entries[i];
-            std::string target_expr = entry.target_is_reference ? ("(*" + entry.target_name + ")") : entry.target_name;
+            std::string target_expr = entry.target_is_reference ? ("(*" + cpp_name(entry.target_name) + ")") : cpp_name(entry.target_name);
             ss << "        if (_listen_reg_" << i << " != 0) {\n";
             ss << "            " << target_expr << "._remove_listener_" << entry.signal_name << "(_listen_reg_" << i << ");\n";
             ss << "            _listen_reg_" << i << " = 0;\n";
@@ -60,7 +61,7 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
             }
             if (cleanup.empty())
                 continue;
-            ss << "        if (" << var->name << ".is_valid()) { webcc::" << cleanup << "(" << var->name << "); }\n";
+            ss << "        if (" << cpp_name(var->name) << ".is_valid()) { webcc::" << cleanup << "(" << cpp_name(var->name) << "); }\n";
         }
     };
 
@@ -89,9 +90,9 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
         if (resolve_component_qname(session, component.module_name, t).empty())
             continue;
         if (is_vec)
-            ss << "        for (int _i = 0; _i < (int)" << var->name << ".size(); _i++) " << var->name << "[_i]._destroy();\n";
+            ss << "        for (int _i = 0; _i < (int)" << cpp_name(var->name) << ".size(); _i++) " << cpp_name(var->name) << "[_i]._destroy();\n";
         else
-            ss << "        " << var->name << "._destroy();\n";
+            ss << "        " << cpp_name(var->name) << "._destroy();\n";
     }
 
     // Collect all elements that are conditionally created in if/else regions
@@ -509,9 +510,9 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
         for (const auto *var : tickable_state_members)
         {
             if (var->type.ends_with("[]"))
-                ss << "        for (auto &_c : " << var->name << ") _c.tick(dt);\n";
+                ss << "        for (auto &_c : " << cpp_name(var->name) << ") _c.tick(dt);\n";
             else
-                ss << "        " << var->name << ".tick(dt);\n";
+                ss << "        " << cpp_name(var->name) << ".tick(dt);\n";
         }
 
         // Forward tick to the currently-mounted route page. Route pages are heap

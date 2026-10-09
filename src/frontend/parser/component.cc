@@ -120,7 +120,6 @@ std::unique_ptr<DataDef> Parser::parse_data()
         std::string fieldName = current().value;
         if (!is_identifier_token())
             expect(TokenType::IDENTIFIER, "Expected field name");
-        check_name(fieldName, current().line);
         advance();
         expect(TokenType::SEMICOLON, "Expected ';'");
 
@@ -929,7 +928,6 @@ Component Parser::parse_component()
                 var_decl->name = current().value;
                 if (is_identifier_token())
                 {
-                    check_name(var_decl->name, current().line);
                     advance();
                 }
                 else
@@ -1087,8 +1085,6 @@ Component Parser::parse_component()
                         throw std::runtime_error("Expected parameter name at line " + std::to_string(current().line));
                     }
 
-                    check_name(paramName, current().line);
-                    check_name(paramName, current().line);
             func.params.push_back({paramType, paramName, is_mutable_param, is_reference});
 
                     if (current().type == TokenType::COMMA)
@@ -1202,7 +1198,6 @@ FunctionDef Parser::parse_function_def(bool is_public)
     func.is_public = is_public;
     func.name = current().value;
     int func_line = current().line;
-    check_name(func.name, func_line);
     if (!is_identifier_token())
         expect(TokenType::IDENTIFIER, "Expected function name");
     advance();

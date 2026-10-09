@@ -3,6 +3,7 @@
 // =============================================================================
 
 #include "json_codegen.h"
+#include "codegen_utils.h"
 #include <cstdint>
 #include <sstream>
 #include <set>
@@ -52,7 +53,7 @@ std::string generate_meta_struct(const std::string& data_type) {
     for (const auto& field : *fields) {
         if (!field.type.empty() && std::isupper(field.type[0]) && 
             DataTypeRegistry::instance().lookup(field.type)) {
-            ss << "    " << field.type << "Meta " << field.name << ";\n";
+            ss << "    " << field.type << "Meta " << cpp_name(field.name) << ";\n";
         }
     }
     
@@ -146,7 +147,7 @@ static void generate_primitive_field_parse(std::stringstream& ss,
                                             const std::string& indent) {
     ss << indent << "if (!__coi_json::is_null(" << src_var << ", " << pos_var << ", " << len_var << ")) {\n";
     std::string kind = scalar_kind(field_type);
-    std::string target = result_var + "." + field_name;
+    std::string target = result_var + "." + cpp_name(field_name);
     ss << indent << "    " << target << " = " << extract_scalar(kind, "decltype(" + target + ")", src_var, pos_var, len_var, ok_var) << ";\n";
     if (kind == "string")
         ss << indent << "    " << meta_var << ".set(" << field_idx << ");\n";
@@ -178,7 +179,7 @@ static void generate_array_field_parse(std::stringstream& ss,
     ss << indent << "    __coi_json::for_each(" << arr_view << ".data(), 0, " << arr_view << ".length(), [&](const char* " << aes << ", uint32_t " << aep << ", uint32_t " << aelen << ") {\n";
 
     if (!(!elem_type.empty() && std::isupper(elem_type[0]) && DataTypeRegistry::instance().lookup(elem_type))) {
-        std::string target = result_var + "." + field_name;
+        std::string target = result_var + "." + cpp_name(field_name);
         ss << indent << "        bool " << aok << ";\n";
         ss << indent << "        " << target << ".push_back("
            << extract_scalar(scalar_kind(elem_type), "decltype(" + target + ")::value_type", aes, aep, aelen, aok) << ");\n";
@@ -193,7 +194,7 @@ static void generate_array_field_parse(std::stringstream& ss,
         generate_object_fields_parse(ss, elem_type, ae, ae_meta,
                                      ae_view + ".data()", ae_view + ".length()", ae_ok,
                                      indent + "            ", depth + 1);
-        ss << indent << "            " << result_var << "." << field_name << ".push_back(" << ae << ");\n";
+        ss << indent << "            " << result_var << "." << cpp_name(field_name) << ".push_back(" << ae << ");\n";
         ss << indent << "        }\n";
     }
 
@@ -222,8 +223,8 @@ static void generate_nested_field_parse(std::stringstream& ss,
     ss << indent << "if (" << nv << ".length() > 0) {\n";
     ss << indent << "    bool " << n_ok << ";\n";
     generate_object_fields_parse(ss, nested_type,
-                                 result_var + "." + field_name,
-                                 meta_var + "." + field_name,
+                                 result_var + "." + cpp_name(field_name),
+                                 meta_var + "." + cpp_name(field_name),
                                  nv + ".data()", nv + ".length()", n_ok,
                                  indent + "    ", depth + 1);
     ss << indent << "    " << meta_var << ".set(" << field_idx << ");\n";
@@ -705,7 +706,7 @@ std::string generate_json_writers(const std::vector<JsonPod>& pods) {
         ss << signature(pod) << " {\n";
         for (size_t i = 0; i < pod.fields.size(); i++) {
             const auto& f = pod.fields[i];
-            ss << "    w.put(\"" << (i ? "," : "{") << "\\\"" << f.name << "\\\":\"); __coi_json_write(w, v." << f.name << ");\n";
+            ss << "    w.put(\"" << (i ? "," : "{") << "\\\"" << f.name << "\\\":\"); __coi_json_write(w, v." << cpp_name(f.name) << ");\n";
         }
         ss << "    w.put(\"" << (pod.fields.empty() ? "{}" : "}") << "\");\n";
         ss << "}\n";

@@ -154,7 +154,7 @@ static std::string build_lambda_params(FunctionCall *func_call)
             params += ", ";
         if (auto *id = dynamic_cast<Identifier *>(func_call->args[i].value.get()))
         {
-            params += "int32_t " + id->name;
+            params += "int32_t " + cpp_name(id->name);
         }
         else
         {
@@ -177,7 +177,7 @@ static std::string build_lambda_call(FunctionCall *func_call)
             result += ", ";
         if (auto *id = dynamic_cast<Identifier *>(func_call->args[i].value.get()))
         {
-            result += id->name;
+            result += cpp_name(id->name);
         }
         else
         {
@@ -194,7 +194,7 @@ static std::string view_event_call(const HTMLAttribute &attr, const ViewEventAtt
 {
     if (dynamic_cast<FunctionCall *>(attr.value.get()))
         return attr.value->to_webcc();
-    return generate_event_call(*spec.method, "DOMElement", attr.value->to_webcc(), "_e");
+    return generate_event_call(*spec.method, "DOMElement", attr.value->raw_name(), "_e");
 }
 
 static std::string build_lambda_capture(const std::string &loop_var_name)
@@ -203,8 +203,18 @@ static std::string build_lambda_capture(const std::string &loop_var_name)
     {
         return "[this]";
     }
-    // In loop: capture loop var by value so lambda survives loop iteration
-    return "[this, " + loop_var_name + "]";
+    // In loop: capture loop var by value so lambda survives loop iteration (nested loops: "r, t")
+    std::string names;
+    size_t start = 0;
+    while (start <= loop_var_name.size())
+    {
+        size_t comma = loop_var_name.find(", ", start);
+        std::string one = loop_var_name.substr(start, comma == std::string::npos ? std::string::npos : comma - start);
+        names += (names.empty() ? "" : ", ") + cpp_name(one);
+        if (comma == std::string::npos) break;
+        start = comma + 2;
+    }
+    return "[this, " + names + "]";
 }
 
 // Collect member reference names from view children (recursive)
@@ -296,7 +306,7 @@ void ComponentInstantiation::generate_code(ViewCodegenContext& ctx)
     // Handle member reference (e.g., <a/> where "a" is a member variable of component type)
     if (is_member_reference)
     {
-        instance_name = member_name;
+        instance_name = cpp_name(member_name);
         
         // Set props on the existing member
         for (auto &prop : props)
@@ -307,21 +317,21 @@ void ComponentInstantiation::generate_code(ViewCodegenContext& ctx)
                 // Callback with params: generate lambda that forwards args
                 std::string lambda_params = build_lambda_params_from_types(prop.callback_param_types);
                 std::string forward_args = build_forward_args(prop.callback_param_types.size());
-                ctx.ss << "        " << instance_name << "." << prop.name << " = [this](" << lambda_params << ") { this->" << val << "(" << forward_args << "); };\n";
+                ctx.ss << "        " << instance_name << "." << cpp_name(prop.name) << " = [this](" << lambda_params << ") { this->" << val << "(" << forward_args << "); };\n";
             }
-            else if (ctx.method_names.count(val) || prop.is_callback)
+            else if (ctx.method_names.count(prop.value->raw_name()) || prop.is_callback)
             {
                 // No-param callback or method reference
-                ctx.ss << "        " << instance_name << "." << prop.name << " = [this]() { this->" << val << "(); };\n";
+                ctx.ss << "        " << instance_name << "." << cpp_name(prop.name) << " = [this]() { this->" << val << "(); };\n";
             }
             else if (prop.is_reference)
             {
                 // Actual reference: pointer to variable
-                ctx.ss << "        " << instance_name << "." << prop.name << " = &(" << val << ");\n";
+                ctx.ss << "        " << instance_name << "." << cpp_name(prop.name) << " = &(" << val << ");\n";
             }
             else
             {
-                ctx.ss << "        " << instance_name << "." << prop.name << " = " << val << ";\n";
+                ctx.ss << "        " << instance_name << "." << cpp_name(prop.name) << " = " << val << ";\n";
             }
         }
 
@@ -343,7 +353,7 @@ void ComponentInstantiation::generate_code(ViewCodegenContext& ctx)
     if (ctx.in_loop)
     {
         std::string vector_name = "_loop_" + qname + "s";
-        instance_name = vector_name + "[" + vector_name + ".size() - 1]";
+        instance_name = cpp_name(vector_name) + "[" + cpp_name(vector_name) + ".size() - 1]";
         ctx.ss << "        " << vector_name << ".push_back(" << qname << "());\n";
         // one alias per instance: two components in the same loop body share a scope
         std::string alias = "_inst_" + qname + "_" + std::to_string(id);
@@ -364,21 +374,21 @@ void ComponentInstantiation::generate_code(ViewCodegenContext& ctx)
             // Callback with params: generate lambda that forwards args
             std::string lambda_params = build_lambda_params_from_types(prop.callback_param_types);
             std::string forward_args = build_forward_args(prop.callback_param_types.size());
-            ctx.ss << "        " << instance_name << "." << prop.name << " = [this](" << lambda_params << ") { this->" << val << "(" << forward_args << "); };\n";
+            ctx.ss << "        " << instance_name << "." << cpp_name(prop.name) << " = [this](" << lambda_params << ") { this->" << val << "(" << forward_args << "); };\n";
         }
-        else if (ctx.method_names.count(val) || prop.is_callback)
+        else if (ctx.method_names.count(prop.value->raw_name()) || prop.is_callback)
         {
             // No-param callback or method reference
-            ctx.ss << "        " << instance_name << "." << prop.name << " = [this]() { this->" << val << "(); };\n";
+            ctx.ss << "        " << instance_name << "." << cpp_name(prop.name) << " = [this]() { this->" << val << "(); };\n";
         }
         else if (prop.is_reference)
         {
             // Actual reference: pointer to variable
-            ctx.ss << "        " << instance_name << "." << prop.name << " = &(" << val << ");\n";
+            ctx.ss << "        " << instance_name << "." << cpp_name(prop.name) << " = &(" << val << ");\n";
         }
         else
         {
-            ctx.ss << "        " << instance_name << "." << prop.name << " = " << val << ";\n";
+            ctx.ss << "        " << instance_name << "." << cpp_name(prop.name) << " = " << val << ";\n";
         }
     }
 
@@ -559,7 +569,7 @@ void HTMLElement::generate_code(ViewCodegenContext& ctx)
 
     if (!ref_binding.empty())
     {
-        ctx.ss << "        " << ref_binding << " = " << var << ";\n";
+        ctx.ss << "        " << cpp_name(ref_binding) << " = " << var << ";\n";
     }
 
     // webcc event attributes, one handler per event, switch on the first field
@@ -870,7 +880,7 @@ static void generate_prop_update_code(std::stringstream &ss, ComponentInstantiat
     for (auto &prop : comp->props)
     {
         std::string val = prop.value->to_webcc();
-        std::string prefix = "            " + inst_ref + "." + prop.name + " = ";
+        std::string prefix = "            " + inst_ref + "." + cpp_name(prop.name) + " = ";
 
         if (prop.is_callback && !prop.callback_param_types.empty())
         {
@@ -879,7 +889,7 @@ static void generate_prop_update_code(std::stringstream &ss, ComponentInstantiat
             std::string forward_args = build_forward_args(prop.callback_param_types.size());
             ss << prefix << "[this](" << lambda_params << ") { this->" << val << "(" << forward_args << "); };\n";
         }
-        else if (method_names.count(val) || prop.is_callback)
+        else if (method_names.count(prop.value->raw_name()) || prop.is_callback)
         {
             // No-param callback or method reference
             ss << prefix << "[this]() { this->" << val << "(); };\n";
@@ -1213,8 +1223,8 @@ void ViewForRangeStatement::generate_code(ViewCodegenContext& ctx)
 
     if (ctx.in_loop || !ctx.loop_regions || !ctx.loop_counter)
     {
-        ctx.ss << "        for (int " << var_name << " = " << start->to_webcc() << "; "
-           << var_name << " < " << end->to_webcc() << "; " << var_name << "++) {\n";
+        ctx.ss << "        for (int " << cpp_name(var_name) << " = " << start->to_webcc() << "; "
+           << cpp_name(var_name) << " < " << end->to_webcc() << "; " << cpp_name(var_name) << "++) {\n";
         std::stringstream body_ss;
         HandleBlock body_handles;
         for (auto &child : children)
@@ -1303,7 +1313,7 @@ void ViewForRangeStatement::generate_code(ViewCodegenContext& ctx)
     {
         std::stringstream update_ss;
         std::string vec_name = "_loop_" + region.component_type + "s";
-        std::string inst_ref = vec_name + "[" + var_name + "]";
+        std::string inst_ref = vec_name + "[" + cpp_name(var_name) + "]";
         generate_prop_update_code(update_ss, loop_component, inst_ref, ctx.method_names, var_name);
         region.item_update_code = update_ss.str();
     }
@@ -1332,7 +1342,7 @@ void ViewForEachStatement::generate_code(ViewCodegenContext& ctx)
 
     if (ctx.in_loop || !key_expr || !ctx.loop_regions || !ctx.loop_counter)
     {
-        ctx.ss << "        for (auto& " << var_name << " : " << iterable->to_webcc() << ") {\n";
+        ctx.ss << "        for (auto& " << cpp_name(var_name) << " : " << iterable->to_webcc() << ") {\n";
         std::stringstream body_ss;
         HandleBlock body_handles;
         for (auto &child : children)
@@ -1356,6 +1366,7 @@ void ViewForEachStatement::generate_code(ViewCodegenContext& ctx)
     region.key_expr = key_expr->to_webcc();
     region.var_name = var_name;
     region.iterable_expr = iterable->to_webcc();
+    region.iterable_raw = iterable->raw_name();
 
     // the body's values too (class={p.id == active}), not just the array
     collect_dependencies(region.dependencies);

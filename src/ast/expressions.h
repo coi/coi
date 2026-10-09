@@ -49,6 +49,7 @@ struct StringLiteral : Expression {
 };
 
 struct Identifier : Expression {
+    std::string raw_name() override;
     std::string name;
     explicit Identifier(const std::string& n) : name(n) {}
     std::string to_webcc() override;
@@ -111,6 +112,7 @@ struct MethodCall : Expression {
 };
 
 struct MemberAccess : Expression {
+    std::string raw_name() override;
     std::unique_ptr<Expression> object;
     std::string member;
 
@@ -194,6 +196,7 @@ struct ArrayRepeatLiteral : Expression {
 };
 
 struct IndexAccess : Expression {
+    std::string raw_name() override;
     std::unique_ptr<Expression> array;
     std::unique_ptr<Expression> index;
 

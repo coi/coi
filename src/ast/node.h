@@ -41,6 +41,8 @@ struct MemberDependency {
 struct ASTNode {
     virtual ~ASTNode() = default;
     virtual std::string to_webcc() { return ""; }
+    // the expression as the source spells it (names unmangled), for the parser's call names
+    virtual std::string raw_name() { return to_webcc(); }
     virtual void collect_dependencies(std::set<std::string>& deps) {}
     virtual void collect_member_dependencies(std::set<MemberDependency>& member_deps) {}
 

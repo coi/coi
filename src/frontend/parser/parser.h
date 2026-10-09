@@ -42,7 +42,6 @@ class Parser{
         // Helper methods
         bool is_type_token();                    // INT, STRING, FLOAT, FLOAT32, BOOL, IDENTIFIER, VOID
         bool is_identifier_token();              // IDENTIFIER, KEY, DATA (keywords usable as names)
-        void check_name(const std::string& name, int line);  // rejects names that are C++ keywords
         std::vector<CallArg> parse_call_args(TokenType end_token);  // Parse (args) or {args}
         
         // Parse array/map type suffix after '[' has been consumed

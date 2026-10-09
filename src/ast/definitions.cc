@@ -1,4 +1,5 @@
 #include "definitions.h"
+#include "../codegen/codegen_utils.h"
 #include "node.h"
 
 // template header + signature, registers params in scope
@@ -21,7 +22,7 @@ static std::string function_signature(const FunctionDef& fn, const std::string& 
         if(i > 0) result += ", ";
         result += (fn.params[i].is_mutable ? "" : "const ") + convert_type(fn.params[i].type);
         if(fn.params[i].is_reference) result += "&";
-        result += " " + fn.params[i].name;
+        result += " " + cpp_name(fn.params[i].name);
 
         ComponentTypeContext::instance().set_method_symbol_type(fn.params[i].name, fn.params[i].type);
     }
@@ -33,7 +34,7 @@ static std::string function_signature(const FunctionDef& fn, const std::string& 
 std::string FunctionDef::to_webcc(const std::string& injected_code) {
     ComponentTypeContext::instance().begin_method_scope();
 
-    std::string result = function_signature(*this, name) + " {\n";
+    std::string result = function_signature(*this, cpp_name(name)) + " {\n";
     // the updates run when the method leaves, early returns included
     if(!injected_code.empty()) {
         result += "    auto _coi_after = coi::on_exit([&]() {\n" + injected_code + "    });\n";
@@ -49,14 +50,14 @@ std::string FunctionDef::to_webcc(const std::string& injected_code) {
 
 std::string FunctionDef::free_declaration() {
     ComponentTypeContext::instance().begin_method_scope();
-    std::string result = function_signature(*this, qualified_name(module_name, name)) + ";\n";
+    std::string result = function_signature(*this, cpp_name(qualified_name(module_name, name))) + ";\n";
     ComponentTypeContext::instance().end_method_scope();
     return result;
 }
 
 std::string FunctionDef::free_definition() {
     ComponentTypeContext::instance().begin_method_scope();
-    std::string result = function_signature(*this, qualified_name(module_name, name)) + " {\n";
+    std::string result = function_signature(*this, cpp_name(qualified_name(module_name, name))) + " {\n";
     for(auto& stmt : body){
         result += "    " + stmt->to_webcc() + "\n";
     }
@@ -99,7 +100,7 @@ std::string DataDef::to_webcc() {
     
     ss << "struct " << qualified_name(module_name, name) << " {\n";
     for(const auto& field : fields){
-        ss << "    " << convert_type(field.type) << " " << field.name << ";\n";
+        ss << "    " << convert_type(field.type) << " " << cpp_name(field.name) << ";\n";
     }
     ss << "};\n";
     return ss.str();

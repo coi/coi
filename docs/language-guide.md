@@ -34,6 +34,8 @@ def HandleClick()  // Error: Method name must start with lowercase
 
 **Why this matters:** When you write `Name(...)`, Coi treats it as component/type construction. Writing `name(...)` is a function call. This distinction enables clean JSX-like syntax without ambiguity.
 
+**Names that are keywords elsewhere** are fine. Coi's block keywords (`style`, `view`, `mount`, `tick`, `init`) only mean something at the start of a component member, so a variable, parameter, field or prop can be called `style`. Words that are keywords in the C++ the compiler writes (`or`, `and`, `not`, `class`, `delete`, `new`, `template`...) work too: in the generated code every lower-case name carries a trailing underscore (`count` is `count_`), so nothing you name can clash with C++ or with the runtime, while JSON keys and HTML attributes keep the name as written. Only Coi's own structural keywords (`component`, `def`, `pod`, `pub`, `mut`, `if`...) can't be names.
+
 ## Modules and Imports
 
 Coi uses a comprehensive module system to organize code and control visibility.

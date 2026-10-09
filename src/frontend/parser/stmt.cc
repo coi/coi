@@ -388,7 +388,6 @@ std::unique_ptr<Statement> Parser::parse_statement()
             name = current().value;
             if (is_identifier_token())
             {
-                check_name(name, current().line);
                 advance();
             }
             else

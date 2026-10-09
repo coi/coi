@@ -1,0 +1,50 @@
+// Test: names that are keywords in C++ work everywhere a name can go; the generated code
+// writes them with a trailing underscore, JSON keys keep the name as written
+
+pod Item { int template; string typename; int[] union; }
+
+component Child(string delete, int new = 0, mut int& register) {
+    mut float or = 0.0;
+    mut int class = 1;
+    mut DOMElement typeid;
+    mut Item default = Item{template = 1, typename = "x", union = [1]};
+    mut Item[] items = [Item{template = 2, typename = "y", union = []}];
+
+    def switch(int not) : int {
+        mut int and = not + class;
+        for xor in 0:3 { and += xor; }
+        for auto in items { and += auto.template; }
+        or += 1.0;
+        register += new;
+        default.template = and;
+        items[0].template = default.template + 1;
+        items[0].typename = delete;
+        string json = Json.stringify(default);
+        match (Json.parse(Item, json)) {
+            Success(Item it, ItemMeta meta) => parsed(it, meta);
+            Error(string msg) => failed(msg);
+        };
+        return and + `${or}`.length() + typeid.getProperty("tagName").length();
+    }
+
+    def parsed(Item it, ItemMeta meta) : void { class += it.template; if (meta.has(Item.template)) class++; }
+    def failed(string msg) : void { class = -1; }
+
+    def operator() : void { switch(2); }
+
+    view {
+        <div &={typeid} onclick={operator}>{delete} {new} {class} {or} {default.typename} {items[0].template}</div>
+    }
+}
+
+component App {
+    mut int register = 0;
+
+    view {
+        <Child delete="gone" new={2} &register={register} />
+    }
+}
+
+app {
+    root = App;
+}

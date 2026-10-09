@@ -65,6 +65,7 @@ struct LoopRegion {
     std::string key_expr;
     std::string key_type;
     std::string iterable_expr;
+    std::string iterable_raw;     // the Coi spelling: the loop registries are looked up by it
 };
 
 // Struct to track reactive if/else regions

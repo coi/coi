@@ -1,3 +1,4 @@
+#include "../../codegen/codegen_utils.h"
 #include "component.h"
 
 void emit_component_router_methods(std::stringstream &ss, const Component &component)
@@ -79,7 +80,7 @@ void emit_component_router_methods(std::stringstream &ss, const Component &compo
                         }
                     }
                     if (is_method_ref)
-                        ss << "[this]() { this->" << ident->name << "(); }";
+                        ss << "[this]() { this->" << cpp_name(ident->name) << "(); }";
                     else
                         ss << "&(" << ident->name << ")";
                 }

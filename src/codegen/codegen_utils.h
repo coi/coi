@@ -5,6 +5,43 @@
 
 // Helper to strip redundant outer parentheses from a condition expression
 // This avoids warnings like: if((x == 1)) -> if(x == 1)
+#include <unordered_set>
+
+// Every user name gets a trailing underscore in the generated C++: "or", "class" or "delete"
+// can name things, and nothing a user writes can clash with the runtime or with what the
+// compiler generates. The compiler's own names start with "_" and go through as they are.
+// JSON keys, HTML attributes and error messages keep the name as written
+inline std::string cpp_name(const std::string& name)
+{
+    if (name.empty() || name[0] == '_' || std::isupper((unsigned char)name[0])) return name;
+    return name + "_";
+}
+
+inline std::string mangle_path(const std::string& path)
+{
+    std::string out;
+    int depth = 0;
+    size_t i = 0;
+    while (i < path.size())
+    {
+        char c = path[i];
+        bool after_deref = i >= 2 && path[i - 2] == '(' && path[i - 1] == '*';
+        if ((std::isalpha((unsigned char)c) || c == '_') && (depth == 0 || after_deref))
+        {
+            size_t j = i;
+            while (j < path.size() && (std::isalnum((unsigned char)path[j]) || path[j] == '_')) j++;
+            out += cpp_name(path.substr(i, j - i));
+            i = j;
+            continue;
+        }
+        if (c == '[' || c == '(') depth++;
+        else if (c == ']' || c == ')') depth--;
+        out += c;
+        i++;
+    }
+    return out;
+}
+
 inline std::string strip_outer_parens(const std::string& expr) {
     if (expr.size() >= 2 && expr.front() == '(' && expr.back() == ')') {
         // Check if the outer parens are actually matching

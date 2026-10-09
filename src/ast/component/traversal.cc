@@ -1,4 +1,5 @@
 #include "component.h"
+#include "../../codegen/codegen_utils.h"
 
 void Component::collect_child_components(ASTNode *node, std::map<std::string, int> &counts)
 {
@@ -36,7 +37,7 @@ void Component::collect_child_updates(ASTNode *node, std::map<std::string, std::
         std::string instance_name;
         if (comp->is_member_reference)
         {
-            instance_name = comp->member_name;
+            instance_name = cpp_name(comp->member_name);
         }
         else
         {
@@ -50,7 +51,7 @@ void Component::collect_child_updates(ASTNode *node, std::map<std::string, std::
             std::set<std::string> deps;
             prop.value->collect_dependencies(deps);
             // a reference already points at the parent's value; a value prop is copied again
-            std::string assign = prop.is_reference ? "" : instance_name + "." + prop.name + " = " + prop.value->to_webcc() + "; ";
+            std::string assign = prop.is_reference ? "" : instance_name + "." + cpp_name(prop.name) + " = " + prop.value->to_webcc() + "; ";
             for (const auto &dep : deps)
             {
                 updates[dep].push_back("        " + assign + instance_name + "._refresh_" + prop.name + "();\n");

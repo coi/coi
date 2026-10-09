@@ -466,7 +466,7 @@ std::string Component::to_webcc(CompilerSession &session)
             info.item_creation_code = region.item_creation_code;
             info.is_member_ref_loop = true;
             info.is_only_child = region.is_only_child;
-            g_component_array_loops[region.iterable_expr] = info;
+            g_component_array_loops[region.iterable_raw.empty() ? region.iterable_expr : region.iterable_raw] = info;
         }
     }
 
@@ -487,7 +487,7 @@ std::string Component::to_webcc(CompilerSession &session)
             info.root_element_var = region.root_element_var;
             info.key_expr = region.key_expr;
             info.is_only_child = region.is_only_child;
-            g_array_loops[region.iterable_expr].push_back(info);
+            g_array_loops[region.iterable_raw.empty() ? region.iterable_expr : region.iterable_raw].push_back(info);
 
             HtmlLoopVarInfo var_info;
             var_info.loop_id = region.loop_id;
@@ -506,11 +506,11 @@ std::string Component::to_webcc(CompilerSession &session)
         ss << "    " << convert_type(resolve_component_type(param->type));
         if (param->is_reference)
         {
-            ss << "* " << param->name << " = nullptr";
+            ss << "* " << cpp_name(param->name) << " = nullptr";
         }
         else
         {
-            ss << " " << param->name;
+            ss << " " << cpp_name(param->name);
             if (param->default_value)
             {
                 ss << " = " << param->default_value->to_webcc();
@@ -545,7 +545,7 @@ std::string Component::to_webcc(CompilerSession &session)
                 ss << "    " << (var->is_mutable ? "" : "const ") << vec_type;
                 if (var->is_reference)
                     ss << "&";
-                ss << " " << var->name << " = " << arr_lit->to_webcc() << ";\n";
+                ss << " " << cpp_name(var->name) << " = " << arr_lit->to_webcc() << ";\n";
                 continue;
             }
         }
@@ -555,7 +555,7 @@ std::string Component::to_webcc(CompilerSession &session)
         ss << "    " << (var->is_mutable || component_member ? "" : "const ") << convert_type(resolve_component_type(var->type));
         if (var->is_reference)
             ss << "&";
-        ss << " " << var->name;
+        ss << " " << cpp_name(var->name);
         if (var->initializer)
         {
             if (DefSchema::instance().is_handle(var->type))
@@ -641,8 +641,8 @@ std::string Component::to_webcc(CompilerSession &session)
             }
             std::string converted = convert_type(resolve_component_type(param.type));
             param_types += converted;
-            param_decl += converted + " " + param.name;
-            arg_list += param.name;
+            param_decl += converted + " " + cpp_name(param.name);
+            arg_list += cpp_name(param.name);
             converted_param_types.push_back(converted);
             param_names.push_back(param.name);
         }
@@ -1111,7 +1111,7 @@ std::string Component::to_webcc(CompilerSession &session)
                 std::string keys_vec = "_loop_" + id + "_keys";
                 std::string anchor_var = "_loop_" + id + "_anchor";
                 bool temp = region.iterable_expr.find('(') != std::string::npos;
-                std::string item_ref = std::string(temp ? "auto " : "auto& ") + region.var_name + " = _items[_idx];\n";
+                std::string item_ref = std::string(temp ? "auto " : "auto& ") + cpp_name(region.var_name) + " = _items[_idx];\n";
 
                 ss << "        auto&& _items = " << region.iterable_expr << ";\n";
                 ss << "        int _new_count = (int)_items.size();\n";
@@ -1169,7 +1169,7 @@ std::string Component::to_webcc(CompilerSession &session)
                 // Recreate all items in current array order with fresh views using insert_before for proper DOM ordering
                 std::string anchor_var = "_loop_" + std::to_string(region.loop_id) + "_anchor";
                 ss << "        g_view_depth++;\n";
-                ss << "        for (auto& " << region.var_name << " : " << region.iterable_expr << ") {\n";
+                ss << "        for (auto& " << cpp_name(region.var_name) << " : " << region.iterable_expr << ") {\n";
 
                 std::string item_code = region.item_creation_code;
                 item_code = transform_to_insert_before(item_code, parent_var, anchor_var);
@@ -1194,7 +1194,7 @@ std::string Component::to_webcc(CompilerSession &session)
                 std::string anchor_var = "_loop_" + std::to_string(region.loop_id) + "_anchor";
 
                 ss << "        if (new_count > old_count) {\n";
-                ss << "            for (int " << region.var_name << " = old_count; " << region.var_name << " < new_count; " << region.var_name << "++) {\n";
+                ss << "            for (int " << cpp_name(region.var_name) << " = old_count; " << cpp_name(region.var_name) << " < new_count; " << cpp_name(region.var_name) << "++) {\n";
 
                 std::string item_code = region.item_creation_code;
                 item_code = transform_to_insert_before(item_code, "_loop_" + std::to_string(region.loop_id) + "_parent", anchor_var);
@@ -1211,7 +1211,7 @@ std::string Component::to_webcc(CompilerSession &session)
 
                 if (!region.item_update_code.empty())
                 {
-                    ss << "            for (int " << region.var_name << " = 0; " << region.var_name << " < new_count; " << region.var_name << "++) {\n";
+                    ss << "            for (int " << cpp_name(region.var_name) << " = 0; " << cpp_name(region.var_name) << " < new_count; " << cpp_name(region.var_name) << "++) {\n";
                     ss << region.item_update_code;
                     ss << "            }\n";
                 }
@@ -1231,7 +1231,7 @@ std::string Component::to_webcc(CompilerSession &session)
                 ss << "        }\n";
                 ss << "        " << vec_name << ".clear();\n";
                 ss << "        g_view_depth++;\n";
-                ss << "        for (int " << region.var_name << " = " << region.start_expr << "; " << region.var_name << " < " << region.end_expr << "; " << region.var_name << "++) {\n";
+                ss << "        for (int " << cpp_name(region.var_name) << " = " << region.start_expr << "; " << cpp_name(region.var_name) << " < " << region.end_expr << "; " << cpp_name(region.var_name) << "++) {\n";
 
                 std::string item_code = region.item_creation_code;
                 // the body appends to the loop's parent: insert before the anchor instead, or the
@@ -1267,7 +1267,7 @@ std::string Component::to_webcc(CompilerSession &session)
         ss << "        }\n";
         // a call like colors() is a temporary: take the item by value
         bool temp = region.iterable_expr.find('(') != std::string::npos;
-        ss << "        " << (temp ? "auto " : "auto& ") << region.var_name << " = " << region.iterable_expr << "[_idx];\n";
+        ss << "        " << (temp ? "auto " : "auto& ") << cpp_name(region.var_name) << " = " << region.iterable_expr << "[_idx];\n";
 
         std::string item_code = transform_to_insert_before(region.item_creation_code, parent_var, "_ref");
         ss << indent_code(item_code, "        ");
@@ -1544,7 +1544,7 @@ std::string Component::to_webcc(CompilerSession &session)
             if (!ctor->args[i].is_reference || !id || !it->second.ref_params.count(param))
                 continue;
             member_refs.push_back({var->name, param, id->name});
-            child_updates[id->name].push_back("        " + var->name + "._refresh_" + param + "();\n");
+            child_updates[id->name].push_back("        " + cpp_name(var->name) + "._refresh_" + param + "();\n");
         }
     }
 
@@ -1672,7 +1672,7 @@ std::string Component::to_webcc(CompilerSession &session)
             if (!member_dep_is_reactive(mem_dep))
                 continue;
             std::string callback_name = make_callback_name(mem_dep.member);
-            ss << "        " << mem_dep.object << "." << callback_name << " = [this]() {";
+            ss << "        " << cpp_name(mem_dep.object) << "." << callback_name << " = [this]() {";
             for (const auto &method_name : methods)
             {
                 ss << " " << method_name << "();";
@@ -1696,7 +1696,7 @@ std::string Component::to_webcc(CompilerSession &session)
             {
                 if (member_dep_update_methods.count(MemberDependency{var->name, member}))
                     continue;
-                ss << "        " << var->name << "." << make_callback_name(member) << " = [this]() { _update_" << var->name << "(); };\n";
+                ss << "        " << cpp_name(var->name) << "." << make_callback_name(member) << " = [this]() { _update_" << var->name << "(); };\n";
             }
         }
     };
@@ -1710,7 +1710,7 @@ std::string Component::to_webcc(CompilerSession &session)
                 for (const auto &member : it->second.pub_mut_members)
                 {
                     std::string callback_name = make_callback_name(member);
-                    ss << "        " << param->name << "." << callback_name << " = [this]() { _update_" << member << "(); };\n";
+                    ss << "        " << cpp_name(param->name) << "." << callback_name << " = [this]() { _update_" << member << "(); };\n";
                 }
             }
         }
@@ -1722,7 +1722,7 @@ std::string Component::to_webcc(CompilerSession &session)
     auto emit_constructed_member_refs = [&]() {
         for (const auto &ref : member_refs)
         {
-            ss << "        " << ref.member << "." << make_callback_name(ref.param) << " = [this]() {";
+            ss << "        " << cpp_name(ref.member) << "." << make_callback_name(ref.param) << " = [this]() {";
             if (generated_updaters.count(ref.var))
                 ss << " _update_" << ref.var << "();";
             for (int if_id : var_to_if_ids[ref.var])
@@ -1730,7 +1730,7 @@ std::string Component::to_webcc(CompilerSession &session)
             if (!g_component_array_loops.count(ref.var) && !g_array_loops.count(ref.var))
                 for (int loop_id : var_to_loop_ids[ref.var])
                     ss << " _sync_loop_" << loop_id << "();";
-            std::string own = "        " + ref.member + "._refresh_" + ref.param + "();\n";
+            std::string own = "        " + cpp_name(ref.member) + "._refresh_" + ref.param + "();\n";
             for (const auto &call : child_updates[ref.var])
                 if (call != own)
                     ss << " " << call.substr(8, call.size() - 10) << ";";
@@ -1744,7 +1744,7 @@ std::string Component::to_webcc(CompilerSession &session)
         for (size_t idx = 0; idx < listen_entries.size(); ++idx)
         {
             const auto &entry = listen_entries[idx];
-            std::string target_expr = entry.target_is_reference ? ("(*" + entry.target_name + ")") : entry.target_name;
+            std::string target_expr = entry.target_is_reference ? ("(*" + cpp_name(entry.target_name) + ")") : cpp_name(entry.target_name);
             std::string lambda_params;
             std::string lambda_args;
             for (size_t i = 0; i < entry.param_types.size(); ++i)
@@ -1827,7 +1827,7 @@ std::string Component::to_webcc(CompilerSession &session)
             if (!member_dep_is_reactive(mem_dep))
                 continue;
             std::string callback_name = make_callback_name(mem_dep.member);
-            ss << "        " << mem_dep.object << "." << callback_name << " = [this]() { _sync_if_" << region.if_id << "(); };\n";
+            ss << "        " << cpp_name(mem_dep.object) << "." << callback_name << " = [this]() { _sync_if_" << region.if_id << "(); };\n";
         }
     }
 

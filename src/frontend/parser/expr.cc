@@ -458,14 +458,14 @@ std::unique_ptr<Expression> Parser::parse_primary()
                 if (is_component)
                 {
                     // Component construction
-                    auto comp_expr = std::make_unique<ComponentConstruction>(expr->to_webcc());
+                    auto comp_expr = std::make_unique<ComponentConstruction>(expr->raw_name());
                     comp_expr->args = std::move(parsed_args);
                     expr = std::move(comp_expr);
                 }
                 else
                 {
                     // Function call
-                    auto call = std::make_unique<FunctionCall>(expr->to_webcc());
+                    auto call = std::make_unique<FunctionCall>(expr->raw_name());
                     call->line = identifier_line;
                     call->args = std::move(parsed_args);
                     expr = std::move(call);

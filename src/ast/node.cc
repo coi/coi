@@ -1,4 +1,5 @@
 #include "node.h"
+#include "../codegen/codegen_utils.h"
 #include "../defs/def_parser.h"
 #include "../cli/error.h"
 #include <cctype>
@@ -156,10 +157,10 @@ std::string FreeFunctionRegistry::resolve_call(const std::string& name) const {
             ErrorHandler::compiler_error("Function '" + fn + "' in module '" + module +
                 "' is not public. Add 'pub' to make it importable: pub def " + fn);
         }
-        return qualified_name(module, fn);
+        return cpp_name(qualified_name(module, fn));
     }
     if (!std::islower(static_cast<unsigned char>(name[0]))) return "";
     if (ctx.has_method(name) || !ctx.get_symbol_type(name).empty()) return "";
     if (!find(ctx.module_name, name)) return "";
-    return qualified_name(ctx.module_name, name);
+    return cpp_name(qualified_name(ctx.module_name, name));
 }

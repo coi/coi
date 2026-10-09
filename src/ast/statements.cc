@@ -40,7 +40,7 @@ std::string VarDeclaration::to_webcc()
             std::string vec_type = "coi::vector<" + convert_type(elem_type) + ">";
             std::string fill = "_v.resize((size_t)(" + count_str + ")); for (size_t _i = 0; _i < _v.size(); _i++) _v[_i] = " +
                                repeat->value->to_webcc() + "; return _v; }()";
-            return std::string(is_mutable ? "" : "const ") + vec_type + " " + name + " = [&]{ " + vec_type + " _v; " + fill + ";";
+            return std::string(is_mutable ? "" : "const ") + vec_type + " " + cpp_name(name) + " = [&]{ " + vec_type + " _v; " + fill + ";";
         }
 
         std::string arr_type = "coi::array<" + convert_type(elem_type) + ", " + count_str + ">";
@@ -48,14 +48,14 @@ std::string VarDeclaration::to_webcc()
         if (is_mutable)
         {
             // Mutable: declare then fill
-            std::string result = arr_type + " " + name + "; ";
+            std::string result = arr_type + " " + cpp_name(name) + "; ";
             result += name + ".fill(" + repeat->value->to_webcc() + ");";
             return result;
         }
         else
         {
             // Immutable: use IIFE to initialize const array
-            std::string result = "const " + arr_type + " " + name + " = []{ ";
+            std::string result = "const " + arr_type + " " + cpp_name(name) + " = []{ ";
             result += arr_type + " _tmp; _tmp.fill(" + repeat->value->to_webcc() + "); return _tmp; }();";
             return result;
         }
@@ -80,7 +80,7 @@ std::string VarDeclaration::to_webcc()
                 std::string result = "const " + arr_type;
                 if (is_reference)
                     result += "&";
-                result += " " + name + " = " + arr_lit->to_webcc() + ";";
+                result += " " + cpp_name(name) + " = " + arr_lit->to_webcc() + ";";
                 return result;
             }
             
@@ -90,7 +90,7 @@ std::string VarDeclaration::to_webcc()
             std::string result = vec_type;
             if (is_reference)
                 result += "&";
-            result += " " + name + " = " + arr_lit->to_webcc() + ";";
+            result += " " + cpp_name(name) + " = " + arr_lit->to_webcc() + ";";
             return result;
         }
     }
@@ -98,7 +98,7 @@ std::string VarDeclaration::to_webcc()
     std::string result = (is_mutable ? "" : "const ") + convert_type(type);
     if (is_reference)
         result += "&";
-    result += " " + name;
+    result += " " + cpp_name(name);
     if (initializer)
     {
         std::string init_code = initializer->to_webcc();
@@ -129,10 +129,10 @@ std::string ComponentParam::to_webcc()
 
 std::string Assignment::to_webcc()
 {
-    std::string lhs = name;
+    std::string lhs = cpp_name(name);
     if (g_ref_props.count(name))
     {
-        lhs = "(*" + name + ")";
+        lhs = "(*" + cpp_name(name) + ")";
     }
 
     std::string rhs;
@@ -185,13 +185,13 @@ std::string Assignment::to_webcc()
         if (info.is_only_child)
         {
             // Bulk optimization: unregister handlers only, then clear parent's innerHTML
-            result += "    for (auto& " + var + " : " + name + ") { " + var + "._remove_view(true); }\n";
+            result += "    for (auto& " + cpp_name(var) + " : " + lhs + ") { " + cpp_name(var) + "._remove_view(true); }\n";
             result += "    webcc::dom::set_inner_html(" + parent_var + ", \"\");\n";
         }
         else
         {
             // Normal path: each _remove_view removes its own DOM element
-            result += "    for (auto& " + var + " : " + name + ") { " + var + "._remove_view(); }\n";
+            result += "    for (auto& " + cpp_name(var) + " : " + lhs + ") { " + cpp_name(var) + "._remove_view(); }\n";
         }
         result += "}\n";
 
@@ -199,9 +199,9 @@ std::string Assignment::to_webcc()
         result += lhs + " = " + rhs + ";\n";
 
         // Re-render all items in the new array with fresh handles
-        result += count_var + " = (int)" + name + ".size();\n";
+        result += count_var + " = (int)" + lhs + ".size();\n";
         result += "g_view_depth++;\n";
-        result += "for (auto& " + var + " : " + name + ") {\n";
+        result += "for (auto& " + cpp_name(var) + " : " + lhs + ") {\n";
         result += info.item_creation_code;
         result += "}\n";
         result += "if (--g_view_depth == 0) webcc::flush();";
@@ -307,11 +307,11 @@ std::string MemberAssignment::to_webcc()
     std::string result;
     if (compound_op.empty())
     {
-        result = obj + "." + member + " = " + val + ";";
+        result = obj + "." + cpp_name(member) + " = " + val + ";";
     }
     else
     {
-        result = obj + "." + member + " = " + obj + "." + member + " " + compound_op + " " + val + ";";
+        result = obj + "." + cpp_name(member) + " = " + obj + "." + cpp_name(member) + " " + compound_op + " " + val + ";";
     }
 
     // Fast path: if assigning to a keyed HTML loop item member (e.g., task.status = ...),
@@ -331,7 +331,7 @@ std::string MemberAssignment::to_webcc()
             result += "\n{\n";
             result += "    int " + idx_var + " = -1;\n";
             result += "    for (int __i = 0; __i < (int)" + info.iterable_expr + ".size(); __i++) {\n";
-            result += "        if (&" + info.iterable_expr + "[__i] == &" + id->name + ") { " + idx_var + " = __i; break; }\n";
+            result += "        if (&" + info.iterable_expr + "[__i] == &" + cpp_name(id->name) + ") { " + idx_var + " = __i; break; }\n";
             result += "    }\n";
             result += "    if (" + idx_var + " >= 0) _sync_loop_" + std::to_string(info.loop_id) + "_item(" + idx_var + ");\n";
             result += "}";
@@ -406,12 +406,14 @@ std::string ExpressionStatement::to_webcc()
                 {
                     // Generate: field mutation + component update call
                     std::string result = call->to_webcc() + ";\n";
-                    result += component_expr + "._update_" + field_name + "();\n";
+                    result += mangle_path(component_expr) + "._update_" + field_name + "();\n";
                     return result;
                 }
             }
 
             std::string arr_name = obj_expr;
+            // the C++ spelling, for the code (a reference param is a pointer); arr_name keys the registries
+            std::string arr_cpp = g_ref_props.count(arr_name) ? "(*" + cpp_name(arr_name) + ")" : mangle_path(arr_name);
             auto it = g_component_array_loops.find(arr_name);
             if (it != g_component_array_loops.end() && it->second.is_member_ref_loop)
             {
@@ -429,13 +431,13 @@ std::string ExpressionStatement::to_webcc()
                     std::string parent_var = "_loop_" + std::to_string(info.loop_id) + "_parent";
                     std::string count_var = "_loop_" + std::to_string(info.loop_id) + "_count";
                     result = "{\n";
-                    result += "int _old_count = (int)" + arr_name + ".size();\n";
-                    result += arr_name + ".push_back(" + item_expr + ");\n";
+                    result += "int _old_count = (int)" + arr_cpp + ".size();\n";
+                    result += arr_cpp + ".push_back(" + item_expr + ");\n";
                     // Only render view if parent container exists (not during init)
                     result += "if (" + parent_var + ".is_valid()) {\n";
                     // (IMPORTANT!!!) Rebind all existing items in case vector reallocated
-                    result += "    for (int _i = 0; _i < _old_count; _i++) " + arr_name + "[_i]._rebind();\n";
-                    result += "    auto& " + var + " = " + arr_name + "[" + arr_name + ".size() - 1];\n";
+                    result += "    for (int _i = 0; _i < _old_count; _i++) " + arr_cpp + "[_i]._rebind();\n";
+                    result += "    auto& " + cpp_name(var) + " = " + arr_cpp + "[" + arr_cpp + ".size() - 1];\n";
                     // Inject the item creation code (callback bindings + view call)
                     result += info.item_creation_code;
                     result += "    " + count_var + "++;\n";
@@ -446,9 +448,9 @@ std::string ExpressionStatement::to_webcc()
                 else if (method == "pop" && call->args.empty())
                 {
                     // arr.pop() -> remove view then pop from array
-                    result = "if (!" + arr_name + ".empty()) {\n";
-                    result += "    " + arr_name + ".back()._remove_view();\n";
-                    result += "    " + arr_name + ".pop_back();\n";
+                    result = "if (!" + arr_cpp + ".empty()) {\n";
+                    result += "    " + arr_cpp + ".back()._remove_view();\n";
+                    result += "    " + arr_cpp + ".pop_back();\n";
                     result += "}\n";
                     return result;
                 }
@@ -457,10 +459,10 @@ std::string ExpressionStatement::to_webcc()
                     // items after the hole move, their handlers point at the old slots
                     std::string count_var = "_loop_" + std::to_string(info.loop_id) + "_count";
                     result = "{ int _at = " + call->args[0].value->to_webcc() + ";\n";
-                    result += "if (_at >= 0 && _at < (int)" + arr_name + ".size()) {\n";
-                    result += "    " + arr_name + "[_at]._remove_view();\n";
-                    result += "    " + arr_name + ".remove(_at);\n";
-                    result += "    for (int _i = _at; _i < (int)" + arr_name + ".size(); _i++) " + arr_name + "[_i]._rebind();\n";
+                    result += "if (_at >= 0 && _at < (int)" + arr_cpp + ".size()) {\n";
+                    result += "    " + arr_cpp + "[_at]._remove_view();\n";
+                    result += "    " + arr_cpp + ".remove(_at);\n";
+                    result += "    for (int _i = _at; _i < (int)" + arr_cpp + ".size(); _i++) " + arr_cpp + "[_i]._rebind();\n";
                     result += "    if (" + count_var + " > 0) " + count_var + "--;\n";
                     result += "} }\n";
                     return result;
@@ -473,16 +475,16 @@ std::string ExpressionStatement::to_webcc()
                     if (info.is_only_child)
                     {
                         // Bulk optimization: unregister handlers only, then clear parent's innerHTML
-                        result = "for (auto& " + var + " : " + arr_name + ") { " + var + "._remove_view(true); }\n";
+                        result = "for (auto& " + cpp_name(var) + " : " + arr_cpp + ") { " + cpp_name(var) + "._remove_view(true); }\n";
                         result += "webcc::dom::set_inner_html(" + parent_var + ", \"\");\n";
                     }
                     else
                     {
                         // Normal path: each _remove_view removes its own DOM element
-                        result = "for (auto& " + var + " : " + arr_name + ") { " + var + "._remove_view(); }\n";
+                        result = "for (auto& " + cpp_name(var) + " : " + arr_cpp + ") { " + cpp_name(var) + "._remove_view(); }\n";
                     }
                     result += count_var + " = 0;\n";
-                    result += arr_name + ".clear();\n";
+                    result += arr_cpp + ".clear();\n";
                     return result;
                 }
             }
@@ -497,19 +499,19 @@ std::string ExpressionStatement::to_webcc()
                 {
                     std::string item_expr = call->args[0].value->to_webcc();
                     result = "{\n";
-                    result += arr_name + ".push_back(" + item_expr + ");\n";
+                    result += arr_cpp + ".push_back(" + item_expr + ");\n";
                     for (const auto &info : loops)
                     {
                         std::string count_var = "_loop_" + std::to_string(info.loop_id) + "_count";
                         result += "if (" + info.parent_var + ".is_valid()) {\n";
-                        result += "    auto& " + info.var_name + " = " + arr_name + "[" + arr_name + ".size() - 1];\n";
+                        result += "    auto& " + cpp_name(info.var_name) + " = " + arr_cpp + "[" + arr_cpp + ".size() - 1];\n";
                         result += info.item_creation_code;
                         if (!info.root_element_var.empty())
                         {
                             result += "    " + info.elements_vec_name + ".push_back(" + info.root_element_var + ");\n";
                             result += "    _loop_" + std::to_string(info.loop_id) + "_keys.push_back(coi_loop_key(" + info.key_expr + "));\n";
                         }
-                        result += "    " + count_var + " = (int)" + arr_name + ".size();\n";
+                        result += "    " + count_var + " = (int)" + arr_cpp + ".size();\n";
                         result += "}\n";
                     }
                     result += "}\n";
@@ -517,14 +519,14 @@ std::string ExpressionStatement::to_webcc()
                 }
                 else if (method == "remove" && call->args.size() == 1)
                 {
-                    result = arr_name + ".remove(" + call->args[0].value->to_webcc() + ");";
+                    result = arr_cpp + ".remove(" + call->args[0].value->to_webcc() + ");";
                     for (const auto &info : loops)
                         result += "\n_sync_loop_" + std::to_string(info.loop_id) + "();";
                     return result;
                 }
                 else if (method == "pop" && call->args.empty())
                 {
-                    result = "if (!" + arr_name + ".empty()) {\n";
+                    result = "if (!" + arr_cpp + ".empty()) {\n";
                     for (const auto &info : loops)
                     {
                         result += "    if (!" + info.elements_vec_name + ".empty()) {\n";
@@ -534,9 +536,9 @@ std::string ExpressionStatement::to_webcc()
                         result += "    }\n";
                         result += "    if (!_loop_" + std::to_string(info.loop_id) + "_keys.empty()) _loop_" + std::to_string(info.loop_id) + "_keys.pop_back();\n";
                     }
-                    result += "    " + arr_name + ".pop_back();\n";
+                    result += "    " + arr_cpp + ".pop_back();\n";
                     for (const auto &info : loops)
-                        result += "    _loop_" + std::to_string(info.loop_id) + "_count = (int)" + arr_name + ".size();\n";
+                        result += "    _loop_" + std::to_string(info.loop_id) + "_count = (int)" + arr_cpp + ".size();\n";
                     result += "}\n";
                     return result;
                 }
@@ -549,7 +551,7 @@ std::string ExpressionStatement::to_webcc()
                         result += "_loop_" + std::to_string(info.loop_id) + "_keys.clear();\n";
                         result += "_loop_" + std::to_string(info.loop_id) + "_count = 0;\n";
                     }
-                    result += arr_name + ".clear();\n";
+                    result += arr_cpp + ".clear();\n";
                     return result;
                 }
             }
@@ -612,9 +614,9 @@ void WhileStatement::collect_dependencies(std::set<std::string> &deps)
 
 std::string ForRangeStatement::to_webcc()
 {
-    std::string code = "for(int " + var_name + " = " + start->to_webcc() + "; ";
-    code += "(" + var_name + " < " + end->to_webcc() + "); ";
-    code += var_name + "++) ";
+    std::string code = "for(int " + cpp_name(var_name) + " = " + start->to_webcc() + "; ";
+    code += "(" + cpp_name(var_name) + " < " + end->to_webcc() + "); ";
+    code += cpp_name(var_name) + "++) ";
     code += body->to_webcc();
     return code;
 }
@@ -632,7 +634,7 @@ std::string ForEachStatement::to_webcc()
     // for c in ["a", "b"]: a brace list needs a type to loop over
     if (auto *lit = dynamic_cast<ArrayLiteral *>(iterable.get()); lit && !lit->element_type.empty())
         over = "coi::vector<" + convert_type(lit->element_type) + ">" + over;
-    std::string code = "for(auto& " + var_name + " : " + over + ") ";
+    std::string code = "for(auto& " + cpp_name(var_name) + " : " + over + ") ";
     code += body->to_webcc();
     return code;
 }

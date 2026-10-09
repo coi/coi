@@ -1,4 +1,5 @@
 #include "codegen.h"
+#include "codegen_utils.h"
 #include "ast/ast.h"
 #include "ast/codegen_state.h"
 #include "../analysis/feature_detector.h"
@@ -476,7 +477,7 @@ void generate_cpp_code(
             out << "struct " << qualified_name(comp.module_name, comp.name) << "_" << data_def->name << " {\n";
             for (const auto &field : data_def->fields)
             {
-                out << "    " << convert_type(field.type) << " " << field.name << ";\n";
+                out << "    " << convert_type(field.type) << " " << cpp_name(field.name) << ";\n";
             }
             out << "};\n";
         }

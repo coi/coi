@@ -1,4 +1,5 @@
 #include "expressions.h"
+#include "../codegen/codegen_utils.h"
 #include "codegen_state.h"
 #include "formatter.h"
 #include "node.h" 
@@ -230,11 +231,15 @@ std::vector<Expression*> StringLiteral::get_children() {
     return children;
 }
 
+std::string Identifier::raw_name() { return name; }
+std::string MemberAccess::raw_name() { return object->raw_name() + "." + member; }
+std::string IndexAccess::raw_name() { return array->raw_name() + "[" + index->to_webcc() + "]"; }
+
 std::string Identifier::to_webcc() {
     if(g_ref_props.count(name)) {
-        return "(*" + name + ")";
+        return "(*" + cpp_name(name) + ")";
     }
-    return name;
+    return cpp_name(name);
 }
 
 void Identifier::collect_dependencies(std::set<std::string>& deps) {
@@ -337,7 +342,7 @@ std::string generate_event_call(const MethodDef& event_method, const std::string
         as_pod = sig && sig->param_types.size() == 1 && DefSchema::instance().resolve_alias(sig->param_types[0]) == spec.pod;
     }
     if (as_pod) n = (int)spec.fields.size();
-    std::string code = "this->" + callback + "(";
+    std::string code = "this->" + cpp_name(callback) + "(";
     if (as_pod) code += spec.pod + "{";
     for (int i = 0; i < n; i++) {
         if (i) code += ", ";
@@ -358,7 +363,7 @@ std::string generate_event_call(const MethodDef& event_method, const std::string
 static std::string generate_page_event_registration(const MethodDef& event_method, const CallArg& arg) {
     SchemaEventSpec spec = SchemaEventSpec::parse(event_method.mapping_value);
     std::string full = "webcc::" + spec.struct_name();
-    std::string call = generate_event_call(event_method, "", arg.value->to_webcc(), "_e");
+    std::string call = generate_event_call(event_method, "", arg.value->raw_name(), "_e");
     std::string listen;
     if (!spec.listen.empty()) {
         listen = "webcc::" + spec.ns + "::" + spec.listen + "(";
@@ -377,7 +382,7 @@ static std::string generate_event_registration(const MethodDef& event_method, co
                                                const std::string& handle_expr, const CallArg& arg) {
     SchemaEventSpec spec = SchemaEventSpec::parse(event_method.mapping_value);
     std::string full = "webcc::" + spec.struct_name();
-    std::string call = generate_event_call(event_method, handle_type, arg.value->to_webcc(), "_e");
+    std::string call = generate_event_call(event_method, handle_type, arg.value->raw_name(), "_e");
     return "coi_events<" + full + ">.set(" + handle_expr + ", [this](const " + full + "& _e) { (void)_e; " + call + "; }, this)";
 }
 
@@ -392,6 +397,15 @@ static std::string wrap_with_callbacks(const std::string& call, const MethodDef&
         code += "            " + generate_event_registration(*ev, method.return_type, "_h", *arg) + ";\n";
     }
     return code + "            return _h;\n        }()";
+}
+
+
+// a method called on a receiver whose type the codegen doesn't know (a match binding, a
+// field path): the compiler's own if some def type has it, the user's otherwise
+static bool def_method_named(const std::string& method) {
+    const auto& defs = DefSchema::instance();
+    return defs.lookup_method("string", method) || defs.lookup_method("array", method) || defs.lookup_method("Meta", method) ||
+           defs.lookup_func(DefSchema::to_snake_case(method));
 }
 
 std::string FunctionCall::to_webcc() {
@@ -432,6 +446,8 @@ std::string FunctionCall::to_webcc() {
             }
         }
     }
+
+    resolved_receiver = mangle_path(resolved_receiver);
 
     // Try DefSchema lookup first (handles @intrinsic, @inline, @map)
     if (!type_or_obj.empty()) {
@@ -477,7 +493,9 @@ std::string FunctionCall::to_webcc() {
         // string/array methods, not for handles
         std::string receiver_type = ComponentTypeContext::instance().get_symbol_type(type_or_obj);
         bool handle_receiver = !receiver_type.empty() && DefSchema::instance().is_handle(DefSchema::instance().resolve_alias(receiver_type));
-        if (!handle_receiver) {
+        // a known component or pod receiver has its own methods, not string's or array's
+        bool builtin_receiver = receiver_type.empty() || receiver_type == "string" || receiver_type.back() == ']';
+        if (!handle_receiver && builtin_receiver) {
             // For string methods, we need to check against the "string" type
             // Use arg_count to find the correct overload
             if (auto* method_def = DefSchema::instance().lookup_method("string", method, args.size())) {
@@ -658,7 +676,7 @@ std::string FunctionCall::to_webcc() {
                                 if (j > 0) arg_code += ", ";
                                 arg_code += "const " + convert_type(sig->param_types[j]) + "& _arg" + std::to_string(j);
                             }
-                            arg_code += ") { this->" + id->name + "(";
+                            arg_code += ") { this->" + cpp_name(id->name) + "(";
                             for (size_t j = 0; j < sig->param_types.size(); ++j) {
                                 if (j > 0) arg_code += ", ";
                                 arg_code += "_arg" + std::to_string(j);
@@ -688,7 +706,7 @@ std::string FunctionCall::to_webcc() {
         return code;
     }
 
-    std::string call_name = name;
+    std::string call_name = name.find('.') == std::string::npos && name.find("::") == std::string::npos ? cpp_name(name) : name;
     std::string free_fn = FreeFunctionRegistry::instance().resolve_call(name);
     if (!free_fn.empty())
     {
@@ -696,7 +714,13 @@ std::string FunctionCall::to_webcc() {
     }
     else if (!type_or_obj.empty())
     {
-        call_name = resolved_receiver + "." + method;
+        // the user's own method gets the C++ name; a string, array, map, handle or def type keeps its own
+        std::string rt = DefSchema::instance().resolve_alias(ComponentTypeContext::instance().get_symbol_type(type_or_obj));
+        bool meta_type = rt.size() > 4 && rt.compare(rt.size() - 4, 4, "Meta") == 0;
+        bool builtin_method = rt.empty() || rt == "unknown"
+                                  ? def_method_named(method)
+                                  : (rt == "string" || rt.back() == ']' || meta_type || DefSchema::instance().is_handle(rt) || DefSchema::instance().lookup_type(rt));
+        call_name = resolved_receiver + "." + (builtin_method ? method : cpp_name(method));
     }
     if (free_fn.empty() &&
         name.find('.') == std::string::npos &&
@@ -734,7 +758,7 @@ std::string FunctionCall::to_webcc() {
                         if (j > 0) arg_code += ", ";
                         arg_code += "const " + convert_type(sig->param_types[j]) + "& _arg" + std::to_string(j);
                     }
-                    arg_code += ") { this->" + id->name + "(";
+                    arg_code += ") { this->" + cpp_name(id->name) + "(";
                     for (size_t j = 0; j < sig->param_types.size(); ++j) {
                         if (j > 0) arg_code += ", ";
                         arg_code += "_arg" + std::to_string(j);
@@ -816,7 +840,7 @@ std::string MemberAccess::to_webcc() {
             }
         }
     }
-    return object->to_webcc() + "." + member;
+    return object->to_webcc() + "." + cpp_name(member);
 }
 
 void MemberAccess::collect_member_dependencies(std::set<MemberDependency>& member_deps) {
@@ -860,7 +884,7 @@ std::string ReferenceExpression::to_webcc() {
                 if (i > 0) result += ", ";
                 result += "const " + convert_type(sig->param_types[i]) + "& _arg" + std::to_string(i);
             }
-            result += ") { this->" + method_name + "(";
+            result += ") { this->" + cpp_name(method_name) + "(";
             for (size_t i = 0; i < sig->param_types.size(); ++i) {
                 if (i > 0) result += ", ";
                 result += "_arg" + std::to_string(i);
@@ -980,7 +1004,7 @@ std::string ComponentConstruction::to_webcc() {
                     if (a.name != field.name) continue;
                     std::string value = a.value->to_webcc();
                     if (a.is_move) value = "coi::move(" + value + ")";
-                    result += (first ? "." : ", .") + field.name + " = " + value;
+                    result += (first ? "." : ", .") + cpp_name(field.name) + " = " + value;
                     first = false;
                 }
             }
@@ -1004,7 +1028,7 @@ std::string ComponentConstruction::to_webcc() {
                     params += (k ? ", " : "") + convert_type(types[k]) + " _a" + std::to_string(k);
                     fwd += (k ? ", _a" : "_a") + std::to_string(k);
                 }
-                result += "[this](" + params + ") { this->" + id->name + "(" + fwd + "); }";
+                result += "[this](" + params + ") { this->" + cpp_name(id->name) + "(" + fwd + "); }";
             } else {
                 result += "[](auto&&... _a) { return " + free_fn + "(_a...); }";
             }
@@ -1061,10 +1085,10 @@ std::string MatchExpr::to_webcc() {
             for (const auto& field : arm.pattern.fields) {
                 if (field.value) {
                     // Value match: _match_subject.field == value
-                    conditions.push_back("_match_subject." + field.name + " == " + field.value->to_webcc());
+                    conditions.push_back("_match_subject." + cpp_name(field.name) + " == " + field.value->to_webcc());
                 } else {
                     // Binding pattern: capture the field into a local variable
-                    bindings += "            const auto& " + field.name + " = _match_subject." + field.name + ";\n";
+                    bindings += "            const auto& " + cpp_name(field.name) + " = _match_subject." + cpp_name(field.name) + ";\n";
                 }
             }
             
@@ -1082,7 +1106,7 @@ std::string MatchExpr::to_webcc() {
             if (!arm.pattern.variant_bindings.empty()) {
                 bindings += "            const auto& __coi_variant = _match_subject.as_" + arm.pattern.type_name + "();\n";
                 for (size_t i = 0; i < arm.pattern.variant_bindings.size(); ++i) {
-                    bindings += "            const auto& " + arm.pattern.variant_bindings[i].name +
+                    bindings += "            const auto& " + cpp_name(arm.pattern.variant_bindings[i].name) +
                                 " = __coi_variant._" + std::to_string(i) + ";\n";
                 }
             }
@@ -1211,7 +1235,12 @@ std::string MethodCall::to_webcc() {
         }
         return from_webcc_value(call + ")", m->return_type);
     }
-    std::string call = "(" + recv + ")." + method + "(";
+    // a pod's generated <Pod>Meta struct counts as a def type: its has() and has_<field>() are the compiler's
+    bool meta_type = type.size() > 4 && type.compare(type.size() - 4, 4, "Meta") == 0;
+    bool builtin_method = type.empty() || type == "unknown"
+                              ? def_method_named(method)
+                              : (type == "string" || type.back() == ']' || meta_type || DefSchema::instance().is_handle(def_type) || DefSchema::instance().lookup_type(def_type));
+    std::string call = "(" + recv + ")." + (builtin_method ? method : cpp_name(method)) + "(";
     for (size_t i = 0; i < args.size(); i++) call += (i ? ", " : "") + args[i].value->to_webcc();
     return call + ")";
 }
