@@ -15,6 +15,7 @@
 #include "codegen/pwa_generator.h"
 #include <iostream>
 #include <chrono>
+#include <cstdlib>
 #include <fstream>
 #include <vector>
 #include <queue>
@@ -546,6 +547,10 @@ int main(int argc, char **argv)
         // temp file + rename: a concurrent build (coi dev) may have app.cc mmapped in clang, truncating it in place is a SIGBUS
         fs::path tmp_path = output_path;
         tmp_path += "." + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + ".tmp";
+        // a codegen error exits mid-write: don't leave the temp file next to the source
+        static fs::path pending_tmp;
+        pending_tmp = tmp_path;
+        std::atexit([] { std::error_code ec; if (!pending_tmp.empty()) fs::remove(pending_tmp, ec); });
         std::ofstream out(tmp_path.string());
         if (!out)
         {
@@ -564,6 +569,7 @@ int main(int argc, char **argv)
         out.close();
         std::error_code rename_err;
         fs::rename(tmp_path, output_path, rename_err);
+        pending_tmp.clear();
         if (rename_err)
         {
             std::cerr << "Error: Could not write " << output_cc << ": " << rename_err.message() << std::endl;
