@@ -219,6 +219,7 @@ void generate_cpp_code(
     out << "    DispatcherBase* next = nullptr;\n";
     out << "    void (*forget)(DispatcherBase*, const void*) = nullptr;\n";
     out << "    void (*forget_handle)(DispatcherBase*, webcc::handle) = nullptr;\n";
+    out << "    void (*forget_range)(DispatcherBase*, int32_t, int32_t) = nullptr;\n";
     out << "};\n";
     out << "template<typename Callback, int MaxListeners = 512>\n";
     out << "struct Dispatcher : DispatcherBase {\n";
@@ -233,6 +234,7 @@ void generate_cpp_code(
     out << "        if (!forget) {\n";
     out << "            forget = [](DispatcherBase* b, const void* o) { static_cast<Dispatcher*>(b)->remove_owner(o); };\n";
     out << "            forget_handle = [](DispatcherBase* b, webcc::handle h) { static_cast<Dispatcher*>(b)->remove(h); };\n";
+    out << "            forget_range = [](DispatcherBase* b, int32_t lo, int32_t hi) { static_cast<Dispatcher*>(b)->remove_range(lo, hi); };\n";
     out << "            next = g_first; g_first = this;\n";
     out << "        }\n";
     out << "        int32_t hid = (int32_t)h;\n";
@@ -268,6 +270,17 @@ void generate_cpp_code(
     out << "            }\n";
     out << "        }\n";
     out << "    }\n";
+    // every handle in [lo, hi): what a removed loop item allocated
+    out << "    void remove_range(int32_t lo, int32_t hi) {\n";
+    out << "        for (int i = 0; i < count; ) {\n";
+    out << "            if (handles[i] >= lo && handles[i] < hi) {\n";
+    out << "                handles[i] = handles[count-1];\n";
+    out << "                callbacks[i] = callbacks[count-1];\n";
+    out << "                owners[i] = owners[count-1];\n";
+    out << "                count--;\n";
+    out << "            } else { i++; }\n";
+    out << "        }\n";
+    out << "    }\n";
     out << "    template<typename... Args>\n";
     out << "    bool dispatch(webcc::handle h, Args&&... args) {\n";
     out << "        int32_t hid = (int32_t)h;\n";
@@ -287,8 +300,27 @@ void generate_cpp_code(
     out << "inline void coi_forget_owner(const void* owner) {\n";
     out << "    for (DispatcherBase* d = DispatcherBase::g_first; d; d = d->next) d->forget(d, owner);\n";
     out << "}\n";
+    // a loop item's handles are consecutive (handles only count up): the item notes the span
+    // under its root element, and forgetting the root forgets every handler inside it, nested
+    // rows included, along with the spans of loops nested in it
+    out << "struct CoiSpan { int32_t root; int32_t lo; int32_t hi; };\n";
+    out << "inline coi::vector<CoiSpan> g_coi_spans;\n";
+    out << "inline void coi_note_span(webcc::handle root, int32_t lo) {\n";
+    out << "    g_coi_spans.push_back(CoiSpan{(int32_t)root, lo, webcc::deferred_handle_counter()});\n";
+    out << "}\n";
     out << "inline void coi_forget_handle(webcc::handle h) {\n";
     out << "    for (DispatcherBase* d = DispatcherBase::g_first; d; d = d->next) d->forget_handle(d, h);\n";
+    out << "    int32_t hid = (int32_t)h;\n";
+    out << "    for (int i = 0; i < (int)g_coi_spans.size(); i++) {\n";
+    out << "        if (g_coi_spans[i].root != hid) continue;\n";
+    out << "        int32_t lo = g_coi_spans[i].lo, hi = g_coi_spans[i].hi;\n";
+    out << "        for (DispatcherBase* d = DispatcherBase::g_first; d; d = d->next) d->forget_range(d, lo, hi);\n";
+    out << "        for (int j = 0; j < (int)g_coi_spans.size(); ) {\n";
+    out << "            if (g_coi_spans[j].root >= lo && g_coi_spans[j].root < hi) { g_coi_spans[j] = g_coi_spans[g_coi_spans.size() - 1]; g_coi_spans.pop_back(); }\n";
+    out << "            else j++;\n";
+    out << "        }\n";
+    out << "        return;\n";
+    out << "    }\n";
     out << "}\n\n";
 
     out << "int g_view_depth = 0;\n";

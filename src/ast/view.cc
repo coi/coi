@@ -1292,6 +1292,10 @@ void ViewForRangeStatement::generate_code(ViewCodegenContext& ctx)
     if (region.is_html_loop && loop_html_element)
     {
         region.root_element_var = "_el_" + std::to_string(root_element_id);
+        // note the item's handle span, so removing it forgets the handlers of nested elements too
+        std::string lo = "_span_lo_" + std::to_string(my_loop_id);
+        region.item_creation_code = "int32_t " + lo + " = webcc::deferred_handle_counter();\n" + region.item_creation_code +
+            "coi_note_span(" + region.root_element_var + ", " + lo + ");\n";
     }
 
     // Generate item update code
@@ -1411,6 +1415,10 @@ void ViewForEachStatement::generate_code(ViewCodegenContext& ctx)
     if (region.is_html_loop && loop_html_element)
     {
         region.root_element_var = "_el_" + std::to_string(root_element_id);
+        // note the item's handle span, so removing it forgets the handlers of nested elements too
+        std::string lo = "_span_lo_" + std::to_string(my_loop_id);
+        region.item_creation_code = "int32_t " + lo + " = webcc::deferred_handle_counter();\n" + region.item_creation_code +
+            "coi_note_span(" + region.root_element_var + ", " + lo + ");\n";
     }
 
     // Generate item update code
