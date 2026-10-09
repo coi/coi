@@ -1,0 +1,21 @@
+// Test: Html.escape and Html.toText, the built-in helpers for markup strings
+
+component App {
+    mut string title = "a < b & \"c\"";
+    mut string html = "<p>Hi <b>there</b></p><ul><li>x &amp; y</li></ul>";
+
+    def safe() : string { return Html.escape(title); }
+    def lines() : int {
+        mut int n = 0;
+        for i in 0:Html.toText(html).length() { if (Html.toText(html).at(i) == "\n") n++; }
+        return n;
+    }
+
+    view {
+        <div>{safe()} {lines()} {Html.toText("<br>").length()}</div>
+    }
+}
+
+app {
+    root = App;
+}

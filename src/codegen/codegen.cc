@@ -89,6 +89,36 @@ void generate_cpp_code(
     out << "using webcc::sin; using webcc::cos; using webcc::tan; using webcc::asin; using webcc::acos; using webcc::atan; using webcc::atan2;\n";
     out << "using webcc::exp; using webcc::log; using webcc::log2; using webcc::log10; using webcc::pow;\n";
     out << "}\n";
+    // Html.escape / Html.toText
+    out << "namespace html {\n";
+    out << "inline string escape(const string& s) {\n";
+    out << "    string out; for (uint32_t i = 0; i < s.length(); i++) { char c = s.data()[i];\n";
+    out << "        if (c == '&') out += \"&amp;\"; else if (c == '<') out += \"&lt;\"; else if (c == '>') out += \"&gt;\";\n";
+    out << "        else if (c == '\"') out += \"&quot;\"; else if (c == '\\'') out += \"&#39;\"; else out += string(&c, 1); }\n";
+    out << "    return out;\n";
+    out << "}\n";
+    // tags go, a <br> or the end of a block element is a line break, the common entities are decoded
+    out << "inline bool html_block_end(const string& tag) {\n";
+    out << "    static const char* ends[] = {\"/p\", \"/div\", \"/li\", \"/h1\", \"/h2\", \"/h3\", \"/h4\", \"/h5\", \"/h6\", \"/tr\", \"/blockquote\", \"/pre\", \"br\", \"br/\", \"br /\"};\n";
+    out << "    for (const char* e : ends) { uint32_t n = 0; while (e[n]) n++;\n";
+    out << "        if (tag.length() >= n && tag.substr(0, n).to_lower() == string(e) && (tag.length() == n || tag.data()[n] == ' ')) return true; }\n";
+    out << "    return false;\n";
+    out << "}\n";
+    out << "inline string to_text(const string& h) {\n";
+    out << "    string out; uint32_t i = 0, n = h.length(); const char* d = h.data();\n";
+    out << "    while (i < n) { char c = d[i];\n";
+    out << "        if (c == '<') { int end = h.index_of(\">\", i); if (end < 0) break;\n";
+    out << "            if (html_block_end(h.substr(i + 1, end - i - 1))) out += \"\\n\"; i = end + 1; continue; }\n";
+    out << "        if (c == '&') { int end = h.index_of(\";\", i);\n";
+    out << "            if (end > (int)i && end - (int)i < 8) { string e = h.substr(i + 1, end - i - 1);\n";
+    out << "                if (e == \"amp\") out += \"&\"; else if (e == \"lt\") out += \"<\"; else if (e == \"gt\") out += \">\";\n";
+    out << "                else if (e == \"quot\") out += \"\\\"\"; else if (e == \"apos\" || e == \"#39\") out += \"'\"; else if (e == \"nbsp\") out += \" \";\n";
+    out << "                else { out += string(d + i, end - i + 1); }\n";
+    out << "                i = end + 1; continue; } }\n";
+    out << "        out += string(&c, 1); i++; }\n";
+    out << "    return out;\n";
+    out << "}\n";
+    out << "}\n";
     out << "// Cast helpers backing the builtin toInt/toFloat/toString methods.\n";
     out << "// Overloaded so one inline template stays valid for any receiver type.\n";
     out << "inline int to_int(const string& s) { return s.to_int(); }\n";

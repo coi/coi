@@ -1,0 +1,13 @@
+// Coi HTML helpers
+// Text in and out of markup, for apps that build or read HTML strings
+
+type Html {
+    // the five characters with a meaning in markup become entities, so the text shows as typed
+    @inline("coi::html::escape(${0})")
+    shared def escape(string text): string
+
+    // tags dropped; a <br> or the end of a block element (p, div, li, h1-h6, tr, blockquote, pre)
+    // becomes a newline; amp, lt, gt, quot, apos, #39 and nbsp are decoded, other entities stay
+    @inline("coi::html::to_text(${0})")
+    shared def toText(string html): string
+}

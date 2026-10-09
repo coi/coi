@@ -458,6 +458,19 @@ component Circle {
 }
 ```
 
+## Html
+
+Two helpers for apps that build or read HTML strings, on a built-in `Html` type.
+
+```tsx
+string safe = Html.escape("a < b & c");        // "a &lt; b &amp; c" (also " and ')
+el.setInnerHtml(Html.escape(title));           // the text shows as typed
+
+string text = Html.toText("<p>Hi <b>there</b></p><p>x &amp; y</p>");
+// "Hi there\nx & y": tags go, a <br> or the end of a block element (p, div, li,
+// h1-h6, tr, blockquote, pre) is a line break, the common entities are decoded
+```
+
 ## Pod Types
 
 Pod types (Plain Old Data) are simple value types (like structs in other languages) that group related fields together. Unlike platform types (Canvas, Audio, etc.), pod types are **copyable** and can be freely passed around.
