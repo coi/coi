@@ -1,0 +1,22 @@
+// Test: an integer literal goes into an int64[] or float[] element, like it does in a declaration
+
+component App {
+    mut int64[] stamps = [1, 2];
+    mut float[] weights = [0.5];
+    mut uint8[] bytes = [0];
+
+    def reset() : void {
+        stamps[0] = 0;
+        stamps[1] = -5;
+        weights[0] = 1;
+        bytes[0] = 255;
+    }
+
+    view {
+        <div>{stamps.size()}</div>
+    }
+}
+
+app {
+    root = App;
+}

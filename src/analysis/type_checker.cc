@@ -2243,7 +2243,9 @@ static void check_function_body(const FunctionDef &method, const Component *comp
             
             std::string value_type = infer_expression_type(idx_assign->value.get(), current_scope);
             
-            if (element_type != "unknown" && !is_compatible_type(element_type, value_type))
+            // xs[k] = 0 on an int64[] (or a float[]): the literal fits, as it does in a declaration
+            if (element_type != "unknown" && !is_compatible_type(element_type, value_type) &&
+                !literal_fits(idx_assign->value.get(), element_type))
             {
                 ErrorHandler::type_error(
                     "Cannot assign '" + value_type + "' to " + (is_map ? "map" : "array") + " element of type '" + element_type + "'",

@@ -1,0 +1,17 @@
+// Test: a literal that doesn't fit the element type is still an error
+
+component App {
+    mut uint8[] bytes = [0];
+
+    def bad() : void {
+        bytes[0] = 300;
+    }
+
+    view {
+        <div>{bytes.size()}</div>
+    }
+}
+
+app {
+    root = App;
+}
