@@ -1,0 +1,22 @@
+// Test: [value; count] into a dynamic array, with a count only known at run time
+
+component App {
+    mut int[] seen = [1, 2, 3];
+
+    def counts(int n) : int {
+        mut int[] count = [0; n];
+        float[] weights = [1.5; n * 2];
+        int[] fixedToo = [7; 3];
+        for i in 0:n { count[i] = i; }
+        count.push(weights.size());
+        return count.size() + fixedToo.size();
+    }
+
+    view {
+        <div>{counts(seen.size())}</div>
+    }
+}
+
+app {
+    root = App;
+}

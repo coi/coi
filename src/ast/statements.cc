@@ -33,6 +33,16 @@ std::string VarDeclaration::to_webcc()
         
         // Use count from repeat initializer (overrides fixed_size if both present)
         std::string count_str = repeat->count->to_webcc();
+
+        // int[] xs = [0; n]: a vector of n copies, the count can be a runtime value
+        if (type.ends_with("[]"))
+        {
+            std::string vec_type = "coi::vector<" + convert_type(elem_type) + ">";
+            std::string fill = "_v.resize((size_t)(" + count_str + ")); for (size_t _i = 0; _i < _v.size(); _i++) _v[_i] = " +
+                               repeat->value->to_webcc() + "; return _v; }()";
+            return std::string(is_mutable ? "" : "const ") + vec_type + " " + name + " = [&]{ " + vec_type + " _v; " + fill + ";";
+        }
+
         std::string arr_type = "coi::array<" + convert_type(elem_type) + ", " + count_str + ">";
         
         if (is_mutable)
