@@ -1,5 +1,10 @@
 // elements over a range: a body binding that reads outer state follows that state even when
-// the range is unchanged; the loop variable starts at the start expression; clicks still work
+// the range is unchanged; the loop variable starts at the start expression; clicks still work;
+// rows stay between their siblings (elements and components alike) however often they rebuild
+component Tag(pub int n) {
+    view { <em class="tag">{n}</em> }
+}
+
 component RangeLoopRebuild {
     mut int count = 3;
     mut string mode = "a";
@@ -14,7 +19,8 @@ component RangeLoopRebuild {
         <div>
             <button class="flip" onclick={flip}>flip</button>
             <button class="more" onclick={more}>more</button>
-            <div class="list"><for i in 1:count><span class={cls()} onclick={pick(i)}>{i}</span></for></div>
+            <div class="list"><b class="head">h</b><for i in 1:count><span class={cls()} onclick={pick(i)}>{i}</span></for><b class="tail">t</b></div>
+            <div class="tags"><b class="head">h</b><for i in 0:count><Tag n={i} /></for><b class="tail">t</b></div>
             <p class="picked">{picked}</p>
         </div>
     }

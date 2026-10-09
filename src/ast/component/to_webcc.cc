@@ -1197,7 +1197,7 @@ std::string Component::to_webcc(CompilerSession &session)
                 ss << "            for (int " << region.var_name << " = old_count; " << region.var_name << " < new_count; " << region.var_name << "++) {\n";
 
                 std::string item_code = region.item_creation_code;
-                item_code = transform_to_insert_before(item_code, region.parent_element, anchor_var);
+                item_code = transform_to_insert_before(item_code, "_loop_" + std::to_string(region.loop_id) + "_parent", anchor_var);
                 ss << indent_code(item_code, "    ");
                 ss << "            }\n";
 
@@ -1234,8 +1234,11 @@ std::string Component::to_webcc(CompilerSession &session)
                 ss << "        for (int " << region.var_name << " = " << region.start_expr << "; " << region.var_name << " < " << region.end_expr << "; " << region.var_name << "++) {\n";
 
                 std::string item_code = region.item_creation_code;
-                item_code = transform_to_insert_before(item_code, region.parent_element, anchor_var);
-                item_code = track_top_level_inserts(item_code, "_loop_" + std::to_string(region.loop_id) + "_parent", vec_name);
+                // the body appends to the loop's parent: insert before the anchor instead, or the
+                // rows end up after whatever follows the loop
+                std::string loop_parent = "_loop_" + std::to_string(region.loop_id) + "_parent";
+                item_code = transform_to_insert_before(item_code, loop_parent, anchor_var);
+                item_code = track_top_level_inserts(item_code, loop_parent, vec_name);
                 ss << indent_code(item_code, "    ");
                 ss << "        }\n";
                 ss << "        if (--g_view_depth == 0) webcc::flush();\n";
