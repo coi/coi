@@ -40,6 +40,7 @@ struct ArrayLoopInfo
     std::string var_name;
     std::string item_creation_code;
     std::string root_element_var;
+    std::string key_expr;
     bool is_only_child;
 };
 extern std::map<std::string, std::vector<ArrayLoopInfo>> g_array_loops;

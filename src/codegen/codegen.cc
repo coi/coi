@@ -323,6 +323,8 @@ void generate_cpp_code(
     out << "    }\n";
     out << "}\n\n";
 
+    // a keyed loop row's key, comparable across syncs whatever its type
+    out << "template<typename T> coi::string coi_loop_key(const T& v) { webcc::hybrid_formatter<128> f; f << v; return coi::string(f.c_str()); }\n";
     out << "int g_view_depth = 0;\n";
 
     // Emit feature-specific globals (dispatchers, callbacks, etc.)

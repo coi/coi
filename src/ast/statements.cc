@@ -495,7 +495,10 @@ std::string ExpressionStatement::to_webcc()
                         result += "    auto& " + info.var_name + " = " + arr_name + "[" + arr_name + ".size() - 1];\n";
                         result += info.item_creation_code;
                         if (!info.root_element_var.empty())
+                        {
                             result += "    " + info.elements_vec_name + ".push_back(" + info.root_element_var + ");\n";
+                            result += "    _loop_" + std::to_string(info.loop_id) + "_keys.push_back(coi_loop_key(" + info.key_expr + "));\n";
+                        }
                         result += "    " + count_var + " = (int)" + arr_name + ".size();\n";
                         result += "}\n";
                     }
@@ -519,6 +522,7 @@ std::string ExpressionStatement::to_webcc()
                         result += "        webcc::dom::remove_element(" + info.elements_vec_name + ".back());\n";
                         result += "        " + info.elements_vec_name + ".pop_back();\n";
                         result += "    }\n";
+                        result += "    if (!_loop_" + std::to_string(info.loop_id) + "_keys.empty()) _loop_" + std::to_string(info.loop_id) + "_keys.pop_back();\n";
                     }
                     result += "    " + arr_name + ".pop_back();\n";
                     for (const auto &info : loops)
@@ -532,6 +536,7 @@ std::string ExpressionStatement::to_webcc()
                     {
                         result += "for (auto& _el : " + info.elements_vec_name + ") { coi_forget_handle(_el); webcc::dom::remove_element(_el); }\n";
                         result += info.elements_vec_name + ".clear();\n";
+                        result += "_loop_" + std::to_string(info.loop_id) + "_keys.clear();\n";
                         result += "_loop_" + std::to_string(info.loop_id) + "_count = 0;\n";
                     }
                     result += arr_name + ".clear();\n";
