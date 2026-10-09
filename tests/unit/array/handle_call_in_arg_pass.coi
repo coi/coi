@@ -1,0 +1,25 @@
+// Test: a platform call on an array element inside another call's argument
+// cx.push(cs[k].getContext2d()) returned from the array-method check before the
+// argument was typed, so the inner call was left as a C++ method that doesn't exist
+
+component App {
+    mut Canvas[] cs;
+    mut CanvasContext2D[] cx;
+
+    def add() : void {
+        cs.push(Canvas.createCanvas("tile", 64.0, 64.0));
+        int k = cs.size() - 1;
+        cx.push(cs[k].getContext2d());
+        cs[k].setSize(128, 128);
+        mut string s = "";
+        s += `${cs[k].toDataUrl()}`.subStr(0, 4);
+    }
+
+    view {
+        <div>{cx.size()}</div>
+    }
+}
+
+app {
+    root = App;
+}

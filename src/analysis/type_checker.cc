@@ -1348,6 +1348,12 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                 exit(1);
             };
 
+            // the arguments are typed here too: xs.push(cs[k].getContext2d()) returns before the
+            // schema walk below, and the inner call needs its receiver type for codegen
+            if (is_dynamic_array || is_fixed_array || normalize_type(obj_type) == "string")
+                for (auto &a : func->args)
+                    infer_expression_type(a.value.get(), scope);
+
             // Use DefSchema for array method lookups
             if (is_dynamic_array || is_fixed_array)
             {
