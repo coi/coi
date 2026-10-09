@@ -1,0 +1,46 @@
+// a keyed loop re-render keeps the live rows: node identity, pointer capture, nested handlers
+pod Row { string id; string[] tags; }
+
+component LoopMorph {
+    mut Row[] rows = [Row{id = "a", tags = ["a1", "a2"]}, Row{id = "b", tags = ["b1"]}, Row{id = "c", tags = []}];
+    mut string sel = "";
+    mut string held = "";
+    mut int moves = 0;
+    mut int ups = 0;
+    mut int renders = 0;
+    mut string picked = "";
+
+    def select(string id) : void { sel = id; }
+    def rerender() : void { renders++; }
+    def reverse() : void {
+        mut Row[] out;
+        for i in 0:rows.size() { out.push(rows[rows.size() - 1 - i]); }
+        rows = out;
+    }
+    def dropFirst() : void { rows.remove(0); }
+    def grab(string id) : void { held = id; }
+    def move() : void { if (!held.isEmpty()) moves++; }
+    def up() : void { held = ""; ups++; }
+    def pick(string tag) : void { picked = tag; }
+    def cls(Row r) : string { return r.id == sel || r.id == held ? `row on${renders}` : `row${renders}`; }
+
+    view {
+        <div>
+            <button class="rerender" onclick={rerender}>rerender</button>
+            <button class="reverse" onclick={reverse}>reverse</button>
+            <button class="dropfirst" onclick={dropFirst}>drop</button>
+            <span class="moves">{moves}</span><span class="ups">{ups}</span><span class="picked">{picked}</span>
+            <ul class="list">
+                <for r in rows key={r.id}>
+                    <li class={cls(r)} data-id={r.id}>
+                        <button class="sel" onclick={select(r.id)}>{r.id}</button>
+                        <span class="grip" onpointerdown={grab(r.id)} onpointermove={move} onpointerup={up}>grip</span>
+                        <for t in r.tags key={t}><button class="tag" onclick={pick(t)}>{t}</button></for>
+                    </li>
+                </for>
+            </ul>
+        </div>
+    }
+}
+
+app { root = LoopMorph; }
