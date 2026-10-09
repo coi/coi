@@ -23,6 +23,12 @@ type string {
     @inline("${this}.contains(${0})")
     def contains(string needle): bool
 
+    @inline("${this}.index_of(${0})")
+    def indexOf(string needle): int
+
+    @inline("${this}.index_of(${0}, (uint32_t)(${1}))")
+    def indexOf(string needle, int from): int
+
     @inline("${this}.empty()")
     def isEmpty(): bool
 

@@ -1,0 +1,26 @@
+// Test: indexOf with and without a start index, on variables, literals and expressions
+
+component App {
+    mut string attrs = "href=\"x\" class=\"y\"";
+
+    def classStart() : int {
+        int at = attrs.indexOf("class=\"");
+        if (at < 0) return -1;
+        return attrs.indexOf("\"", at + 7);
+    }
+
+    def count(string needle) : int {
+        mut int n = 0;
+        mut int i = (attrs + "").indexOf(needle, 0);
+        while (i >= 0) { n++; i = attrs.indexOf(needle, i + 1); }
+        return n;
+    }
+
+    view {
+        <div>{classStart()} {count("\"")} {"abc".indexOf("c")}</div>
+    }
+}
+
+app {
+    root = App;
+}

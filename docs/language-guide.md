@@ -282,6 +282,8 @@ string sub2 = text.subStr(0, 5);  // "Hello" - from index with length
 
 // Search
 bool has = text.contains("World"); // Check if substring exists
+int at = text.indexOf("o");         // 4: first occurrence, -1 when there is none
+int next = text.indexOf("o", 5);    // 7: the first one at or after an index
 
 // Trimming
 string trimmed = text.trim();       // Remove whitespace from both ends
