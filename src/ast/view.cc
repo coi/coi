@@ -61,7 +61,7 @@ static std::string build_forward_args(size_t count)
 // Transforms: webcc::dom::append_child(_if_X_parent, _el[N]);
 // To:         webcc::dom::insert_before(_if_X_parent, _el[N], _if_X_anchor);
 // Also rewrites child component renders (which append their roots internally)
-// to the anchor-aware form: X.view(_if_X_parent); -> X.view(_if_X_parent, _if_X_anchor);
+// to the anchor-aware form: X._view(_if_X_parent); -> X._view(_if_X_parent, _if_X_anchor);
 // Nested regions that share this parent alias it (`_if_Y_parent = _if_X_parent;`)
 // and append through the alias; those appends must land before the anchor too,
 // otherwise a nested region that is already true when the outer one is
@@ -99,8 +99,8 @@ static std::string rewrite_appends(const std::string& code, const std::string& p
 
     // Child components attach their own roots inside view(); pass the anchor
     // through so they keep their position too (an invalid anchor appends).
-    std::string view_pattern = ".view(" + parent + ");";
-    std::string view_replacement = ".view(" + parent + ", " + if_anchor + ");";
+    std::string view_pattern = "._view(" + parent + ");";
+    std::string view_replacement = "._view(" + parent + ", " + if_anchor + ");";
     size_t vpos = 0;
     while ((vpos = result.find(view_pattern, vpos)) != std::string::npos) {
         result.replace(vpos, view_pattern.length(), view_replacement);
@@ -328,11 +328,11 @@ void ComponentInstantiation::generate_code(ViewCodegenContext& ctx)
         // Call view on the existing member (component persists, only view is re-rendered)
         if (!ctx.parent.empty())
         {
-            ctx.ss << "        " << instance_name << ".view(" << ctx.parent << ");\n";
+            ctx.ss << "        " << instance_name << "._view(" << ctx.parent << ");\n";
         }
         else
         {
-            ctx.ss << "        " << instance_name << ".view();\n";
+            ctx.ss << "        " << instance_name << "._view();\n";
         }
         return;
     }
@@ -423,11 +423,11 @@ void ComponentInstantiation::generate_code(ViewCodegenContext& ctx)
     // Call view
     if (!ctx.parent.empty())
     {
-        ctx.ss << "        " << instance_name << ".view(" << ctx.parent << ");\n";
+        ctx.ss << "        " << instance_name << "._view(" << ctx.parent << ");\n";
     }
     else
     {
-        ctx.ss << "        " << instance_name << ".view();\n";
+        ctx.ss << "        " << instance_name << "._view();\n";
     }
 }
 

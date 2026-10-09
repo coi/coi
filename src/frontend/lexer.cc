@@ -106,10 +106,16 @@ Token Lexer::read_string(){
             switch (current()) {
                 case 'n' : str += '\n'; break;
                 case 't' : str += '\t'; break;
+                case 'r' : str += '\r'; break;
+                case '0' : str += '\0'; break;
                 case '\\' : str += '\\'; break;
                 case '"' : str += '"'; break;
+                case '\'' : str += '\''; break;
                 case '$' : str += "\\$"; break;  // Escape $ for ${} interpolation
-                default: str += current();
+                default:
+                    // a silently dropped backslash made "\r" into "r"
+                    ErrorHandler::compiler_error(std::string("Unknown escape '\\") + current() +
+                                                 "' in string literal (known: \\n \\t \\r \\0 \\\\ \\\" \\' \\$)", line);
             }
         }else{
             str += current();

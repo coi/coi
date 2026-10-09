@@ -154,6 +154,7 @@ open_url
 get_time
 get_date_now
 get_timezone_offset_ms
+get_timezone_offset_at
 # one-shot timer: System.setTimeout(ms, &fired) returns a Timeout, timeout.clearTimeout() cancels
 set_timeout +events(TIMER)
 clear_timeout

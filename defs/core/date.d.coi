@@ -1,0 +1,9 @@
+// Coi date helpers
+// Local time from an epoch value; the platform supplies the timezone offset, the calendar is ours
+
+type Date {
+    // ms since the epoch as local time in a pattern: YYYY YY MMMM MMM MM M dddd ddd DD D HH H hh h
+    // mm m ss s A a, [text] kept as it is. "ddd D MMM [at] H:mm" -> "Tue 7 Oct at 10:15"
+    @inline("coi::date::format(${0}, ${1})")
+    shared def format(float64 ms, string pattern): string
+}

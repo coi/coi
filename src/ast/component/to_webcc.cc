@@ -22,7 +22,7 @@ static std::string make_callback_name(const std::string &var_name)
 // Transforms: webcc::dom::append_child(parent_var, _el[N]);
 // To:         webcc::dom::insert_before(parent_var, _el[N], anchor_var);
 // Also rewrites child component renders (which append their roots internally)
-// to the anchor-aware form: X.view(parent_var); -> X.view(parent_var, anchor_var);
+// to the anchor-aware form: X._view(parent_var); -> X._view(parent_var, anchor_var);
 // every node a loop body puts straight into the loop's parent goes on the row list, so the next
 // sync removes all of them: a body with several top-level nodes, or an <if> around one, makes more
 // than the one root element
@@ -83,8 +83,8 @@ static std::string transform_to_insert_before(const std::string &code, const std
 
     // Child components attach their own roots inside view(); pass the anchor
     // through so they keep their position too (an invalid anchor appends).
-    std::string view_pattern = ".view(" + parent_var + ");";
-    std::string view_replacement = ".view(" + parent_var + ", " + anchor_var + ");";
+    std::string view_pattern = "._view(" + parent_var + ");";
+    std::string view_replacement = "._view(" + parent_var + ", " + anchor_var + ");";
     size_t vpos = 0;
     while ((vpos = result.find(view_pattern, vpos)) != std::string::npos)
     {
@@ -1791,7 +1791,8 @@ std::string Component::to_webcc(CompilerSession &session)
     // roots are inserted before it instead of appended, so components created
     // inside anchor-based regions (<if>/<for> re-syncs) keep their position.
     // An invalid handle appends (see dom INSERT_BEFORE: insertBefore(el, ref || null)).
-    ss << "    void view(webcc::handle parent = webcc::dom::get_body(), webcc::handle _before = webcc::handle()) {\n";
+    // _view, like _destroy: a component may have a field called view
+    ss << "    void _view(webcc::handle parent = webcc::dom::get_body(), webcc::handle _before = webcc::handle()) {\n";
     ss << "        g_view_depth++;\n";
     ss << "        _coi_alive = true;\n";
 

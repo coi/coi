@@ -144,6 +144,39 @@ void generate_cpp_code(
     out << "inline string to_string(const string& s) { return s; }\n";
     out << "inline string to_string(bool v) { return string(v ? \"true\" : \"false\"); }\n";
     out << "template<typename T> inline string to_string(T v) { webcc::formatter<32> f; f << v; return string(f.c_str()); }\n";
+    // Date.format: civil-from-days (Howard Hinnant's algorithm) on the local instant, then the pattern
+    out << "namespace date {\n";
+    out << "inline long long fdiv(long long a, long long b) { return (a >= 0 ? a : a - b + 1) / b; }\n";
+    out << "inline string two(long long n) { return n < 10 ? string(\"0\") + to_string((int)n) : to_string((int)n); }\n";
+    out << "inline string format(double ms, const string& pattern) {\n";
+    out << "    static const char* wd[] = {\"Sunday\", \"Monday\", \"Tuesday\", \"Wednesday\", \"Thursday\", \"Friday\", \"Saturday\"};\n";
+    out << "    static const char* mo[] = {\"January\", \"February\", \"March\", \"April\", \"May\", \"June\", \"July\", \"August\", \"September\", \"October\", \"November\", \"December\"};\n";
+    out << "    long long local = (long long)(ms + webcc::system::get_timezone_offset_at(ms));\n";
+    out << "    long long days = fdiv(local, 86400000), rest = local - days * 86400000;\n";
+    out << "    long long hour = rest / 3600000, minute = rest / 60000 % 60, second = rest / 1000 % 60;\n";
+    out << "    long long z = days + 719468, era = fdiv(z, 146097), doe = z - era * 146097;\n";
+    out << "    long long yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365, doy = doe - (365 * yoe + yoe / 4 - yoe / 100);\n";
+    out << "    long long mp = (5 * doy + 2) / 153, day = doy - (153 * mp + 2) / 5 + 1, month = mp < 10 ? mp + 3 : mp - 9;\n";
+    out << "    long long year = yoe + era * 400 + (month <= 2 ? 1 : 0), weekday = ((days + 4) % 7 + 7) % 7, h12 = hour % 12 ? hour % 12 : 12;\n";
+    out << "    string out; const char* p = pattern.data(); uint32_t n = pattern.length(), i = 0;\n";
+    out << "    auto has = [&](const char* t) { uint32_t k = 0; while (t[k]) { if (i + k >= n || p[i + k] != t[k]) return false; k++; } return true; };\n";
+    out << "    while (i < n) {\n";
+    out << "        if (p[i] == '[') { uint32_t e = i + 1; while (e < n && p[e] != ']') e++; out += string(p + i + 1, e - i - 1); i = e < n ? e + 1 : e; continue; }\n";
+    out << "        if (has(\"YYYY\")) { out += to_string((int)year); i += 4; } else if (has(\"YY\")) { out += two(year % 100); i += 2; }\n";
+    out << "        else if (has(\"MMMM\")) { out += string(mo[month - 1]); i += 4; } else if (has(\"MMM\")) { out += string(mo[month - 1], 3); i += 3; }\n";
+    out << "        else if (has(\"MM\")) { out += two(month); i += 2; } else if (has(\"M\")) { out += to_string((int)month); i += 1; }\n";
+    out << "        else if (has(\"dddd\")) { out += string(wd[weekday]); i += 4; } else if (has(\"ddd\")) { out += string(wd[weekday], 3); i += 3; }\n";
+    out << "        else if (has(\"DD\")) { out += two(day); i += 2; } else if (has(\"D\")) { out += to_string((int)day); i += 1; }\n";
+    out << "        else if (has(\"HH\")) { out += two(hour); i += 2; } else if (has(\"H\")) { out += to_string((int)hour); i += 1; }\n";
+    out << "        else if (has(\"hh\")) { out += two(h12); i += 2; } else if (has(\"h\")) { out += to_string((int)h12); i += 1; }\n";
+    out << "        else if (has(\"mm\")) { out += two(minute); i += 2; } else if (has(\"m\")) { out += to_string((int)minute); i += 1; }\n";
+    out << "        else if (has(\"ss\")) { out += two(second); i += 2; } else if (has(\"s\")) { out += to_string((int)second); i += 1; }\n";
+    out << "        else if (has(\"A\")) { out += string(hour < 12 ? \"AM\" : \"PM\"); i += 1; } else if (has(\"a\")) { out += string(hour < 12 ? \"am\" : \"pm\"); i += 1; }\n";
+    out << "        else { out += string(p + i, 1); i++; }\n";
+    out << "    }\n";
+    out << "    return out;\n";
+    out << "}\n";
+    out << "}\n";
     out << "}\n";
 
     // Client-side route matcher + param parsers (only if a router block is used)
@@ -631,7 +664,7 @@ void generate_cpp_code(
     out << "    void* app_mem = coi::malloc(sizeof(" << root_qualified << "));\n";
     out << "    app = new (app_mem) " << root_qualified << "();\n";
     emit_feature_init(out, features, root_qualified);
-    out << "    app->view();\n";
+    out << "    app->_view();\n";
     // no rAF loop without a tick or with tick = demand
     bool has_tick = session.components_with_tick.count(root_qualified) > 0;
     if (!has_tick || final_app_config.tick_on_demand)

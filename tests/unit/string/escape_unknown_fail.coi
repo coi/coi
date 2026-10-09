@@ -1,0 +1,13 @@
+// Test: an escape the language doesn't know is an error, not a dropped backslash
+
+component App {
+    string s = "a\qb";
+
+    view {
+        <div>{s}</div>
+    }
+}
+
+app {
+    root = App;
+}

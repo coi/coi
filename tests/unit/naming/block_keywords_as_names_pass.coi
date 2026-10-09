@@ -1,0 +1,33 @@
+// Test: style, view, mount, tick and init are only keywords at the start of a component
+// member, so they can name variables, parameters and fields
+
+component Card(string style, int view = 0) {
+    mut string mount = "top";
+    mut int tick = 0;
+    mut bool init = false;
+
+    def describe(string style) : string {
+        mut string view = style + "/" + mount;
+        tick++;
+        init = true;
+        return view;
+    }
+
+    style {
+        .card { padding: 4px; }
+    }
+
+    view {
+        <div class="card">{describe(style)} {view} {tick}</div>
+    }
+}
+
+component App {
+    view {
+        <Card style="plain" view={2} />
+    }
+}
+
+app {
+    root = App;
+}

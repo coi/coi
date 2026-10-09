@@ -144,6 +144,8 @@ static std::string escape_cpp(const std::string& text) {
         else if (c == '\\') escaped += "\\\\";
         else if (c == '\n') escaped += "\\n";
         else if (c == '\t') escaped += "\\t";
+        else if (c == '\r') escaped += "\\r";
+        else if (c == '\0') escaped += "\\000";   // three digits, so a digit after it isn't read as part of the octal
         else escaped += c;
     }
     return escaped;

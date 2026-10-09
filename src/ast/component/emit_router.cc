@@ -105,7 +105,7 @@ void emit_component_router_methods(std::stringstream &ss, const Component &compo
         ss << indent << "_route_" << i << " = new " << qualified_name(route.module_name, route.component_name) << "{";
         emit_ctor_args(i, route);
         ss << "};\n";
-        ss << indent << "_route_" << i << "->view(_route_parent);\n";
+        ss << indent << "_route_" << i << "->_view(_route_parent);\n";
         ss << indent << "webcc::dom::insert_before(_route_parent, _route_" << i << "->_get_root_element(), _route_anchor);\n";
         ss << indent << "webcc::flush();\n";
         ss << indent << "return;\n";

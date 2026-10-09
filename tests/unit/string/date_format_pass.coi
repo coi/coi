@@ -1,0 +1,16 @@
+// Test: Date.format lays an epoch time out by a pattern, in local time
+
+component App {
+    float64 t = 1759825500000.0;
+
+    def line() : string { return Date.format(t, "ddd D MMM [at] H:mm"); }
+    def hour() : int { return Date.format(System.getDateNow(), "H").toInt(); }
+
+    view {
+        <div>{line()} {hour()} {Date.format(0.0, "YYYY-MM-DD HH:mm:ss A")}</div>
+    }
+}
+
+app {
+    root = App;
+}

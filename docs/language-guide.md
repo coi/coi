@@ -333,6 +333,8 @@ string code = "Use \${variable} for interpolation";
 string text = "Line 1\nLine 2";  // Newline with \n
 string quote = "He said \"Hello\"";  // Quotes with \"
 string path = "C:\\Users\\name";  // Backslash with \\
+string crlf = "a\r\nb";            // Also \t, \r, \0, \' and \$ (a literal dollar before a brace)
+// Anything else after a backslash is an error
 ```
 
 **Template strings (`` `...` ``)** - Multi-line, minimal escaping:
@@ -470,6 +472,17 @@ string text = Html.toText("<p>Hi <b>there</b></p><p>x &amp; y</p>");
 // "Hi there\nx & y": tags go, a <br> or the end of a block element (p, div, li,
 // h1-h6, tr, blockquote, pre) is a line break, the common entities are decoded
 ```
+
+## Date
+
+`Date.format` lays an epoch time (milliseconds, as `System.getDateNow()` gives it) out as local time. The calendar math is Coi's own; the platform only supplies the timezone offset at that instant.
+
+```tsx
+string when = Date.format(System.getDateNow(), "ddd D MMM [at] H:mm");   // "Tue 7 Oct at 10:15"
+int hour = Date.format(ms, "H").toInt();
+```
+
+Tokens: `YYYY` `YY`, `MMMM` `MMM` `MM` `M`, `dddd` `ddd` (English names), `DD` `D`, `HH` `H` (24h), `hh` `h` (12h), `mm` `m`, `ss` `s`, `A` `a`. Text in `[brackets]` is kept as it is; everything else is copied through.
 
 ## Pod Types
 

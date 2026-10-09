@@ -1,0 +1,22 @@
+// Test: every escape a string literal knows, and that each one is a single character
+
+component App {
+    string crlf = "\r\n";
+    string quotes = "say \"hi\" and \'bye\'";
+    string tab = "a\tb";
+    string back = "c:\\dir";
+    string dollar = "cost: \$5";
+
+    def ok() : bool {
+        return crlf.length() == 2 && crlf.charAt(0) == 13 && crlf.charAt(1) == 10 &&
+               quotes.length() == 20 && tab.length() == 3 && back.length() == 6 && dollar.length() == 8;
+    }
+
+    view {
+        <div>{ok() ? "ok" : "bad"}</div>
+    }
+}
+
+app {
+    root = App;
+}

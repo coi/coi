@@ -114,7 +114,7 @@ std::unique_ptr<ASTNode> Parser::parse_html_element()
     int start_line = current().line;
 
     auto parse_component_props = [&](ComponentInstantiation &comp) {
-        while (current().type == TokenType::IDENTIFIER || current().type == TokenType::AMPERSAND || current().type == TokenType::COLON)
+        while (is_identifier_token() || current().type == TokenType::AMPERSAND || current().type == TokenType::COLON)
         {
             bool is_ref_prop = false;
             bool is_move_prop = false;
@@ -127,8 +127,11 @@ std::unique_ptr<ASTNode> Parser::parse_html_element()
                 is_move_prop = true;
             }
 
+            // a prop can be named like a block keyword (style, view...), see is_identifier_token
             std::string prop_name = current().value;
-            expect(TokenType::IDENTIFIER, "Expected prop name");
+            if (!is_identifier_token())
+                expect(TokenType::IDENTIFIER, "Expected prop name");
+            advance();
 
             std::unique_ptr<Expression> prop_value;
             if (match(TokenType::ASSIGN))
