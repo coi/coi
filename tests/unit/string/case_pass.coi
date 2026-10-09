@@ -1,0 +1,17 @@
+// Test: toLower and toUpper on strings, literals and expressions
+
+component App {
+    mut string title = "Hello, World";
+    mut string query = "WORLD";
+
+    def matches() : bool { return title.toLower().contains(query.toLower()); }
+    def shout() : string { return (title + "!").toUpper(); }
+
+    view {
+        <div>{matches() ? "yes" : "no"} {shout()} {"MiXeD".toLower()}</div>
+    }
+}
+
+app {
+    root = App;
+}

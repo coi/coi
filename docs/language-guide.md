@@ -288,6 +288,10 @@ string trimmed = text.trim();       // Remove whitespace from both ends
 string left = text.trimStart();     // Remove leading whitespace
 string right = text.trimEnd();      // Remove trailing whitespace
 
+// Case (ASCII letters only; other bytes, so all of UTF-8 beyond ASCII, stay as they are)
+string lower = text.toLower();      // "hello, world!"
+string upper = text.toUpper();      // "HELLO, WORLD!"
+
 // Bytes (UTF-8)
 uint8[] bytes = text.toBytes();
 string back = string.fromBytes(bytes);
