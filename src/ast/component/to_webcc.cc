@@ -524,9 +524,27 @@ std::string Component::to_webcc(CompilerSession &session)
         ss << ";\n";
     }
 
+    // State whose initializer reads a param can't be a field initializer: the parent sets
+    // params after construction. Those are left unset here and seeded once at the top of _view
+    std::set<std::string> param_names;
+    for (auto &param : params)
+        param_names.insert(param->name);
+    std::vector<std::pair<std::string, std::string>> seeded_state;
+    auto reads_param = [&](Expression *init) {
+        if (!init)
+            return false;
+        std::set<std::string> deps;
+        init->collect_dependencies(deps);
+        for (auto &d : deps)
+            if (param_names.count(d))
+                return true;
+        return false;
+    };
+
     // State variables (data members only - callbacks emitted later)
     for (auto &var : state)
     {
+        bool seed = !var->is_reference && reads_param(var->initializer.get());
         // Special handling for array literals
         if (auto arr_lit = dynamic_cast<ArrayLiteral *>(var->initializer.get()))
         {
@@ -547,6 +565,12 @@ std::string Component::to_webcc(CompilerSession &session)
                 // receive. Using coi::array<T, N> here would cause a type mismatch.
           
                 std::string vec_type = "coi::vector<" + convert_type(resolve_component_type(elem_type)) + ">";
+                if (seed)
+                {
+                    ss << "    " << vec_type << " " << cpp_name(var->name) << ";\n";
+                    seeded_state.push_back({cpp_name(var->name), arr_lit->to_webcc()});
+                    continue;
+                }
                 ss << "    " << (var->is_mutable ? "" : "const ") << vec_type;
                 if (var->is_reference)
                     ss << "&";
@@ -557,6 +581,14 @@ std::string Component::to_webcc(CompilerSession &session)
 
         // never const, the parent calls _destroy etc. on it
         bool component_member = !var->is_reference && session.component_info.count(resolve_component_qname(session, module_name, var->type));
+        bool plain_init = var->initializer && !DefSchema::instance().is_handle(var->type) && var->type.find("coi::function<") != 0;
+        if (seed && plain_init && !component_member)
+        {
+            // not const: it's assigned once in _view; the checker still keeps Coi code from writing it
+            ss << "    " << convert_type(resolve_component_type(var->type)) << " " << cpp_name(var->name) << "{};\n";
+            seeded_state.push_back({cpp_name(var->name), var->initializer->to_webcc()});
+            continue;
+        }
         ss << "    " << (var->is_mutable || component_member ? "" : "const ") << convert_type(resolve_component_type(var->type));
         if (var->is_reference)
             ss << "&";
@@ -760,6 +792,8 @@ std::string Component::to_webcc(CompilerSession &session)
     // Child component members
     emit_component_members(ss, component_members);
     ss << "    bool _coi_alive = false; // view() mounted and _destroy() not yet run\n";
+    if (!seeded_state.empty())
+        ss << "    bool _coi_seeded = false; // state that reads params, set on the first _view\n";
 
     // Vector members for components in loops
     emit_loop_vector_members(ss, loop_component_types);
@@ -1817,6 +1851,15 @@ std::string Component::to_webcc(CompilerSession &session)
     ss << "    void _view(webcc::handle parent = webcc::dom::get_body(), webcc::handle _before = webcc::handle()) {\n";
     ss << "        g_view_depth++;\n";
     ss << "        _coi_alive = true;\n";
+    if (!seeded_state.empty())
+    {
+        // once: a loop may view the same instance again, and that mustn't reset its state
+        ss << "        if (!_coi_seeded) {\n";
+        ss << "            _coi_seeded = true;\n";
+        for (auto &[name, init] : seeded_state)
+            ss << "            " << name << " = " << init << ";\n";
+        ss << "        }\n";
+    }
 
     bool has_init = false;
     bool has_mount = false;

@@ -1,0 +1,20 @@
+// state initialized from a param sees the value the parent passed, and keeps its own changes
+component Picker(int start, string[] names) {
+    mut int at = start + 1;
+    mut string[] picked = [names[0]];
+    def next() : void { at++; }
+    view { <div><span class="at">{at}</span><span class="picked">{picked[0]}</span><button class="next" onclick={next}>next</button></div> }
+}
+
+component StateFromParam {
+    mut int n = 0;
+    def bump() : void { n++; }
+    view {
+        <div>
+            <Picker start={41} names={["first", "second"]} />
+            <button class="bump" onclick={bump}>{n}</button>
+        </div>
+    }
+}
+
+app { root = StateFromParam; }

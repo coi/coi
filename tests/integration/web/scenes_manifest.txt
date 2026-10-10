@@ -38,3 +38,4 @@ timer_data_url|tests/integration/web/scenes/timer_data_url.coi|web
 method_dep_chain|tests/integration/web/scenes/method_dep_chain.coi|web
 keyed_child_loop|tests/integration/web/scenes/keyed_child_loop.coi|web
 local_var_dep|tests/integration/web/scenes/local_var_dep.coi|web
+state_from_param|tests/integration/web/scenes/state_from_param.coi|web
