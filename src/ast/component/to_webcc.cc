@@ -1161,15 +1161,26 @@ std::string Component::to_webcc(CompilerSession &session)
                 // Keyed component loop
                 std::string vec_name = region.is_member_ref_loop ? region.iterable_expr : ("_loop_" + region.component_type + "s");
 
-                ss << "        int _new_count = (int)" << vec_name << ".size();\n";
+                if (region.is_member_ref_loop)
+                {
+                    ss << "        int _new_count = (int)" << vec_name << ".size();\n";
 
-                // Clear existing views - MUST call _remove_view() to unregister event handlers from dispatchers
-                ss << "        if (" << count_var << " > 0) {\n";
-                ss << "            for (int _i = 0; _i < " << count_var << "; _i++) {\n";
-                ss << "                " << vec_name << "[_i]._remove_view();\n";
-                ss << "            }\n";
-                ss << "        }\n";
-                ss << "        \n";
+                    // Clear existing views - MUST call _remove_view() to unregister event handlers from dispatchers
+                    ss << "        if (" << count_var << " > 0) {\n";
+                    ss << "            for (int _i = 0; _i < " << count_var << "; _i++) {\n";
+                    ss << "                " << vec_name << "[_i]._remove_view();\n";
+                    ss << "            }\n";
+                    ss << "        }\n";
+                    ss << "        \n";
+                }
+                else
+                {
+                    // the rows are rebuilt below, so the old instances go entirely; leaving them
+                    // in the vector made every sync tear down stale rows and keep the live ones
+                    ss << "        int _new_count = (int)" << region.iterable_expr << ".size();\n";
+                    ss << "        for (auto& _c : " << vec_name << ") _c._destroy();\n";
+                    ss << "        " << vec_name << ".clear();\n";
+                }
 
                 // Recreate all items in current array order with fresh views using insert_before for proper DOM ordering
                 std::string anchor_var = "_loop_" + std::to_string(region.loop_id) + "_anchor";
