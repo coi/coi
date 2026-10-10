@@ -937,7 +937,11 @@ std::string Component::to_webcc(CompilerSession &session)
         std::string method_name;
         if (key.type == "attr" && !key.name.empty())
         {
-            method_name = "_update_el" + std::to_string(key.element_id) + "_" + key.name;
+            // attribute names can hold '-' and ':' (data-id, xlink:href), identifiers can't
+            std::string attr = key.name;
+            for (char &c : attr)
+                if (!isalnum((unsigned char)c)) c = '_';
+            method_name = "_update_el" + std::to_string(key.element_id) + "_" + attr;
         }
         else if (key.type == "text")
         {
@@ -1180,6 +1184,8 @@ std::string Component::to_webcc(CompilerSession &session)
                     ss << "        int _new_count = (int)" << region.iterable_expr << ".size();\n";
                     ss << "        for (auto& _c : " << vec_name << ") _c._destroy();\n";
                     ss << "        " << vec_name << ".clear();\n";
+                    // rows hand out `this` (handlers, child callbacks), so the vector must not move under them
+                    ss << "        " << vec_name << ".reserve(_new_count);\n";
                 }
 
                 // Recreate all items in current array order with fresh views using insert_before for proper DOM ordering

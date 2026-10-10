@@ -15,4 +15,13 @@ export async function run({ page, expect }) {
   // the rebuilt rows still take clicks
   await covers.nth(0).click();
   await expect.textContains(page.locator(".opened"), "b");
+
+  // a bigger rebuild: every row still answers for itself
+  for (let i = 0; i < 6; i++) await page.click(".add");
+  await page.click(".bump");
+  const ids = await covers.evaluateAll((els) => els.map((e) => e.dataset.id));
+  for (let i = 0; i < ids.length; i++) {
+    await covers.nth(i).click();
+    await expect.textContains(page.locator(".opened"), ids[i]);
+  }
 }
