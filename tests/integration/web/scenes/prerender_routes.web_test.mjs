@@ -8,16 +8,26 @@ export async function run({ page, expect }) {
   const tool = await (await page.request.get(root + "tool/")).text();
   await expect.ok(tool.includes('<button class="count">0</button>'), "second route not prerendered");
 
-  // after the takeover: one copy, styled, and alive
-  await page.waitForFunction(() => !document.getElementById("coi-pre"));
-  await expect.ok(await page.locator(".site").count() === 1, "prerendered copy left next to the app");
+  // hydration: the elements that arrived as HTML are the ones the app runs on. The wasm is
+  // held back until the page has been marked, then let through
+  let release;
+  const held = new Promise((r) => (release = r));
+  await page.route("**/app.wasm", async (route) => { await held; await route.continue(); });
+  await page.goto(root);
+  await page.waitForSelector("[data-hydrate] .hi");
+  await page.evaluate(() => { document.querySelector(".hi").__mark = "kept"; });
+  release();
+  await page.waitForFunction(() => !document.querySelector("[data-hydrate]"));
+  await expect.ok(await page.evaluate(() => document.querySelector(".hi").__mark === "kept"), "prerendered elements were replaced, not taken over");
+  await expect.ok(await page.locator(".site").count() === 1, "a second copy of the page");
   await expect.ok(await page.locator(".tile").first().evaluate((e) => getComputedStyle(e).color) === "rgb(1, 2, 3)", "CSS missing");
   await page.click(".like");
   await expect.textContains(page.locator(".like"), "1");
+  await page.unroute("**/app.wasm");
 
   // a folder route, with its trailing slash
   await page.goto(root + "tool/");
-  await page.waitForFunction(() => !document.getElementById("coi-pre"));
+  await page.waitForFunction(() => !document.querySelector("[data-hydrate]"));
   await expect.ok(await page.locator(".count").count() === 1, "tool page doubled or missing");
   await page.click(".count");
   await expect.textContains(page.locator(".count"), "1");

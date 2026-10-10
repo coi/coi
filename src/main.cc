@@ -32,7 +32,7 @@ namespace fs = std::filesystem;
 
 // app.prerender: the generated C++ is built for this machine by webcc and run once per static
 // route of the root's router ("/" without one); the HTML of each first render goes into its
-// own copy of index.html (route "/x" -> x/index.html), where the app takes over once it loads
+// own copy of index.html (route "/x" -> x/index.html); the loaded app hydrates it
 static bool prerender_pages(const AppConfig &config, const std::vector<Component> &components,
                             const fs::path &app_cc, const fs::path &out_dir, const fs::path &cache_dir)
 {
@@ -75,8 +75,16 @@ static bool prerender_pages(const AppConfig &config, const std::vector<Component
     {
         std::ifstream in(pre_dir / ("page" + std::to_string(i) + ".html"));
         std::string html((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        // the root element is marked for the app to find and take over
+        size_t tag_end = html.find_first_of(" >", html.find('<') + 1);
+        if (html.empty() || html[0] != '<' || tag_end == std::string::npos)
+        {
+            std::cerr << colors::RED << "Error:" << colors::RESET << " app.prerender: " << paths[i] << " rendered no element" << std::endl;
+            return false;
+        }
+        html.insert(tag_end, " data-hydrate");
         std::string page = index;
-        page.replace(at, marker.size(), "<div id=\"coi-pre\">" + html + "</div>");
+        page.replace(at, marker.size(), html);
         std::string rel = paths[i];
         while (!rel.empty() && rel.front() == '/') rel.erase(0, 1);
         while (!rel.empty() && rel.back() == '/') rel.pop_back();

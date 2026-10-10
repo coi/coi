@@ -728,13 +728,10 @@ void generate_cpp_code(
     out << "    webcc::flush();\n";
     if (final_app_config.prerender)
     {
-        // the page arrived prerendered: the app has drawn its own copy, the old one goes
-        // in the same task, so no frame shows both or neither
-        out << "    {\n";
-        out << "        webcc::DOMElement pre = webcc::dom::get_element_by_id(\"coi-pre\");\n";
-        out << "        if (pre.is_valid() && (int32_t)pre >= 0) webcc::dom::remove_element(pre);\n";
-        out << "        webcc::flush();\n";
-        out << "    }\n";
+        // the page arrived prerendered: its elements stay and take on the first render
+        // (handlers, handles, whatever differs now), the fresh copy was never shown
+        out << "    webcc::dom::hydrate(app->_get_root_element());\n";
+        out << "    webcc::flush();\n";
     }
     out << "    return 0;\n";
     out << "}\n";

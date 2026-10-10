@@ -1,5 +1,5 @@
-// app.prerender: every static route's first render is in the served HTML, and the app takes
-// over once loaded: one copy of the page, live, on every route
+// app.prerender: every static route's first render is in the served HTML, and the loaded app
+// hydrates it: the same elements, now live, on every route
 pod Point { string name; }
 
 component Tile(string name) {

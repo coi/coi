@@ -100,7 +100,7 @@ app {
 ```
 `prerender`: `coi build` runs the app once per static route of the root's router ("/" without
 one) and writes the first render into that route's file ("/x" -> x/index.html). The page shows
-before any script runs; the loaded app then replaces it and is fully live. Browser-only calls
+before any script runs; the loaded app then takes over those elements (hydration) and is fully live. Browser-only calls
 (storage, fetch, canvas) return nothing at build time. Routes with params aren't prerendered.
 `base` sets the `<base href>` all assets and routes resolve against. Use the domain
 root `"/"` (default) for root deploys and local dev; set a subpath like `"/repo/"`

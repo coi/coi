@@ -260,12 +260,11 @@ app {
 
 ### Prerendering
 
-`prerender = true;` turns every page of the app into real HTML at build time, so it shows at once, and search engines and link previews can read it. Once the app has loaded it takes over the page and everything works as usual.
+`prerender = true;` renders every page to HTML at build time, so it shows at once and search engines and link previews can read it. When the app has loaded, it hydrates the page.
 
-- `coi build` compiles the app for your machine as well, runs it once for every static route of the root's `router` (`"/"` without one) and writes each first render into that route's file: `"/"` into `index.html`, `"/about"` into `about/index.html`.
-- In the browser the HTML is there before any script runs. When the app has loaded it draws the page itself and replaces the prerendered copy in the same moment, so nothing flickers.
-- What the first render shows is in the HTML: method results, loops over arrays, child components. Platform calls that need a browser (storage, fetch, canvas) return nothing at build time, so a page that loads its data shows its empty or loading state, and the app fills it in once it runs.
-- Routes with parameters (`"/users/:id"`) aren't prerendered; they work as before. `coi dev` doesn't prerender.
+- Every static route of the root's `router` is rendered (`"/"` without one): `"/"` into `index.html`, `"/about"` into `about/index.html`. Routes with parameters aren't.
+- Browser-only calls (storage, fetch, canvas) return nothing at build time; the app fills those parts in when it hydrates.
+- `coi dev` doesn't prerender.
 
 A site with a start page in front of an app is two routes:
 
