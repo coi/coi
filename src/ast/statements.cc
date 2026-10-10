@@ -530,7 +530,7 @@ std::string ExpressionStatement::to_webcc()
                     for (const auto &info : loops)
                     {
                         result += "    if (!" + info.elements_vec_name + ".empty()) {\n";
-                        result += "        coi_forget_handle(" + info.elements_vec_name + ".back());\n";
+                        result += "        _forget_row(" + info.elements_vec_name + ".back());\n";
                         result += "        webcc::dom::remove_element(" + info.elements_vec_name + ".back());\n";
                         result += "        " + info.elements_vec_name + ".pop_back();\n";
                         result += "    }\n";
@@ -546,7 +546,7 @@ std::string ExpressionStatement::to_webcc()
                 {
                     for (const auto &info : loops)
                     {
-                        result += "for (auto& _el : " + info.elements_vec_name + ") { coi_forget_handle(_el); webcc::dom::remove_element(_el); }\n";
+                        result += "for (auto& _el : " + info.elements_vec_name + ") { _forget_row(_el); webcc::dom::remove_element(_el); }\n";
                         result += info.elements_vec_name + ".clear();\n";
                         result += "_loop_" + std::to_string(info.loop_id) + "_keys.clear();\n";
                         result += "_loop_" + std::to_string(info.loop_id) + "_count = 0;\n";

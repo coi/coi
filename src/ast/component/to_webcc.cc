@@ -181,6 +181,11 @@ static void emit_loop_vector_members(std::stringstream &ss, const std::set<std::
     {
         ss << "    coi::vector<" << comp_name << "> _loop_" << comp_name << "s;\n";
     }
+    ss << "    void _forget_row(webcc::handle row) {\n";
+    for (const auto &comp_name : loop_component_types)
+        ss << "        coi_drop_row_children(_loop_" << comp_name << "s, row);\n";
+    ss << "        coi_forget_handle(row);\n";
+    ss << "    }\n";
 }
 
 static void emit_loop_region_members(std::stringstream &ss, const std::vector<LoopRegion> &loop_regions)
@@ -1134,14 +1139,14 @@ std::string Component::to_webcc(CompilerSession &session)
                 ss << "            _new_keys.push_back(_k);\n";
                 ss << "        }\n";
                 ss << "        for (int _j = 0; _j < (int)_old.size(); _j++) {\n";
-                ss << "            if (!_taken[_j]) { coi_forget_handle(_old[_j]); webcc::dom::remove_element(_old[_j]); }\n";
+                ss << "            if (!_taken[_j]) { _forget_row(_old[_j]); webcc::dom::remove_element(_old[_j]); }\n";
                 ss << "        }\n";
                 ss << "        " << elements_vec << ".clear();\n";
                 ss << "        g_view_depth++;\n";
                 ss << "        for (int _idx = 0; _idx < _new_count; _idx++) {\n";
                 ss << "            " << item_ref;
                 ss << indent_code(transform_to_insert_before(region.item_creation_code, "_loop_" + id + "_parent", anchor_var), "        ");
-                ss << "            if (_take[_idx] >= 0) { coi_forget_handle(_old[_take[_idx]]); webcc::dom::morph(_old[_take[_idx]], " << region.root_element_var << "); }\n";
+                ss << "            if (_take[_idx] >= 0) { _forget_row(_old[_take[_idx]]); webcc::dom::morph(_old[_take[_idx]], " << region.root_element_var << "); }\n";
                 ss << "            else webcc::dom::detach(" << region.root_element_var << ");\n";
                 ss << "            " << elements_vec << ".push_back(" << region.root_element_var << ");\n";
                 ss << "        }\n";
@@ -1226,7 +1231,7 @@ std::string Component::to_webcc(CompilerSession &session)
                 std::string anchor_var = "_loop_" + std::to_string(region.loop_id) + "_anchor";
 
                 ss << "        for (auto& _el : " << vec_name << ") {\n";
-                ss << "            coi_forget_handle(_el);\n";
+                ss << "            _forget_row(_el);\n";
                 ss << "            webcc::dom::remove_element(_el);\n";
                 ss << "        }\n";
                 ss << "        " << vec_name << ".clear();\n";
@@ -1273,7 +1278,7 @@ std::string Component::to_webcc(CompilerSession &session)
         ss << indent_code(item_code, "        ");
         // the live row takes the fresh one's look and handles
         ss << "        if (_idx < (int)" << elements_vec << ".size()) {\n";
-        ss << "            coi_forget_handle(" << elements_vec << "[_idx]);\n";
+        ss << "            _forget_row(" << elements_vec << "[_idx]);\n";
         ss << "            webcc::dom::morph(" << elements_vec << "[_idx], " << region.root_element_var << ");\n";
         ss << "            " << elements_vec << "[_idx] = " << region.root_element_var << ";\n";
         ss << "        } else " << elements_vec << ".push_back(" << region.root_element_var << ");\n";
@@ -1322,7 +1327,7 @@ std::string Component::to_webcc(CompilerSession &session)
             {
                 std::string vec_name = "_loop_" + std::to_string(loop_id) + "_elements";
                 ss << "            while ((int)" << vec_name << ".size() > 0) {\n";
-                ss << "                coi_forget_handle(" << vec_name << "[" << vec_name << ".size() - 1]);\n";
+                ss << "                _forget_row(" << vec_name << "[" << vec_name << ".size() - 1]);\n";
                 ss << "                webcc::dom::remove_element(" << vec_name << "[" << vec_name << ".size() - 1]);\n";
                 ss << "                " << vec_name << ".pop_back();\n";
                 ss << "            }\n";

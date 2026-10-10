@@ -66,7 +66,7 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
     };
 
     // Destroy method
-    ss << "    void _destroy() {\n";
+    ss << "    void _destroy(bool _skip_dom = false) {\n";
     // Idempotent: parents destroy every child they hold, whether or not that
     // child was mounted (or was already torn down by an if-region toggle).
     ss << "        if (!_coi_alive) return;\n";
@@ -76,9 +76,9 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
     // children own their own entries: view children, loop items, mounted members
     for (auto const &[comp_name, count] : component_members)
         for (int i = 0; i < count; ++i)
-            ss << "        " << comp_name << "_" << i << "._destroy();\n";
+            ss << "        " << comp_name << "_" << i << "._destroy(_skip_dom);\n";
     for (const auto &comp_name : loop_component_types)
-        ss << "        for (int _i = 0; _i < (int)_loop_" << comp_name << "s.size(); _i++) _loop_" << comp_name << "s[_i]._destroy();\n";
+        ss << "        for (int _i = 0; _i < (int)_loop_" << comp_name << "s.size(); _i++) _loop_" << comp_name << "s[_i]._destroy(_skip_dom);\n";
     for (const auto &var : component.state)
     {
         if (var->is_reference)
@@ -90,9 +90,9 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
         if (resolve_component_qname(session, component.module_name, t).empty())
             continue;
         if (is_vec)
-            ss << "        for (int _i = 0; _i < (int)" << cpp_name(var->name) << ".size(); _i++) " << cpp_name(var->name) << "[_i]._destroy();\n";
+            ss << "        for (int _i = 0; _i < (int)" << cpp_name(var->name) << ".size(); _i++) " << cpp_name(var->name) << "[_i]._destroy(_skip_dom);\n";
         else
-            ss << "        " << cpp_name(var->name) << "._destroy();\n";
+            ss << "        " << cpp_name(var->name) << "._destroy(_skip_dom);\n";
     }
 
     // Collect all elements that are conditionally created in if/else regions
@@ -234,7 +234,7 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
         // Remove root element (which removes all children)
         if (element_count > 0)
         {
-            ss << "        webcc::dom::remove_element(_el[0]);\n";
+            ss << "        if (!_skip_dom) webcc::dom::remove_element(_el[0]);\n";
         }
     }
     else
@@ -243,7 +243,7 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
         emit_remove_handlers_loop("        ");
         if (element_count > 0)
         {
-            ss << "        webcc::dom::remove_element(_el[0]);\n";
+            ss << "        if (!_skip_dom) webcc::dom::remove_element(_el[0]);\n";
         }
     }
     // Cleanup route components

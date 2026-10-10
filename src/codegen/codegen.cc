@@ -387,6 +387,16 @@ void generate_cpp_code(
     out << "    }\n";
     out << "}\n\n";
 
+    // a forgotten loop row (removed, or morphed into a fresh one) takes the child components it
+    // made with it: destroyed in place, leaving the DOM the row's removal or morph owns. They keep
+    // their slot in the vector (handlers hold their address); _destroy is idempotent after that
+    out << "template<typename V> inline void coi_drop_row_children(V& v, webcc::handle row) {\n";
+    out << "    for (const CoiSpan& s : g_coi_spans) {\n";
+    out << "        if (s.root != (int32_t)row) continue;\n";
+    out << "        for (auto& c : v) if ((int32_t)c._el[0] >= s.lo && (int32_t)c._el[0] < s.hi) c._destroy(true);\n";
+    out << "        return;\n";
+    out << "    }\n";
+    out << "}\n";
     // a keyed loop row's key, comparable across syncs whatever its type
     out << "template<typename T> coi::string coi_loop_key(const T& v) { webcc::hybrid_formatter<128> f; f << v; return coi::string(f.c_str()); }\n";
     out << "int g_view_depth = 0;\n";
