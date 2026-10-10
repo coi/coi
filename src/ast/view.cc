@@ -1436,7 +1436,8 @@ void ViewForEachStatement::generate_code(ViewCodegenContext& ctx)
     if (loop_component && !region.component_type.empty())
     {
         std::stringstream update_ss;
-        generate_prop_update_code(update_ss, loop_component, var_name, ctx.method_names, var_name);
+        // the row's instance is bound as _inst by the keyed sync
+        generate_prop_update_code(update_ss, loop_component, "_inst", ctx.method_names, var_name);
         region.item_update_code = update_ss.str();
     }
 

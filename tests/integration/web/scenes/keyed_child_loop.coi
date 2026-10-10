@@ -1,9 +1,11 @@
-// a keyed loop whose rows are components keeps one row per item across re-syncs
+// a keyed loop whose rows are components keeps one row per item across re-syncs, and keeps
+// the rows themselves when only their props change
 pod Item { string id; string title; }
 
-component Cover(string id, string title, string meta, def onOpen(string) : void) {
+component Cover(string id, string title, string meta, bool held, def onOpen(string) : void, def onGrab(string) : void) {
     def open() : void { onOpen(id); }
-    view { <button class="cover" data-id={id} onclick={open}>{title} {meta}</button> }
+    def down() : void { onGrab(id); }
+    view { <button class={held ? "cover held" : "cover"} data-id={id} onclick={open} onpointerdown={down}>{title} {meta}</button> }
 }
 
 component KeyedChildLoop {
@@ -11,11 +13,13 @@ component KeyedChildLoop {
     mut int bumps = 0;
     mut int adds = 0;
     mut string opened = "";
+    mut string grabbed = "";
 
     def bump() : void { bumps++; }
     def add() : void { items.push(Item{id = `notebook-with-a-long-id-past-inline-storage-${adds}`, title = "N"}); adds++; }
     def dropFirst() : void { items.remove(0); }
     def go(string id) : void { opened = id; }
+    def grab(string id) : void { grabbed = id; }
 
     view {
         <div>
@@ -25,7 +29,7 @@ component KeyedChildLoop {
             <span class="opened">{opened}</span>
             <div class="grid">
                 <for it in items key={it.id}>
-                    <Cover id={it.id} title={it.title} meta={`${bumps}`} &onOpen={go} />
+                    <Cover id={it.id} title={it.title} meta={`${bumps}`} held={it.id == grabbed} &onOpen={go} &onGrab={grab} />
                 </for>
             </div>
         </div>

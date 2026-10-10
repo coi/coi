@@ -209,6 +209,11 @@ static void emit_loop_region_members(std::stringstream &ss, const std::vector<Lo
             if (region.is_keyed)
                 ss << "    coi::vector<coi::string> _loop_" << region.loop_id << "_keys;\n";
         }
+        else if (region.is_keyed && !region.component_type.empty() && !region.is_member_ref_loop)
+        {
+            // keyed component rows: the keys of the last sync, to update props in place
+            ss << "    coi::vector<coi::string> _loop_" << region.loop_id << "_keys;\n";
+        }
     }
 }
 
@@ -1213,6 +1218,26 @@ std::string Component::to_webcc(CompilerSession &session)
                 }
                 else
                 {
+                    // same keys in the same order: the rows stay and only their props are set.
+                    // Rebuilding them here would replace the element under a pointer between
+                    // its pointerdown and its click
+                    std::string keys_vec = "_loop_" + std::to_string(region.loop_id) + "_keys";
+                    ss << "        coi::vector<coi::string> _new_keys;\n";
+                    ss << "        for (auto& " << cpp_name(region.var_name) << " : " << region.iterable_expr << ") _new_keys.push_back(coi_loop_key(" << region.key_expr << "));\n";
+                    if (!region.item_update_code.empty())
+                    {
+                        ss << "        bool _same = " << count_var << " > 0 && (int)" << vec_name << ".size() == (int)_new_keys.size() && " << keys_vec << ".size() == _new_keys.size();\n";
+                        ss << "        for (int _k = 0; _same && _k < (int)_new_keys.size(); _k++) if (!(" << keys_vec << "[_k] == _new_keys[_k])) _same = false;\n";
+                        ss << "        if (_same) {\n";
+                        ss << "            int _i = 0;\n";
+                        ss << "            for (auto& " << cpp_name(region.var_name) << " : " << region.iterable_expr << ") {\n";
+                        ss << "            auto& _inst = " << vec_name << "[_i++];\n";
+                        ss << region.item_update_code;
+                        ss << "            }\n";
+                        ss << "            return;\n";
+                        ss << "        }\n";
+                    }
+                    ss << "        " << keys_vec << " = _new_keys;\n";
                     // the rows are rebuilt below, so the old instances go entirely; leaving them
                     // in the vector made every sync tear down stale rows and keep the live ones
                     ss << "        int _new_count = (int)" << region.iterable_expr << ".size();\n";
