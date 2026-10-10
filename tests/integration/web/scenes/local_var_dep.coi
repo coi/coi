@@ -1,0 +1,19 @@
+// a binding through a method that reads members via a local still updates
+component LocalVarDep(string fallback = "dots") {
+    mut string paper = "";
+
+    def pick(string p) : void { paper = p; }
+    def is(string p) : bool {
+        string v = paper.isEmpty() ? fallback : paper;
+        return v == p;
+    }
+
+    view {
+        <div>
+            <button class={is("dots") ? "opt dots on" : "opt dots"} onclick={pick("dots")}>Dots</button>
+            <button class={is("lines") ? "opt lines on" : "opt lines"} onclick={pick("lines")}>Lines</button>
+        </div>
+    }
+}
+
+app { root = LocalVarDep; }

@@ -747,7 +747,6 @@ System.getTimezoneOffsetMs()// local offset from UTC in ms; add to a UTC epoch m
 System.getVisibilityState() // "visible" / "hidden" / ...
 System.isHidden()           // bool
 System.requestFrame()       // run tick on the next frame (app { tick = demand; } only, else no-op)
-System.random()  System.random(seed)   // [0.0, 1.0)
 ```
 Note: use `System.log(...)`. There is no bare `print(...)`.
 

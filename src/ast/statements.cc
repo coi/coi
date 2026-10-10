@@ -223,6 +223,13 @@ std::string Assignment::to_webcc()
     return lhs + " = " + rhs + ";";
 }
 
+// a local's initializer counts: `string v = a.isEmpty() ? b : a; return v == p;` depends on a and b
+void VarDeclaration::collect_dependencies(std::set<std::string> &deps)
+{
+    if (initializer)
+        initializer->collect_dependencies(deps);
+}
+
 void Assignment::collect_dependencies(std::set<std::string> &deps)
 {
     value->collect_dependencies(deps);

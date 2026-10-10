@@ -336,7 +336,7 @@ component MusicPlayer {
 
 ## System
 
-Logging, page title, time, random numbers, and URL navigation.
+Logging, page title, time, and URL navigation.
 
 ### Methods
 
@@ -355,8 +355,6 @@ Logging, page title, time, random numbers, and URL navigation.
 | `System.getTimezoneOffsetAt(float64 ms)` | The same offset at that instant (daylight saving time). `Date.format` uses it |
 | `System.getVisibilityState()` | Get document visibility state (`"visible"`, `"hidden"`, etc.) |
 | `System.isHidden()` | Check if document is hidden (`true` hidden, `false` visible) |
-| `System.random()` | Random float between 0.0 and 1.0 |
-| `System.random(int seed)` | Seeded random (for reproducibility) |
 
 ### Example
 
@@ -377,12 +375,35 @@ float epoch = System.getDateNow();  // Milliseconds since epoch
 string visibility = System.getVisibilityState();
 bool hidden = System.isHidden();
 
-// Random numbers
-float r = System.random();          // 0.0 to 1.0
-
 // URL navigation
 System.openUrl("https://example.com");  // Opens in new tab
 System.navigate("/dashboard");           // Client-side navigation
+```
+
+## Math
+
+Numbers: constants, the usual functions, and random numbers. Everything takes and returns `float`.
+
+| Constant | Value |
+|----------|-------|
+| `Math.PI`, `Math.HALF_PI`, `Math.TAU` | π, π/2, 2π |
+| `Math.DEG2RAD`, `Math.RAD2DEG` | Multiply to convert degrees ↔ radians |
+| `Math.E` | Euler's number |
+
+| Method | Description |
+|--------|-------------|
+| `Math.abs(x)`, `Math.sqrt(x)`, `Math.pow(base, exp)`, `Math.hypot(x, y)` | Basic |
+| `Math.exp(x)`, `Math.log(x)`, `Math.log2(x)`, `Math.log10(x)` | Exponent and logarithms |
+| `Math.sin(x)`, `Math.cos(x)`, `Math.tan(x)`, `Math.asin(x)`, `Math.acos(x)`, `Math.atan(x)`, `Math.atan2(y, x)` | Trigonometry, in radians |
+| `Math.floor(x)`, `Math.ceil(x)`, `Math.round(x)`, `Math.trunc(x)` | Rounding |
+| `Math.min(a, b)`, `Math.max(a, b)`, `Math.clamp(v, lo, hi)`, `Math.lerp(a, b, t)` | Utility |
+| `Math.random()` | Random float in [0.0, 1.0) |
+| `Math.random(int seed)` | Seeded random (for reproducibility) |
+
+```coi
+float d = Math.hypot(dx, dy);
+float a = 45.0 * Math.DEG2RAD;
+int roll = (Math.random() * 6.0).toInt() + 1;   // 1 to 6
 ```
 
 ## Input
@@ -1109,7 +1130,8 @@ These names are taken: an enum of your own can't be called `ReadyState`. An unkn
 | `Image`      | Image loading for canvas rendering               |
 | `Audio`      | Audio playback, volume, looping, playback position |
 | `Storage`    | Local storage (setItem, getItem, removeItem, clear) |
-| `System`     | Logging, page title, time, random, URL navigation |
+| `System`     | Logging, page title, time, URL navigation |
+| `Math`       | Math functions, constants, random numbers        |
 | `Input`      | Keyboard input, pointer lock                     |
 | `DOMElement` | Direct DOM manipulation                          |
 | `WebGL`      | WebGL context and rendering                      |

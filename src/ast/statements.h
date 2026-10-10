@@ -13,6 +13,7 @@ struct VarDeclaration : Statement {
     bool is_move = false;  // true if initialized with &expr (move semantics)
 
     std::string to_webcc() override;
+    void collect_dependencies(std::set<std::string>& deps) override;
     std::vector<ASTNode*> get_child_nodes() override { return {initializer.get()}; }
 };
 
