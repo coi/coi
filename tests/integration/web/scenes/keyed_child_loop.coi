@@ -1,0 +1,34 @@
+// a keyed loop whose rows are components keeps one row per item across re-syncs
+pod Item { string id; string title; }
+
+component Cover(string id, string title, string meta, def onOpen(string) : void) {
+    def open() : void { onOpen(id); }
+    view { <button class="cover" onclick={open}>{title} {meta}</button> }
+}
+
+component KeyedChildLoop {
+    mut Item[] items = [Item{id = "a", title = "A"}, Item{id = "b", title = "B"}];
+    mut int bumps = 0;
+    mut string opened = "";
+
+    def bump() : void { bumps++; }
+    def add() : void { items.push(Item{id = `n${items.size()}`, title = "N"}); }
+    def dropFirst() : void { items.remove(0); }
+    def go(string id) : void { opened = id; }
+
+    view {
+        <div>
+            <button class="bump" onclick={bump}>bump</button>
+            <button class="add" onclick={add}>add</button>
+            <button class="drop" onclick={dropFirst}>drop</button>
+            <span class="opened">{opened}</span>
+            <div class="grid">
+                <for it in items key={it.id}>
+                    <Cover id={it.id} title={it.title} meta={`${bumps}`} &onOpen={go} />
+                </for>
+            </div>
+        </div>
+    }
+}
+
+app { root = KeyedChildLoop; }
