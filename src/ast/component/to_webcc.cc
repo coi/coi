@@ -1938,7 +1938,7 @@ std::string Component::to_webcc(CompilerSession &session)
     // _sync_route() matches statics, dynamic params, and the catch-all itself.
     if (router)
     {
-        ss << "        _current_route = webcc::system::get_pathname();\n";
+        ss << "        _current_route = __coi_route::path(webcc::system::get_pathname());\n";
         ss << "        _sync_route();\n";
     }
     ss << "    }\n";

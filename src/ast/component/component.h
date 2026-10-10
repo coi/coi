@@ -104,6 +104,10 @@ struct AppConfig {
     std::string icon;
     // theme-color
     std::string theme;
+    // first render of every static route as HTML at build time; the app takes over on load
+    bool prerender = false;
+    // a file whose lines go into every page's <head>, relative to the project root
+    std::string head;
 };
 
 // Per-event bitmask over element ids, stored as 64-bit words (word el>>6,

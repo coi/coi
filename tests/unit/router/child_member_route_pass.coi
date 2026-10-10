@@ -1,0 +1,22 @@
+// Test: a routed component whose state holds a component built with arguments
+// (the route's instance used to be brace-initialized, which clang rejects here)
+component Panel(mut int& count, def onBump : void) {
+    def bump() : void { onBump(); }
+    view { <button onclick={bump}>{count}</button> }
+}
+
+component Page {
+    mut int n = 0;
+    def bump() : void { n++; }
+    Panel panel = Panel(&n, &bump);
+    view { <div><{panel} /></div> }
+}
+
+component App {
+    router {
+        "/" => Page;
+    }
+    view { <div><route /></div> }
+}
+
+app { root = App; }

@@ -17,8 +17,8 @@ void emit_component_router_methods(std::stringstream &ss, const Component &compo
     // would then run on freed memory — use-after-free, DOM handle garbage,
     // and eventually OOB crashes (timing/data dependent).
     ss << "    void navigate(const coi::string& route) {\n";
-    ss << "        if (_current_route == route) return;\n";
-    ss << "        _current_route = route;\n";
+    ss << "        if (_current_route == __coi_route::path(route)) return;\n";
+    ss << "        _current_route = __coi_route::path(route);\n";
     ss << "        webcc::system::push_state(route);\n";
     ss << "        webcc::dom::scroll_to_top();\n";
     ss << "        _route_dirty = true;\n";
@@ -26,8 +26,8 @@ void emit_component_router_methods(std::stringstream &ss, const Component &compo
 
     // _handle_popstate() method - called when browser back/forward buttons are clicked
     ss << "    void _handle_popstate(const coi::string& path) {\n";
-    ss << "        if (_current_route == path) return;\n";
-    ss << "        _current_route = path;\n";
+    ss << "        if (_current_route == __coi_route::path(path)) return;\n";
+    ss << "        _current_route = __coi_route::path(path);\n";
     // For popstate, we don't need to validate - _sync_route will handle fallback via else
     ss << "        _route_dirty = true;\n";
     ss << "    }\n";
@@ -103,9 +103,12 @@ void emit_component_router_methods(std::stringstream &ss, const Component &compo
     // Emit creation, mounting, and early-return for a matched route.
     auto emit_route_mount = [&](size_t i, const RouteEntry &route, const std::string &indent)
     {
-        ss << indent << "_route_" << i << " = new " << qualified_name(route.module_name, route.component_name) << "{";
+        // parentheses, as components are built everywhere else: `new X{...}` is aggregate
+        // initialization, and clang rejects a member built as `Child(...)` inside it once
+        // Child holds an array (a component's handles)
+        ss << indent << "_route_" << i << " = new " << qualified_name(route.module_name, route.component_name) << "(";
         emit_ctor_args(i, route);
-        ss << "};\n";
+        ss << ");\n";
         ss << indent << "_route_" << i << "->_view(_route_parent);\n";
         ss << indent << "webcc::dom::insert_before(_route_parent, _route_" << i << "->_get_root_element(), _route_anchor);\n";
         ss << indent << "webcc::flush();\n";

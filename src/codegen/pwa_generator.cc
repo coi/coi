@@ -213,8 +213,9 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
     const req = e.request;
     if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
-    // cache first for built files, app for routes, rest to the network
-    e.respondWith(caches.open(CACHE).then((c) => c.match(req).then((hit) => hit || (req.mode === 'navigate' ? c.match('./') : undefined))).then((hit) => hit || fetch(req)));
+    // cache first for built files; a page: its own (prerendered) index.html, else the app's; rest to the network
+    const page = (c) => c.match(new URL(req.url).pathname.replace(/\/?$/, '/') + 'index.html').then((hit) => hit || c.match('./'));
+    e.respondWith(caches.open(CACHE).then((c) => c.match(req).then((hit) => hit || (req.mode === 'navigate' ? page(c) : undefined))).then((hit) => hit || fetch(req)));
 });
 )JS";
     std::ofstream(out_dir / "sw.js") << s.str();

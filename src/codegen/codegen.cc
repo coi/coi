@@ -190,6 +190,12 @@ void generate_cpp_code(
     if (any_router)
     {
         out << "namespace __coi_route {\n";
+        out << "// \"/app/\" is \"/app\": a folder's page is served with the slash\n";
+        out << "inline coi::string path(const coi::string& p) {\n";
+        out << "    uint32_t n = p.length();\n";
+        out << "    while (n > 1 && p.data()[n - 1] == '/') n--;\n";
+        out << "    return n == p.length() ? p : coi::string(p.data(), n);\n";
+        out << "}\n";
         out << "// Match `path` against `pattern`, capturing each ':' segment into caps[] in order.\n";
         out << "// Literal segments must match exactly and the segment counts must agree.\n";
         out << "inline bool match(const char* pp, uint32_t pl, const coi::string& path, coi::string* caps) {\n";
@@ -720,6 +726,16 @@ void generate_cpp_code(
     else
         out << "    webcc::system::set_main_loop(update_wrapper);\n";
     out << "    webcc::flush();\n";
+    if (final_app_config.prerender)
+    {
+        // the page arrived prerendered: the app has drawn its own copy, the old one goes
+        // in the same task, so no frame shows both or neither
+        out << "    {\n";
+        out << "        webcc::DOMElement pre = webcc::dom::get_element_by_id(\"coi-pre\");\n";
+        out << "        if (pre.is_valid() && (int32_t)pre >= 0) webcc::dom::remove_element(pre);\n";
+        out << "        webcc::flush();\n";
+        out << "    }\n";
+    }
     out << "    return 0;\n";
     out << "}\n";
 }

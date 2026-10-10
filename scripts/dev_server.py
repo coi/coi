@@ -6,6 +6,7 @@ Supports SPA routing and optional hot reloading via Server-Sent Events.
 
 import http.server
 import os
+import re
 import subprocess
 import sys
 import time
@@ -35,6 +36,19 @@ self.addEventListener('activate', (e) => e.waitUntil(caches.keys()
 """
 
 
+def app_base():
+    """The app's `base` from the built index.html ("/" when unset), with both slashes."""
+    try:
+        with open('index.html', 'r', encoding='utf-8') as f:
+            m = re.search(r'<base href="([^"]*)"', f.read())
+    except OSError:
+        m = None
+    base = m.group(1) if m else '/'
+    if not base.startswith('/'):
+        base = '/' + base
+    return base if base.endswith('/') else base + '/'
+
+
 class DevHandler(http.server.SimpleHTTPRequestHandler):
     """HTTP handler with SPA routing and optional hot reload support."""
     
@@ -48,6 +62,21 @@ class DevHandler(http.server.SimpleHTTPRequestHandler):
         if self.path == '/__hot_reload' and hot_reload_enabled:
             self.handle_sse()
             return
+
+        # An app built with a `base` (e.g. "/app/") is served under it, like it is deployed:
+        # the root and the bare path lead there, the prefix is taken off before the file lookup
+        base = app_base()
+        if base != '/':
+            plain = self.path.split('?')[0]
+            if plain == '/' or plain == base[:-1]:
+                self.send_response(302)
+                self.send_header('Location', base)
+                self.end_headers()
+                return
+            if not self.path.startswith(base):
+                self.send_error(404, f'the app is under {base}')
+                return
+            self.path = '/' + self.path[len(base):]
         
         # A PWA build's service worker would serve cached files and hide your edits.
         # Answer with one that removes itself (and any worker left from a real build).

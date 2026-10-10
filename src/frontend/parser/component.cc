@@ -514,6 +514,21 @@ void Parser::parse_app()
             app_config.theme = current().value;
             expect(TokenType::STRING_LITERAL, "Expected string");
         }
+        else if (key == "prerender")
+        {
+            if (current().type == TokenType::TRUE)
+                app_config.prerender = true;
+            else if (current().type == TokenType::FALSE)
+                app_config.prerender = false;
+            else
+                ErrorHandler::compiler_error("app.prerender must be true or false", current().line);
+            advance();
+        }
+        else if (key == "head")
+        {
+            app_config.head = current().value;
+            expect(TokenType::STRING_LITERAL, "Expected string");
+        }
         else if (key == "tick")
         {
             std::string mode = current().value;

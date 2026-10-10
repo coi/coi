@@ -1,0 +1,39 @@
+// app.prerender: every static route's first render is in the served HTML, and the app takes
+// over once loaded: one copy of the page, live, on every route
+pod Point { string name; }
+
+component Tile(string name) {
+    style { .tile { color: rgb(1, 2, 3); } }
+    view { <li class="tile">{name}</li> }
+}
+
+component Front {
+    Point[] points = [Point{name = "fast"}, Point{name = "offline"}];
+    mut int likes = 0;
+    def like() : void { likes++; }
+    def year() : int { return 2026; }
+    view {
+        <main>
+            <h1 class="hi">Hello</h1>
+            <ul><for p in points key={p.name}><Tile name={p.name} /></for></ul>
+            <p class="year">{year()}</p>
+            <button class="like" onclick={like}>{likes}</button>
+        </main>
+    }
+}
+
+component Tool {
+    mut int n = 0;
+    def inc() : void { n++; }
+    view { <button class="count" onclick={inc}>{n}</button> }
+}
+
+component PrerenderRoutes {
+    router {
+        "/" => Front;
+        "/tool" => Tool;
+    }
+    view { <div class="site"><route /></div> }
+}
+
+app { root = PrerenderRoutes; prerender = true; }

@@ -239,6 +239,8 @@ app {
     pwa = true;                                    // Installable, works offline
     icon = "assets/icon.png";                      // Favicon and app icon
     theme = "#0b3d2e";                             // Browser UI color
+    prerender = true;                              // Every route as HTML at build time
+    head = "src/head.html";                        // Extra lines for every page's <head>
 }
 ```
 
@@ -252,7 +254,32 @@ app {
 | `pwa` | `true` / `false` | No | Generates a manifest and a service worker so the app can be installed and starts offline, see [Installable and offline](#installable-and-offline) |
 | `icon` | String | No | Path in the build output, e.g. `"assets/icon.png"`. Used as favicon and app icon |
 | `theme` | String | No | CSS color for the browser's UI (address bar, title bar of the installed app) |
+| `prerender` | `true` / `false` | No | Renders every static route to HTML at build time, see [Prerendering](#prerendering) |
+| `head` | String | No | A file (path from the project root) whose lines go into every page's `<head>`: analytics, a font, a small script |
 | `tick` | `always` / `demand` | No | `demand` runs `tick` only on requested frames, see [Frames on demand](components.md#frames-on-demand) |
+
+### Prerendering
+
+`prerender = true;` turns every page of the app into real HTML at build time, so it shows at once, and search engines and link previews can read it. Once the app has loaded it takes over the page and everything works as usual.
+
+- `coi build` compiles the app for your machine as well, runs it once for every static route of the root's `router` (`"/"` without one) and writes each first render into that route's file: `"/"` into `index.html`, `"/about"` into `about/index.html`.
+- In the browser the HTML is there before any script runs. When the app has loaded it draws the page itself and replaces the prerendered copy in the same moment, so nothing flickers.
+- What the first render shows is in the HTML: method results, loops over arrays, child components. Platform calls that need a browser (storage, fetch, canvas) return nothing at build time, so a page that loads its data shows its empty or loading state, and the app fills it in once it runs.
+- Routes with parameters (`"/users/:id"`) aren't prerendered; they work as before. `coi dev` doesn't prerender.
+
+A site with a start page in front of an app is two routes:
+
+```tsx
+component Site {
+    router {
+        "/" => Landing;
+        "/app" => App;
+    }
+    view { <div><route /></div> }
+}
+
+app { root = Site; prerender = true; }
+```
 
 **Note:** If you have a `styles/` folder at the project root (next to `src/`), all `.css` files in it are automatically bundled into `app.css`.
 
@@ -265,7 +292,7 @@ app {
 }
 ```
 
-Leave `base` as `"/"` (the default) for root deploys and local development.
+Leave `base` as `"/"` (the default) for root deploys. `coi dev` serves the app under its `base` too, so `http://localhost:8000/` leads to `http://localhost:8000/repo/`.
 
 ### Installable and offline
 

@@ -94,8 +94,14 @@ app {
     pwa = true;                        // optional: manifest + service worker (installable, offline)
     icon = "assets/icon.png";          // optional: favicon and app icon (square PNG >= 512px or SVG)
     theme = "#0b3d2e";                 // optional: browser UI color
+    prerender = true;                  // optional: every static route as HTML at build time
+    head = "src/head.html";            // optional: lines for every page's <head>
 }
 ```
+`prerender`: `coi build` runs the app once per static route of the root's router ("/" without
+one) and writes the first render into that route's file ("/x" -> x/index.html). The page shows
+before any script runs; the loaded app then replaces it and is fully live. Browser-only calls
+(storage, fetch, canvas) return nothing at build time. Routes with params aren't prerendered.
 `base` sets the `<base href>` all assets and routes resolve against. Use the domain
 root `"/"` (default) for root deploys and local dev; set a subpath like `"/repo/"`
 when serving from one, e.g. a GitHub project page at `https://user.github.io/repo/`.

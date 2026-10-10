@@ -1,3 +1,4 @@
+#include <sstream>
 #include "cli/log.h"
 #include "frontend/lexer.h"
 #include "frontend/parser/parser.h"
@@ -23,8 +24,69 @@
 #include <algorithm>
 #include <filesystem>
 #include <cstdlib>
+#include <cstdio>
+#include <regex>
+#include <set>
 
 namespace fs = std::filesystem;
+
+// app.prerender: the generated C++ is built for this machine by webcc and run once per static
+// route of the root's router ("/" without one); the HTML of each first render goes into its
+// own copy of index.html (route "/x" -> x/index.html), where the app takes over once it loads
+static bool prerender_pages(const AppConfig &config, const std::vector<Component> &components,
+                            const fs::path &app_cc, const fs::path &out_dir, const fs::path &cache_dir)
+{
+    std::vector<std::string> paths;
+    for (const auto &c : components)
+    {
+        if (c.name != config.root_component || !c.router)
+            continue;
+        for (const auto &r : c.router->routes)
+            if (!r.is_default && r.path_params.empty())
+                paths.push_back(r.path);
+    }
+    if (paths.empty())
+        paths.push_back("/");
+
+    progress("prerendering " + std::to_string(paths.size()) + (paths.size() == 1 ? " page" : " pages"));
+    fs::path pre_dir = cache_dir / "prerender";
+    fs::create_directories(pre_dir);
+    std::string cmd = "\"" + (fs::path(get_executable_dir()) / "deps" / "webcc" / "webcc").string() + "\" \"" + app_cc.string() +
+                      "\" --cache-dir \"" + (cache_dir / "webcc-host").string() + "\"" + (g_verbose ? "" : " --quiet");
+    for (size_t i = 0; i < paths.size(); i++)
+        cmd += " --render '" + paths[i] + "=" + (pre_dir / ("page" + std::to_string(i) + ".html")).string() + "'";
+    if (system(cmd.c_str()) != 0)
+    {
+        std::cerr << colors::RED << "Error:" << colors::RESET << " app.prerender: rendering the pages failed" << std::endl;
+        return false;
+    }
+
+    std::ifstream index_in(out_dir / "index.html");
+    std::string index((std::istreambuf_iterator<char>(index_in)), std::istreambuf_iterator<char>());
+    index_in.close();
+    const std::string marker = "<!--coi-pre-->";
+    size_t at = index.find(marker);
+    if (at == std::string::npos)
+    {
+        std::cerr << colors::RED << "Error:" << colors::RESET << " app.prerender: index.html has no place for the page" << std::endl;
+        return false;
+    }
+    for (size_t i = 0; i < paths.size(); i++)
+    {
+        std::ifstream in(pre_dir / ("page" + std::to_string(i) + ".html"));
+        std::string html((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        std::string page = index;
+        page.replace(at, marker.size(), "<div id=\"coi-pre\">" + html + "</div>");
+        std::string rel = paths[i];
+        while (!rel.empty() && rel.front() == '/') rel.erase(0, 1);
+        while (!rel.empty() && rel.back() == '/') rel.pop_back();
+        fs::path file = rel.empty() ? out_dir / "index.html" : out_dir / rel / "index.html";
+        fs::create_directories(file.parent_path());
+        std::ofstream out(file);
+        out << page;
+    }
+    return true;
+}
 
 int main(int argc, char **argv)
 {
@@ -513,6 +575,7 @@ int main(int argc, char **argv)
         validate_mutability(all_components);
         validate_types(all_components, all_global_enums, all_global_data, all_global_functions, file_imports);
 
+
         // Determine output filename
         fs::path input_path(input_file);
         fs::path output_path;
@@ -574,6 +637,31 @@ int main(int argc, char **argv)
         }
 
         // Code generation - automatically detect required headers and features
+        // only what the app reaches from its root goes into the build (every component was
+        // checked above): what nothing uses costs no code and no CSS
+        {
+            std::vector<std::string> roots;
+            for (const auto &c : all_components)
+                if (c.name == final_app_config.root_component) roots.push_back(qualified_name(c.module_name, c.name));
+            for (const auto &[route, comp] : final_app_config.routes)
+                for (const auto &c : all_components)
+                    if (c.name == comp) roots.push_back(qualified_name(c.module_name, c.name));
+            std::set<std::string> keep;
+            for (const auto &r : roots)
+                for (const auto &q : reachable_components(all_components, r)) keep.insert(q);
+            std::vector<Component> kept;
+            for (auto &c : all_components)
+            {
+                if (keep.count(qualified_name(c.module_name, c.name))) kept.push_back(std::move(c));
+                else if (g_verbose) std::cerr << "Not reachable from the root, left out: " << c.name << std::endl;
+            }
+            all_components = std::move(kept);
+        }
+
+        // a dev build serves the app as it is; prerendering is for what gets deployed
+        if (dev || cc_only)
+            final_app_config.prerender = false;
+
         std::set<std::string> required_headers = get_required_headers(all_components, all_global_functions);
         FeatureFlags features = detect_features(all_components, required_headers, all_global_functions);
 
@@ -611,34 +699,45 @@ int main(int argc, char **argv)
             // manual `coi build`) must not read each other's half-written template
             const std::string template_name = "index.template." + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + ".html";
             fs::path template_path = cache_dir / template_name;
+
             {
+                std::string lang = final_app_config.lang.empty() ? "en" : final_app_config.lang;
+                std::string title = final_app_config.title.empty() ? "Coi App" : final_app_config.title;
+                std::string base = final_app_config.base.empty() ? "/" : final_app_config.base;
+
+                std::ostringstream head;
+                // Resolve assets/routes against the deploy base (see `base` in app{}).
+                head << "    <base href=\"" << base << "\">\n";
+                head << "    <meta charset=\"utf-8\">\n";
+                head << "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, viewport-fit=cover\">\n";
+                head << "    <title>" << title << "</title>\n";
+                if (!final_app_config.description.empty())
+                {
+                    head << "    <meta name=\"description\" content=\"" << final_app_config.description << "\">\n";
+                }
+                // Auto-include generated CSS using deploy-path-safe relative URL
+                head << "    <link rel=\"stylesheet\" href=\"./app.css\">\n";
+                head << pwa_head_tags(final_app_config);
+                // app.head: the project's own lines for every page's <head>
+                if (!final_app_config.head.empty())
+                {
+                    std::ifstream in(project_root / final_app_config.head);
+                    if (!in)
+                    {
+                        std::cerr << colors::RED << "Error:" << colors::RESET << " app.head: could not read " << (project_root / final_app_config.head).string() << std::endl;
+                        return 1;
+                    }
+                    head << std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()) << "\n";
+                }
+
+                // a prerendered page's markup goes at the marker, one copy of the page per route
+                std::string page = "<!DOCTYPE html>\n<html lang=\"" + lang + "\">\n<head>\n" + head.str() +
+                                   "</head>\n<body>\n" + (final_app_config.prerender ? "<!--coi-pre-->\n" : "") +
+                                   "{{script}}\n</body>\n</html>\n";
                 std::ofstream tmpl_out(template_path);
                 if (tmpl_out)
                 {
-                    std::string lang = final_app_config.lang.empty() ? "en" : final_app_config.lang;
-                    std::string title = final_app_config.title.empty() ? "Coi App" : final_app_config.title;
-                    std::string base = final_app_config.base.empty() ? "/" : final_app_config.base;
-
-                    tmpl_out << "<!DOCTYPE html>\n";
-                    tmpl_out << "<html lang=\"" << lang << "\">\n";
-                    tmpl_out << "<head>\n";
-                    // Resolve assets/routes against the deploy base (see `base` in app{}).
-                    tmpl_out << "    <base href=\"" << base << "\">\n";
-                    tmpl_out << "    <meta charset=\"utf-8\">\n";
-                    tmpl_out << "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, viewport-fit=cover\">\n";
-                    tmpl_out << "    <title>" << title << "</title>\n";
-                    if (!final_app_config.description.empty())
-                    {
-                        tmpl_out << "    <meta name=\"description\" content=\"" << final_app_config.description << "\">\n";
-                    }
-                    // Auto-include generated CSS using deploy-path-safe relative URL
-                    tmpl_out << "    <link rel=\"stylesheet\" href=\"./app.css\">\n";
-                    tmpl_out << pwa_head_tags(final_app_config);
-                    tmpl_out << "</head>\n";
-                    tmpl_out << "<body>\n";
-                    tmpl_out << "{{script}}\n";
-                    tmpl_out << "</body>\n";
-                    tmpl_out << "</html>\n";
+                    tmpl_out << page;
                     tmpl_out.close();
                 }
             }
@@ -671,11 +770,6 @@ int main(int argc, char **argv)
             progress("compiling to WebAssembly");
             int ret = system(cmd.c_str());
 
-            // Clean up intermediate files from cache (keep webcc cache for faster rebuilds)
-            if (!keep_cc)
-            {
-                fs::remove(cache_dir / "app.cc");
-            }
             fs::remove(template_path);
 
             if (ret != 0)
@@ -683,6 +777,11 @@ int main(int argc, char **argv)
                 std::cerr << "Error: webcc compilation failed." << std::endl;
                 return 1;
             }
+            if (final_app_config.prerender && !prerender_pages(final_app_config, all_components, abs_output_cc, abs_output_dir, cache_dir))
+                return 1;
+            // Clean up intermediate files from cache (keep webcc cache for faster rebuilds)
+            if (!keep_cc)
+                fs::remove(cache_dir / "app.cc");
             if (final_app_config.pwa && !dev)
             {
                 progress("bundling");
