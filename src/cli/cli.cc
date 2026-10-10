@@ -1,3 +1,10 @@
+#include "log.h"
+#include <chrono>
+#include <iomanip>
+#include <poll.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <cstdio>
 #include "cli.h"
 #include "error.h"
 #include "version.h"
@@ -501,6 +508,83 @@ static fs::path find_entry_point()
     return fs::path();
 }
 
+
+// The compiler runs in a pipe. Its ">> phase" lines become one status line that is redrawn
+// in place with a spinner while the build works; anything else it prints (errors) goes
+// through as it is, above the status line. Without a terminal the phases print as plain lines
+static int run_with_status(const std::string& cmd)
+{
+    FILE* pipe = popen(cmd.c_str(), "r");
+    if (!pipe) return 1;
+    int fd = fileno(pipe);
+    bool live = isatty(STDOUT_FILENO) && !g_verbose;
+    static const char* frames[] = {"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"};
+    int frame = 0;
+    std::string status, pending;
+    bool shown = false;
+    auto clear = [&]() { if (shown) { std::cout << "\r\033[2K"; shown = false; } };
+    auto draw = [&]() {
+        if (!live || status.empty()) return;
+        std::cout << "\r\033[2K  " << BRAND << frames[frame % 10] << RESET << " " << DIM << status << RESET << std::flush;
+        shown = true;
+    };
+    // webcc reports its own steps per C++ file; a Coi user sees the WebAssembly stage, not app.cc
+    auto in_coi_terms = [](std::string step) {
+        if (step.rfind("compiling ", 0) == 0 && step.size() > 3 && step.compare(step.size() - 3, 3, ".cc") == 0)
+            return std::string("compiling to WebAssembly");
+        if (step == "linking WebAssembly") return std::string("linking");
+        return step;
+    };
+    auto take_line = [&](const std::string& line) {
+        if (line.rfind(">> ", 0) == 0)
+        {
+            std::string next = in_coi_terms(line.substr(3));
+            if (next == status) return;   // the same stage, another file: nothing new to say
+            status = next;
+            if (live) draw();
+            else std::cout << DIM << "  " << status << RESET << std::endl;
+            return;
+        }
+        clear();
+        std::cout << line << std::endl;
+        draw();
+    };
+    char buf[4096];
+    while (true)
+    {
+        struct pollfd pfd = {fd, POLLIN, 0};
+        int r = poll(&pfd, 1, 80);
+        if (r == 0) { frame++; draw(); continue; }
+        ssize_t n = read(fd, buf, sizeof(buf));
+        if (n <= 0) break;
+        pending.append(buf, n);
+        size_t nl;
+        while ((nl = pending.find('\n')) != std::string::npos)
+        {
+            take_line(pending.substr(0, nl));
+            pending.erase(0, nl + 1);
+        }
+    }
+    if (!pending.empty()) take_line(pending);
+    clear();
+    int code = pclose(pipe);
+    return WIFEXITED(code) ? WEXITSTATUS(code) : 1;
+}
+
+// what came out, like a bundler's summary
+static void print_sizes(const fs::path& dist_dir)
+{
+    for (const char* name : {"app.wasm", "app.js", "app.css"})
+    {
+        fs::path f = dist_dir / name;
+        if (!fs::exists(f)) continue;
+        double kb = fs::file_size(f) / 1024.0;
+        char size[32];
+        std::snprintf(size, sizeof(size), "%7.1f kB", kb);
+        std::cout << "    " << DIM << std::left << std::setw(9) << name << RESET << " " << size << std::endl;
+    }
+}
+
 int build_project(bool keep_cc, bool cc_only, bool silent_banner)
 {
     if (!silent_banner)
@@ -526,7 +610,7 @@ int build_project(bool keep_cc, bool cc_only, bool silent_banner)
     fs::path assets_dir = project_dir / "assets";
     if (fs::exists(assets_dir) && fs::is_directory(assets_dir))
     {
-        std::cout << DIM << "Copying assets..." << RESET << std::endl;
+        if (g_verbose) std::cout << DIM << "Copying assets..." << RESET << std::endl;
         fs::path dest_assets = dist_dir / "assets";
         for (const auto &asset : fs::recursive_directory_iterator(assets_dir))
         {
@@ -554,10 +638,14 @@ int build_project(bool keep_cc, bool cc_only, bool silent_banner)
         extra_flags += " --keep-cc";
     if (cc_only)
         extra_flags += " --cc-only";
-    std::string cmd = "bash -c 'set -o pipefail; " + coi_bin.string() + " " + entry.string() + " --out " + dist_dir.string() + extra_flags + " 2>&1 | grep -v \"Success! Run\"'";
+    if (g_verbose)
+        extra_flags += " --verbose";
+    if (silent_banner)   // a dev build: quick to compile, and the dev server never serves the service worker
+        extra_flags += " --dev";
+    std::string cmd = coi_bin.string() + " " + entry.string() + " --out " + dist_dir.string() + extra_flags + " --progress 2>&1";
 
-    std::cout << BRAND << "▶" << RESET << " Building..." << std::endl;
-    int ret = system(cmd.c_str());
+    auto started = std::chrono::steady_clock::now();
+    int ret = run_with_status(cmd);
 
     if (ret != 0)
     {
@@ -565,7 +653,12 @@ int build_project(bool keep_cc, bool cc_only, bool silent_banner)
         return 1;
     }
 
-    std::cout << GREEN << "✓" << RESET << " Built to " << BOLD << "dist/" << RESET << std::endl;
+    double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
+    char took[32];
+    std::snprintf(took, sizeof(took), "%.2fs", seconds);
+    std::cout << "  " << GREEN << "✓" << RESET << " built " << BOLD << "dist/" << RESET << DIM << " in " << took << RESET << std::endl;
+    if (!silent_banner)   // a plain `coi build`; dev rebuilds don't repeat the sizes
+        print_sizes(dist_dir);
     return 0;
 }
 
@@ -586,13 +679,7 @@ int dev_project(bool keep_cc, bool cc_only, bool hot_reloading)
     fs::path coi_bin = exe_dir / "coi";
     fs::path dev_script = exe_dir / "scripts" / "dev_server.py";
 
-    std::cout << "  " << GREEN << "➜" << RESET << "  Local:   " << CYAN << BOLD << "http://localhost:8000" << RESET << std::endl;
-    if (!hot_reloading)
-    {
-        std::cout << "  " << DIM << "↻ Hot reload: disabled" << RESET << std::endl;
-    }
-    std::cout << "  " << DIM << "Press Ctrl+C to stop" << RESET << std::endl;
-    std::cout << std::endl;
+    // the server prints the address once it has a port, and the rest
 
     if (!fs::exists(dev_script))
     {
@@ -601,12 +688,13 @@ int dev_project(bool keep_cc, bool cc_only, bool hot_reloading)
         return 1;
     }
 
-    std::string cmd = "python3 " + dev_script.string() +
+    std::string cmd = "python3 -u " + dev_script.string() +
                      " " + project_dir.string() +
                      " " + coi_bin.string() +
                      " " + dist_dir.string();
     
     if (!hot_reloading) cmd += " --no-watch";
+    if (g_verbose) cmd += " --verbose";
     if (keep_cc) cmd += " --keep-cc";
     if (cc_only) cmd += " --cc-only";
 
@@ -706,6 +794,7 @@ void print_help(const char *program_name)
     std::cout << "    " << DIM << "--cc-only" << RESET << "         Generate C++ only, skip WASM" << std::endl;
     std::cout << "    " << DIM << "--keep-cc" << RESET << "         Keep generated C++ files" << std::endl;
     std::cout << "    " << DIM << "--no-watch" << RESET << "        Disable hot reloading (dev only)" << std::endl;
+    std::cout << "    " << DIM << "--verbose, -V" << RESET << "     Show every file processed and tool run" << std::endl;
     std::cout << "    " << DIM << "--pkg" << RESET << "             Create a package (init only)" << std::endl;
     std::cout << std::endl;
     std::cout << "  " << BOLD << "Examples:" << RESET << std::endl;

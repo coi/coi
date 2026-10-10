@@ -1,5 +1,6 @@
 // Definition file parser implementation
 
+#include "../cli/log.h"
 #include "def_parser.h"
 #include <cctype>
 #include "../cli/error.h"
@@ -1040,7 +1041,7 @@ bool DefSchema::load_cache(const std::string &cache_path)
     }
 
     loaded_ = true;
-    std::cout << "[DefSchema] Loaded " << types_.size() << " types from cache" << std::endl;
+    if (g_verbose) std::cout << "[DefSchema] Loaded " << types_.size() << " types from cache" << std::endl;
     return true;
 }
 
@@ -1111,7 +1112,7 @@ bool DefSchema::save_cache(const std::string &cache_path)
         }
     }
 
-    std::cout << "[DefSchema] Saved cache with " << types_.size() << " types" << std::endl;
+    if (g_verbose) std::cout << "[DefSchema] Saved cache with " << types_.size() << " types" << std::endl;
     return true;
 }
 

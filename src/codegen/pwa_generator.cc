@@ -1,3 +1,4 @@
+#include "../cli/log.h"
 #include "pwa_generator.h"
 #include "../ast/component/component.h"
 #include <algorithm>
@@ -217,5 +218,5 @@ self.addEventListener('fetch', (e) => {
 });
 )JS";
     std::ofstream(out_dir / "sw.js") << s.str();
-    std::cout << "[Coi] PWA: manifest.webmanifest, sw.js (" << files.size() << " files cached, version " << version << ")" << std::endl;
+    if (g_verbose) std::cout << "[Coi] PWA: manifest.webmanifest, sw.js (" << files.size() << " files cached, version " << version << ")" << std::endl;
 }

@@ -1,3 +1,4 @@
+#include "../cli/log.h"
 #include "css_generator.h"
 #include "ast/ast.h"
 #include "../cli/error.h"
@@ -257,5 +258,5 @@ void generate_css_file(
         }
     }
     css_out.close();
-    std::cerr << "Generated " << css_path.string() << std::endl;
+    if (g_verbose) std::cerr << "Generated " << css_path.string() << std::endl;
 }

@@ -1,3 +1,4 @@
+#include "cli/log.h"
 #include "frontend/lexer.h"
 #include "frontend/parser/parser.h"
 #include "ast/ast.h"
@@ -101,11 +102,16 @@ int main(int argc, char **argv)
             keep_cc = true;
         else if (arg == "--cc-only")
             cc_only = true;
+        else if (arg == "--verbose" || arg == "-V")
+            g_verbose = true;
     }
 
     if (first_arg == "build")
     {
-        return build_project(keep_cc, cc_only);
+        bool rebuild = false;   // the dev server's rebuilds: no banner
+        for (int i = 2; i < argc; ++i)
+            if (std::string(argv[i]) == "--rebuild") rebuild = true;
+        return build_project(keep_cc, cc_only, rebuild);
     }
 
     if (first_arg == "dev")
@@ -188,6 +194,7 @@ int main(int argc, char **argv)
 
     std::string input_file;
     std::string output_dir;
+    bool dev = false;   // a dev build: quick to compile, no manifest or service worker
 
     for (int i = 1; i < argc; ++i)
     {
@@ -196,6 +203,12 @@ int main(int argc, char **argv)
             cc_only = true;
         else if (arg == "--keep-cc")
             keep_cc = true;
+        else if (arg == "--verbose" || arg == "-V")
+            g_verbose = true;
+        else if (arg == "--progress")
+            g_progress = true;
+        else if (arg == "--dev")
+            dev = true;
         else if (arg == "--out" || arg == "-o")
         {
             if (i + 1 < argc)
@@ -277,7 +290,8 @@ int main(int argc, char **argv)
                 continue;
             processed_files.insert(current_file_path);
 
-            std::cerr << "Processing " << current_file_path << "..." << std::endl;
+            if (g_verbose) std::cerr << "Processing " << current_file_path << "..." << std::endl;
+            progress("parsing " + fs::path(current_file_path).filename().string());
 
             std::ifstream file(current_file_path);
             if (!file)
@@ -447,7 +461,8 @@ int main(int argc, char **argv)
             }
         }
 
-        std::cerr << "All files processed. Total components: " << all_components.size() << std::endl;
+        if (g_verbose) std::cerr << "All files processed. Total components: " << all_components.size() << std::endl;
+        progress("generating code for " + std::to_string(all_components.size()) + " components");
 
         register_free_functions(all_global_functions);
 
@@ -643,10 +658,17 @@ int main(int argc, char **argv)
 
             std::string cmd = webcc_path.string() + " " + abs_output_cc.string();
             cmd += " --out " + abs_output_dir.string();
-            cmd += " --cache-dir " + webcc_cache_dir.string();
+            cmd += " --cache-dir " + (dev ? webcc_cache_dir.string() + "-dev" : webcc_cache_dir.string());   // dev objects are compiled differently
             cmd += " --template " + abs_template.string();
-
-            std::cerr << "Running: " << cmd << std::endl;
+            if (!g_verbose)
+                cmd += " --quiet";
+            else
+                std::cerr << "Running: " << cmd << std::endl;
+            if (g_progress)
+                cmd += " --progress";
+            if (dev)
+                cmd += " --dev";
+            progress("compiling to WebAssembly");
             int ret = system(cmd.c_str());
 
             // Clean up intermediate files from cache (keep webcc cache for faster rebuilds)
@@ -661,8 +683,11 @@ int main(int argc, char **argv)
                 std::cerr << "Error: webcc compilation failed." << std::endl;
                 return 1;
             }
-            if (final_app_config.pwa)
+            if (final_app_config.pwa && !dev)
+            {
+                progress("bundling");
                 generate_pwa_files(final_output_dir, final_app_config);
+            }
         }
     }
     catch (const std::exception &e)

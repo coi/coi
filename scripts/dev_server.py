@@ -13,7 +13,7 @@ import threading
 from pathlib import Path
 
 # ANSI colors
-DIM = '\033[2m'
+DIM = ''  
 RESET = '\033[0m'
 GREEN = '\033[32m'
 YELLOW = '\033[33m'
@@ -170,8 +170,8 @@ def get_mtimes(project_dir):
     return mtimes
 
 
-def watch_files(project_dir, coi_bin, keep_cc, cc_only):
-    print(f'{DIM}  Watching for changes...{RESET}')
+def watch_files(project_dir, coi_bin, keep_cc, cc_only, verbose):
+    print(f'{DIM}  watching for changes{RESET}')
     last = get_mtimes(project_dir)
     
     while True:
@@ -182,26 +182,21 @@ def watch_files(project_dir, coi_bin, keep_cc, cc_only):
         changed += [f'{Path(p).name} (deleted)' for p in last if p not in curr]
         
         if changed:
-            print(f'{YELLOW}↻{RESET} {DIM}{", ".join(changed)}{RESET}')
+            print(f'  {YELLOW}↻{RESET} {DIM}{", ".join(changed)}{RESET}')
             
             # Use 'coi build' to ensure assets and styles/ CSS are bundled
-            cmd = [coi_bin, 'build']
+            cmd = [coi_bin, 'build', '--rebuild']
             if keep_cc: cmd.append('--keep-cc')
             if cc_only: cmd.append('--cc-only')
+            if verbose: cmd.append('--verbose')
             
+            # the build draws its own status line and result, straight to the terminal
             try:
-                r = subprocess.run(cmd, capture_output=True, text=True, timeout=30, cwd=project_dir)
+                r = subprocess.run(cmd, timeout=600, cwd=project_dir)
                 if r.returncode == 0:
-                    print(f'{GREEN}✓{RESET} Rebuilt')
                     notify_reload()
-                else:
-                    print(f'{RED}✗{RESET} Build failed:')
-                    output = r.stdout + r.stderr
-                    for line in output.splitlines():
-                        if line.strip():
-                            print(f'  {line}')
             except Exception as e:
-                print(f'{RED}✗{RESET} {e}')
+                print(f'  {RED}✗{RESET} {e}')
             
             last = curr
 
@@ -219,22 +214,43 @@ def main():
     hot_reload_enabled = '--no-watch' not in sys.argv
     keep_cc = '--keep-cc' in sys.argv
     cc_only = '--cc-only' in sys.argv
+    verbose = '--verbose' in sys.argv
     
     os.chdir(os.path.join(project_dir, 'dist'))
-    
-    if hot_reload_enabled:
-        watcher = threading.Thread(
-            target=watch_files,
-            args=(project_dir, coi_bin, keep_cc, cc_only),
-            daemon=True
-        )
-        watcher.start()
     
     class Server(http.server.ThreadingHTTPServer):
         allow_reuse_address = True
     
-    with Server(('', 8000), DevHandler) as httpd:
-        httpd.serve_forever()
+    # 8000, or the next free port when something (another coi dev?) has it
+    httpd = None
+    for port in range(8000, 8011):
+        try:
+            httpd = Server(('', port), DevHandler)
+            break
+        except OSError:
+            continue
+    if httpd is None:
+        print(f'  {RED}✗{RESET} ports 8000 to 8010 are all in use')
+        sys.exit(1)
+    print(f'  {GREEN}➜{RESET}  Local:   \033[36m\033[1mhttp://localhost:{port}{RESET}' + (f'  {DIM}(8000 was taken){RESET}' if port != 8000 else ''))
+    if not hot_reload_enabled:
+        print(f'  {DIM}↻ hot reload off{RESET}')
+    print(f'  {DIM}press Ctrl+C to stop{RESET}')
+    print()
+    
+    if hot_reload_enabled:
+        watcher = threading.Thread(
+            target=watch_files,
+            args=(project_dir, coi_bin, keep_cc, cc_only, verbose),
+            daemon=True
+        )
+        watcher.start()
+    
+    with httpd:
+        try:
+            httpd.serve_forever()
+        except KeyboardInterrupt:
+            print()   # Ctrl+C: a clean line, no traceback
 
 
 if __name__ == '__main__':

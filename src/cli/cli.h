@@ -7,7 +7,7 @@
 namespace colors {
     constexpr const char* RESET   = "\033[0m";
     constexpr const char* BOLD    = "\033[1m";
-    constexpr const char* DIM     = "\033[2m";
+    constexpr const char* DIM     = "";   // plain: grey is hard to read on dark themes and the dim attribute gets boxed in black
     
     constexpr const char* RED     = "\033[31m";
     constexpr const char* GREEN   = "\033[32m";
