@@ -11,6 +11,8 @@
 static std::set<std::string> g_enum_types;
 // Global map of known data types to their field names (for Meta.has(Type.field))
 static std::map<std::string, std::set<std::string>> g_data_type_fields;
+// global pod name -> the modules that define one ("" for files without a module line)
+static std::map<std::string, std::set<std::string>> g_pod_modules;
 // Global map of known data types to their field types (for member access type inference)
 static std::map<std::string, std::map<std::string, std::string>> g_data_type_field_types;
 
@@ -441,6 +443,22 @@ bool is_compatible_type(const std::string &source, const std::string &target)
     if (source == "unknown" || target == "unknown")
         return true;
 
+    // "Geo::Point" from outside and "Point" inside Geo name the same pod (also as Geo::Point[] etc.)
+    auto unqualified = [](const std::string &t) -> std::string {
+        size_t d = t.find("::");
+        if (d == std::string::npos)
+            return t;
+        std::string prefix = t.substr(0, d);
+        if (prefix == "webcc" || prefix == "coi" || prefix == "std")
+            return t;
+        for (char c : prefix)
+            if (!std::isalnum((unsigned char)c) && c != '_')
+                return t;
+        return t.substr(d + 2);
+    };
+    if (unqualified(source) == unqualified(target))
+        return true;
+
     // Handle Component.EnumName type compatibility
     // App.Mode should be compatible with Mode (when Mode is from App's shared enum)
     auto extract_enum_name = [](const std::string &t) -> std::string {
@@ -605,6 +623,31 @@ static void check_known_type(const std::string &type, const std::vector<std::str
     if (!is_known_type(type, type_params))
     {
         ErrorHandler::type_error("Unknown type '" + type + "'", line);
+        exit(1);
+    }
+    // a pod from another module is named with its module: Geo::Point, not Point
+    for (size_t i = 0; i < type.size();)
+    {
+        if (!std::isalpha((unsigned char)type[i]) && type[i] != '_') { i++; continue; }
+        size_t j = i;
+        while (j < type.size() && (std::isalnum((unsigned char)type[j]) || type[j] == '_')) j++;
+        bool qualified = (j + 1 < type.size() && type[j] == ':' && type[j + 1] == ':') || (i >= 2 && type[i - 1] == ':' && type[i - 2] == ':');
+        std::string word = type.substr(i, j - i);
+        i = j;
+        if (qualified || std::find(type_params.begin(), type_params.end(), word) != type_params.end())
+            continue;
+        auto it = g_pod_modules.find(word);
+        if (it == g_pod_modules.end() || it->second.count(g_ctx_module) || it->second.count(""))
+            continue;
+        if (g_ctx_component)
+        {
+            bool local = false;
+            for (const auto &d : g_ctx_component->data)
+                if (d->name == word) local = true;
+            if (local) continue;
+        }
+        std::string mod = *it->second.begin();
+        ErrorHandler::type_error("Pod '" + word + "' is in module '" + mod + "', write '" + mod + "::" + word + "'", line);
         exit(1);
     }
 }
@@ -2769,6 +2812,7 @@ void validate_types(const std::vector<Component> &components,
     // Collect all enum type names (for enum <-> int conversion checking)
     g_enum_types.clear();
     g_data_type_fields.clear();
+    g_pod_modules.clear();
     g_data_type_field_types.clear();
     
     // Add global enums
@@ -2806,6 +2850,7 @@ void validate_types(const std::vector<Component> &components,
         }
         g_data_type_fields[d->name] = fields;
         g_data_type_field_types[d->name] = field_types;
+        g_pod_modules[d->name].insert(d->module_name);
         if (!d->module_name.empty())
         {
             g_data_type_fields[d->module_name + "_" + d->name] = fields;

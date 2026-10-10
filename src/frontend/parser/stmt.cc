@@ -207,10 +207,18 @@ std::unique_ptr<Statement> Parser::parse_statement()
         }
         else if (next.type == TokenType::DOUBLE_COLON)
         {
-            // Check for "Module::Type Name" pattern
-            if (peek(2).type == TokenType::IDENTIFIER && peek(3).type == TokenType::IDENTIFIER)
+            // "Module::Type Name", also with [] / [N] / & after the type
+            if (peek(2).type == TokenType::IDENTIFIER)
             {
-                is_type = true; // Module::Type Name
+                TokenType a = peek(3).type;
+                if (a == TokenType::IDENTIFIER)
+                    is_type = true; // Module::Type Name
+                else if (a == TokenType::AMPERSAND && peek(4).type == TokenType::IDENTIFIER)
+                    is_type = true; // Module::Type& Name
+                else if (a == TokenType::LBRACKET && peek(4).type == TokenType::RBRACKET && peek(5).type == TokenType::IDENTIFIER)
+                    is_type = true; // Module::Type[] Name
+                else if (a == TokenType::LBRACKET && peek(4).type == TokenType::INT_LITERAL && peek(5).type == TokenType::RBRACKET && peek(6).type == TokenType::IDENTIFIER)
+                    is_type = true; // Module::Type[N] Name
             }
         }
         else if (next.type == TokenType::LBRACKET)

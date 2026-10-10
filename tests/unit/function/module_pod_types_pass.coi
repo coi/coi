@@ -1,0 +1,25 @@
+// Test: Module::Pod as a return type, local, mut array, param, component param and pod field
+import "modules/Geometry.coi";
+
+pod Segment { Geometry::Point a; Geometry::Point[] stops; }
+
+component Dot(Geometry::Point at) { view { <i>{at.x}</i> } }
+
+component App {
+    def origin() : Geometry::Point { return Geometry::Point{0.0, 0.0}; }
+    def pair(Geometry::Point a) : Geometry::Point[] {
+        mut Geometry::Point[] out;
+        out.push(a);
+        out.push(origin());
+        return out;
+    }
+    def length() : float {
+        Segment s = Segment{a = origin(), stops = pair(origin())};
+        Geometry::Point& first = s.stops[0];
+        return Geometry::dist2(s.a, first);
+    }
+
+    view { <div>{length()}<Dot at={origin()} /></div> }
+}
+
+app { root = App; }

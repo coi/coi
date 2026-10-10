@@ -102,8 +102,9 @@ std::string convert_type(const std::string& type) {
                         std::all_of(prefix.begin(), prefix.end(), [](unsigned char c) {
                             return std::isalnum(c) || c == '_';
                         });
-        if (is_ident && prefix != "webcc" && prefix != "coi" && prefix != "std") {
-            std::string name = type.substr(dcolon_pos + 2);
+        std::string name = type.substr(dcolon_pos + 2);
+        // Geo::Point[] and Geo::Point[string] go through the array/map cases below, element first
+        if (is_ident && prefix != "webcc" && prefix != "coi" && prefix != "std" && name.find('[') == std::string::npos) {
             return prefix + "_" + name;
         }
     }

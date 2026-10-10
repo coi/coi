@@ -65,6 +65,13 @@ std::unique_ptr<DataDef> Parser::parse_data()
         {
             ErrorHandler::compiler_error("Expected type in pod field", current().line);
         }
+        // Cross-module type: Module::Type
+        if (current().type == TokenType::DOUBLE_COLON)
+        {
+            advance();
+            type += "::" + current().value;
+            expect(TokenType::IDENTIFIER, "Expected type name after '::'");
+        }
 
         // Handle generic type arguments: Result<int>, Pair<A, B>
         if (current().type == TokenType::LT)
@@ -684,6 +691,13 @@ Component Parser::parse_component()
                 else
                 {
                     throw std::runtime_error("Expected param type");
+                }
+                // Cross-module type: Module::Type
+                if (current().type == TokenType::DOUBLE_COLON)
+                {
+                    advance();
+                    param->type += "::" + current().value;
+                    expect(TokenType::IDENTIFIER, "Expected type name after '::'");
                 }
 
                 // Info[]& pages, Info& p
@@ -1404,6 +1418,13 @@ FunctionDef Parser::parse_function_def(bool is_public)
     // Single return type, Point[] and int[string] included
     func.return_type = current().value;
     advance();
+    // Cross-module type: Module::Type
+    if (current().type == TokenType::DOUBLE_COLON)
+    {
+        advance();
+        func.return_type += "::" + current().value;
+        expect(TokenType::IDENTIFIER, "Expected type name after '::'");
+    }
     if (current().type == TokenType::LBRACKET)
     {
         advance();

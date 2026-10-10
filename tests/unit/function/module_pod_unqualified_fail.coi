@@ -1,0 +1,9 @@
+// Test: a pod from another module needs its module prefix
+import "modules/Geometry.coi";
+
+component App {
+    def origin() : Point { return Geometry::Point{0.0, 0.0}; }
+    view { <div>{origin().x}</div> }
+}
+
+app { root = App; }

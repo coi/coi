@@ -1,3 +1,4 @@
+#include <functional>
 #include "codegen.h"
 #include "codegen_utils.h"
 #include "ast/ast.h"
@@ -456,10 +457,43 @@ void generate_cpp_code(
         }
     }
 
-    // Output global data types (defined outside components)
-    for (const auto &data_def : all_global_data)
+    // Output global data types (defined outside components). A pod comes after the pods its
+    // fields use; files are read in import order, so one can use a pod from a later file
     {
-        out << data_def->to_webcc();
+        std::map<std::string, const DataDef *> by_name;
+        for (const auto &data_def : all_global_data)
+            by_name[qualified_name(data_def->module_name, data_def->name)] = data_def.get();
+        std::set<const DataDef *> done, visiting;
+        std::function<void(const DataDef *)> emit = [&](const DataDef *d) {
+            if (done.count(d) || visiting.count(d))
+                return;
+            visiting.insert(d);
+            for (const auto &field : d->fields)
+            {
+                // every name in the type: Geo::Point[], Point[string], Pair<A, B>
+                const std::string &t = field.type;
+                for (size_t i = 0; i < t.size();)
+                {
+                    if (!std::isalpha((unsigned char)t[i]) && t[i] != '_') { i++; continue; }
+                    size_t j = i;
+                    while (j < t.size() && (std::isalnum((unsigned char)t[j]) || t[j] == '_' || (t[j] == ':' && j + 1 < t.size() && t[j + 1] == ':')))
+                        j += t[j] == ':' ? 2 : 1;
+                    std::string word = t.substr(i, j - i);
+                    size_t dc = word.find("::");
+                    std::string key = dc == std::string::npos ? qualified_name(d->module_name, word)
+                                                              : qualified_name(word.substr(0, dc), word.substr(dc + 2));
+                    auto it = by_name.find(key);
+                    if (it != by_name.end() && it->second != d)
+                        emit(it->second);
+                    i = j;
+                }
+            }
+            visiting.erase(d);
+            done.insert(d);
+            out << const_cast<DataDef *>(d)->to_webcc();
+        };
+        for (const auto &data_def : all_global_data)
+            emit(data_def.get());
     }
     if (!all_global_data.empty())
     {
