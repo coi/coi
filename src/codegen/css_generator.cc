@@ -45,7 +45,23 @@ void write_component_css(std::ostream &css_out, const Component &comp)
             if (start == std::string::npos)
                 return sel;
             std::string trimmed = sel.substr(start, end - start + 1);
-            size_t colon = trimmed.find(':');
+            // the scope goes on the last compound, before its first pseudo: ".a:hover .b:focus" -> ".a:hover .b[..]:focus".
+            // Brackets and parens are skipped, ":not(.x .y)" and "[href^='a:b']" hold no boundary
+            size_t last = 0, colon = std::string::npos;
+            int depth = 0;
+            for (size_t i = 0; i < trimmed.size(); i++)
+            {
+                char c = trimmed[i];
+                if (c == '(' || c == '[') depth++;
+                else if (c == ')' || c == ']') depth--;
+                else if (depth == 0 && (std::isspace((unsigned char)c) || c == '>' || c == '+' || c == '~'))
+                {
+                    last = i + 1;
+                    colon = std::string::npos;
+                }
+                else if (depth == 0 && c == ':' && colon == std::string::npos && i >= last)
+                    colon = i;
+            }
             if (colon != std::string::npos)
             {
                 return trimmed.substr(0, colon) + "[coi-scope=\"" + scope_name + "\"]" + trimmed.substr(colon);

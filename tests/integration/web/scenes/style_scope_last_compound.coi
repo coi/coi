@@ -1,0 +1,14 @@
+// a pseudo on an ancestor outside the component: the scope goes on the last compound, not before the first colon
+component Dot {
+    style {
+        .dot { width: 200px; height: 20px; background: #825fff; }
+        .outer:not(.off) .dot { width: 50px; }
+        [data-k="a:b"] > .dot { height: 30px; }
+    }
+    view { <div class="dot"></div> }
+}
+
+component App {
+    view { <div class="outer" data-k="a:b"><Dot /></div> }
+}
+app { root = App; }
