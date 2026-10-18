@@ -1090,6 +1090,8 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
     // Ternary operator type inference (cond ? true_expr : false_expr)
     if (auto ternary = dynamic_cast<TernaryOp *>(expr))
     {
+        // the condition is typed too: a method call in it needs its receiver's type for codegen
+        infer_expression_type(ternary->condition.get(), scope);
         // The result type is the type of the true/false branches (they should match)
         std::string true_type = infer_expression_type(ternary->true_expr.get(), scope);
         std::string false_type = infer_expression_type(ternary->false_expr.get(), scope);
@@ -1541,7 +1543,9 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
             size_t param_offset = 0;
 
             bool implicit_obj = false;
-            if (!obj_name.empty())
+            // found on the receiver's own type: the def's params come after the receiver
+            bool on_own_type = entry == &typed_entry && scope.count(obj_name);
+            if (!obj_name.empty() && !on_own_type)
             {
                 if (scope.count(obj_name))
                 {
@@ -1565,9 +1569,9 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                         return "unknown";
                     }
                 }
-                else if (obj_name.find('.') != std::string::npos && scope.count(obj_name.substr(0, obj_name.find('.'))))
+                else if (obj_name.find_first_of(".[") != std::string::npos && scope.count(obj_name.substr(0, obj_name.find_first_of(".["))))
                 {
-                    // a value, not a type name
+                    // a value (a.b, a[i].b), not a type name
                     return "unknown";
                 }
                 else
@@ -2199,6 +2203,8 @@ static void check_function_body(const FunctionDef &method, const Component *comp
         {
             // Check condition for use of moved variables
             check_moved_use(if_stmt->condition.get(), if_stmt->line);
+            // typed like any expression: method calls in it need their receiver's type for codegen
+            infer_expression_type(if_stmt->condition.get(), current_scope);
             
             check_stmt(if_stmt->then_branch, current_scope);
             if (if_stmt->else_branch)

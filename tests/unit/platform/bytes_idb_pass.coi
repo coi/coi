@@ -25,7 +25,7 @@ component BytesIdbPass {
     mount {
         db = Idb.open("tests", &opened);
         Blob copy = Blob.create([9, 8, 7]);
-        total = copy.size();
+        total = copy.size().toInt();
         copy.free();
         ws = WebSocket.connect("ws://localhost:1/");
         ws.onBinaryMessage(&binary);

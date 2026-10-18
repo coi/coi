@@ -32,6 +32,15 @@ request_pointer_lock
 scroll_to_top
 exec_command
 focus_end
+# a rich editor: what is selected, which element was clicked, classes on content it made
+get_selection_anchor
+get_selection_text
+closest
+contains
+add_click_target_listener +listen(CLICK_TARGET)
+add_class
+remove_class
+get_attribute
 
 [canvas]
 create_canvas
@@ -188,6 +197,10 @@ get_uniform_location
 uniform_1f
 vertex_attrib_pointer
 draw_arrays
+
+[DOMElement]
+// false for the "none" handle, from getSelectionAnchor or closest when nothing matches
+@inline("${this}.is_valid()") def isValid(): bool
 
 [Canvas]
 // 2D context, lowLatency cuts pen lag, opaque skips alpha

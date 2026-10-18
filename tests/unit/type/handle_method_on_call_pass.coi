@@ -1,0 +1,20 @@
+// Test: a method on a call's result is typed in an if, a ternary and a declaration,
+// for a platform method's result and an own method's
+component HandleMethodOnCall {
+    mut DOMElement box;
+    mut string r = "";
+
+    def pick(string s) : DOMElement { return box.closest(s); }
+
+    def go() : void {
+        if (box.closest("div").isValid()) r = "a";
+        if (pick("p").isValid()) r = "b";
+        bool ok = box.closest("div").isValid();
+        r = ok ? "c" : (pick("p").isValid() ? "d" : "e");
+        r = `${box.closest("p").isValid() ? "f" : "g"}`;
+    }
+
+    view { <p &={box} onclick={go}>{r}</p> }
+}
+
+app { root = HandleMethodOnCall; }

@@ -1,0 +1,15 @@
+// more events in one batch than the update loop takes at once: none lost, none left waiting
+component App {
+    mut int moves = 0;
+    mut int ups = 0;
+    def down(PointerEvent e) : void { moves = 0; }
+    def move(PointerEvent e) : void { moves++; }
+    def up(PointerEvent e) : void { ups++; }
+    view {
+        <div>
+            <div class="pad" style="width:300px;height:200px;background:#eee" onpointerdown={down} onpointermove={move} onpointerup={up}></div>
+            <p class="out">{`${moves} ${ups}`}</p>
+        </div>
+    }
+}
+app { root = App; }

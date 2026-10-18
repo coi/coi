@@ -685,13 +685,17 @@ void generate_cpp_code(
     out << "    double dt = (time - last_time) / 1000.0;\n";
     out << "    last_time = time;\n";
     out << "    if (dt > 0.1) dt = 0.1; // Cap dt to avoid huge jumps\n";
+    // every queued event, 64 at a time: one left behind would wait for the next input on an
+    // app that draws on demand (and the poll that finds a 65th must not throw it away)
     out << "    static webcc::Event events[64];\n";
-    out << "    uint32_t count = 0;\n";
     out << "    webcc::Event e;\n";
-    out << "    while (webcc::poll_event(e) && count < 64) {\n";
-    out << "        events[count++] = e;\n";
+    out << "    for (;;) {\n";
+    out << "        uint32_t count = 0;\n";
+    out << "        while (count < 64 && webcc::poll_event(e)) events[count++] = e;\n";
+    out << "        if (count == 0) break;\n";
+    out << "        dispatch_events(events, count);\n";
+    out << "        if (count < 64) break;\n";
     out << "    }\n";
-    out << "    dispatch_events(events, count);\n";
     
     // Only call tick if the root component has a tick method
     if (session.components_with_tick.count(root_qualified))

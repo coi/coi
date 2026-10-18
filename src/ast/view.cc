@@ -742,6 +742,11 @@ void HTMLElement::generate_code(ViewCodegenContext& ctx)
     {
         ctx.ss << "        webcc::dom::append_child(" << ctx.parent << ", " << var << ");\n";
     }
+    // autofocus: the browser honors the attribute once per document, so an input that shows up
+    // later (an <if>, a new row) is focused here, once it is in the page
+    for (auto &attr : attributes)
+        if (attr.name == "autofocus")
+            ctx.ss << "        webcc::dom::focus(" << var << ");\n";
 
     // Children
     bool has_elements = false;

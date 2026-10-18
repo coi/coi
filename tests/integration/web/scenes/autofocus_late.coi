@@ -1,0 +1,24 @@
+// an autofocus input that appears after the page has loaded (an <if>, a row in a keyed loop) takes
+// focus, even though the button that made it appear had it
+pod Row { string id; string name; }
+
+component App {
+    mut bool editing = false;
+    mut string rowEditing = "";
+    mut Row[] rows = [Row{id = "a", name = "A"}, Row{id = "b", name = "B"}];
+    def edit() : void { editing = true; }
+    def editRow(string id) : void { rowEditing = id; }
+    view {
+        <div>
+            <button class="edit" onclick={edit}>edit</button>
+            <if editing><input class="field" autofocus="true" /></if>
+            <for r in rows key={r.id}>
+                <div class="row">
+                    <if rowEditing != r.id><button class={`go-${r.id}`} onclick={editRow(r.id)}>{r.name}</button></if>
+                    <if rowEditing == r.id><input class={`in-${r.id}`} autofocus="true" /></if>
+                </div>
+            </for>
+        </div>
+    }
+}
+app { root = App; }
