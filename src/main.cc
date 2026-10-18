@@ -37,16 +37,28 @@ static bool prerender_pages(const AppConfig &config, const std::vector<Component
                             const fs::path &app_cc, const fs::path &out_dir, const fs::path &cache_dir)
 {
     std::vector<std::string> paths;
+    std::vector<bool> rest;   // "/app/*": the page also stands for everything under it
     for (const auto &c : components)
     {
         if (c.name != config.root_component || !c.router)
             continue;
         for (const auto &r : c.router->routes)
             if (!r.is_default && r.path_params.empty())
+            {
                 paths.push_back(r.path);
+                rest.push_back(r.rest);
+            }
     }
     if (paths.empty())
+    {
         paths.push_back("/");
+        rest.push_back(true);
+    }
+    for (const auto &extra : config.prerender_paths)
+    {
+        paths.push_back(extra);
+        rest.push_back(true);
+    }
 
     progress("prerendering " + std::to_string(paths.size()) + (paths.size() == 1 ? " page" : " pages"));
     fs::path pre_dir = cache_dir / "prerender";
@@ -85,6 +97,15 @@ static bool prerender_pages(const AppConfig &config, const std::vector<Component
         html.insert(tag_end, " data-hydrate");
         std::string page = index;
         page.replace(at, marker.size(), html);
+        // served for a path that isn't this page's route (a host falling back to the root page
+        // for a deep link): the prerendered markup stays hidden until the app has taken over
+        std::string guard = "<script>(function(){var r=\"" + paths[i] + "\",p=location.pathname.replace(/\\/+$/,\"\")||\"/\";"
+                            "if(!(p===r||(" + std::string(rest[i] ? "true" : "false") + "&&p.indexOf(r===\"/\"?\"/\":r+\"/\")===0)))"
+                            "document.documentElement.setAttribute(\"data-coi-other-route\",\"\");})()</script>"
+                            "<style>[data-coi-other-route] [data-hydrate]{visibility:hidden}</style>\n";
+        size_t head_end = page.find("</head>");
+        if (head_end != std::string::npos)
+            page.insert(head_end, guard);
         std::string rel = paths[i];
         while (!rel.empty() && rel.front() == '/') rel.erase(0, 1);
         while (!rel.empty() && rel.back() == '/') rel.pop_back();

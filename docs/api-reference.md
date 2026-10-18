@@ -1100,6 +1100,7 @@ Events of a handle you create in code (`img.onLoaded(&h)`) need that handle's li
 | `FileRequest.open(accept, multiple, &onOpened = h)` | File dialog (in a click or key handler); `h(Blob data, string name, string mime, int index, int count)` per file |
 | `Files.save(name, mime, bytes)` | Download |
 | `System.setTimeout(ms, &fired)` | One-shot timer; returns a `Timeout`, `timeout.clearTimeout()` cancels it. The handler runs an update right away |
+| `System.onPopstate(&h)`, `System.getPathname()` | Back/forward with the path arrived at, `h(string path)`; the current path. For a component on a `"/prefix/*"` route that keeps its own screens |
 | `canvas.toDataUrl(mime = "image/png", quality = 0.92)` | The canvas as a `data:` URL string; draw a thumbnail into a small offscreen canvas first |
 | `FetchRequest.request(method, url, headers, bytes, &onDone = h, &onError = e)` | Any method, binary body; `h(int status, Blob body)` for every response |
 | `Image.fromBlob(blob, mime, &onLoaded = h)` | Image from bytes; `img.free()` releases it |

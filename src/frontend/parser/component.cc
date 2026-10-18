@@ -199,6 +199,17 @@ std::unique_ptr<RouterDef> Parser::parse_router()
             }
             entry.path = current().value;
 
+            // "/app/*" matches /app and everything under it; the path kept is the prefix
+            if (entry.path.size() >= 2 && entry.path.compare(entry.path.size() - 2, 2, "/*") == 0)
+            {
+                entry.rest = true;
+                entry.path = entry.path.size() == 2 ? "/" : entry.path.substr(0, entry.path.size() - 2);
+            }
+            if (entry.path.find('*') != std::string::npos)
+            {
+                throw std::runtime_error("'*' in a route path only goes at the end, as \"/prefix/*\" (path '" + current().value + "' at line " + std::to_string(current().line) + ")");
+            }
+
             // Extract dynamic ':' segments (e.g. "/users/:id" -> param "id").
             // Names are bound to the target component by the type checker.
             size_t seg_start = 0;
@@ -520,8 +531,22 @@ void Parser::parse_app()
                 app_config.prerender = true;
             else if (current().type == TokenType::FALSE)
                 app_config.prerender = false;
+            else if (current().type == TokenType::LBRACKET)
+            {
+                // prerender = ["/app/note", ...]: the routes, plus these paths
+                app_config.prerender = true;
+                advance();
+                while (current().type != TokenType::RBRACKET)
+                {
+                    if (current().type != TokenType::STRING_LITERAL)
+                        ErrorHandler::compiler_error("app.prerender takes true, false or a list of paths like [\"/app/note\"]", current().line);
+                    app_config.prerender_paths.push_back(current().value);
+                    advance();
+                    if (current().type == TokenType::COMMA) advance();
+                }
+            }
             else
-                ErrorHandler::compiler_error("app.prerender must be true or false", current().line);
+                ErrorHandler::compiler_error("app.prerender must be true, false or a list of paths", current().line);
             advance();
         }
         else if (key == "head")

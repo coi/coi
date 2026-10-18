@@ -1,0 +1,17 @@
+// Test: "/app/*" matches /app and every path under it; the prefix is what gets prerendered
+component Front { view { <p>front</p> } }
+component App {
+    mut string here = "";
+    mount { System.onPopstate(&moved); }
+    def moved(string path) : void { here = path; }
+    def go() : void { System.navigate("/app/notes/1"); }
+    view { <div><button onclick={go}>go</button><p>{here}</p></div> }
+}
+component Site {
+    router {
+        "/" => Front;
+        "/app/*" => App;
+    }
+    view { <div><route /></div> }
+}
+app { root = Site; }

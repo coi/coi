@@ -292,8 +292,9 @@ void emit_feature_event_handlers(std::ostream &out, const FeatureFlags &f)
     }
     if (f.router)
     {
+        std::string pop_handlers = g_used_events.count("system::POPSTATE") ? " coi_events<webcc::system::PopstateEvent>.dispatch_all(*evt);" : "";
         out << "        } else if (e.opcode == webcc::system::PopstateEvent::OPCODE) {\n";
-        out << "            if (auto evt = e.as<webcc::system::PopstateEvent>()) { if (g_popstate_callback) g_popstate_callback(coi::string(evt->path)); }\n";
+        out << "            if (auto evt = e.as<webcc::system::PopstateEvent>()) { if (g_popstate_callback) g_popstate_callback(coi::string(evt->path));" << pop_handlers << " }\n";
     }
 }
 

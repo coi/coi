@@ -44,3 +44,4 @@ style_scope_last_compound|tests/integration/web/scenes/style_scope_last_compound
 dom_selection_click|tests/integration/web/scenes/dom_selection_click.coi|web
 events_burst|tests/integration/web/scenes/events_burst.coi|web
 autofocus_late|tests/integration/web/scenes/autofocus_late.coi|web
+router_rest_keep|tests/integration/web/scenes/router_rest_keep.coi|web

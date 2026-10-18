@@ -13,8 +13,10 @@ static void emit_event_dispatch(std::ostream &out, const FeatureFlags &features)
 {
     for (const auto &[key, ev] : g_used_events)
     {
-        // keyboard feature dispatches these itself
+        // keyboard feature dispatches these itself, the router popstate
         if (features.keyboard && (key == "input::KEY_DOWN" || key == "input::KEY_UP"))
+            continue;
+        if (features.router && key == "system::POPSTATE")
             continue;
         out << "        } else if (e.opcode == " << ev.struct_name << "::OPCODE) {\n";
         out << "            if (auto evt = e.as<" << ev.struct_name << ">()) {\n";
@@ -197,14 +199,16 @@ void generate_cpp_code(
         out << "    return n == p.length() ? p : coi::string(p.data(), n);\n";
         out << "}\n";
         out << "// Match `path` against `pattern`, capturing each ':' segment into caps[] in order.\n";
-        out << "// Literal segments must match exactly and the segment counts must agree.\n";
-        out << "inline bool match(const char* pp, uint32_t pl, const coi::string& path, coi::string* caps) {\n";
+        out << "// Literal segments must match exactly and the segment counts must agree, unless `rest`:\n";
+        out << "// then the path may go on below the pattern (\"/app/*\")\n";
+        out << "inline bool match(const char* pp, uint32_t pl, const coi::string& path, coi::string* caps, bool rest = false) {\n";
         out << "    const char* sp = path.data(); uint32_t sl = path.length();\n";
         out << "    uint32_t pi = 0, si = 0; int cap = 0;\n";
         out << "    while (true) {\n";
         out << "        while (pi < pl && pp[pi] == '/') pi++;\n";
         out << "        while (si < sl && sp[si] == '/') si++;\n";
         out << "        bool pend = pi >= pl, send = si >= sl;\n";
+        out << "        if (pend && rest) return true;\n";
         out << "        if (pend || send) return pend && send;\n";
         out << "        uint32_t ps = pi; while (pi < pl && pp[pi] != '/') pi++;\n";
         out << "        uint32_t ss = si; while (si < sl && sp[si] != '/') si++;\n";

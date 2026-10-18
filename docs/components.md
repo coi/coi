@@ -531,6 +531,32 @@ component NavBar {
 }
 ```
 
+### One component for many URLs
+
+Usually every screen is its own route component, and the router mounts and unmounts them. Sometimes one component must stay mounted while the URL changes under it, because it holds what the screens share: an editor with its open document and undo history, an app with a storage connection and a sidebar. A trailing `/*` gives such a component every path under a prefix, and it picks the screen from the path itself:
+
+```tsx
+router {
+    "/" => Landing;
+    "/app/*" => App;     // /app, /app/note/42, /app/trash...
+}
+```
+
+`App` is created once and stays while the URL moves around under `/app`: `System.navigate("/app/note/42")` from inside it changes the URL without remounting it, and back and forward reach it through `System.onPopstate`:
+
+```tsx
+component App {
+    mount {
+        System.onPopstate(&routed);   // back or forward landed on this path
+        routed(System.getPathname()); // a deep link on load
+    }
+    def routed(string path) : void { ... pick the screen from the path ... }
+    def openNote(string id) : void { ...; System.navigate(`/app/note/${id}`); }
+}
+```
+
+A route without parameters keeps its component whenever the same route matches again; a route with `:params` is rebuilt for new values. Only `/app` is prerendered for a `/app/*` route; a host (and the generated service worker, and `coi dev`) serves `app/index.html` for any path under it. A host that answers a deep link with the root page instead still works: a prerendered page served for a path outside its route keeps its markup hidden until the app has taken over, so the visitor sees a blank page rather than the wrong one for a moment.
+
 ### How It Works
 
 - Routes are defined in the `router {}` block with `"path" => Component;` syntax
@@ -551,6 +577,7 @@ component NavBar {
 | Navigate | `System.navigate("/path")` | Programmatically change route |
 | With props | `"/" => Page(&callback);` | Pass props to route component |
 | Dynamic param | `"/users/:id" => User;` | Capture a URL segment into `User`'s same-named param |
+| Rest | `"/app/*" => App;` | `/app` and everything under it, one component that stays mounted; `System.onPopstate(&h)` tells it about back/forward |
 
 ## Next Steps
 

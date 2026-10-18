@@ -93,13 +93,15 @@ class DevHandler(http.server.SimpleHTTPRequestHandler):
                 super().do_GET()
             return
         
-        # SPA fallback
-        self.path = '/index.html'
-        index_path = self.translate_path(self.path)
-        if os.path.isfile(index_path):
-            self.serve_html_with_reload(index_path)
-        else:
-            self.send_error(404)
+        # SPA fallback: the nearest prerendered ancestor page, like the service worker
+        # ("/app/note/x" is served by "/app/index.html", a "/app/*" route), else the root
+        parts = self.path.split('?')[0].rstrip('/').split('/')
+        for n in range(len(parts), 0, -1):
+            candidate = self.translate_path('/'.join(parts[:n]) + '/index.html')
+            if os.path.isfile(candidate):
+                self.serve_html_with_reload(candidate)
+                return
+        self.send_error(404)
 
     def serve_bytes(self, content, content_type):
         self.send_response(200)

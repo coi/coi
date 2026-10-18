@@ -41,13 +41,17 @@ void emit_component_router_methods(std::stringstream &ss, const Component &compo
     ss << "        _sync_route();\n";
     ss << "    }\n";
 
-    // _sync_route() method - destroys old component and creates the matching one
+    // _sync_route() method - creates the matching component, after destroying the one shown.
+    // A route without params that matches again (another path under "/app/*", or back/forward
+    // staying within it) keeps its component: it knows the path through System.onPopstate or its
+    // own navigate call
     ss << "    void _sync_route() {\n";
-    // First destroy any existing route component
+    ss << "        auto _drop = [&]() {\n";
     for (size_t i = 0; i < component.router->routes.size(); ++i)
     {
-        ss << "        if (_route_" << i << ") { _route_" << i << "->_destroy(); delete _route_" << i << "; _route_" << i << " = nullptr; }\n";
+        ss << "            if (_route_" << i << ") { _route_" << i << "->_destroy(); delete _route_" << i << "; _route_" << i << " = nullptr; }\n";
     }
+    ss << "        };\n";
 
     // Emit the target component's constructor arguments, filling each param from
     // either a captured path param (_rp_<i>_<k>) or an explicit route argument.
@@ -106,6 +110,9 @@ void emit_component_router_methods(std::stringstream &ss, const Component &compo
         // parentheses, as components are built everywhere else: `new X{...}` is aggregate
         // initialization, and clang rejects a member built as `Child(...)` inside it once
         // Child holds an array (a component's handles)
+        if (route.path_params.empty())
+            ss << indent << "if (_route_" << i << ") return;\n";
+        ss << indent << "_drop();\n";
         ss << indent << "_route_" << i << " = new " << qualified_name(route.module_name, route.component_name) << "(";
         emit_ctor_args(i, route);
         ss << ");\n";
@@ -122,7 +129,7 @@ void emit_component_router_methods(std::stringstream &ss, const Component &compo
         if (route.is_default)
             continue;
 
-        if (route.path_params.empty())
+        if (route.path_params.empty() && !route.rest)
         {
             // Static route: exact path comparison.
             ss << "        if (_current_route == \"" << route.path << "\") {\n";
@@ -135,8 +142,8 @@ void emit_component_router_methods(std::stringstream &ss, const Component &compo
             // A parse failure (e.g. "abc" for an int) leaves the route unmatched.
             size_t k = route.path_params.size();
             ss << "        {\n";
-            ss << "            coi::string _rc_" << i << "[" << k << "];\n";
-            ss << "            if (__coi_route::match(\"" << route.path << "\", " << route.path.size() << ", _current_route, _rc_" << i << ")) {\n";
+            ss << "            coi::string _rc_" << i << "[" << (k ? k : 1) << "];\n";
+            ss << "            if (__coi_route::match(\"" << route.path << "\", " << route.path.size() << ", _current_route, _rc_" << i << (route.rest ? ", true" : "") << ")) {\n";
             ss << "                bool _ok_" << i << " = true;\n";
             for (size_t p = 0; p < route.path_params.size(); ++p)
             {

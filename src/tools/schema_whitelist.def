@@ -155,6 +155,8 @@ is_online
 # page lifecycle, PAGE_HIDE is the last chance to save
 init_lifecycle +listen(PAGE_HIDE, PAGE_SHOW, ONLINE)
 init_visibility_change +listen(VISIBILITY_CHANGE)
+# back and forward, with the path arrived at; a "/app/*" route's component stays and hears it here
+init_popstate +listen(POPSTATE)
 log
 warn
 error

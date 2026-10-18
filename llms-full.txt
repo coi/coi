@@ -769,6 +769,10 @@ mut DOMElement el;
 def full() : void { el.requestFullscreen(); }   // also requestPointerLock(), scrollToTop()
 view { <video &={el} src="v.mp4"></video> }
 ```
+Router: `"/app/*" => App` matches /app and everything under it with ONE component that
+stays mounted while `System.navigate("/app/x")` moves within it; it hears back/forward via
+`System.onPopstate(&h)` (`h(string path)`) and reads a deep link with `System.getPathname()`.
+
 A handle is a value; one value means "no element" (what `closest`, `getSelectionAnchor`
 and a fresh `DOMElement` hold). It is not null and not a bool: check it with `el.exists()`,
 never `if (el)`. Editor helpers for a `contenteditable`: `el.closest(sel)`, `el.contains(o)`,

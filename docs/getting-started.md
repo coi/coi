@@ -254,7 +254,7 @@ app {
 | `pwa` | `true` / `false` | No | Generates a manifest and a service worker so the app can be installed and starts offline, see [Installable and offline](#installable-and-offline) |
 | `icon` | String | No | Path in the build output, e.g. `"assets/icon.png"`. Used as favicon and app icon |
 | `theme` | String | No | CSS color for the browser's UI (address bar, title bar of the installed app) |
-| `prerender` | `true` / `false` | No | Renders every static route to HTML at build time, see [Prerendering](#prerendering) |
+| `prerender` | `true` / `false` / `["/app/note"]` | No | Renders every static route to HTML at build time, plus the listed paths, see [Prerendering](#prerendering) |
 | `head` | String | No | A file (path from the project root) whose lines go into every page's `<head>`: analytics, a font, a small script |
 | `tick` | `always` / `demand` | No | `demand` runs `tick` only on requested frames, see [Frames on demand](components.md#frames-on-demand) |
 
@@ -265,6 +265,7 @@ app {
 - Every static route of the root's `router` is rendered (`"/"` without one): `"/"` into `index.html`, `"/about"` into `about/index.html`. Routes with parameters aren't.
 - Browser-only calls (storage, fetch, canvas) return nothing at build time; the app fills those parts in when it hydrates.
 - `coi dev` doesn't prerender.
+- A `"/app/*"` route gets one page, `app/index.html`, which a host serves for every path under it (the generated service worker and `coi dev` do). `prerender = ["/app/note"];` renders more pages under such a route: the app runs with that pathname, so it can render that screen's frame (an empty note) for `/app/note/<id>` links. A page served for a path outside its own route hides its markup until the app has taken over.
 
 A site with a start page in front of an app is two routes:
 

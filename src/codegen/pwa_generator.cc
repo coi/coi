@@ -213,8 +213,13 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
     const req = e.request;
     if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
-    // cache first for built files; a page: its own (prerendered) index.html, else the app's; rest to the network
-    const page = (c) => c.match(new URL(req.url).pathname.replace(/\/?$/, '/') + 'index.html').then((hit) => hit || c.match('./'));
+    // cache first for built files; a page: its own (prerendered) index.html, else the nearest
+    // ancestor's ("/app/note/x" is served by "/app/", a "/app/*" route), else the root; rest to the network
+    const page = async (c) => {
+        const parts = new URL(req.url).pathname.replace(/\/+$/, '').split('/');
+        for (let n = parts.length; n >= 1; n--) { const hit = await c.match(parts.slice(0, n).join('/') + '/index.html'); if (hit) return hit; }
+        return c.match('./');
+    };
     e.respondWith(caches.open(CACHE).then((c) => c.match(req).then((hit) => hit || (req.mode === 'navigate' ? page(c) : undefined))).then((hit) => hit || fetch(req)));
 });
 )JS";

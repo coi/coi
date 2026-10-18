@@ -1,5 +1,6 @@
 // app.prerender: every static route's first render is in the served HTML, and the loaded app
-// hydrates it: the same elements, now live, on every route
+// hydrates it: the same elements, now live, on every route. A "/docs/*" route gets one page for
+// /docs and, from the list, one for /docs/guide: the frame a host serves for /docs/guide/<x>
 pod Point { string name; }
 
 component Tile(string name) {
@@ -28,12 +29,20 @@ component Tool {
     view { <button class="count" onclick={inc}>{n}</button> }
 }
 
+// one component for every path under /docs; what it shows comes from the path
+component Docs {
+    mut string at = "";
+    mount { at = System.getPathname(); }
+    view { <p class="at">{at}</p> }
+}
+
 component PrerenderRoutes {
     router {
         "/" => Front;
         "/tool" => Tool;
+        "/docs/*" => Docs;
     }
     view { <div class="site"><route /></div> }
 }
 
-app { root = PrerenderRoutes; prerender = true; }
+app { root = PrerenderRoutes; prerender = ["/docs/guide"]; }

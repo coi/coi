@@ -1,0 +1,33 @@
+// "/app/*": one component for every path under /app. Moving between those paths keeps it (its
+// state stays), it hears back/forward through System.onPopstate, and leaving to "/" destroys it
+component Front { view { <p class="front">front</p> } }
+
+component App {
+    mut int clicks = 0;
+    mut string heard = "";
+    mount { System.onPopstate(&moved); }
+    def moved(string path) : void { heard = path; }
+    def bump() : void { clicks++; }
+    def toA() : void { System.navigate("/app/a"); }
+    def toB() : void { System.navigate("/app/b/deeper"); }
+    def home() : void { System.navigate("/"); }
+    view {
+        <div class="app">
+            <button class="bump" onclick={bump}>bump</button>
+            <button class="a" onclick={toA}>a</button>
+            <button class="b" onclick={toB}>b</button>
+            <button class="home" onclick={home}>home</button>
+            <p class="clicks">{clicks}</p>
+            <p class="heard">{heard}</p>
+        </div>
+    }
+}
+
+component Site {
+    router {
+        "/" => Front;
+        "/app/*" => App;
+    }
+    view { <div class="site"><route /></div> }
+}
+app { root = Site; }

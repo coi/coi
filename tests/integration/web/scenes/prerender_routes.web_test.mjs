@@ -7,6 +7,13 @@ export async function run({ page, expect }) {
   await expect.ok(html.includes(">offline</li>") && html.includes(">2026</p>"), "loop or method output not prerendered");
   const tool = await (await page.request.get(root + "tool/")).text();
   await expect.ok(tool.includes('<button class="count">0</button>'), "second route not prerendered");
+  // a "/docs/*" route: its prefix page, and the listed /docs/guide rendered with that path
+  const docs = await (await page.request.get(root + "docs/")).text();
+  await expect.ok(docs.includes('<p class="at">/docs</p>'), "the /docs/* route's prefix page not prerendered");
+  const guide = await (await page.request.get(root + "docs/guide/")).text();
+  await expect.ok(guide.includes('<p class="at">/docs/guide</p>'), "a listed prerender path not rendered with its own pathname");
+  // served for another path, a page keeps its markup hidden until the app takes over
+  await expect.ok(guide.includes('var r="/docs/guide"') && guide.includes("data-coi-other-route"), "no route guard in a prerendered page");
 
   // hydration: the elements that arrived as HTML are the ones the app runs on. The wasm is
   // held back until the page has been marked, then let through

@@ -1,0 +1,9 @@
+// Test: '*' only at the end of a route path
+component A { view { <p>a</p> } }
+component Site {
+    router {
+        "/*/x" => A;
+    }
+    view { <div><route /></div> }
+}
+app { root = Site; }

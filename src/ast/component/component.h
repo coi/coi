@@ -31,6 +31,7 @@ struct RouteEntry {
     std::vector<RouteParam> path_params;           // ':' segments in path order (names from parser, types from type checker)
     std::vector<RouteCtorSlot> ctor_order;         // How to fill the component constructor (built by type checker)
     bool is_default = false;                       // True for 'else' route (catch-all)
+    bool rest = false;                             // "/app/*": path is the prefix, anything under it matches
     int line = 0;
 };
 
@@ -106,6 +107,9 @@ struct AppConfig {
     std::string theme;
     // first render of every static route as HTML at build time; the app takes over on load
     bool prerender = false;
+    // more pages to render, under a "/prefix/*" route: "/app/note" is what a host serves for
+    // /app/note/<anything>, so the app renders that screen's frame for it
+    std::vector<std::string> prerender_paths;
     // a file whose lines go into every page's <head>, relative to the project root
     std::string head;
 };
