@@ -1,0 +1,23 @@
+// Test: integers convert to each other and to float with toInt/toInt64/toFloat
+component IntCasts {
+    mut string result = "";
+
+    def convert() : void {
+        int k = 3;
+        int64 wide = k.toInt64();
+        int64 big = 5000000000;
+        int narrow = (big % 1000).toInt();
+        uint8 b = 200;
+        int fromByte = b.toInt();
+        int64 byteWide = b.toInt64();
+        result = `${wide} ${narrow} ${fromByte} ${byteWide} ${big.toFloat()}`;
+    }
+
+    view {
+        <p onclick={convert}>{result}</p>
+    }
+}
+
+app {
+    root = IntCasts;
+}

@@ -1,0 +1,11 @@
+// Test: a method a number doesn't have is a type error, not a C++ member call
+component UnknownNumberMethodFail {
+    mut string result = "";
+    def go() : void {
+        int k = 3;
+        int64 w = k.toLong();
+        result = `${w}`;
+    }
+    view { <p onclick={go}>{result}</p> }
+}
+app { root = UnknownNumberMethodFail; }

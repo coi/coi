@@ -1431,6 +1431,24 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                     return method_def->return_type.empty() ? "void" : normalize_type(method_def->return_type);
                 }
             }
+            // a number or bool has only what its def declares; anything else would reach C++ as a member call
+            static const std::set<std::string> primitives = {"bool", "int8", "int16", "int32", "int64",
+                "uint8", "uint16", "uint32", "uint64", "float32", "float64"};
+            if (std::string pt = normalize_type(obj_type); primitives.count(pt))
+            {
+                std::set<std::string> names;
+                if (const TypeDef *td = DefSchema::instance().lookup_type(pt))
+                    for (const auto &m : td->methods)
+                        if (!m.is_shared)
+                            names.insert(m.name);
+                std::string list;
+                for (const auto &n : names)
+                    list += (list.empty() ? "" : ", ") + n;
+                ErrorHandler::type_error("'" + pt + "' has no method '" + method_name + "' with " +
+                                         std::to_string(func->args.size()) + " argument(s)" +
+                                         (list.empty() ? "" : " (available: " + list + ")"), func->line);
+                exit(1);
+            }
         }
 
         // handle.onEvent(&handler)

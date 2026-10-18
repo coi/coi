@@ -15,6 +15,12 @@ type int {
 // 8-bit signed integer (-128 to 127)
 @builtin
 type int8 {
+    @inline("coi::to_int(${this})")
+    def toInt(): int
+
+    @inline("(int64_t)(${this})")
+    def toInt64(): int64
+
     @inline("coi::to_float(${this})")
     def toFloat(): float
 
@@ -25,6 +31,12 @@ type int8 {
 // 16-bit signed integer (-32,768 to 32,767)
 @builtin
 type int16 {
+    @inline("coi::to_int(${this})")
+    def toInt(): int
+
+    @inline("(int64_t)(${this})")
+    def toInt64(): int64
+
     @inline("coi::to_float(${this})")
     def toFloat(): float
 
@@ -35,6 +47,12 @@ type int16 {
 // 32-bit signed integer (-2,147,483,648 to 2,147,483,647)
 @builtin
 type int32 {
+    @inline("coi::to_int(${this})")
+    def toInt(): int
+
+    @inline("(int64_t)(${this})")
+    def toInt64(): int64
+
     @inline("coi::to_float(${this})")
     def toFloat(): float
 
@@ -45,6 +63,12 @@ type int32 {
 // 64-bit signed integer
 @builtin
 type int64 {
+    @inline("coi::to_int(${this})")
+    def toInt(): int
+
+    @inline("(int64_t)(${this})")
+    def toInt64(): int64
+
     @inline("coi::to_float(${this})")
     def toFloat(): float
 
@@ -55,6 +79,12 @@ type int64 {
 // 8-bit unsigned integer (0 to 255)
 @builtin
 type uint8 {
+    @inline("coi::to_int(${this})")
+    def toInt(): int
+
+    @inline("(int64_t)(${this})")
+    def toInt64(): int64
+
     @inline("coi::to_float(${this})")
     def toFloat(): float
 
@@ -65,6 +95,12 @@ type uint8 {
 // 16-bit unsigned integer (0 to 65,535)
 @builtin
 type uint16 {
+    @inline("coi::to_int(${this})")
+    def toInt(): int
+
+    @inline("(int64_t)(${this})")
+    def toInt64(): int64
+
     @inline("coi::to_float(${this})")
     def toFloat(): float
 
@@ -75,6 +111,12 @@ type uint16 {
 // 32-bit unsigned integer (0 to 4,294,967,295)
 @builtin
 type uint32 {
+    @inline("coi::to_int(${this})")
+    def toInt(): int
+
+    @inline("(int64_t)(${this})")
+    def toInt64(): int64
+
     @inline("coi::to_float(${this})")
     def toFloat(): float
 
@@ -85,6 +127,12 @@ type uint32 {
 // 64-bit unsigned integer
 @builtin
 type uint64 {
+    @inline("coi::to_int(${this})")
+    def toInt(): int
+
+    @inline("(int64_t)(${this})")
+    def toInt64(): int64
+
     @inline("coi::to_float(${this})")
     def toFloat(): float
 
