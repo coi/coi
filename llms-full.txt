@@ -769,6 +769,12 @@ mut DOMElement el;
 def full() : void { el.requestFullscreen(); }   // also requestPointerLock(), scrollToTop()
 view { <video &={el} src="v.mp4"></video> }
 ```
+A handle is a value; one value means "no element" (what `closest`, `getSelectionAnchor`
+and a fresh `DOMElement` hold). It is not null and not a bool: check it with `el.exists()`,
+never `if (el)`. Editor helpers for a `contenteditable`: `el.closest(sel)`, `el.contains(o)`,
+`el.addClass/removeClass`, `el.getAttribute/getProperty`, `el.focusEnd()`,
+`DOMElement.getSelectionAnchor()`, `Dom.getSelectionText()`, `Dom.execCommand(name, value)`,
+and the view attribute `onclicktarget={h}` with `h(DOMElement target, float x, float y, Mods m)`.
 
 ### FetchRequest (HTTP; callback-based, no promises)
 ```coi
@@ -999,7 +1005,7 @@ app { root = Bouncer; }
 - Reading component state from a top-level function. It only sees its params and locals.
 - Omitting the return type. Always write `: void` (or the real type) after the params.
 - Using `null`/`undefined`. There is none. Use defaults ("", 0, false) and `.isEmpty()`;
-  `Storage.getItem` returns `""` when missing.
+  `Storage.getItem` returns `""` when missing; a `DOMElement` that may be nothing: `.exists()`.
 - Constructing with `new`, or mixing braces/parens: pods use `Pod{...}`, components use
   `Component(...)` (code) or `<Component ... />` (view).
 - Enum access with a dot: it is `Enum::Value` (cross-component shared enum: `Comp.Enum::Value`).

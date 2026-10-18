@@ -7,11 +7,11 @@ component HandleMethodOnCall {
     def pick(string s) : DOMElement { return box.closest(s); }
 
     def go() : void {
-        if (box.closest("div").isValid()) r = "a";
-        if (pick("p").isValid()) r = "b";
-        bool ok = box.closest("div").isValid();
-        r = ok ? "c" : (pick("p").isValid() ? "d" : "e");
-        r = `${box.closest("p").isValid() ? "f" : "g"}`;
+        if (box.closest("div").exists()) r = "a";
+        if (pick("p").exists()) r = "b";
+        bool ok = box.closest("div").exists();
+        r = ok ? "c" : (pick("p").exists() ? "d" : "e");
+        r = `${box.closest("p").exists() ? "f" : "g"}`;
     }
 
     view { <p &={box} onclick={go}>{r}</p> }

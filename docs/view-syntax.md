@@ -155,7 +155,9 @@ component KeyboardInput {
 | `onchange` | `def handler(string value) : void` | Input lost focus after change |
 | `onkeydown` | `def handler(int keycode) : void` | Key pressed |
 
-### Pointer, wheel, resize, focus and drop
+An input with `autofocus="true"` takes focus when it appears, also later on, inside an `<if>` or a new row of a loop. (The browser alone honors the attribute once per page; Coi focuses the element itself when it is created.)
+
+### Pointer, wheel, resize, focus, click target and drop
 
 These come from the platform's events, so their handlers work like [events on handles](api-reference.md#events-on-handles): a handler takes the event's pod, its leading fields, or nothing.
 
@@ -182,6 +184,7 @@ component Sketch {
 | `onresize` | `ResizeEvent` | Once when the element appears, then on every size or pixel-ratio change |
 | `onscroll` | `ScrollEvent` | The element's `left` and `top` scroll offsets, at most once per frame; scrolling itself is never delayed |
 | `onfocus`, `onblur` | nothing | |
+| `onclicktarget` | `(DOMElement target, float x, float y, Mods mods)` | Any click inside the element, with the element actually clicked (a line of an editor, a link), where on it in its own px, and the modifier keys. For a plain button use `onclick` |
 | `ondrop` | `(Blob data, string name, string mime, float x, float y, int index, int count)` | One call per dropped file. No pod, since `Blob` is a handle |
 
 **Pointer flags.** By default the pointer is captured, so `onpointerup` arrives even when it's released outside the element. A drawing surface wants more, and sets `pointerflags`:

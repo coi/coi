@@ -199,8 +199,8 @@ vertex_attrib_pointer
 draw_arrays
 
 [DOMElement]
-// false for the "none" handle, from getSelectionAnchor or closest when nothing matches
-@inline("${this}.is_valid()") def isValid(): bool
+// false for the "no element" handle, as getSelectionAnchor or closest return when nothing matches
+@inline("(${this}).is_valid()") def exists(): bool
 
 [Canvas]
 // 2D context, lowLatency cuts pen lag, opaque skips alpha

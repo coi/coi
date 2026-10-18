@@ -483,7 +483,7 @@ Reference handle for browser APIs and measurements.
 
 `DOMElement` is used as a **reference handle** to interact with browser APIs that cannot be expressed declaratively in the view. Use the `&={element}` binding to capture a reference to an element.
 
-> **Note:** Direct DOM manipulation methods (`.appendChild()`, `.setInnerHtml()`, `.addClass()`, etc.) have been removed. Define your UI structure declaratively in the `view {}` block instead. For rendering HTML strings, use the `<raw>` element (see [View Syntax](view-syntax.md#raw-html)). See [CHANGES.md](../CHANGES.md#direct-dom-manipulation--declarative-view) for migration details.
+> **Note:** Structure is declared in the `view {}` block, not built by hand: there is no `appendChild` or `createElement`. The methods below exist for what a view can't say, mostly a rich-text editor (a `contenteditable`), whose content the browser edits and the page then reads back. For rendering HTML strings, use the `<raw>` element (see [View Syntax](view-syntax.md#raw-html)). See [CHANGES.md](../CHANGES.md#direct-dom-manipulation--declarative-view) for migration details.
 
 ### Methods
 
@@ -492,6 +492,32 @@ Reference handle for browser APIs and measurements.
 | `requestFullscreen()` | Enter fullscreen mode |
 | `requestPointerLock()` | Request pointer lock |
 | `scrollToTop()` | Scroll element to top |
+| `exists()` | `false` for the "no element" handle (see below) |
+| `closest(selector)` | The element or its nearest ancestor matching the selector; the "no element" handle when none |
+| `contains(other)` | `1` when `other` is the element or inside it |
+| `getAttribute(name)`, `getProperty(name)`, `setProperty(name, value)`, `setStyle(name, value)` | Read and write an element |
+| `addClass(cls)`, `removeClass(cls)` | Toggle a class on an element the page made itself (typed into an editor, set by `setInnerHtml`) |
+| `focus(preventScroll = 0)`, `blur()`, `focusEnd()` | Keyboard focus; `focusEnd` puts the caret at the end of an editable element's content |
+| `DOMElement.getSelectionAnchor()` | The element holding the caret (or where the selection starts); the "no element" handle when nothing is selected |
+| `Dom.getSelectionText()` | The selected text, `""` for a caret |
+| `Dom.execCommand(name, value)` | An editing command on the focused editable element: `"bold"`, `"insertText"`, `"indent"`, `"formatBlock"`... |
+
+### The "no element" handle
+
+A `DOMElement` is a value, not a reference: it names an element in the page, and there is one value that names none. Lookups that can miss (`closest`, `getSelectionAnchor`, `DOMElement.getElementById`) return it, and a freshly declared `DOMElement` holds it. There is no null in Coi; this is an ordinary value like `""` or `[]`, and calling a method on it does nothing (webcc logs a warning). `exists()` tells the two apart. As with every condition in Coi, that check is explicit: a handle is not a `bool`, so `if (el)` is an error and `if (el.exists())` is how it is written.
+
+```tsx
+// the list item under the caret, if the caret is in this editor
+def caretItem() : DOMElement {
+    DOMElement at = DOMElement.getSelectionAnchor();
+    if (!at.exists() || box.contains(at) == 0) { DOMElement none; return none; }
+    return at.closest("li");
+}
+
+def tab() : void {
+    if (caretItem().exists()) Dom.execCommand("indent", "");
+}
+```
 
 ### Example
 
