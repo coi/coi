@@ -41,6 +41,7 @@ add_click_target_listener +listen(CLICK_TARGET)
 add_class
 remove_class
 get_attribute
+set_attribute
 
 [canvas]
 create_canvas
