@@ -1,0 +1,8 @@
+// Test: a method can't take a lifecycle block's name
+component App {
+    mut int n = 0;
+    def tick(int i) : void { n = i; }
+    view { <p>{n}</p> }
+}
+
+app { root = App; }

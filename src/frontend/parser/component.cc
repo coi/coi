@@ -1045,7 +1045,13 @@ Component Parser::parse_component()
         // Function definition (with optional pub prefix)
         else if (current().type == TokenType::DEF)
         {
-            comp.methods.push_back(parse_function_def(is_public));
+            int line = current().line;
+            FunctionDef func = parse_function_def(is_public);
+            // the lifecycle blocks are methods by these names in the generated code
+            if (func.name == "tick" || func.name == "init" || func.name == "mount")
+                ErrorHandler::compiler_error("A method can't be called '" + func.name + "': that's the " + func.name +
+                                             " block. Write '" + func.name + " { }' for the block, or pick another name", line);
+            comp.methods.push_back(std::move(func));
         }
         // Init block
         else if (current().type == TokenType::INIT)
