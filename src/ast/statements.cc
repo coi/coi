@@ -71,23 +71,11 @@ std::string VarDeclaration::to_webcc()
             // Propagate element type to anonymous struct literals
             arr_lit->propagate_element_type(elem_type);
             
-            // Optimization: If immutable and initialized with literal, use fixed-size array
-            // No need for dynamic allocation if we know the size at compile time and can't modify
-            if (!is_mutable)
-            {
-                size_t count = arr_lit->elements.size();
-                std::string arr_type = "coi::array<" + convert_type(elem_type) + ", " + std::to_string(count) + ">";
-                std::string result = "const " + arr_type;
-                if (is_reference)
-                    result += "&";
-                result += " " + cpp_name(name) + " = " + arr_lit->to_webcc() + ";";
-                return result;
-            }
-            
-            // Mutable dynamic array - use vector with brace init (variadic constructor)
+            // T[] is a vector even when it can't change: as a fixed array it couldn't go where a
+            // T[] is expected (a pod field, an argument, a return value). T[N] is the fixed one
             std::string vec_type = "coi::vector<" + convert_type(elem_type) + ">";
 
-            std::string result = vec_type;
+            std::string result = (is_mutable ? "" : "const ") + vec_type;
             if (is_reference)
                 result += "&";
             result += " " + cpp_name(name) + " = " + arr_lit->to_webcc() + ";";

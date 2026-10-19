@@ -1,0 +1,24 @@
+// Test: a T[] local that isn't mut still goes where a T[] is expected
+pod Item { int id; string name; }
+pod Box { Item[] items; string[] tags; }
+
+def make() : Box {
+    Item[] items = [Item{id = 1, name = "a"}, Item{id = 2, name = "b"}];
+    string[] tags = ["x", "y"];
+    return Box{items = items, tags = tags};
+}
+
+def count(string[] xs) : int { return xs.size(); }
+def names() : string[] { string[] n = ["p", "q"]; return n; }
+
+component App {
+    mut int n = 0;
+    init {
+        Box b = make();
+        string[] local = ["k"];
+        n = b.items.size() + count(local) + names().size();
+    }
+    view { <p>{n}</p> }
+}
+
+app { root = App; }
