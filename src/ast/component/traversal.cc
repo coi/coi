@@ -30,7 +30,8 @@ void Component::collect_child_components(ASTNode *node, std::map<std::string, in
     }
 }
 
-void Component::collect_child_updates(ASTNode *node, std::map<std::string, std::vector<std::string>> &updates, std::map<std::string, int> &counters)
+void Component::collect_child_updates(ASTNode *node, std::map<std::string, std::vector<std::string>> &updates, std::map<std::string, int> &counters,
+                                      std::map<MemberDependency, std::vector<std::string>> *member_updates)
 {
     if (auto comp = dynamic_cast<ComponentInstantiation *>(node))
     {
@@ -52,9 +53,17 @@ void Component::collect_child_updates(ASTNode *node, std::map<std::string, std::
             prop.value->collect_dependencies(deps);
             // a reference already points at the parent's value; a value prop is copied again
             std::string assign = prop.is_reference ? "" : instance_name + "." + cpp_name(prop.name) + " = " + prop.value->to_webcc() + "; ";
+            std::string call = "        " + assign + instance_name + "._refresh_" + prop.name + "();\n";
             for (const auto &dep : deps)
             {
-                updates[dep].push_back("        " + assign + instance_name + "._refresh_" + prop.name + "();\n");
+                updates[dep].push_back(call);
+            }
+            if (member_updates)
+            {
+                std::set<MemberDependency> member_deps;
+                prop.value->collect_member_dependencies(member_deps);
+                for (const auto &dep : member_deps)
+                    (*member_updates)[dep].push_back(call);
             }
         }
     }
@@ -62,18 +71,18 @@ void Component::collect_child_updates(ASTNode *node, std::map<std::string, std::
     {
         for (auto &child : el->children)
         {
-            collect_child_updates(child.get(), updates, counters);
+            collect_child_updates(child.get(), updates, counters, member_updates);
         }
     }
     if (auto viewIf = dynamic_cast<ViewIfStatement *>(node))
     {
         for (auto &child : viewIf->then_children)
         {
-            collect_child_updates(child.get(), updates, counters);
+            collect_child_updates(child.get(), updates, counters, member_updates);
         }
         for (auto &child : viewIf->else_children)
         {
-            collect_child_updates(child.get(), updates, counters);
+            collect_child_updates(child.get(), updates, counters, member_updates);
         }
     }
 }

@@ -1,0 +1,37 @@
+// a pub member two levels down, changed down there, read by the top view inside a ternary,
+// as a prop of another component and as a select's value: all of them follow it
+component Leaf {
+    pub mut string font = "a";
+    pub mut int editing = 0;
+    def edit() : void { editing = 1; }
+    def change() : void { font = "c"; }
+    view { <div><button class="edit" onclick={edit}>edit</button><button class="change" onclick={change}>change</button></div> }
+}
+
+component Mid {
+    pub mut Leaf leaf;
+    view { <div><{leaf} /></div> }
+}
+
+component Show(string value) {
+    view { <p class="shown">{value}</p> }
+}
+
+component App {
+    mut Mid mid;
+    mut string fallback = "z";
+    def on() : bool { return mid.leaf.editing > 0; }
+    view {
+        <div>
+            <p class="plain">{mid.leaf.font}</p>
+            <p class="tern">{on() ? mid.leaf.font : fallback}</p>
+            <Show value={on() ? mid.leaf.font : fallback} />
+            <select class="sel" value={on() ? mid.leaf.font : fallback}>
+                <option value="a">a</option><option value="c">c</option><option value="z">z</option>
+            </select>
+            <{mid} />
+        </div>
+    }
+}
+
+app { root = App; }

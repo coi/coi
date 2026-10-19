@@ -117,6 +117,35 @@ static bool prerender_pages(const AppConfig &config, const std::vector<Component
     return true;
 }
 
+// pages an earlier build prerendered (x/index.html with a data-hydrate root): a dev build doesn't
+// hydrate, and a route may be gone, so they'd be served stale with the live app below them
+static void remove_prerendered_pages(const fs::path &out_dir)
+{
+    std::error_code ec;
+    if (!fs::exists(out_dir, ec))
+        return;
+    std::vector<fs::path> stale;
+    for (auto it = fs::recursive_directory_iterator(out_dir, ec); it != fs::recursive_directory_iterator(); it.increment(ec))
+    {
+        if (ec)
+            break;
+        const fs::path &f = it->path();
+        if (f.filename() != "index.html" || f.parent_path() == out_dir)
+            continue;
+        std::ifstream in(f);
+        std::string html((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        if (html.find(" data-hydrate") != std::string::npos)
+            stale.push_back(f);
+    }
+    for (const auto &f : stale)
+    {
+        fs::remove(f, ec);
+        // the route's folder goes too once nothing else is in it
+        for (fs::path d = f.parent_path(); d != out_dir && fs::is_empty(d, ec); d = d.parent_path())
+            fs::remove(d, ec);
+    }
+}
+
 int main(int argc, char **argv)
 {
     if (argc < 2)
@@ -806,6 +835,7 @@ int main(int argc, char **argv)
                 std::cerr << "Error: webcc compilation failed." << std::endl;
                 return 1;
             }
+            remove_prerendered_pages(abs_output_dir);
             if (final_app_config.prerender && !prerender_pages(final_app_config, all_components, abs_output_cc, abs_output_dir, cache_dir))
                 return 1;
             // Clean up intermediate files from cache (keep webcc cache for faster rebuilds)

@@ -1015,6 +1015,25 @@ std::string Component::to_webcc(CompilerSession &session)
         }
     }
 
+    // a child component's prop that reads a.b (or a.b.c): one method per a.b sends the props
+    // again, called from a.onBChange like the element bindings above
+    {
+        std::map<std::string, std::vector<std::string>> by_var;
+        std::map<std::string, int> counters;
+        std::map<MemberDependency, std::vector<std::string>> prop_updates;
+        for (auto &root : render_roots)
+            collect_child_updates(root.get(), by_var, counters, &prop_updates);
+        for (const auto &[mem_dep, calls] : prop_updates)
+        {
+            std::string method_name = "_update_props_" + mem_dep.object + "_" + mem_dep.member;
+            ss << "    void " << method_name << "() {\n";
+            for (const auto &call : calls)
+                ss << call;
+            ss << "    }\n";
+            member_dep_update_methods[mem_dep].insert(method_name);
+        }
+    }
+
     // Generate shared element+attribute update methods first
     for (const auto &[key, binding] : element_attr_bindings)
     {

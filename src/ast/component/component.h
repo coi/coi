@@ -83,7 +83,9 @@ struct Component : ASTNode {
     std::unique_ptr<RouterDef> router;  // Optional router block
 
     void collect_child_components(ASTNode* node, std::map<std::string, int>& counts);
-    void collect_child_updates(ASTNode* node, std::map<std::string, std::vector<std::string>>& updates, std::map<std::string, int>& counters);
+    // member_updates: the same prop updates keyed by the a.b a prop reads (a child's pub member)
+    void collect_child_updates(ASTNode* node, std::map<std::string, std::vector<std::string>>& updates, std::map<std::string, int>& counters,
+                               std::map<MemberDependency, std::vector<std::string>>* member_updates = nullptr);
     std::string to_webcc() override { static CompilerSession s; return to_webcc(s); }
     std::string to_webcc(CompilerSession& session);
 };
