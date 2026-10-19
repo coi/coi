@@ -1,0 +1,11 @@
+// Test: a soft keyword (key, style, view, ...) as a loop variable
+component App {
+    mut string s = "";
+    init {
+        for key in ["a", "b"] { s += key; }
+        for view in 0:2 { s += `${view}`; }
+    }
+    view { <p>{s}</p> }
+}
+
+app { root = App; }

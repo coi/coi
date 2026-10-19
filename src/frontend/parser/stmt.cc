@@ -66,7 +66,7 @@ std::unique_ptr<Statement> Parser::parse_statement()
         advance();
 
         // Check for range-based or foreach syntax: for i in start:end { } OR for e in array { }
-        if (current().type == TokenType::IDENTIFIER && peek().type == TokenType::IN)
+        if (is_identifier_token() && peek().type == TokenType::IN)
         {
             std::string var_name = current().value;
             advance(); // skip identifier
@@ -98,7 +98,7 @@ std::unique_ptr<Statement> Parser::parse_statement()
             return forEach;
         }
 
-        ErrorHandler::compiler_error("Unexpected token after 'for'. Expected range 'i in start:end' or foreach 'i in array'. C-style for loops are not supported.", -1);
+        ErrorHandler::compiler_error("Unexpected token after 'for'. Expected range 'i in start:end' or foreach 'i in array'. C-style for loops are not supported.", current().line);
     }
 
     // Return
