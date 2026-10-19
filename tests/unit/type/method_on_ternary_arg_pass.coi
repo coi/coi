@@ -1,0 +1,13 @@
+// Test: a method on a ternary's result is typed when the call is an argument to an own method
+component MethodOnTernaryArg {
+    mut DOMElement a;
+    mut DOMElement b;
+    mut string r = "";
+    def shout(string s) : string { return s.toUpper(); }
+    def go() : void {
+        r = shout((a.exists() ? a : b).getProperty("innerText"));
+        r = shout((r.isEmpty() ? "x" : r).trim());
+    }
+    view { <div><p &={a} onclick={go}>{r}</p><p &={b}></p></div> }
+}
+app { root = MethodOnTernaryArg; }

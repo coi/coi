@@ -1481,12 +1481,17 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
             }
         }
 
-        // own method wins over a platform function
+        // own method wins over a platform function; its arguments are typed like any other
+        // expression (a method call inside one needs its receiver's type for codegen)
         if (obj_name.empty() && g_ctx_component)
         {
             for (const auto &m : g_ctx_component->methods)
                 if (m.name == method_name)
+                {
+                    for (auto &a : func->args)
+                        infer_expression_type(a.value.get(), scope);
                     return m.return_type.empty() ? "void" : normalize_type(m.return_type);
+                }
         }
 
         // Clipboard.onPasteText(&h)
