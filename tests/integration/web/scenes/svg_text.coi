@@ -1,0 +1,15 @@
+// text inside an svg <text>, static and bound, shows up (svg elements have no innerText)
+component App {
+    mut int n = 1;
+    def bump() : void { n++; }
+    view {
+        <div>
+            <svg viewBox="0 0 200 60" width="200" height="60">
+                <text class="fixed" x="4" y="20">label</text>
+                <text class="bound" x="4" y="50">count {n}</text>
+            </svg>
+            <button class="bump" onclick={bump}>bump</button>
+        </div>
+    }
+}
+app { root = App; }
