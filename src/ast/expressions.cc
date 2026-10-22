@@ -915,9 +915,16 @@ bool TernaryOp::is_static() {
 }
 
 std::string ArrayLiteral::to_webcc() {
+    // [[1.0, 2.0], ...]: an inner brace list names its vector type, a bare one can't be deduced
+    std::string inner = element_type.size() > 2 && element_type.ends_with("[]") ? element_type.substr(0, element_type.size() - 2) : "";
     std::string code = "{";
     for (size_t i = 0; i < elements.size(); ++i) {
         if (i > 0) code += ", ";
+        auto *nested = dynamic_cast<ArrayLiteral *>(elements[i].get());
+        if (nested && !inner.empty()) {
+            if (nested->element_type.empty()) nested->element_type = inner;
+            code += "coi::vector<" + convert_type(inner) + ">";
+        }
         code += elements[i]->to_webcc();
     }
     code += "}";

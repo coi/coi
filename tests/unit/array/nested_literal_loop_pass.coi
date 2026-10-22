@@ -1,0 +1,11 @@
+// Test: looping over a literal of literals
+component App {
+    mut float sum = 0.0;
+    init {
+        for d in [[1.0, 2.0], [3.0, 4.0]] { sum += d[0] * d[1]; }
+        for w in [["a", "b"], ["c"]] { sum += w.size().toFloat(); }
+    }
+    view { <p>{sum}</p> }
+}
+
+app { root = App; }
