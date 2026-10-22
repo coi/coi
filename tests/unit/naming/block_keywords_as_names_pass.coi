@@ -1,5 +1,7 @@
 // Test: style, view, mount, tick and init are only keywords at the start of a component
-// member, so they can name variables, parameters and fields
+// member, so they can name variables, parameters and fields, with built-in or own types
+
+pod Spot { int x; int view; }
 
 component Card(string style, int view = 0) {
     mut string mount = "top";
@@ -13,12 +15,21 @@ component Card(string style, int view = 0) {
         return view;
     }
 
+    def spots() : int {
+        mut Spot tick = Spot{x = 1, view = 0};
+        tick.view = 2;
+        mut Spot[] key = [tick];
+        key[0].x = 3;
+        Spot& init = key[0];
+        return tick.x + tick.view + init.x + key.size();
+    }
+
     style {
         .card { padding: 4px; }
     }
 
     view {
-        <div class="card">{describe(style)} {view} {tick}</div>
+        <div class="card">{describe(style)} {view} {tick} {spots()}</div>
     }
 }
 

@@ -171,7 +171,7 @@ std::unique_ptr<Statement> Parser::parse_statement()
         // Call:        Name(...)
 
         Token next = peek(1);
-        if (next.type == TokenType::IDENTIFIER)
+        if (is_name_token(next.type))
         {
             is_type = true; // "Type Name"
         }
@@ -200,7 +200,7 @@ std::unique_ptr<Statement> Parser::parse_statement()
             }
             
             // Check if followed by identifier (the variable name)
-            if (saved_pos < tokens.size() && tokens[saved_pos].type == TokenType::IDENTIFIER)
+            if (saved_pos < tokens.size() && is_name_token(tokens[saved_pos].type))
             {
                 is_type = true; // Type<...> Name
             }
@@ -211,24 +211,24 @@ std::unique_ptr<Statement> Parser::parse_statement()
             if (peek(2).type == TokenType::IDENTIFIER)
             {
                 TokenType a = peek(3).type;
-                if (a == TokenType::IDENTIFIER)
+                if (is_name_token(a))
                     is_type = true; // Module::Type Name
-                else if (a == TokenType::AMPERSAND && peek(4).type == TokenType::IDENTIFIER)
+                else if (a == TokenType::AMPERSAND && is_name_token(peek(4).type))
                     is_type = true; // Module::Type& Name
-                else if (a == TokenType::LBRACKET && peek(4).type == TokenType::RBRACKET && peek(5).type == TokenType::IDENTIFIER)
+                else if (a == TokenType::LBRACKET && peek(4).type == TokenType::RBRACKET && is_name_token(peek(5).type))
                     is_type = true; // Module::Type[] Name
-                else if (a == TokenType::LBRACKET && peek(4).type == TokenType::INT_LITERAL && peek(5).type == TokenType::RBRACKET && peek(6).type == TokenType::IDENTIFIER)
+                else if (a == TokenType::LBRACKET && peek(4).type == TokenType::INT_LITERAL && peek(5).type == TokenType::RBRACKET && is_name_token(peek(6).type))
                     is_type = true; // Module::Type[N] Name
             }
         }
         else if (next.type == TokenType::LBRACKET)
         {
             // Check for "Type[] Name" (dynamic) or "Type[N] Name" (fixed-size)
-            if (peek(2).type == TokenType::RBRACKET && peek(3).type == TokenType::IDENTIFIER)
+            if (peek(2).type == TokenType::RBRACKET && is_name_token(peek(3).type))
             {
                 is_type = true; // Type[] Name
             }
-            else if (peek(2).type == TokenType::INT_LITERAL && peek(3).type == TokenType::RBRACKET && peek(4).type == TokenType::IDENTIFIER)
+            else if (peek(2).type == TokenType::INT_LITERAL && peek(3).type == TokenType::RBRACKET && is_name_token(peek(4).type))
             {
                 is_type = true; // Type[N] Name
             }
@@ -431,7 +431,7 @@ std::unique_ptr<Statement> Parser::parse_statement()
 
     // Assignment to array element: arr[i] = value or arr[i] += value etc.
     // Also handles arr[i].member = value (member assignment on array element)
-    if (current().type == TokenType::IDENTIFIER && peek().type == TokenType::LBRACKET)
+    if (is_identifier_token() && peek().type == TokenType::LBRACKET)
     {
         // Could be an index assignment or an expression statement with index access
         // Need to look ahead to see if there's an assignment operator after the bracket
@@ -474,7 +474,7 @@ std::unique_ptr<Statement> Parser::parse_statement()
             while (current().type == TokenType::DOT)
             {
                 advance(); // skip '.'
-                if (current().type != TokenType::IDENTIFIER)
+                if (!is_identifier_token())
                     break;
                 advance(); // skip member name
             }
@@ -555,7 +555,7 @@ std::unique_ptr<Statement> Parser::parse_statement()
             // Now parse the member chain
             expect(TokenType::DOT, "Expected '.'");
             std::string last_member = current().value;
-            expect(TokenType::IDENTIFIER, "Expected member name");
+            expect_name("Expected member name");
 
             // Handle chained member access (arr[i].a.b = value)
             while (current().type == TokenType::DOT)
@@ -563,7 +563,7 @@ std::unique_ptr<Statement> Parser::parse_statement()
                 advance(); // skip '.'
                 obj_expr = std::make_unique<MemberAccess>(std::move(obj_expr), last_member);
                 last_member = current().value;
-                expect(TokenType::IDENTIFIER, "Expected member name");
+                expect_name("Expected member name");
             }
 
             TokenType opType = current().type;
@@ -603,7 +603,7 @@ std::unique_ptr<Statement> Parser::parse_statement()
 
     // Member assignment: obj.member = value or obj.a.b = value
     // Also handles: obj.member[index] = value (map/array index on member)
-    if (current().type == TokenType::IDENTIFIER && peek().type == TokenType::DOT)
+    if (is_identifier_token() && peek().type == TokenType::DOT)
     {
         // Look ahead to find if this is a member assignment
         size_t saved_pos = pos;
@@ -613,7 +613,7 @@ std::unique_ptr<Statement> Parser::parse_statement()
         while (current().type == TokenType::DOT)
         {
             advance(); // skip '.'
-            if (current().type != TokenType::IDENTIFIER)
+            if (!is_identifier_token())
                 break;
             advance(); // skip member name
         }
@@ -661,7 +661,7 @@ std::unique_ptr<Statement> Parser::parse_statement()
             advance(); // skip first '.'
 
             std::string member = current().value;
-            expect(TokenType::IDENTIFIER, "Expected member name");
+            expect_name("Expected member name");
 
             // Handle chained member access
             while (current().type == TokenType::DOT)
@@ -669,7 +669,7 @@ std::unique_ptr<Statement> Parser::parse_statement()
                 advance(); // skip '.'
                 obj_expr = std::make_unique<MemberAccess>(std::move(obj_expr), member);
                 member = current().value;
-                expect(TokenType::IDENTIFIER, "Expected member name");
+                expect_name("Expected member name");
             }
 
             // Build full member access expression
@@ -722,7 +722,7 @@ std::unique_ptr<Statement> Parser::parse_statement()
             advance(); // skip first '.'
 
             std::string last_member = current().value;
-            expect(TokenType::IDENTIFIER, "Expected member name");
+            expect_name("Expected member name");
 
             // Handle chained member access (a.b.c = value means object is a.b, member is c)
             while (current().type == TokenType::DOT)
@@ -731,7 +731,7 @@ std::unique_ptr<Statement> Parser::parse_statement()
                 // Previous member becomes part of the object
                 obj_expr = std::make_unique<MemberAccess>(std::move(obj_expr), last_member);
                 last_member = current().value;
-                expect(TokenType::IDENTIFIER, "Expected member name");
+                expect_name("Expected member name");
             }
 
             TokenType opType = current().type;

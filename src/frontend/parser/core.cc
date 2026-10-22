@@ -63,6 +63,15 @@ void Parser::expect(TokenType type, const std::string &msg)
     }
 }
 
+// a name, soft keywords included
+void Parser::expect_name(const std::string &msg)
+{
+    if (is_identifier_token())
+        advance();
+    else
+        ErrorHandler::compiler_error(msg, current().line);
+}
+
 // Check if current token is a type keyword (INT, STRING, FLOAT, etc.) or identifier
 bool Parser::is_type_token()
 {
@@ -76,8 +85,11 @@ bool Parser::is_type_token()
 // Check if current token can be used as an identifier (including keywords that are allowed as names)
 bool Parser::is_identifier_token()
 {
-    TokenType t = current().type;
+    return is_name_token(current().type);
+}
 
+bool Parser::is_name_token(TokenType t)
+{
     // 1. Standard identifiers are always okay.
     if (t == TokenType::IDENTIFIER)
         return true;

@@ -190,7 +190,7 @@ std::unique_ptr<Expression> Parser::parse_postfix()
             advance();
             expr = std::make_unique<PostfixOp>(std::move(expr), "--");
         }
-        else if (current().type == TokenType::DOT && (peek().type == TokenType::IDENTIFIER || peek().type == TokenType::KEY))
+        else if (current().type == TokenType::DOT && is_name_token(peek().type))
         {
             // "abc".at(0), (a + b).x; names chain in parse_primary
             advance();
