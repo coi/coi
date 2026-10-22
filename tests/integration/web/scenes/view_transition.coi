@@ -1,0 +1,16 @@
+// a change made inside a view transition: the update comes as an event, done ends the transition
+component App {
+    mut bool dark = false;
+    mut int updates = 0;
+    mut ViewTransition vt;
+    def toggle() : void { vt = Dom.startViewTransition(&update); }
+    def update() : void { dark = !dark; updates++; vt.viewTransitionDone(); }
+    view {
+        <div class={dark ? "page dark" : "page"}>
+            <button class="toggle" onclick={toggle}>toggle</button>
+            <span class="state">{dark ? "dark" : "light"} {updates}</span>
+        </div>
+    }
+}
+
+app { root = App; }

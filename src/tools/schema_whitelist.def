@@ -11,6 +11,9 @@
 //   @inline("x") def ...       - Raw inline definition (emitted as-is)
 
 [dom]
+# a view transition: the update comes as an event on the handle, view_transition_done ends it
+start_view_transition +events(VIEW_TRANSITION_UPDATE)
+view_transition_done
 set_property
 # +listen makes these view attributes
 remove_pointer_listener
