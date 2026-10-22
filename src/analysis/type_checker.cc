@@ -329,6 +329,8 @@ static bool literal_fits(Expression *expr, const std::string &target)
 static bool is_known_type(std::string t, const std::vector<std::string> &type_params);
 
 // what Json.stringify can write; generic params count as fine
+static std::string strip_module_prefix(const std::string &type);
+
 static bool is_json_type(const std::string &raw, int depth = 0)
 {
     std::string t = normalize_type(raw);
@@ -347,6 +349,16 @@ static bool is_json_type(const std::string &raw, int depth = 0)
         return is_json_type(t.substr(0, br), depth + 1);
     std::string base = t.substr(0, t.find('<'));
     auto it = g_data_type_field_types.find(base);
+    if (it == g_data_type_field_types.end() && base.find("::") != std::string::npos)
+    {
+        // "Admin::Body" is registered as Admin_Body (and as Body)
+        std::string qualified = base;
+        for (size_t p; (p = qualified.find("::")) != std::string::npos;)
+            qualified.replace(p, 2, "_");
+        it = g_data_type_field_types.find(qualified);
+        if (it == g_data_type_field_types.end())
+            it = g_data_type_field_types.find(strip_module_prefix(base));
+    }
     if (it == g_data_type_field_types.end())
         return !is_known_type(t, {});
     for (const auto &[name, field_type] : it->second)
