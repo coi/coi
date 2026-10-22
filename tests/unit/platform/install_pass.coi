@@ -1,0 +1,20 @@
+// Test: the install prompt; the state arrives on subscribe and on every change, the prompt opens from a click
+component App {
+    mut int state = 0;
+
+    mount {
+        System.onInstallState(&changed);
+    }
+
+    def changed(uint8 s) : void { state = s.toInt(); }
+    def install() : void { System.promptInstall(); }
+
+    view {
+        <div>
+            <if state == 1><button onclick={install}>Install</button></if>
+            <if state == 2><span>Installed</span></if>
+        </div>
+    }
+}
+
+app { root = App; }

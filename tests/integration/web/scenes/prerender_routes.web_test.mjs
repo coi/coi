@@ -38,4 +38,17 @@ export async function run({ page, expect }) {
   await expect.ok(await page.locator(".count").count() === 1, "tool page doubled or missing");
   await page.click(".count");
   await expect.textContains(page.locator(".count"), "1");
+
+  // a canvas drawn on before hydration: the prerendered canvas gives way to the one with the drawing
+  await page.route("**/app.wasm", async (route) => { await held2; await route.continue(); });
+  let release2;
+  const held2 = new Promise((r) => (release2 = r));
+  await page.goto(root + "sketch/");
+  await page.waitForSelector("[data-hydrate] canvas.sketch");
+  release2();
+  await page.waitForFunction(() => !document.querySelector("[data-hydrate]"));
+  await expect.ok(await page.locator("canvas.sketch").count() === 1, "canvas doubled or missing");
+  const red = await page.evaluate(() => { const c = document.querySelector("canvas.sketch"); return c.getContext("2d").getImageData(5, 5, 1, 1).data[0]; });
+  await expect.ok(red === 255, "the canvas on the page is not the one drawn on");
+  await page.unroute("**/app.wasm");
 }

@@ -29,6 +29,19 @@ component Tool {
     view { <button class="count" onclick={inc}>{n}</button> }
 }
 
+// draws as it mounts, before the page is hydrated: what it drew must be what shows
+component Sketch {
+    mut Canvas c;
+    mut CanvasContext2D ctx;
+    mount {
+        c.setSize(20, 20);
+        ctx = c.getContext2d();
+        ctx.setFillStyleStr("#ff0000");
+        ctx.fillRect(0.0, 0.0, 20.0, 20.0);
+    }
+    view { <canvas &={c} class="sketch"></canvas> }
+}
+
 // one component for every path under /docs; what it shows comes from the path
 component Docs {
     mut string at = "";
@@ -40,6 +53,7 @@ component PrerenderRoutes {
     router {
         "/" => Front;
         "/tool" => Tool;
+        "/sketch" => Sketch;
         "/docs/*" => Docs;
     }
     view { <div class="site"><route /></div> }
