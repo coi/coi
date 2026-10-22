@@ -107,6 +107,8 @@ struct AppConfig {
     std::string icon;
     // theme-color
     std::string theme;
+    // overlay: an installed app draws into its title bar, the window buttons float over it
+    bool titlebar_overlay = false;
     // first render of every static route as HTML at build time; the app takes over on load
     bool prerender = false;
     // more pages to render, under a "/prefix/*" route: "/app/note" is what a host serves for

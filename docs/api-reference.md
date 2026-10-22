@@ -346,6 +346,7 @@ Logging, page title, time, and URL navigation.
 | `System.warn(string msg)` | Log warning to console |
 | `System.error(string msg)` | Log error to console |
 | `System.setTitle(string title)` | Set page title |
+| `System.setThemeColor(string color)` | Set the browser's UI color (address bar, the installed app's title bar) |
 | `System.reload()` | Reload the page |
 | `System.openUrl(string url)` | Open URL in new tab |
 | `System.navigate(string path)` | Navigate to route (client-side routing) |

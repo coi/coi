@@ -169,6 +169,8 @@ log
 warn
 error
 set_title
+# the browser's UI color at runtime (app.theme sets the first one)
+set_theme_color
 reload
 open_url
 get_time

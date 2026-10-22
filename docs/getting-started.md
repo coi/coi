@@ -239,6 +239,7 @@ app {
     pwa = true;                                    // Installable, works offline
     icon = "assets/icon.png";                      // Favicon and app icon
     theme = "#0b3d2e";                             // Browser UI color
+    titlebar = overlay;                            // Installed app draws its own title bar
     prerender = true;                              // Every route as HTML at build time
     head = "src/head.html";                        // Extra lines for every page's <head>
 }
@@ -253,7 +254,8 @@ app {
 | `base` | String | No | Deploy base path, emitted as `<base href="">` (default: `"/"`) |
 | `pwa` | `true` / `false` | No | Generates a manifest and a service worker so the app can be installed and starts offline, see [Installable and offline](#installable-and-offline) |
 | `icon` | String | No | Path in the build output, e.g. `"assets/icon.png"`. Used as favicon and app icon |
-| `theme` | String | No | CSS color for the browser's UI (address bar, title bar of the installed app) |
+| `theme` | String | No | CSS color for the browser's UI (address bar, title bar of the installed app). `System.setThemeColor` changes it at runtime, e.g. for a dark theme |
+| `titlebar` | `system` / `overlay` | No | `overlay` lets the installed app draw into its title bar, see [Your own title bar](#your-own-title-bar) |
 | `prerender` | `true` / `false` / `["/app/note"]` | No | Renders every static route to HTML at build time, plus the listed paths, see [Prerendering](#prerendering) |
 | `head` | String | No | A file (path from the project root) whose lines go into every page's `<head>`: analytics, a font, a small script |
 | `tick` | `always` / `demand` | No | `demand` runs `tick` only on requested frames, see [Frames on demand](components.md#frames-on-demand) |
@@ -304,6 +306,24 @@ With `pwa = true`, `coi build` also writes `manifest.webmanifest` and `sw.js` ne
 - **Development.** `coi dev` never uses the service worker, and removes one left over from a `coi build` on the same address, so you always see your latest edits.
 
 Service workers need HTTPS (or `localhost`). Keep data the user creates in IndexedDB, not in the build: the cache is replaced on every update.
+
+### Your own title bar
+
+With `titlebar = overlay`, an installed app on desktop Chrome or Edge has no separate title bar: the page starts at the top of the window and the window buttons float over its top corner, like most desktop apps. The user can switch back to the normal bar from the window menu; other browsers and phones keep it.
+
+The page sees the free part of the bar through CSS `env()` values (all unset without the overlay, so the fallbacks apply):
+
+```css
+:root {
+    --bar-left: env(titlebar-area-x, 0px);                                                   /* macOS: buttons on the left */
+    --bar-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw));  /* Windows, Linux: on the right */
+    --bar-height: env(titlebar-area-height, 0px);
+}
+.header { padding-right: var(--bar-right); app-region: drag; }    /* drag the window by it */
+.header button { app-region: no-drag; }                            /* buttons in it stay clickable */
+```
+
+The buttons sit on `theme`; keep it the color of your header, and call `System.setThemeColor` when that changes.
 
 For client-side routing, use the `router {}` block inside your root component. See [Components](components.md#client-side-routing) for details.
 

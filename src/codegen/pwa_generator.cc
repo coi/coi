@@ -134,6 +134,9 @@ void generate_pwa_files(const fs::path &out_dir, const AppConfig &config)
     m << "  \"start_url\": " << json_str(base) << ",\n";
     m << "  \"scope\": " << json_str(base) << ",\n";
     m << "  \"display\": \"standalone\",\n";
+    // where it's supported (desktop Chrome and Edge) the page gets the title bar; elsewhere standalone
+    if (config.titlebar_overlay)
+        m << "  \"display_override\": [\"window-controls-overlay\"],\n";
     if (!config.theme.empty())
     {
         m << "  \"theme_color\": " << json_str(config.theme) << ",\n";

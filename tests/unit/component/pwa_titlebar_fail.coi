@@ -1,0 +1,12 @@
+// Test: app.titlebar only takes system or overlay
+component TitlebarFail {
+    view {
+        <div>x</div>
+    }
+}
+
+app {
+    root = TitlebarFail;
+    pwa = true;
+    titlebar = hidden;
+}

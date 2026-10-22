@@ -554,6 +554,17 @@ void Parser::parse_app()
             app_config.head = current().value;
             expect(TokenType::STRING_LITERAL, "Expected string");
         }
+        else if (key == "titlebar")
+        {
+            std::string mode = current().value;
+            expect(TokenType::IDENTIFIER, "Expected 'system' or 'overlay'");
+            if (mode == "overlay")
+                app_config.titlebar_overlay = true;
+            else if (mode == "system")
+                app_config.titlebar_overlay = false;
+            else
+                ErrorHandler::compiler_error("app.titlebar must be 'system' or 'overlay', got '" + mode + "'", current().line);
+        }
         else if (key == "tick")
         {
             std::string mode = current().value;

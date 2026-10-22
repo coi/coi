@@ -1,0 +1,19 @@
+// Test: app.titlebar = overlay, and System.setThemeColor at runtime
+component TitlebarPass {
+    mut bool dark = false;
+    def toggle() : void {
+        dark = !dark;
+        System.setThemeColor(dark ? "#1c1b19" : "#f6f5f2");
+    }
+    view {
+        <button onclick={toggle}>theme</button>
+    }
+}
+
+app {
+    root = TitlebarPass;
+    title = "Notes";
+    pwa = true;
+    theme = "#f6f5f2";
+    titlebar = overlay;
+}
