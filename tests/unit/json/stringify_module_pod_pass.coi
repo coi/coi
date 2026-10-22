@@ -1,0 +1,16 @@
+// Test: Json.stringify of a pod named through its module (Profile::Login), as a local
+// and as a literal, not only as a value that came out of Json.parse
+import "modules/Profile.coi";
+
+component App {
+    mut string out = "";
+
+    init {
+        Profile::Login l = Profile::Login{provider = "google", handle = "ada"};
+        out = Json.stringify(l) + Json.stringify(Profile::Login{provider = "discord", handle = ""}) + Json.stringify([l]);
+    }
+
+    view { <div>{out}</div> }
+}
+
+app { root = App; }
