@@ -1,0 +1,18 @@
+// Test: a module pod naming a pod declared later in the module (Later::Reply holds Later::Usage),
+// parsed from outside the module, so its Meta struct needs the later pod's Meta first too
+import "modules/Later.coi";
+
+component App {
+    mut int notes = 0;
+
+    init {
+        match (Json.parse(Later::Reply, "{\"usage\":{\"notes\":3,\"notebooks\":1},\"all\":[]}")) {
+            Success(Later::Reply r, Later::ReplyMeta m) => { notes = r.usage.notes; };
+            Error(string message) => {};
+        };
+    }
+
+    view { <div>{notes}</div> }
+}
+
+app { root = App; }

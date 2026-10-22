@@ -506,19 +506,22 @@ void generate_cpp_code(
     }
 
     // Output global data types (defined outside components). A pod comes after the pods its
-    // fields use; files are read in import order, so one can use a pod from a later file
+    // fields use; files are read in import order, so one can use a pod from a later file.
+    // The same order serves the Meta structs below, which hold each other the same way
+    std::vector<const DataDef *> ordered_global_data;
     {
         std::map<std::string, const DataDef *> by_name;
         for (const auto &data_def : all_global_data)
             by_name[qualified_name(data_def->module_name, data_def->name)] = data_def.get();
         std::set<const DataDef *> done, visiting;
-        std::function<void(const DataDef *)> emit = [&](const DataDef *d) {
+        std::function<void(const DataDef *)> visit = [&](const DataDef *d) {
             if (done.count(d) || visiting.count(d))
                 return;
             visiting.insert(d);
             for (const auto &field : d->fields)
             {
-                // every name in the type: Geo::Point[], Point[string], Pair<A, B>
+                // every name in the type: Geo::Point[], Point[string], Pair<A, B>; field types
+                // were qualified above (Geo_Point), so a word is tried as it is first
                 const std::string &t = field.type;
                 for (size_t i = 0; i < t.size();)
                 {
@@ -528,20 +531,23 @@ void generate_cpp_code(
                         j += t[j] == ':' ? 2 : 1;
                     std::string word = t.substr(i, j - i);
                     size_t dc = word.find("::");
-                    std::string key = dc == std::string::npos ? qualified_name(d->module_name, word)
-                                                              : qualified_name(word.substr(0, dc), word.substr(dc + 2));
-                    auto it = by_name.find(key);
+                    auto it = by_name.find(word);
+                    if (it == by_name.end())
+                        it = by_name.find(dc == std::string::npos ? qualified_name(d->module_name, word)
+                                                                  : qualified_name(word.substr(0, dc), word.substr(dc + 2)));
                     if (it != by_name.end() && it->second != d)
-                        emit(it->second);
+                        visit(it->second);
                     i = j;
                 }
             }
             visiting.erase(d);
             done.insert(d);
-            out << const_cast<DataDef *>(d)->to_webcc();
+            ordered_global_data.push_back(d);
         };
         for (const auto &data_def : all_global_data)
-            emit(data_def.get());
+            visit(data_def.get());
+        for (const DataDef *d : ordered_global_data)
+            out << const_cast<DataDef *>(d)->to_webcc();
     }
     if (!all_global_data.empty())
     {
@@ -612,7 +618,7 @@ void generate_cpp_code(
     // Output Meta structs for JSON parsing (if Json.parse is used)
     if (features.json)
     {
-        for (const auto &data_def : all_global_data)
+        for (const DataDef *data_def : ordered_global_data)
         {
             if (data_def->source_file.empty())
                 continue;
