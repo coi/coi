@@ -694,18 +694,19 @@ void collect_mods_recursive(ASTNode *node, std::set<std::string> &mods)
                 mods.insert(id->name);
             }
         }
+        else if (auto id = root_identifier(idxAssign->array.get()))
+        {
+            mods.insert(id->name); // obj.items[i] = v modifies obj
+        }
     }
     else if (auto memberAssign = dynamic_cast<MemberAssignment *>(node))
     {
-        // Track the root object being modified (walk out of the member chain).
-        Expression *obj = memberAssign->object.get();
-        while (auto member = dynamic_cast<MemberAccess *>(obj))
+        // the root object being modified: a.b.c = v, items[i].c = v and a.items[i].c = v all modify their root
+        // (a component in a component array updates itself)
+        if (auto id = root_identifier(memberAssign->object.get()))
         {
-            obj = member->object.get();
-        }
-        if (auto id = dynamic_cast<Identifier *>(obj))
-        {
-            mods.insert(id->name);
+            if (g_component_array_loops.find(id->name) == g_component_array_loops.end())
+                mods.insert(id->name);
         }
     }
     else if (auto postfix = dynamic_cast<PostfixOp *>(node))
