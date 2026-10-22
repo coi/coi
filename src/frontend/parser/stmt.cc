@@ -2,6 +2,25 @@
 #include "cli/error.h"
 #include <stdexcept>
 
+// the operator of a compound assignment token ("+" for +=), "" for plain = and :=
+static std::string compound_op_of(TokenType t)
+{
+    switch (t)
+    {
+    case TokenType::PLUS_ASSIGN: return "+";
+    case TokenType::MINUS_ASSIGN: return "-";
+    case TokenType::STAR_ASSIGN: return "*";
+    case TokenType::SLASH_ASSIGN: return "/";
+    case TokenType::PERCENT_ASSIGN: return "%";
+    case TokenType::AMPERSAND_ASSIGN: return "&";
+    case TokenType::PIPE_ASSIGN: return "|";
+    case TokenType::CARET_ASSIGN: return "^";
+    case TokenType::LSHIFT_ASSIGN: return "<<";
+    case TokenType::RSHIFT_ASSIGN: return ">>";
+    default: return "";
+    }
+}
+
 std::unique_ptr<Statement> Parser::parse_statement()
 {
     // Block
@@ -634,6 +653,14 @@ std::unique_ptr<Statement> Parser::parse_statement()
                     bracket_depth--;
                 advance();
             }
+            // obj.member[index].field = value
+            while (current().type == TokenType::DOT)
+            {
+                advance(); // skip '.'
+                if (!is_identifier_token())
+                    break;
+                advance(); // skip field name
+            }
         }
 
         // Check if followed by assignment operator
@@ -678,6 +705,31 @@ std::unique_ptr<Statement> Parser::parse_statement()
             expect(TokenType::LBRACKET, "Expected '['");
             auto index_expr = parse_expression();
             expect(TokenType::RBRACKET, "Expected ']'");
+
+            // obj.member[index].a.b = value: a member assignment on the element
+            if (current().type == TokenType::DOT)
+            {
+                std::unique_ptr<Expression> elem = std::make_unique<IndexAccess>(std::move(obj_expr), std::move(index_expr));
+                advance(); // skip '.'
+                std::string field = current().value;
+                expect_name("Expected member name");
+                while (current().type == TokenType::DOT)
+                {
+                    advance(); // skip '.'
+                    elem = std::make_unique<MemberAccess>(std::move(elem), field);
+                    field = current().value;
+                    expect_name("Expected member name");
+                }
+                TokenType fieldOp = current().type;
+                advance(); // skip assignment operator
+                auto field_assign = std::make_unique<MemberAssignment>();
+                field_assign->object = std::move(elem);
+                field_assign->member = field;
+                field_assign->value = parse_expression();
+                field_assign->compound_op = compound_op_of(fieldOp);
+                expect(TokenType::SEMICOLON, "Expected ';'");
+                return field_assign;
+            }
 
             TokenType opType = current().type;
             advance(); // skip assignment operator

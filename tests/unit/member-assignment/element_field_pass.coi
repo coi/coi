@@ -1,0 +1,41 @@
+// Test: assigning a field of an array element reached through a member: obj.items[i].field = value
+pod Pos {
+    int x;
+}
+
+pod Item {
+    int count;
+    Pos at;
+}
+
+pod Bag {
+    Item[] items;
+}
+
+component ElementFieldTest {
+    mut Bag bag = Bag{items = [Item{count = 1, at = Pos{x = 0}}, Item{count = 2, at = Pos{x = 0}}]};
+
+    def bump(int i) : void {
+        bag.items[i].count = 5;
+        bag.items[i].count += 2;
+        bag.items[i + 1].at.x = 9;
+    }
+
+    def local() : int {
+        mut Bag b = bag;
+        for i in 0:b.items.size() { if (b.items[i].count > 0) b.items[i].count = 0; }
+        return b.items[0].count;
+    }
+
+    init {
+        bump(0);
+    }
+
+    view {
+        <div>{bag.items[0].count} {bag.items[1].at.x} {local()}</div>
+    }
+}
+
+app {
+    root = ElementFieldTest;
+}
