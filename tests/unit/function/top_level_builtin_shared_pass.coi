@@ -1,0 +1,8 @@
+// Test: a top-level function can call a built-in type's shared methods (string.fromBytes)
+def letter(uint8 b) : string { return string.fromBytes([b]); }
+
+component App {
+    view { <div>{letter(65)}</div> }
+}
+
+app { root = App; }

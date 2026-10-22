@@ -1,0 +1,6 @@
+module Profile;
+
+// pods that name each other inside their module
+pub pod Login { string provider; string handle; }
+pub pod Me { string name; Login[] logins; Login first; }
+pub pod Reply { Me account; int plan; }

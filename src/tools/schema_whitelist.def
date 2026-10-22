@@ -124,6 +124,7 @@ free
 exit_pointer_lock
 # block browser shortcuts like Ctrl+S
 prevent_key
+prevent_key_outside_fields
 allow_key
 # Input.onKeyDown / onKeyUp
 init_keyboard +listen(KEY_DOWN, KEY_UP)

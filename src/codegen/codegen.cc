@@ -36,6 +36,35 @@ static void emit_event_dispatch(std::ostream &out, const FeatureFlags &features)
     }
 }
 
+// A module's pods name each other without the module (Login, not Account::Login), and any
+// pod may name another module's as Geo::Point. Written out as C++ every name carries its
+// module (Account_Login, Geo_Point); the structs, the JSON code and its registry all read
+// the field types, so they are rewritten once here
+static std::string qualify_pod_type(const std::string &t, const std::string &module, const std::set<std::string> &pods)
+{
+    auto ident = [](char c) { return std::isalnum(static_cast<unsigned char>(c)) || c == '_'; };
+    std::string out;
+    for (size_t i = 0; i < t.size();)
+    {
+        if (!std::isalpha(static_cast<unsigned char>(t[i])) && t[i] != '_') { out += t[i++]; continue; }
+        size_t j = i;
+        while (j < t.size() && ident(t[j])) j++;
+        std::string word = t.substr(i, j - i);
+        if (j + 1 < t.size() && t[j] == ':' && t[j + 1] == ':')
+        {
+            size_t k = j + 2, m = k;
+            while (m < t.size() && ident(t[m])) m++;
+            std::string q = qualified_name(word, t.substr(k, m - k));
+            out += pods.count(q) ? q : t.substr(i, m - i);
+            i = m;
+            continue;
+        }
+        out += !module.empty() && pods.count(qualified_name(module, word)) ? qualified_name(module, word) : word;
+        i = j;
+    }
+    return out;
+}
+
 void generate_cpp_code(
     std::ostream &out,
     std::vector<Component> &all_components,
@@ -248,6 +277,15 @@ void generate_cpp_code(
         emit_json_runtime(out);
     }
     out << "\n";
+
+    {
+        std::set<std::string> pods;
+        for (const auto &data_def : all_global_data)
+            pods.insert(qualified_name(data_def->module_name, data_def->name));
+        for (const auto &data_def : all_global_data)
+            for (auto &field : data_def->fields)
+                field.type = qualify_pod_type(field.type, data_def->module_name, pods);
+    }
 
     // Register all data types in the DataTypeRegistry for JSON codegen
     // Component-local types are prefixed with ComponentName_

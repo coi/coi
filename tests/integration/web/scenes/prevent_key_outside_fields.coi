@@ -1,0 +1,16 @@
+// Space held outside a text field doesn't scroll the page; in a field it still types
+component App {
+    mut string text = "";
+    mount { Input.preventKeyOutsideFields(32); }
+    def typed(string v) : void { text = v; }
+    view {
+        <div class="scroller" style="height:200px;overflow:auto">
+            <div style="height:2000px">
+                <input class="field" value={text} oninput={typed} />
+                <p class="echo">{text}</p>
+            </div>
+        </div>
+    }
+}
+
+app { root = App; }

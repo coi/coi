@@ -2625,6 +2625,9 @@ static void check_free_function_names(const FunctionDef &fn, const std::set<std:
         if (std::isupper(static_cast<unsigned char>(name[0])) ? is_known_type(name)
                                                                 : resolve_free_function(name, no_scope, line) != nullptr)
             return;
+        // a built-in type with shared methods: string.fromBytes(...), int.parse(...)
+        if (DefSchema::instance().lookup_type(name) != nullptr)
+            return;
         ErrorHandler::type_error("Unknown identifier '" + name + "' in function '" + fn.name + "'", line);
         exit(1);
     };

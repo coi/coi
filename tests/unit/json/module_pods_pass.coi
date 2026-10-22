@@ -1,0 +1,23 @@
+// Test: a module's pods naming each other (Me holds Login[]), parsed and written from
+// outside the module as Profile::Me
+import "modules/Profile.coi";
+
+component App {
+    mut Profile::Me me;
+    mut string out = "";
+
+    init {
+        match (Json.parse(Profile::Reply, "{\"account\":{\"name\":\"Ada\",\"logins\":[{\"provider\":\"google\",\"handle\":\"\"}],\"first\":{\"provider\":\"discord\",\"handle\":\"ada\"}},\"plan\":1}")) {
+            Success(Profile::Reply r, Profile::ReplyMeta m) => { me = r.account; };
+            Error(string message) => {};
+        };
+        match (Json.parse(Profile::Me, Json.stringify(me))) {
+            Success(Profile::Me again, Profile::MeMeta m) => { out = again.first.handle; };
+            Error(string message) => {};
+        };
+    }
+
+    view { <div>{me.name} {me.logins.size()} {out}</div> }
+}
+
+app { root = App; }

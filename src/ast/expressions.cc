@@ -105,6 +105,9 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
         // First arg is data type identifier (e.g., "User" or "User[]")
         // Resolve component-local types (e.g., "TestStruct" -> "App_TestStruct")
         std::string data_type = args[0].value->to_webcc();
+        // another module's pod: Geo::Point is Geo_Point in C++
+        for (size_t dc; (dc = data_type.find("::")) != std::string::npos;)
+            data_type.replace(dc, 2, "_");
         
         // Handle array types: resolve the element type, then add [] back
         bool is_array = data_type.size() > 2 && data_type.substr(data_type.size() - 2) == "[]";
