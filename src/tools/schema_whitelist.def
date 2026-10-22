@@ -235,6 +235,7 @@ open +events
 put +events(DONE, ERROR)
 get +events(VALUE, ERROR)
 remove +events(DONE, ERROR)
+clear +events(DONE, ERROR)
 keys +events(KEYS, ERROR)
 close
 

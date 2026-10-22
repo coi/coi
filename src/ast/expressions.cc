@@ -496,8 +496,11 @@ std::string FunctionCall::to_webcc() {
         // string/array methods, not for handles
         std::string receiver_type = ComponentTypeContext::instance().get_symbol_type(type_or_obj);
         bool handle_receiver = !receiver_type.empty() && DefSchema::instance().is_handle(DefSchema::instance().resolve_alias(receiver_type));
-        // a known component or pod receiver has its own methods, not string's or array's
-        bool builtin_receiver = receiver_type.empty() || receiver_type == "string" || receiver_type.back() == ']';
+        // a known component or pod receiver has its own methods, not string's or array's; so does
+        // a type called by name (Storage.clear() is Storage's, not an array's clear)
+        bool type_by_name = receiver_type.empty() && std::isupper(static_cast<unsigned char>(type_or_obj[0])) &&
+                            DefSchema::instance().lookup_type(type_or_obj) != nullptr;
+        bool builtin_receiver = !type_by_name && (receiver_type.empty() || receiver_type == "string" || receiver_type.back() == ']');
         if (!handle_receiver && builtin_receiver) {
             // For string methods, we need to check against the "string" type
             // Use arg_count to find the correct overload

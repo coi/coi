@@ -1,0 +1,11 @@
+// Test: a shared method named like an array or string method (Storage.clear) maps to its own API
+component App {
+    mut string[] items = ["a"];
+    def reset() : void {
+        Storage.clear();
+        items.clear();
+    }
+    view { <div onclick={reset}>{items.size()}</div> }
+}
+
+app { root = App; }
