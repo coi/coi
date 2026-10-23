@@ -270,6 +270,31 @@ static bool is_enum_type(const std::string &t) {
     return false;
 }
 
+// page.blocks, r.servers: the type at the end of a path of pod fields from a variable in
+// scope; "" when a step isn't a pod field
+static std::string get_data_field_type(const std::string& type_name, const std::string& field_name);
+std::string normalize_type(const std::string &type);
+static std::string member_path_type(const std::string &path, const std::map<std::string, std::string> &scope)
+{
+    size_t dot = path.find('.');
+    if (dot == std::string::npos || !scope.count(path.substr(0, dot)))
+        return "";
+    std::string type = normalize_type(scope.at(path.substr(0, dot)));
+    size_t pos = dot + 1;
+    while (true)
+    {
+        size_t next = path.find('.', pos);
+        std::string seg = path.substr(pos, next == std::string::npos ? std::string::npos : next - pos);
+        std::string t = get_data_field_type(type, seg);
+        if (t.empty())
+            return "";
+        type = normalize_type(t);
+        if (next == std::string::npos)
+            return type;
+        pos = next + 1;
+    }
+}
+
 // Check if a type is a known data type
 static bool is_data_type(const std::string &t) {
     if (g_data_type_fields.count(t))
@@ -1142,6 +1167,17 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
     }
 
     // Match expression type inference - all arms must have compatible types
+        // an inline function reaches here only when no array method took it
+    if (auto lam = dynamic_cast<LambdaExpr *>(expr))
+    {
+        if (!lam->placed)
+        {
+            ErrorHandler::type_error("An inline function (" + lam->param + " => ...) only goes to an array's indexOf, contains, remove, "
+                                     "filter, count, any or all. Anywhere else, make it a method and pass &name", lam->line);
+            exit(1);
+        }
+        return "inline-function";
+    }
     if (auto match = dynamic_cast<MatchExpr *>(expr))
     {
         if (match->arms.empty())
@@ -1387,11 +1423,20 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
             }
         }
 
-        // Handle array/vector/string methods BEFORE schema lookup
-        // These are built-in methods that shouldn't be confused with schema functions
-        if (!obj_name.empty() && scope.count(obj_name))
+                // Handle array/vector/string methods BEFORE schema lookup
+        // These are built-in methods that shouldn't be confused with schema functions.
+        // page.blocks.indexOf(...): a path of pod fields is typed like a variable
+        std::string path_type = !obj_name.empty() && !scope.count(obj_name) && obj_name.find('[') == std::string::npos &&
+                                        obj_name.find('(') == std::string::npos
+                                    ? member_path_type(obj_name, scope)
+                                    : "";
+        if (!path_type.empty() && (path_type.ends_with("]") || path_type == "string"))
+            func->receiver_type = path_type;
+        else
+            path_type.clear();
+        if (!obj_name.empty() && (scope.count(obj_name) || !path_type.empty()))
         {
-            std::string obj_type = scope.at(obj_name);
+            std::string obj_type = scope.count(obj_name) ? scope.at(obj_name) : path_type;
             
             // Check if it's any array type (dynamic [] or fixed-size [N])
             bool is_dynamic_array = obj_type.ends_with("[]");
@@ -1424,6 +1469,38 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                 exit(1);
             };
 
+                        // an inline function: the array's indexOf, contains, remove, filter, count, any and all
+            // run it on each element; its parameter is an element, its body must say true or false
+            LambdaExpr *lam = func->args.size() == 1 ? dynamic_cast<LambdaExpr *>(func->args[0].value.get()) : nullptr;
+            if (lam && (is_dynamic_array || is_fixed_array))
+            {
+                static const std::set<std::string> dynamic_only = {"remove", "filter"};
+                static const std::set<std::string> takes = {"indexOf", "contains", "remove", "filter", "count", "any", "all"};
+                if (!takes.count(method_name) || (is_fixed_array && dynamic_only.count(method_name)))
+                {
+                    ErrorHandler::type_error("'" + method_name + "' on " + (is_fixed_array ? "a fixed-size array" : "an array") +
+                                                 " doesn't take an inline function (" +
+                                                 (is_fixed_array ? "indexOf, contains, count, any and all do)" : "indexOf, contains, remove, filter, count, any and all do)"),
+                                             func->line);
+                    exit(1);
+                }
+                std::string elem = is_dynamic_array ? obj_type.substr(0, obj_type.size() - 2) : obj_type.substr(0, obj_type.rfind('['));
+                lam->placed = true;
+                lam->param_type = elem;
+                auto inner = scope;
+                inner[lam->param] = elem;
+                std::string said = normalize_type(infer_expression_type(lam->body.get(), inner));
+                if (said != "bool" && said != "unknown")
+                {
+                    ErrorHandler::type_error("The inline function given to '" + method_name + "' must say true or false for each element; this one is a '" +
+                                                 display_type_name(said) + "'", lam->line);
+                    exit(1);
+                }
+                if (method_name == "filter") return elem + "[]";
+                if (method_name == "remove") return "void";
+                if (method_name == "indexOf" || method_name == "count") return normalize_type("int");
+                return "bool";
+            }
             // the arguments are typed here too: xs.push(cs[k].getContext2d()) returns before the
             // schema walk below, and the inner call needs its receiver type for codegen
             if (is_dynamic_array || is_fixed_array || normalize_type(obj_type) == "string")
@@ -2741,6 +2818,12 @@ static void check_free_function_names(const FunctionDef &fn, const std::set<std:
                     arm_scope[binding.name] = false;
                 check_expr(arm.body.get(), arm_scope, arm.line);
             }
+        }
+                else if (auto *lam = dynamic_cast<LambdaExpr *>(expr))
+        {
+            Scope inner = scope;
+            inner[lam->param] = false;   // the element: read, never assigned
+            check_expr(lam->body.get(), inner, line);
         }
         else if (auto *block = dynamic_cast<BlockExpr *>(expr))
         {

@@ -96,6 +96,30 @@ void generate_cpp_code(
     out << "template<typename T> using vector = webcc::vector<T>;\n";
     out << "}\n";
     // bytes point into the event buffer, copy them
+        // an array method's inline function (b => ...) runs here, inlined into one loop
+    out << R"(template<typename V, typename F> inline int32_t coi_index_where(const V& v, F pred) {
+    for (int32_t i = 0; i < (int32_t)v.size(); i++) if (pred(v[i])) return i;
+    return -1;
+}
+template<typename V, typename F> inline bool coi_any(const V& v, F pred) { return coi_index_where(v, pred) >= 0; }
+template<typename V, typename F> inline bool coi_all(const V& v, F pred) {
+    for (int32_t i = 0; i < (int32_t)v.size(); i++) if (!pred(v[i])) return false;
+    return true;
+}
+template<typename V, typename F> inline int32_t coi_count_where(const V& v, F pred) {
+    int32_t n = 0;
+    for (int32_t i = 0; i < (int32_t)v.size(); i++) if (pred(v[i])) n++;
+    return n;
+}
+template<typename V, typename F> inline void coi_remove_where(V& v, F pred) {
+    for (int32_t i = 0; i < (int32_t)v.size();) { if (pred(v[i])) v.remove(i); else i++; }
+}
+template<typename V, typename F> inline V coi_filter(const V& v, F pred) {
+    V out;
+    for (int32_t i = 0; i < (int32_t)v.size(); i++) if (pred(v[i])) out.push_back(v[i]);
+    return out;
+}
+)";
     out << "inline coi::vector<uint8_t> coi_bytes(webcc::bytes_view v) {\n";
     out << "    coi::vector<uint8_t> out; out.reserve(v.length());\n";
     out << "    for (uint32_t i = 0; i < v.length(); i++) out.push_back(v.data()[i]);\n";

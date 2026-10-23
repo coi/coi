@@ -1,0 +1,13 @@
+// Test: an inline function's body must say true or false
+pod Block { int id; }
+
+component App {
+    mut Block[] blocks = [];
+    mut int i = 0;
+    init {
+        i = blocks.indexOf(b => b.id + 1);
+    }
+    view { <p>{i}</p> }
+}
+
+app { root = App; }

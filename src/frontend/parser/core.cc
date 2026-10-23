@@ -174,6 +174,25 @@ std::vector<CallArg> Parser::parse_call_args(TokenType end_token)
                 current().line);
         }
 
+                // an inline function: b => b.id == 7 (its body is one expression)
+        if (is_identifier_token() && peek().type == TokenType::ARROW)
+        {
+            auto lam = std::make_unique<LambdaExpr>();
+            lam->param = current().value;
+            lam->line = current().line;
+            advance();
+            advance();   // '=>'
+            if (current().type == TokenType::LBRACE)
+                ErrorHandler::compiler_error("An inline function's body is one expression: " + lam->param + " => " + lam->param +
+                                             ".id == 7. For more than that, make it a method and pass &name", current().line);
+            lam->body = parse_expression();
+            arg.value = std::move(lam);
+            args.push_back(std::move(arg));
+            if (current().type == TokenType::COMMA)
+                advance();
+            continue;
+        }
+
         // Check if this is a named argument: name = value or name := value
         bool is_named = false;
         if (is_identifier_token())

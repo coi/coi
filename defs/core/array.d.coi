@@ -28,11 +28,34 @@ type array<T> {
     @inline("${this}.contains(${0})")
     def contains(T value): bool
 
-    @inline("${this}.remove(${0})")
+        @inline("${this}.remove(${0})")
     def remove(int index): void
 
     @inline("${this}.sort()")
     def sort(): void
+
+    // with an inline function (b => b.id == 7): indexOf, contains and remove take it under
+    // these names; the compiler picks them when the argument is one
+    @inline("coi_index_where(${this}, ${0})")
+    def indexOfWhere(def pred(T): bool): int
+
+    @inline("coi_any(${this}, ${0})")
+    def containsWhere(def pred(T): bool): bool
+
+    @inline("coi_remove_where(${this}, ${0})")
+    def removeWhere(def pred(T): bool): void
+
+    @inline("coi_filter(${this}, ${0})")
+    def filter(def pred(T): bool): T[]
+
+    @inline("coi_count_where(${this}, ${0})")
+    def count(def pred(T): bool): int
+
+    @inline("coi_any(${this}, ${0})")
+    def any(def pred(T): bool): bool
+
+    @inline("coi_all(${this}, ${0})")
+    def all(def pred(T): bool): bool
 }
 
 // Fixed-size array (T[N]) - maps to webcc::array<T, N>
@@ -50,9 +73,24 @@ type array<T, N> {
     @inline("${this}.contains(${0})")
     def contains(T value): bool
 
-    @inline("${this}.fill(${0})")
+        @inline("${this}.fill(${0})")
     def fill(T value): void
 
     @inline("${this}.sort()")
     def sort(): void
+
+    @inline("coi_index_where(${this}, ${0})")
+    def indexOfWhere(def pred(T): bool): int
+
+    @inline("coi_any(${this}, ${0})")
+    def containsWhere(def pred(T): bool): bool
+
+    @inline("coi_count_where(${this}, ${0})")
+    def count(def pred(T): bool): int
+
+    @inline("coi_any(${this}, ${0})")
+    def any(def pred(T): bool): bool
+
+    @inline("coi_all(${this}, ${0})")
+    def all(def pred(T): bool): bool
 }

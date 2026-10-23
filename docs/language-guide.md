@@ -212,6 +212,23 @@ int first = nums[0];
 nums[0] = 100;               // Requires mut
 ```
 
+### Searching with an Inline Function
+
+The search methods take an inline function: a name, `=>`, and one expression that says true or false for an element. It runs inside the call, so it can read anything in scope, and the compiler puts it straight into the loop. Nothing is allocated.
+
+```tsx
+mut TextBlock[] blocks = page.blocks;
+
+int i = blocks.indexOf(b => b.id == 7);          // the first one, -1 when none
+bool any = blocks.contains(b => b.y > cutoff);   // the same as any()
+blocks.remove(b => b.id == 7);                   // every one that says true (requires mut)
+TextBlock[] wide = blocks.filter(b => b.w > 400.0);
+int n = blocks.count(b => b.font == "mono");
+bool allDone = todos.all(t => t.done);
+```
+
+The element's type comes from the array, so there is nothing to annotate. An inline function goes nowhere else: not into a variable, not to another function, not to a callback. For that, write a method and pass `&name`. Its body is one expression; for more, a method as well.
+
 ### Fixed-Size Array Methods (T[N])
 
 ```tsx
@@ -228,6 +245,7 @@ fixed.fill(0);                // Fill all elements with value
 // Search
 int idx = fixed.indexOf(3);   // Find index of value (-1 if not found)
 bool has = fixed.contains(3); // Check if value exists
+int big = fixed.count(x => x > 3);   // inline functions work here too (not remove/filter)
 
 // Index access
 int first = fixed[0];

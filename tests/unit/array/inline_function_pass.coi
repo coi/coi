@@ -1,0 +1,29 @@
+// Test: an inline function given to an array's search methods
+pod Block { int id; float y; bool done; }
+
+component App {
+    mut Block[] blocks = [Block{id = 1, y = 10.0, done = false}, Block{id = 7, y = 40.0, done = true}];
+    int[3] fixed = [1, 5, 9];
+    mut int where = -1;
+    mut bool has = false;
+    mut int n = 0;
+    mut bool every = false;
+    mut Block[] tall = [];
+    int cutoff = 20;
+
+    init {
+        where = blocks.indexOf(b => b.id == 7);
+        has = blocks.contains(b => b.y > cutoff);
+        n = blocks.count(b => b.done);
+        every = blocks.all(b => b.id > 0) && fixed.any(x => x == 5);
+        tall = blocks.filter(b => b.y > 20.0);
+        blocks.remove(b => b.id == 1);
+        n = fixed.count(x => x > 3) + fixed.indexOf(x => x == 9);
+    }
+
+    view {
+        <div>{where} {has} {n} {every} {tall.size()} {blocks.size()}</div>
+    }
+}
+
+app { root = App; }

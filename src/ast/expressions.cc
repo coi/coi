@@ -47,6 +47,16 @@ static std::string expand_inline_template(const std::string& tmpl, const std::st
 static std::string to_webcc_arg(const std::string& code, const std::string& coi_type);
 static std::string from_webcc_value(const std::string& code, const std::string& coi_type);
 
+// b => ...: an array method given an inline function uses its ...Where form (defs/core/array.d.coi)
+static bool has_inline_function(const std::vector<CallArg>& args) {
+    return args.size() == 1 && dynamic_cast<LambdaExpr*>(args[0].value.get()) != nullptr;
+}
+static std::string predicate_method(const std::string& method, const std::vector<CallArg>& args) {
+    if (has_inline_function(args) && (method == "indexOf" || method == "contains" || method == "remove"))
+        return method + "Where";
+    return method;
+}
+
 
 // Helper to generate intrinsic code
 static std::string generate_intrinsic(const std::string& intrinsic_name,
@@ -504,14 +514,15 @@ std::string FunctionCall::to_webcc() {
         if (!handle_receiver && builtin_receiver) {
             // For string methods, we need to check against the "string" type
             // Use arg_count to find the correct overload
-            if (auto* method_def = DefSchema::instance().lookup_method("string", method, args.size())) {
-                if (method_def->mapping_type == MappingType::Inline) {
-                    return expand_inline_template(method_def->mapping_value, resolved_receiver, args);
+                        if (!has_inline_function(args))
+                if (auto* method_def = DefSchema::instance().lookup_method("string", method, args.size())) {
+                    if (method_def->mapping_type == MappingType::Inline) {
+                        return expand_inline_template(method_def->mapping_value, resolved_receiver, args);
+                    }
                 }
-            }
 
-            // Check array methods
-            if (auto* method_def = DefSchema::instance().lookup_method("array", method, args.size())) {
+            // Check array methods (an inline function argument picks the ...Where form)
+            if (auto* method_def = DefSchema::instance().lookup_method("array", predicate_method(method, args), args.size())) {
                 if (method_def->mapping_type == MappingType::Inline) {
                     return expand_inline_template(method_def->mapping_value, resolved_receiver, args);
                 }
@@ -1191,6 +1202,20 @@ bool MatchExpr::is_static() {
     return true;
 }
 
+// a generic lambda: the element type is whatever the array holds, the loop is in the helper
+// (coi_index_where and friends in the generated prelude)
+std::string LambdaExpr::to_webcc() {
+    return "[&](const auto& " + cpp_name(param) + ") { return (" + body->to_webcc() + "); }";
+}
+
+// what the body reads from outside, which is what a view binding using it depends on
+void LambdaExpr::collect_dependencies(std::set<std::string>& deps) {
+    std::set<std::string> inner;
+    body->collect_dependencies(inner);
+    inner.erase(param);
+    deps.insert(inner.begin(), inner.end());
+}
+
 std::string BlockExpr::to_webcc() {
     std::string code = "([&]() {\n";
     for (const auto& stmt : statements) {
@@ -1233,10 +1258,12 @@ std::string MethodCall::to_webcc() {
     std::string recv = receiver->to_webcc();
     if (dynamic_cast<StringLiteral*>(receiver.get()) && receiver->is_static())
         recv = "coi::string(" + recv + ")";
-    const auto* m = DefSchema::instance().lookup_method(def_type, method, args.size());
+        bool inline_fn = has_inline_function(args);
+    std::string want = predicate_method(method, args);
+    const auto* m = DefSchema::instance().lookup_method(inline_fn ? "array" : def_type, want, args.size());
     if (!m && (type.empty() || type == "unknown")) {
-        m = DefSchema::instance().lookup_method("string", method, args.size());
-        if (!m) m = DefSchema::instance().lookup_method("array", method, args.size());
+        if (!inline_fn) m = DefSchema::instance().lookup_method("string", method, args.size());
+        if (!m) m = DefSchema::instance().lookup_method("array", want, args.size());
     }
     if (m && m->mapping_type == MappingType::Inline)
         return expand_inline_template(m->mapping_value, "(" + recv + ")", args);

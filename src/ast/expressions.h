@@ -301,6 +301,23 @@ struct MatchExpr : Expression {
 
 // Block expression for match arm bodies that contain statements
 // Generated as an IIFE expression so it can be used where an expression is required.
+// b => b.id == 7: an inline function handed to an array method (indexOf, contains, remove,
+// filter, count, any, all). It runs inside the call and is never stored, so it may read
+// anything in scope; the compiler puts its body straight into the loop. Anywhere else it
+// is an error: a function to keep is a method, passed as &name
+struct LambdaExpr : Expression {
+    std::string param;
+    std::unique_ptr<Expression> body;
+    std::string param_type;   // the array's element type, set by the type checker
+    bool placed = false;      // an array method took it (the type checker says)
+    int line = 0;
+
+    std::string to_webcc() override;
+    void collect_dependencies(std::set<std::string>& deps) override;
+    bool is_static() override { return false; }
+    std::vector<Expression*> get_children() override { return {body.get()}; }
+};
+
 struct BlockExpr : Expression {
     std::vector<std::unique_ptr<Statement>> statements;
 

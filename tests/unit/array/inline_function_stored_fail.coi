@@ -1,0 +1,13 @@
+// Test: an inline function can't be kept; only an array method takes one
+pod Block { int id; }
+
+component App {
+    mut Block[] blocks = [];
+    def keep(int x) : void { }
+    init {
+        keep(b => b.id == 7);
+    }
+    view { <p>x</p> }
+}
+
+app { root = App; }

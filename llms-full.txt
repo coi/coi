@@ -232,6 +232,12 @@ scores.sort();                 // ascending
 scores.reserve(64);
 int idx = scores.indexOf(20);  // -1 if absent
 bool c  = scores.contains(20);
+// with an inline function (one expression, element type inferred; only here, never stored):
+int i   = blocks.indexOf(b => b.id == 7);      // first match, -1 if none
+bool h  = blocks.contains(b => b.y > cutoff);  // same as any()
+blocks.remove(b => b.id == 7);                 // every match (requires mut)
+TextBlock[] wide = blocks.filter(b => b.w > 400.0);
+int n = blocks.count(b => b.done);  bool ok = blocks.all(b => b.done);
 int first = scores[0];
 scores[0] = 99;                // requires mut
 

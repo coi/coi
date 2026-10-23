@@ -1,0 +1,39 @@
+// an inline function given to an array's indexOf, contains, remove, filter, count, any, all
+pod Block { int id; string font; float y; }
+
+component App {
+    mut Block[] blocks = [Block{id = 1, font = "mono", y = 10.0}, Block{id = 7, font = "sans", y = 40.0}, Block{id = 9, font = "mono", y = 70.0}];
+    int[4] fixed = [2, 4, 6, 8];
+    mut string found = "";
+    mut string counted = "";
+    mut string kept = "";
+    mut string removed = "";
+    float cutoff = 30.0;
+
+    def lowest(Block[] list, float below) : int {
+        return list.count(b => b.y < below);
+    }
+
+    init {
+        found = `${blocks.indexOf(b => b.id == 7)} ${blocks.indexOf(b => b.id == 8)} ${blocks.contains(b => b.y > cutoff)} ${fixed.indexOf(x => x == 6)} ${fixed.any(x => x > 8)}`;
+        counted = `${blocks.count(b => b.font == "mono")} ${lowest(blocks, 50.0)} ${blocks.all(b => b.id > 0)} ${fixed.all(x => x > 2)}`;
+        Block[] mono = blocks.filter(b => b.font == "mono");
+        mut string ids = "";
+        for b in mono { ids += `${b.id},`; }
+        kept = `${mono.size()} ${ids}`;
+        blocks.remove(b => b.y > cutoff);
+        mut string left = "";
+        for b in blocks { left += `${b.id},`; }
+        removed = `${blocks.size()} ${left}`;
+    }
+
+    view {
+        <div>
+            <p class="found">{found}</p>
+            <p class="counted">{counted}</p>
+            <p class="kept">{kept}</p>
+            <p class="removed">{removed}</p>
+        </div>
+    }
+}
+app { root = App; }

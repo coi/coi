@@ -1,0 +1,10 @@
+// Test: a fixed-size array can't remove by inline function
+component App {
+    mut int[3] fixed = [1, 2, 3];
+    init {
+        fixed.remove(x => x == 2);
+    }
+    view { <p>x</p> }
+}
+
+app { root = App; }
