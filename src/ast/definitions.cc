@@ -85,8 +85,36 @@ void register_free_functions(const std::vector<std::unique_ptr<FunctionDef>>& fu
     }
 }
 
-std::string DataDef::to_webcc() {
+// a union is one struct holding every alternative, with which one it is: a value type like a
+// pod, copyable, no heap. Made from an alternative it takes that alternative's first tag; a
+// match arm Point(Point p) reads is_Point() and as_Point()._0
+static std::string emit_union(const DataDef &u) {
     std::stringstream ss;
+    std::string me = qualified_name(u.module_name, u.name);
+    ss << "struct " << me << " {\n";
+    for (const auto& field : u.fields)
+        ss << "    " << convert_type(field.type) << " " << cpp_name(field.name) << ";\n";
+    ss << "    int32_t _which = -1;\n";
+    for (size_t i = 0; i < u.alts.size(); ++i)
+        ss << "    " << convert_type(u.alts[i].type) << " _" << i << "{};\n";
+    ss << "    " << me << "() = default;\n";
+    for (size_t i = 0; i < u.alts.size(); ++i)
+        ss << "    " << me << "(const " << convert_type(u.alts[i].type) << "& v) : " << cpp_name(u.tag) << "(\"" << u.alts[i].tags[0]
+           << "\"), _which(" << i << "), _" << i << "(v) {}\n";
+    for (size_t i = 0; i < u.alts.size(); ++i) {
+        ss << "    bool is_" << u.alts[i].name << "() const { return _which == " << i << "; }\n";
+        ss << "    struct _As" << i << " { const " << convert_type(u.alts[i].type) << "& _0; };\n";
+        ss << "    _As" << i << " as_" << u.alts[i].name << "() const { return _As" << i << "{_" << i << "}; }\n";
+    }
+    ss << "};\n";
+    return ss.str();
+}
+
+std::string DataDef::to_webcc() {
+    if (is_union)
+        return emit_union(*this);
+    std::stringstream ss;
+    
     
     // Generate template declaration for generic types
     if (!type_params.empty()) {

@@ -1,0 +1,7 @@
+// Test: every alternative of a union is a pod
+enum Kind { A, B }
+union Message(string type) {
+    "a" => Kind;
+}
+component App { view { <p>x</p> } }
+app { root = App; }

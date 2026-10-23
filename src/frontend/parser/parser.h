@@ -78,7 +78,8 @@ class Parser{
         std::unique_ptr<Expression> parse_match();  // Parse match expression
         std::unique_ptr<Expression> parse_prop_or_attr_value();
         std::unique_ptr<Statement> parse_statement();
-        std::unique_ptr<DataDef> parse_data();
+                std::unique_ptr<DataDef> parse_data();
+        std::unique_ptr<DataDef> parse_union();
         std::unique_ptr<EnumDef> parse_enum();
         std::string parse_style_block();
         std::unique_ptr<ASTNode> parse_html_element();

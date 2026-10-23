@@ -282,17 +282,23 @@ void generate_cpp_code(
         std::set<std::string> pods;
         for (const auto &data_def : all_global_data)
             pods.insert(qualified_name(data_def->module_name, data_def->name));
-        for (const auto &data_def : all_global_data)
+                for (const auto &data_def : all_global_data)
+        {
             for (auto &field : data_def->fields)
                 field.type = qualify_pod_type(field.type, data_def->module_name, pods);
+            for (auto &alt : data_def->alts)
+                alt.type = qualify_pod_type(alt.type, data_def->module_name, pods);
+        }
     }
 
     // Register all data types in the DataTypeRegistry for JSON codegen
     // Component-local types are prefixed with ComponentName_
     DataTypeRegistry::instance().clear();
-    for (const auto &data_def : all_global_data)
+        for (const auto &data_def : all_global_data)
     {
         DataTypeRegistry::instance().register_type(qualified_name(data_def->module_name, data_def->name), data_def->fields);
+        if (data_def->is_union)
+            DataTypeRegistry::instance().register_union(qualified_name(data_def->module_name, data_def->name), data_def->tag, data_def->alts);
     }
     for (const auto &comp : all_components)
     {
@@ -519,12 +525,17 @@ void generate_cpp_code(
         std::function<void(const DataDef *)> visit = [&](const DataDef *d) {
             if (done.count(d) || visiting.count(d))
                 return;
-            visiting.insert(d);
+                        visiting.insert(d);
+            // a union holds its alternatives by value: they come first, like field types
+            std::vector<std::string> types;
             for (const auto &field : d->fields)
+                types.push_back(field.type);
+            for (const auto &alt : d->alts)
+                types.push_back(alt.type);
+            for (const std::string &t : types)
             {
                 // every name in the type: Geo::Point[], Point[string], Pair<A, B>; field types
                 // were qualified above (Geo_Point), so a word is tried as it is first
-                const std::string &t = field.type;
                 for (size_t i = 0; i < t.size();)
                 {
                     if (!std::isalpha((unsigned char)t[i]) && t[i] != '_') { i++; continue; }
@@ -587,13 +598,13 @@ void generate_cpp_code(
     out << "\n";
 
     {
-        std::vector<JsonPod> pods;
+                std::vector<JsonPod> pods;
         for (const auto &data_def : all_global_data)
             if (!data_def->source_file.empty())
-                pods.push_back({qualified_name(data_def->module_name, data_def->name), data_def->type_params, data_def->fields});
+                pods.push_back({qualified_name(data_def->module_name, data_def->name), data_def->type_params, data_def->fields, data_def->is_union, data_def->alts});
         for (const auto &comp : all_components)
             for (const auto &data_def : comp.data)
-                pods.push_back({qualified_name(comp.module_name, comp.name) + "_" + data_def->name, data_def->type_params, data_def->fields});
+                pods.push_back({qualified_name(comp.module_name, comp.name) + "_" + data_def->name, data_def->type_params, data_def->fields, false, {}});
         emit_json_writer_runtime(out);
         out << generate_json_writers(pods) << "\n";
     }

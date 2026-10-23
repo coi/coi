@@ -203,7 +203,9 @@ Token Lexer::read_identifier(){
         {"component", TokenType::COMPONENT},
         {"def", TokenType::DEF},
         {"return", TokenType::RETURN},
-        {"pod", TokenType::POD},
+                {"pod", TokenType::POD},
+        {"union", TokenType::UNION},
+
         {"view", TokenType::VIEW},
         {"tick", TokenType::TICK},
         {"init", TokenType::INIT},

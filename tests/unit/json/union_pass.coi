@@ -1,0 +1,42 @@
+// Test: a union of pods told apart by a tag: made from an alternative, matched, parsed, written
+pod Pointer { float x; float y; }
+pod Hold { int block; bool on; }
+pod Left { }
+
+union Message(string type) {
+    string from;
+    "at" => Pointer;
+    "hold" | "held" => Hold;
+    "left" => Left;
+}
+
+pod Batch { Message[] items; Message last; }
+
+component App {
+    mut string out = "";
+    def describe(Message m) : string {
+        string s = match (m) {
+            Pointer(Pointer p) => `at ${p.x},${p.y} from ${m.from}`;
+            Hold(Hold h) => `${m.type} ${h.block}`;
+            else => "left";
+        };
+        return s;
+    }
+    init {
+        mut Message a = Pointer{x = 1.0, y = 2.0};
+        a.from = "me";
+        out = describe(a) + " " + Json.stringify(a);
+        match (Json.parse(Message, `{"type":"held","from":"x","block":7,"on":true}`)) {
+            Success(Message m, MessageMeta meta) => { out += " " + describe(m) + (meta.has(Message.from) ? " from" : ""); };
+            Error(string e) => { out += " error"; };
+        };
+        match (Json.parse(Batch, `{"items":[{"type":"left"},{"type":"at","x":3,"y":4}],"last":{"type":"hold","block":1,"on":false}}`)) {
+            Success(Batch b, BatchMeta meta) => { out += ` ${b.items.size()} ` + describe(b.last); };
+            Error(string e) => { out += " error"; };
+        };
+        Message[] list = [Left{}, Hold{block = 1, on = false}];
+        out += ` ${list.size()}`;
+    }
+    view { <p>{out}</p> }
+}
+app { root = App; }

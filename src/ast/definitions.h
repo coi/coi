@@ -35,6 +35,13 @@ struct DataField {
     std::string name;
 };
 
+// one alternative of a union: the tag values that mean it, and the pod it then is
+struct UnionAlt {
+    std::vector<std::string> tags;
+    std::string type;   // as written (Geo::Point), qualified for C++ before codegen
+    std::string name;   // the bare pod name, what a match arm says: Point(Point p)
+};
+
 struct DataDef : ASTNode {
     std::string name;
     std::string module_name;  // Module this type belongs to
@@ -42,6 +49,12 @@ struct DataDef : ASTNode {
     bool is_public = false;   // Requires pub keyword to be importable
     std::vector<std::string> type_params;  // Generic type parameters (e.g., ["T"] or ["A", "B"])
     std::vector<DataField> fields;
+
+    // a union: one of several pods at a time, told apart by a string field (the tag) whose value
+    // picks the alternative. fields[0] is the tag; the other fields are on every alternative
+    bool is_union = false;
+    std::string tag;
+    std::vector<UnionAlt> alts;
 
     std::string to_webcc() override;
 };

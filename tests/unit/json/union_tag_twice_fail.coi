@@ -1,0 +1,9 @@
+// Test: a tag value can't mean two alternatives
+pod A { int n; }
+pod B { int m; }
+union Message(string type) {
+    "x" => A;
+    "x" | "y" => B;
+}
+component App { view { <p>x</p> } }
+app { root = App; }

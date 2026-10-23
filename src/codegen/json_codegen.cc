@@ -27,8 +27,18 @@ const std::vector<DataField>* DataTypeRegistry::lookup(const std::string& name) 
     return it != types_.end() ? &it->second : nullptr;
 }
 
+void DataTypeRegistry::register_union(const std::string& name, const std::string& tag, const std::vector<UnionAlt>& alts) {
+    unions_[name] = UnionInfo{tag, alts};
+}
+
+const DataTypeRegistry::UnionInfo* DataTypeRegistry::lookup_union(const std::string& name) const {
+    auto it = unions_.find(name);
+    return it != unions_.end() ? &it->second : nullptr;
+}
+
 void DataTypeRegistry::clear() {
     types_.clear();
+    unions_.clear();
 }
 
 // ============================================================================
@@ -133,6 +143,68 @@ static void generate_object_fields_parse(std::stringstream& ss,
                                           const std::string& indent,
                                           int depth);
 
+// a union: the tag field picks the alternative; the tag and the shared fields are parsed like
+// a pod's, then the alternative's fields into its slot. top: the whole document is this union,
+// so a value no alternative is for is an error; nested, the field is simply left as none
+static void generate_union_parse(std::stringstream& ss,
+                                 const std::string& union_type,
+                                 const std::string& result_var,
+                                 const std::string& meta_var,
+                                 const std::string& src_var,
+                                 const std::string& len_var,
+                                 const std::string& indent,
+                                 int depth,
+                                 bool top) {
+    auto* u = DataTypeRegistry::instance().lookup_union(union_type);
+    if (!u) return;
+    std::string d = std::to_string(depth);
+    std::string tag = "_utag" + d, tp = "_utp" + d, uok = "_uok" + d;
+    ss << indent << "coi::string " << tag << ";\n";
+    ss << indent << "if (uint32_t " << tp << " = __coi_json::find_key(" << src_var << ", " << len_var << ", \"" << u->tag << "\", " << u->tag.length() << ")) {\n";
+    ss << indent << "    " << tp << " = __coi_json::skip_ws(" << src_var << ", " << tp << ", " << len_var << ");\n";
+    ss << indent << "    if (!__coi_json::is_null(" << src_var << ", " << tp << ", " << len_var << ")) " << tag << " = __coi_json::ext_str(" << src_var << ", " << tp << ", " << len_var << ");\n";
+    ss << indent << "}\n";
+    ss << indent << "bool " << uok << ";\n";
+    generate_object_fields_parse(ss, union_type, result_var, meta_var, src_var, len_var, uok, indent, depth);
+    for (size_t i = 0; i < u->alts.size(); i++) {
+        std::string cond;
+        for (const auto& t : u->alts[i].tags)
+            cond += (cond.empty() ? "" : " || ") + tag + " == \"" + t + "\"";
+        std::string am = "_uam" + d + "_" + std::to_string(i), aok = "_uaok" + d + "_" + std::to_string(i);
+        ss << indent << (i == 0 ? "if (" : "else if (") << cond << ") {\n";
+        ss << indent << "    " << result_var << "._which = " << i << ";\n";
+        ss << indent << "    " << u->alts[i].type << "Meta " << am << "{};\n";
+        ss << indent << "    bool " << aok << ";\n";
+        generate_object_fields_parse(ss, u->alts[i].type, result_var + "._" + std::to_string(i), am,
+                                     src_var, len_var, aok, indent + "    ", depth + 1);
+        ss << indent << "}\n";
+    }
+    if (top) {
+        ss << indent << "else {\n";
+        ss << indent << "    _r.ok = false;\n";
+        ss << indent << "    _r.error = \"No alternative of " << union_type << " for this " << u->tag << "\";\n";
+        ss << indent << "    _r.error_payload._0 = _r.error;\n";
+        ss << indent << "    return _r;\n";
+        ss << indent << "}\n";
+    }
+}
+
+// a pod's fields, or a union through its tag
+static void generate_value_parse(std::stringstream& ss,
+                                 const std::string& data_type,
+                                 const std::string& result_var,
+                                 const std::string& meta_var,
+                                 const std::string& src_var,
+                                 const std::string& len_var,
+                                 const std::string& ok_var,
+                                 const std::string& indent,
+                                 int depth) {
+    if (DataTypeRegistry::instance().lookup_union(data_type))
+        generate_union_parse(ss, data_type, result_var, meta_var, src_var, len_var, indent, depth, false);
+    else
+        generate_object_fields_parse(ss, data_type, result_var, meta_var, src_var, len_var, ok_var, indent, depth);
+}
+
 // Generate inline parsing code for a single primitive field
 static void generate_primitive_field_parse(std::stringstream& ss,
                                             const std::string& field_type,
@@ -191,9 +263,9 @@ static void generate_array_field_parse(std::stringstream& ss,
         ss << indent << "            " << elem_type << " " << ae << "{};\n";
         ss << indent << "            " << elem_type << "Meta " << ae_meta << "{};\n";
         ss << indent << "            bool " << ae_ok << ";\n";
-        generate_object_fields_parse(ss, elem_type, ae, ae_meta,
-                                     ae_view + ".data()", ae_view + ".length()", ae_ok,
-                                     indent + "            ", depth + 1);
+                generate_value_parse(ss, elem_type, ae, ae_meta,
+                             ae_view + ".data()", ae_view + ".length()", ae_ok,
+                             indent + "            ", depth + 1);
         ss << indent << "            " << result_var << "." << cpp_name(field_name) << ".push_back(" << ae << ");\n";
         ss << indent << "        }\n";
     }
@@ -222,11 +294,11 @@ static void generate_nested_field_parse(std::stringstream& ss,
     ss << indent << "auto " << nv << " = __coi_json::isolate(" << src_var << ", " << pos_var << ", " << len_var << ");\n";
     ss << indent << "if (" << nv << ".length() > 0) {\n";
     ss << indent << "    bool " << n_ok << ";\n";
-    generate_object_fields_parse(ss, nested_type,
-                                 result_var + "." + cpp_name(field_name),
-                                 meta_var + "." + cpp_name(field_name),
-                                 nv + ".data()", nv + ".length()", n_ok,
-                                 indent + "    ", depth + 1);
+        generate_value_parse(ss, nested_type,
+                         result_var + "." + cpp_name(field_name),
+                         meta_var + "." + cpp_name(field_name),
+                         nv + ".data()", nv + ".length()", n_ok,
+                         indent + "    ", depth + 1);
     ss << indent << "    " << meta_var << ".set(" << field_idx << ");\n";
     ss << indent << "}\n";
 }
@@ -359,7 +431,7 @@ static std::string generate_json_parse_array(
     ss << "                    " << elem_type << " _elem{};\n";
     ss << "                    " << elem_type << "Meta _elem_meta{};\n";
     ss << "                    bool _ok;\n";
-    generate_object_fields_parse(ss, elem_type, "_elem", "_elem_meta", "_ev.data()", "_ev.length()", "_ok", "                    ", 0);
+        generate_value_parse(ss, elem_type, "_elem", "_elem_meta", "_ev.data()", "_ev.length()", "_ok", "                    ", 0);
     ss << "                    _r.value.push_back(coi::move(_elem));\n";
     ss << "                    _r.meta.push_back(coi::move(_elem_meta));\n";
     ss << "                }\n";
@@ -415,9 +487,12 @@ std::string generate_json_parse(
     ss << "                _r.error_payload._0 = _r.error;\n";
     ss << "                return _r;\n";
     ss << "            }\n";
-    ss << "            _r.ok = true;\n";
+        ss << "            _r.ok = true;\n";
     ss << "            bool _ok;\n";
-    generate_object_fields_parse(ss, data_type, "_r.value", "_r.meta", "_s", "_len", "_ok", "            ", 0);
+    if (DataTypeRegistry::instance().lookup_union(data_type))
+        generate_union_parse(ss, data_type, "_r.value", "_r.meta", "_s", "_len", "            ", 0, true);
+    else
+        generate_object_fields_parse(ss, data_type, "_r.value", "_r.meta", "_s", "_len", "_ok", "            ", 0);
     ss << "            _r.success._0 = _r.value;\n";
     ss << "            _r.success._1 = _r.meta;\n";
     ss << "            return _r;\n";
@@ -702,11 +777,20 @@ std::string generate_json_writers(const std::vector<JsonPod>& pods) {
     };
     for (const auto& pod : pods)
         ss << signature(pod) << ";\n";
-    for (const auto& pod : pods) {
+        for (const auto& pod : pods) {
         ss << signature(pod) << " {\n";
         for (size_t i = 0; i < pod.fields.size(); i++) {
             const auto& f = pod.fields[i];
             ss << "    w.put(\"" << (i ? "," : "{") << "\\\"" << f.name << "\\\":\"); __coi_json_write(w, v." << cpp_name(f.name) << ");\n";
+        }
+        // a union: after the tag and the shared fields, the alternative's own fields
+        for (size_t a = 0; a < pod.alts.size(); a++) {
+            auto* af = DataTypeRegistry::instance().lookup(pod.alts[a].type);
+            if (!af) continue;
+            ss << "    if (v._which == " << a << ") {\n";
+            for (const auto& f : *af)
+                ss << "        w.put(\",\\\"" << f.name << "\\\":\"); __coi_json_write(w, v._" << a << "." << cpp_name(f.name) << ");\n";
+            ss << "    }\n";
         }
         ss << "    w.put(\"" << (pod.fields.empty() ? "{}" : "}") << "\");\n";
         ss << "}\n";

@@ -11,6 +11,9 @@
 static std::set<std::string> g_enum_types;
 // Global map of known data types to their field names (for Meta.has(Type.field))
 static std::map<std::string, std::set<std::string>> g_data_type_fields;
+// a union's alternatives (the pod names), by the union's name and its module-qualified name;
+// an alternative converts to its union
+static std::map<std::string, std::set<std::string>> g_union_alts;
 // global pod name -> the modules that define one ("" for files without a module line)
 static std::map<std::string, std::set<std::string>> g_pod_modules;
 // Global map of known data types to their field types (for member access type inference)
@@ -468,8 +471,24 @@ bool is_compatible_type(const std::string &source, const std::string &target)
                 return t;
         return t.substr(d + 2);
     };
-    if (unqualified(source) == unqualified(target))
+        if (unqualified(source) == unqualified(target))
         return true;
+
+    // a union takes any of its alternatives: Message m = Pointer{...}
+    {
+        auto it = g_union_alts.find(unqualified(target));
+        if (it == g_union_alts.end())
+        {
+            std::string u = target;
+            size_t pos;
+            while ((pos = u.find("::")) != std::string::npos)
+                u.replace(pos, 2, "_");
+            it = g_union_alts.find(u);
+        }
+        if (it != g_union_alts.end() && it->second.count(unqualified(source)))
+            return true;
+    }
+
 
     // Handle Component.EnumName type compatibility
     // App.Mode should be compatible with Mode (when Mode is from App's shared enum)
@@ -2854,10 +2873,11 @@ void validate_types(const std::vector<Component> &components,
     }
 
     // Collect all enum type names (for enum <-> int conversion checking)
-    g_enum_types.clear();
+        g_enum_types.clear();
     g_data_type_fields.clear();
     g_pod_modules.clear();
     g_data_type_field_types.clear();
+    g_union_alts.clear();
     
     // Add global enums
     for (const auto &e : global_enums)
@@ -2892,7 +2912,7 @@ void validate_types(const std::vector<Component> &components,
             fields.insert(f.name);
             field_types[f.name] = f.type;
         }
-        g_data_type_fields[d->name] = fields;
+                g_data_type_fields[d->name] = fields;
         g_data_type_field_types[d->name] = field_types;
         g_pod_modules[d->name].insert(d->module_name);
         if (!d->module_name.empty())
@@ -2900,7 +2920,43 @@ void validate_types(const std::vector<Component> &components,
             g_data_type_fields[d->module_name + "_" + d->name] = fields;
             g_data_type_field_types[d->module_name + "_" + d->name] = field_types;
         }
+        if (d->is_union)
+        {
+            std::set<std::string> alts;
+            for (const auto &alt : d->alts)
+                alts.insert(alt.name);
+            g_union_alts[d->name] = alts;
+            if (!d->module_name.empty())
+                g_union_alts[d->module_name + "_" + d->name] = alts;
+        }
     }
+    // a union's alternatives are pods (not unions, not primitives), each once, each tag once
+    for (const auto &d : global_data)
+    {
+        if (!d->is_union)
+            continue;
+        std::set<std::string> seen_types, seen_tags;
+        for (const auto &alt : d->alts)
+        {
+            if (!is_data_type(alt.name) || g_union_alts.count(alt.name))
+            {
+                ErrorHandler::type_error("Union '" + d->name + "': '" + alt.type + "' is not a pod. Every alternative of a union is a pod");
+                exit(1);
+            }
+            if (!seen_types.insert(alt.name).second)
+            {
+                ErrorHandler::type_error("Union '" + d->name + "': pod '" + alt.name + "' is an alternative twice. Give one alternative several tags instead: \"a\" | \"b\" => " + alt.name + ";");
+                exit(1);
+            }
+            for (const auto &tag : alt.tags)
+                if (!seen_tags.insert(tag).second)
+                {
+                    ErrorHandler::type_error("Union '" + d->name + "': tag \"" + tag + "\" means two alternatives");
+                    exit(1);
+                }
+        }
+    }
+
 
     // Add component-local data types and fields
     for (const auto &comp : components)

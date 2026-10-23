@@ -1,0 +1,68 @@
+// a union of pods told apart by a tag: made from an alternative, matched, parsed, written back
+pod Pointer { float x; float y; }
+pod Hold { int block; bool on; }
+pod Left { }
+
+union Message(string type) {
+    string from;
+    "at" => Pointer;
+    "hold" | "held" => Hold;
+    "left" => Left;
+}
+
+pod Batch { Message[] items; Message last; }
+
+component App {
+    mut string made = "";
+    mut string parsed = "";
+    mut string unknown = "";
+    mut string nested = "";
+    mut string round = "";
+    def describe(Message m) : string {
+        string s = match (m) {
+            Pointer(Pointer p) => `at ${p.x},${p.y} from ${m.from}`;
+            Hold(Hold h) => `${m.type} ${h.block} ${h.on ? "on" : "off"}`;
+            else => "left";
+        };
+        return s;
+    }
+    init {
+        mut Message a = Pointer{x = 1.0, y = 2.0};
+        a.from = "me";
+        made = describe(a) + " | " + Json.stringify(a);
+        match (Json.parse(Message, `{"type":"held","from":"x","block":7,"on":true}`)) {
+            Success(Message m, MessageMeta meta) => { parsed = describe(m) + (meta.has(Message.from) ? " (from present)" : ""); };
+            Error(string e) => { parsed = "error"; };
+        };
+        match (Json.parse(Message, `{"type":"dance","from":"x"}`)) {
+            Success(Message m, MessageMeta meta) => { unknown = "parsed?!"; };
+            Error(string e) => { unknown = "error: " + e; };
+        };
+        match (Json.parse(Batch, `{"items":[{"type":"left"},{"type":"at","x":3,"y":4},{"type":"nope"}],"last":{"type":"hold","block":1,"on":false}}`)) {
+            Success(Batch b, BatchMeta meta) => {
+                mut string parts = "";
+                for it in b.items { parts += "[" + describe(it) + "]"; }
+                nested = `${b.items.size()} ${parts} last=${describe(b.last)}`;
+            };
+            Error(string e) => { nested = "error"; };
+        };
+        // written then read back is the same message
+        mut Message h = Hold{block = 9, on = true};
+        h.type = "held";
+        h.from = "q";
+        match (Json.parse(Message, Json.stringify(h))) {
+            Success(Message m, MessageMeta meta) => { round = describe(m) + " from " + m.from; };
+            Error(string e) => { round = "error"; };
+        };
+    }
+    view {
+        <div>
+            <p class="made">{made}</p>
+            <p class="parsed">{parsed}</p>
+            <p class="unknown">{unknown}</p>
+            <p class="nested">{nested}</p>
+            <p class="round">{round}</p>
+        </div>
+    }
+}
+app { root = App; }

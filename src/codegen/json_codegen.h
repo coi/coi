@@ -21,15 +21,21 @@ public:
     // Register a data type
     void register_type(const std::string& name, const std::vector<DataField>& fields);
     
-    // Look up a data type's fields
+        // Look up a data type's fields
     const std::vector<DataField>* lookup(const std::string& name) const;
-    
+
+    // a union: its tag field and alternatives (types already qualified for C++)
+    struct UnionInfo { std::string tag; std::vector<UnionAlt> alts; };
+    void register_union(const std::string& name, const std::string& tag, const std::vector<UnionAlt>& alts);
+    const UnionInfo* lookup_union(const std::string& name) const;
+
     // Clear all registrations
     void clear();
-    
+
 private:
     DataTypeRegistry() = default;
     std::map<std::string, std::vector<DataField>> types_;
+    std::map<std::string, UnionInfo> unions_;
 };
 
 // Generate the JSON parse expression for a specific data type
@@ -57,6 +63,8 @@ struct JsonPod {
     std::string name;
     std::vector<std::string> type_params;
     std::vector<DataField> fields;
+    bool is_union = false;          // the tag and shared fields are `fields`; the alternative's fields follow
+    std::vector<UnionAlt> alts;
 };
 std::string generate_json_writers(const std::vector<JsonPod>& pods);
 

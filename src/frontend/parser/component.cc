@@ -136,6 +136,95 @@ std::unique_ptr<DataDef> Parser::parse_data()
     return def;
 }
 
+// union Name(string tag) { shared fields; "value" | "value" => Pod; ... }
+// One of several pods at a time, told apart by the tag: a JSON object's tag field picks the
+// alternative. The shared fields are on every alternative, next to the tag
+std::unique_ptr<DataDef> Parser::parse_union()
+{
+    expect(TokenType::UNION, "Expected 'union'");
+    std::string name = current().value;
+    int name_line = current().line;
+    expect(TokenType::IDENTIFIER, "Expected union name");
+    if (!name.empty() && !std::isupper(name[0]))
+        ErrorHandler::compiler_error("Union type name '" + name + "' must start with an uppercase letter", name_line);
+
+    auto def = std::make_unique<DataDef>();
+    def->name = name;
+    def->is_union = true;
+    expect(TokenType::LPAREN, "Expected '(' after the union's name: union " + name + "(string type) { ... }");
+    if (current().type != TokenType::STRING)
+        ErrorHandler::compiler_error("A union's tag is a string field: union " + name + "(string type) { ... }", current().line);
+    advance();
+    def->tag = current().value;
+    expect(TokenType::IDENTIFIER, "Expected the tag field's name");
+    expect(TokenType::RPAREN, "Expected ')' after the tag");
+    def->fields.push_back({"string", def->tag});
+
+    expect(TokenType::LBRACE, "Expected '{'");
+    while (current().type != TokenType::RBRACE && current().type != TokenType::END_OF_FILE)
+    {
+        // "value" | "value" => Pod;
+        if (current().type == TokenType::STRING_LITERAL)
+        {
+            UnionAlt alt;
+            alt.tags.push_back(current().value);
+            advance();
+            while (current().type == TokenType::PIPE)
+            {
+                advance();
+                alt.tags.push_back(current().value);
+                expect(TokenType::STRING_LITERAL, "Expected another tag value after '|'");
+            }
+            expect(TokenType::ARROW, "Expected '=>' and the pod this tag means");
+            alt.type = current().value;
+            alt.name = current().value;
+            expect(TokenType::IDENTIFIER, "Expected a pod type after '=>'");
+            if (current().type == TokenType::DOUBLE_COLON)
+            {
+                advance();
+                alt.type += "::" + current().value;
+                alt.name = current().value;
+                expect(TokenType::IDENTIFIER, "Expected type name after '::'");
+            }
+            expect(TokenType::SEMICOLON, "Expected ';'");
+            def->alts.push_back(std::move(alt));
+            continue;
+        }
+        // a shared field, as in a pod
+        std::string type = current().value;
+        if (current().type == TokenType::INT || current().type == TokenType::STRING ||
+            current().type == TokenType::FLOAT || current().type == TokenType::FLOAT32 ||
+            current().type == TokenType::BOOL || current().type == TokenType::IDENTIFIER)
+            advance();
+        else
+            ErrorHandler::compiler_error("Expected a shared field (type and name) or a tag (\"value\" => Pod;) in union " + name, current().line);
+        if (current().type == TokenType::DOUBLE_COLON)
+        {
+            advance();
+            type += "::" + current().value;
+            expect(TokenType::IDENTIFIER, "Expected type name after '::'");
+        }
+        if (current().type == TokenType::LBRACKET)
+        {
+            advance();
+            type += parse_type_bracket_suffix();
+        }
+        std::string fieldName = current().value;
+        int field_line = current().line;
+        if (!is_identifier_token())
+            expect(TokenType::IDENTIFIER, "Expected field name");
+        advance();
+        expect(TokenType::SEMICOLON, "Expected ';'");
+        if (fieldName == def->tag)
+            ErrorHandler::compiler_error("'" + fieldName + "' is already the tag of union " + name, field_line);
+        def->fields.push_back({type, fieldName});
+    }
+    expect(TokenType::RBRACE, "Expected '}'");
+    if (def->alts.empty())
+        ErrorHandler::compiler_error("Union '" + name + "' has no alternatives: add \"value\" => Pod; lines", name_line);
+    return def;
+}
+
 std::unique_ptr<EnumDef> Parser::parse_enum()
 {
     expect(TokenType::ENUM, "Expected 'enum'");

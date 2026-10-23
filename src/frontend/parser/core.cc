@@ -97,8 +97,8 @@ bool Parser::is_name_token(TokenType t)
     // 2. Soft Keywords: Common words that are keywords in some places
     // but useful as variable names in others. The block keywords (style, view, mount, unmount,
     // tick, init) only mean something at the start of a component member, so a name can be one
-    if (t == TokenType::KEY || t == TokenType::STYLE || t == TokenType::VIEW || t == TokenType::MOUNT ||
-        t == TokenType::UNMOUNT || t == TokenType::TICK || t == TokenType::INIT)
+        if (t == TokenType::KEY || t == TokenType::STYLE || t == TokenType::VIEW || t == TokenType::MOUNT ||
+        t == TokenType::UNMOUNT || t == TokenType::TICK || t == TokenType::INIT || t == TokenType::UNION)
         return true;
 
     // 3. Hard Keywords: Modifiers and Structure.
@@ -248,14 +248,15 @@ void Parser::parse_file()
             is_public = true;
             advance();
             
-            // pub must be followed by component, enum, pod, def, or import
+            // pub must be followed by component, enum, pod, union, def, or import
             if (current().type != TokenType::COMPONENT && 
                 current().type != TokenType::ENUM && 
-                current().type != TokenType::POD &&
+                                current().type != TokenType::POD &&
+                current().type != TokenType::UNION &&
                 current().type != TokenType::DEF &&
                 current().type != TokenType::IMPORT)
             {
-                ErrorHandler::compiler_error("'pub' can only be used with component, enum, pod, def, or import declarations", current().line);
+                ErrorHandler::compiler_error("'pub' can only be used with component, enum, pod, union, def, or import declarations", current().line);
             }
         }
 
@@ -281,10 +282,18 @@ void Parser::parse_file()
             enum_def->module_name = module_name;
             global_enums.push_back(std::move(enum_def));
         }
-        else if (current().type == TokenType::POD)
+                else if (current().type == TokenType::POD)
         {
             // Global pod type (outside any component)
             auto data_def = parse_data();
+            data_def->is_public = is_public;
+            data_def->module_name = module_name;
+            global_data.push_back(std::move(data_def));
+        }
+        else if (current().type == TokenType::UNION)
+        {
+            // a union of pods: one of them at a time, told apart by a tag field
+            auto data_def = parse_union();
             data_def->is_public = is_public;
             data_def->module_name = module_name;
             global_data.push_back(std::move(data_def));

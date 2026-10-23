@@ -679,6 +679,51 @@ if (meta.has(User.email)) { /* ... */ }
 
 See [API Reference - JSON](api-reference.md#json) for more details and examples.
 
+### Unions
+
+A value that is one of several shapes is a `union`: one of several pods at a time, told apart by a string field, the tag. Fields declared in the union itself are on every alternative, next to the tag.
+
+```tsx
+pod Click { float x; float y; }
+pod Key { string code; }
+pod Resize { int width; int height; }
+
+// one event from an input log; "kind" says which
+union Event(string kind) {
+    int64 time;                   // on every event
+    "click" => Click;
+    "keydown" | "keyup" => Key;   // two tag values, one shape
+    "resize" => Resize;
+}
+```
+
+A union is a value like a pod: copyable, no allocation, one struct holding whichever alternative it is. It is made from an alternative and takes that alternative's first tag; the tag and the shared fields are ordinary fields:
+
+```tsx
+mut Event e = Key{code = "Enter"};   // e.kind is "keydown"
+e.kind = "keyup";
+e.time = System.getDateNow().toInt64();
+```
+
+`match` tells the alternatives apart, binding the pod inside:
+
+```tsx
+match (e) {
+    Click(Click c) => { System.log(`click at ${c.x}, ${c.y} at ${e.time}`); };
+    Key(Key k) => { if (e.kind == "keyup") System.log("released " + k.code); };
+    else => { System.log("resized"); };
+};
+```
+
+`Json.parse(Event, text)` reads the tag first and parses the alternative it names; a tag no alternative is for is an `Error`. Inside a pod or an array a union parses the same way, and a tag nobody claims leaves the field as none, which no `match` arm matches. `Json.stringify` writes the tag, the shared fields and the alternative's fields as one flat object, so a union round-trips through JSON as the record it describes:
+
+```tsx
+match (Json.parse(Event, `{"kind":"click","time":1700000000000,"x":1,"y":2}`)) {
+    Success(Event ev, EventMeta meta) => { handle(ev); };
+    Error(string err) => { };
+};
+```
+
 ### Reactivity
 
 Pod types participate in Coi's reactivity system. When you modify a field of a pod type, the entire object is marked as modified:

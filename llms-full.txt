@@ -495,6 +495,27 @@ Passing modes at the call site (in a view):
 | `&prop={value}` | reference (child can modify parent's value / callback) |
 | `:prop={value}` | move (ownership transferred to child) |
 
+### Unions (one of several pods, told apart by a tag field)
+```coi
+pod Click { float x; float y; }
+pod Key { string code; }
+union Event(string kind) {          // the tag: a string field on the union
+    int64 time;                     // shared fields: on every alternative
+    "click" => Click;
+    "keydown" | "keyup" => Key;     // several tag values, one pod
+}
+mut Event e = Key{code = "Enter"};  // made from an alternative; e.kind is "keydown"
+e.time = 0;
+match (e) {
+    Click(Click c) => { ... };                  // the arm names the pod and binds it
+    Key(Key k) => { if (e.kind == "keyup") ... };
+    else => { ... };
+};
+Json.parse(Event, text)      // reads the tag, parses that alternative; unknown tag = Error
+Json.stringify(e)            // one flat object: tag, shared fields, the alternative's fields
+```
+A union is a value like a pod (copyable, no allocation). Inside pods and arrays it parses the same way.
+
 ### Lifecycle
 ```
 init {}     runs BEFORE the view; no DOM yet; set up state
