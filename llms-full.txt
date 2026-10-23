@@ -248,7 +248,7 @@ bool e = ages.empty();
 bool h = ages.contains("alice");
 ages.erase("bob");
 ages.clear();
-for string key in ages {       // iterates KEYS
+for key in ages {       // iterates KEYS
     System.log(key);
     System.log(ages[key]);     // number logged via string context as needed
 }

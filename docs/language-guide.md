@@ -259,7 +259,7 @@ int age = ages["alice"];      // Get value by key
 ages["alice"] = 26;           // Set value by key (requires mut)
 
 // Iteration - iterates over keys
-for string name in ages {
+for name in ages {
     System.log(name);       // Prints each key
     System.log(ages[name]); // Access value via key
 }
