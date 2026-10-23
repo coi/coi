@@ -747,7 +747,7 @@ mount { music = Audio.load("assets/song.mp3"); music.setVolume(0.8); }
 ```coi
 System.log(msg)  System.warn(msg)  System.error(msg)
 System.setTitle(t)  System.reload()  System.openUrl(url)  System.navigate(path)
-System.getTime()            // seconds (float64, high precision)
+System.getTime()            // ms since the page loaded (float64, high precision)
 System.getDateNow()         // ms since epoch, UTC (float64)
 System.getTimezoneOffsetMs()// local offset from UTC in ms; add to a UTC epoch ms for local
 System.getVisibilityState() // "visible" / "hidden" / ...

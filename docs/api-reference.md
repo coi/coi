@@ -350,7 +350,7 @@ Logging, page title, time, and URL navigation.
 | `System.reload()` | Reload the page |
 | `System.openUrl(string url)` | Open URL in new tab |
 | `System.navigate(string path)` | Navigate to route (client-side routing) |
-| `System.getTime()` | Get time in seconds (float64) |
+| `System.getTime()` | Milliseconds since the page started loading (float64, `performance.now()`) |
 | `System.getDateNow()` | Get milliseconds since epoch, UTC (float64) |
 | `System.getTimezoneOffsetMs()` | Local timezone offset from UTC in milliseconds (float64; add to a UTC epoch ms to get local time) |
 | `System.getTimezoneOffsetAt(float64 ms)` | The same offset at that instant (daylight saving time). `Date.format` uses it |
@@ -369,7 +369,7 @@ System.error("Error occurred");
 System.setTitle("My App");
 
 // Time
-float now = System.getTime();       // Seconds (high precision)
+float now = System.getTime();       // Milliseconds since the page loaded (high precision)
 float epoch = System.getDateNow();  // Milliseconds since epoch
 
 // Page visibility
