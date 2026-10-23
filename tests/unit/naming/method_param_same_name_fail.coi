@@ -1,0 +1,9 @@
+// Test: a method can't share its name with a parameter
+component Panel(int open) {
+    def open() : void {}
+    view { <p>{open}</p> }
+}
+
+component App { view { <Panel open={1} /> } }
+
+app { root = App; }

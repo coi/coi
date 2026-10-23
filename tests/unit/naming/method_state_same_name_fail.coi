@@ -1,0 +1,8 @@
+// Test: a method can't share its name with a state variable
+component App {
+    mut int count = 0;
+    def count() : void {}
+    view { <p>x</p> }
+}
+
+app { root = App; }

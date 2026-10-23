@@ -1257,6 +1257,17 @@ Component Parser::parse_component()
         }
     }
 
+    // a method and a variable by one name are one name in the generated code
+    for (const auto &m : comp.methods)
+    {
+        for (const auto &p : comp.params)
+            if (p->name == m.name)
+                ErrorHandler::compiler_error("'" + m.name + "' is both a parameter and a method of " + comp.name + ". Rename one of them", m.line);
+        for (const auto &v : comp.state)
+            if (v->name == m.name)
+                ErrorHandler::compiler_error("'" + m.name + "' is both a variable and a method of " + comp.name + ". Rename one of them", m.line);
+    }
+
     expect(TokenType::RBRACE, "Expected '}' to close component '" + comp.name + "'");
     return comp;
 }
@@ -1269,6 +1280,7 @@ FunctionDef Parser::parse_function_def(bool is_public)
     func.is_public = is_public;
     func.name = current().value;
     int func_line = current().line;
+    func.line = func_line;
     if (!is_identifier_token())
         expect(TokenType::IDENTIFIER, "Expected function name");
     advance();
