@@ -49,12 +49,17 @@ component Docs {
     view { <p class="at">{at}</p> }
 }
 
+// a route whose whole view is a child with an <if> on a prop: its root is the child's
+component Panel(bool on) { view { <section class="panel"><if on><p class="shown">on</p></if></section> } }
+component Wrapped { view { <Panel on={true} /> } }
+
 component PrerenderRoutes {
     router {
         "/" => Front;
         "/tool" => Tool;
         "/sketch" => Sketch;
         "/docs/*" => Docs;
+        "/wrapped" => Wrapped;
     }
     view { <div class="site"><route /></div> }
 }

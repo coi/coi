@@ -406,9 +406,17 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
     else
     {
         // No if/else at root, just return _el[0]
+        auto *child = component.render_roots.size() == 1 ? dynamic_cast<ComponentInstantiation *>(component.render_roots[0].get()) : nullptr;
         if (element_count > 0)
         {
             ss << "        return _el[0];\n";
+        }
+        else if (child)
+        {
+            // the view is one child component: its root is ours
+            std::string inst = child->is_member_reference ? cpp_name(child->member_name)
+                                                          : qualified_name(child->module_prefix, child->component_name) + "_0";
+            ss << "        return " << inst << "._get_root_element();\n";
         }
         else
         {

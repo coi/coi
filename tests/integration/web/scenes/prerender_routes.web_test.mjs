@@ -32,6 +32,13 @@ export async function run({ page, expect }) {
   await expect.textContains(page.locator(".like"), "1");
   await page.unroute("**/app.wasm");
 
+  // a route that is one child component: rendered in its place, before the route's anchor
+  const wrapped = await (await page.request.get(root + "wrapped/")).text();
+  await expect.ok(/<section class="panel"><p class="shown">on<\/p><!--coi-⚓--><\/section><!--coi-route-->/.test(wrapped), "a child-rooted route not prerendered in place");
+  await page.goto(root + "wrapped/");
+  await page.waitForFunction(() => !document.querySelector("[data-hydrate]"));
+  await expect.ok(await page.locator(".panel").count() === 1 && await page.locator(".shown").count() === 1, "child-rooted route doubled or missing");
+
   // a folder route, with its trailing slash
   await page.goto(root + "tool/");
   await page.waitForFunction(() => !document.querySelector("[data-hydrate]"));
