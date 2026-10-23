@@ -130,7 +130,7 @@ Build and start a local development server with hot reloading:
 coi dev
 ```
 
-This builds the project and starts a server at `http://localhost:8000`. The server automatically watches for changes to:
+This builds the project and starts a server at `http://localhost:8000` (or the next free port; `COI_PORT=8001 coi dev` starts from another one, handy when two projects run side by side). The server automatically watches for changes to:
 - `.coi` files in `src/`
 - Files in `assets/` (images, fonts, etc.)
 - `.css` files in `styles/`

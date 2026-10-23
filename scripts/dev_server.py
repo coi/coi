@@ -252,18 +252,23 @@ def main():
     class Server(http.server.ThreadingHTTPServer):
         allow_reuse_address = True
     
-    # 8000, or the next free port when something (another coi dev?) has it
+    # 8000 (or COI_PORT), or the next free port when something (another coi dev?) has it
+    try:
+        first = int(os.environ.get('COI_PORT', 8000))
+    except ValueError:
+        print(f'  {RED}✗{RESET} COI_PORT must be a number, got {os.environ["COI_PORT"]!r}')
+        sys.exit(1)
     httpd = None
-    for port in range(8000, 8011):
+    for port in range(first, first + 11):
         try:
             httpd = Server(('', port), DevHandler)
             break
         except OSError:
             continue
     if httpd is None:
-        print(f'  {RED}✗{RESET} ports 8000 to 8010 are all in use')
+        print(f'  {RED}✗{RESET} ports {first} to {first + 10} are all in use')
         sys.exit(1)
-    print(f'  {GREEN}➜{RESET}  Local:   \033[36m\033[1mhttp://localhost:{port}{RESET}' + (f'  {DIM}(8000 was taken){RESET}' if port != 8000 else ''))
+    print(f'  {GREEN}➜{RESET}  Local:   \033[36m\033[1mhttp://localhost:{port}{RESET}' + (f'  {DIM}({first} was taken){RESET}' if port != first else ''))
     if not hot_reload_enabled:
         print(f'  {DIM}↻ hot reload off{RESET}')
     print(f'  {DIM}press Ctrl+C to stop{RESET}')

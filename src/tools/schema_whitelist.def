@@ -38,6 +38,9 @@ focus_end
 # a rich editor: what is selected, which element was clicked, classes on content it made
 get_selection_anchor
 get_selection_text
+# the caret as a text offset, and html put at such an offset
+get_caret_offset
+insert_at_text_offset
 closest
 contains
 add_click_target_listener +listen(CLICK_TARGET)
