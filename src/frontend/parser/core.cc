@@ -95,10 +95,10 @@ bool Parser::is_name_token(TokenType t)
         return true;
 
     // 2. Soft Keywords: Common words that are keywords in some places
-    // but useful as variable names in others. The block keywords (style, view, mount, tick,
-    // init) only mean something at the start of a component member, so a name can be one
+    // but useful as variable names in others. The block keywords (style, view, mount, unmount,
+    // tick, init) only mean something at the start of a component member, so a name can be one
     if (t == TokenType::KEY || t == TokenType::STYLE || t == TokenType::VIEW || t == TokenType::MOUNT ||
-        t == TokenType::TICK || t == TokenType::INIT)
+        t == TokenType::UNMOUNT || t == TokenType::TICK || t == TokenType::INIT)
         return true;
 
     // 3. Hard Keywords: Modifiers and Structure.

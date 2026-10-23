@@ -217,6 +217,10 @@ uniform_1f
 vertex_attrib_pointer
 draw_arrays
 
+[Timeout]
+# a timer still pending when its component is destroyed is cancelled with it
+@cleanup("system::clear_timeout")
+
 [DOMElement]
 // false for the "no element" handle, as getSelectionAnchor or closest return when nothing matches
 @inline("(${this}).is_valid()") def exists(): bool

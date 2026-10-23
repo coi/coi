@@ -1057,7 +1057,9 @@ int main()
         out << "//\n";
         out << "// The following functionality is handled by Coi language constructs:\n";
         out << "//\n";
-        out << "// - init { ... }          : Runs once when component mounts\n";
+        out << "// - init { ... }          : Runs once before the view\n";
+        out << "// - mount { ... }         : Runs once after the view, DOM ready\n";
+        out << "// - unmount { ... }       : Runs as the component is destroyed\n";
         out << "// - tick { ... }          : Main loop (replaces setMainLoop)\n";
         out << "// - style { ... }         : Scoped CSS styles for this component\n";
         out << "// - style global { ... }  : Global CSS styles (not scoped)\n";

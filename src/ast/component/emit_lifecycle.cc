@@ -71,6 +71,10 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
     // child was mounted (or was already torn down by an if-region toggle).
     ss << "        if (!_coi_alive) return;\n";
     ss << "        _coi_alive = false;\n";
+    // the unmount block first: handlers, timers and sockets are still there for it
+    for (const auto &m : component.methods)
+        if (m.name == "unmount")
+            ss << "        _user_unmount();\n";
     // every handler / fetch callback this component registered
     ss << "        coi_forget_owner(this);\n";
     // children own their own entries: view children, loop items, mounted members

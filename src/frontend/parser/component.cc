@@ -1059,7 +1059,7 @@ Component Parser::parse_component()
             int line = current().line;
             FunctionDef func = parse_function_def(is_public);
             // the lifecycle blocks are methods by these names in the generated code
-            if (func.name == "tick" || func.name == "init" || func.name == "mount")
+            if (func.name == "tick" || func.name == "init" || func.name == "mount" || func.name == "unmount")
                 ErrorHandler::compiler_error("A method can't be called '" + func.name + "': that's the " + func.name +
                                              " block. Write '" + func.name + " { }' for the block, or pick another name", line);
             comp.methods.push_back(std::move(func));
@@ -1087,6 +1087,23 @@ Component Parser::parse_component()
             advance();
             FunctionDef func;
             func.name = "mount";
+            func.return_type = "void";
+            expect(TokenType::LBRACE, "Expected '{'");
+
+            while (current().type != TokenType::RBRACE)
+            {
+                func.body.push_back(parse_statement());
+            }
+
+            expect(TokenType::RBRACE, "Expected '}'");
+            comp.methods.push_back(std::move(func));
+        }
+        // Unmount block (runs as the component is destroyed, before its handlers and timers go)
+        else if (current().type == TokenType::UNMOUNT)
+        {
+            advance();
+            FunctionDef func;
+            func.name = "unmount";
             func.return_type = "void";
             expect(TokenType::LBRACE, "Expected '{'");
 

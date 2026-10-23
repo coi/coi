@@ -501,6 +501,9 @@ init {}     runs BEFORE the view; no DOM yet; set up state
 view {}     declares the DOM
 mount {}    runs AFTER the view; DOM ready; do Canvas/measurements here
 tick(float dt) {}  runs every frame; dt is seconds; animations/physics
+unmount {}  runs as the component is destroyed (if turned false, loop row dropped, route left, parent gone);
+  handlers, timers and sockets are still there for it; after it the compiler removes the handlers,
+  cancels pending Timeouts, closes WebSockets and destroys child components. Rarely needed
   An app with no tick anywhere skips the frame loop: events schedule their own frame, idle = no code runs.
   With `app { tick = demand; }` tick runs only on requested frames: after an event, and after
   System.requestFrame(). Call System.requestFrame() inside tick while animating, stop when done.
@@ -511,6 +514,7 @@ component App {
     init { data = [1, 2, 3]; }         // no DOM access here
     mount { }                          // DOM is ready here
     tick(float dt) { }                 // per-frame
+    unmount { }                        // being destroyed; timers and handlers go by themselves
 }
 ```
 

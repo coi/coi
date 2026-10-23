@@ -1,0 +1,28 @@
+// unmount runs when the <if> around a child turns false, and the child's pending timer dies with it
+component Ticker(def onGone : void, def onTick : void) {
+    mut Timeout timer;
+    mount { timer = System.setTimeout(400, &fire); }
+    def fire() : void { onTick(); }
+    unmount { onGone(); }
+    view { <p class="ticker">ticking</p> }
+}
+
+component App {
+    mut bool open = false;
+    mut int gone = 0;
+    mut int ticks = 0;
+    def show() : void { open = true; }
+    def hide() : void { open = false; }
+    def childGone() : void { gone++; }
+    def ticked() : void { ticks++; }
+    view {
+        <div>
+            <button class="show" onclick={show}>show</button>
+            <button class="hide" onclick={hide}>hide</button>
+            <if open><Ticker &onGone={childGone} &onTick={ticked} /></if>
+            <p class="gone">{gone}</p>
+            <p class="ticks">{ticks}</p>
+        </div>
+    }
+}
+app { root = App; }

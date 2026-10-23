@@ -1734,8 +1734,12 @@ std::string Component::to_webcc(CompilerSession &session)
         {
             method.name = "_user_mount";
         }
+        else if (method.name == "unmount")
+        {
+            method.name = "_user_unmount";
+        }
         ss << "    " << method.to_webcc(updates);
-        if (original_name == "tick" || original_name == "init" || original_name == "mount")
+        if (original_name == "tick" || original_name == "init" || original_name == "mount" || original_name == "unmount")
         {
             method.name = original_name;
         }

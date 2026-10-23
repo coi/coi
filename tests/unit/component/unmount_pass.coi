@@ -1,0 +1,24 @@
+// Test: an unmount block, and a Timeout field that is cancelled with the component
+component Child(def onGone : void) {
+    mut Timeout later;
+    mount { later = System.setTimeout(1000, &fire); }
+    def fire() : void {}
+    unmount { onGone(); }
+    view { <p>child</p> }
+}
+
+component App {
+    mut bool open = true;
+    mut int gone = 0;
+    def close() : void { open = false; }
+    def childGone() : void { gone++; }
+    view {
+        <div>
+            <if open><Child &onGone={childGone} /></if>
+            <button onclick={close}>close</button>
+            <p>{gone}</p>
+        </div>
+    }
+}
+
+app { root = App; }

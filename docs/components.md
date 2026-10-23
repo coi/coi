@@ -220,6 +220,7 @@ component App {
 │  2. view {}     - DOM elements are created             │
 │  3. mount {}    - DOM is ready, elements accessible    │
 │  4. tick(dt) {} - Called every frame (if defined)      │
+│  5. unmount {}  - The component is being destroyed     │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -281,6 +282,22 @@ component AnimatedBall {
 }
 ```
 
+### `unmount {}` - Teardown
+
+Runs as the component is destroyed: when the `<if>` around it turns false, when a loop drops its row, when the router moves to another page, or when its parent goes. It runs first, while the component's handlers, timers and sockets are still in place, so it can say goodbye over a socket or tell its parent through a callback.
+
+```tsx
+component Poller(def onGone : void) {
+    mut Timeout again;
+    mount { load(); }
+    def load() : void { again = System.setTimeout(3000, &load); }
+    unmount { onGone(); }
+    view { <p>polling</p> }
+}
+```
+
+Most components need no `unmount` at all: after it, the compiler removes every event handler the component registered, cancels its pending `Timeout`s, closes its `WebSocket`s and destroys its child components. A timer or socket kept in a field can never outlive its component.
+
 ### Frames on demand
 
 An app without any `tick` does no work between events: the compiler skips the frame loop, and every event (click, pointer move, fetch result) schedules one frame to handle it. Idle, the app runs no code at all.
@@ -329,6 +346,7 @@ Several `System.requestFrame()` calls before a frame produce one frame. With `ti
 | `view {}` | Creates DOM | Being created | Define HTML structure |
 | `mount {}` | After view | ✅ Yes | Canvas setup, DOM measurements |
 | `tick(dt) {}` | Every frame (or [on demand](#frames-on-demand)) | ✅ Yes | Animations, physics, updates |
+| `unmount {}` | As the component is destroyed | ✅ Yes, still | A last word to a parent or a socket; timers and handlers are cleaned up for you |
 
 ## Logic-Only Components
 

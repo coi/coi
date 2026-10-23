@@ -208,6 +208,7 @@ Token Lexer::read_identifier(){
         {"tick", TokenType::TICK},
         {"init", TokenType::INIT},
         {"mount", TokenType::MOUNT},
+        {"unmount", TokenType::UNMOUNT},
         {"pub", TokenType::PUB},
         {"key", TokenType::KEY},
         {"style", TokenType::STYLE},

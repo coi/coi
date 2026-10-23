@@ -49,3 +49,4 @@ member_chain_prop|tests/integration/web/scenes/member_chain_prop.coi|web
 svg_text|tests/integration/web/scenes/svg_text.coi|web
 prevent_key_outside_fields|tests/integration/web/scenes/prevent_key_outside_fields.coi|web
 view_transition|tests/integration/web/scenes/view_transition.coi|web
+unmount_child|tests/integration/web/scenes/unmount_child.coi|web

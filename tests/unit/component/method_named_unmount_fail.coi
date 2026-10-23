@@ -1,0 +1,8 @@
+// Test: a method can't take the unmount block's name
+component App {
+    mut int n = 0;
+    def unmount() : void { n = 1; }
+    view { <p>{n}</p> }
+}
+
+app { root = App; }
