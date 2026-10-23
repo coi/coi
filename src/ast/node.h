@@ -17,6 +17,7 @@ struct ComponentMemberInfo {
     std::set<std::string> pub_mut_members;  // pub mut params and state (each has an onXChange hook)
     std::vector<std::string> param_names;   // in declaration order, for Child(&doc, ...) in code
     std::set<std::string> ref_params;
+    std::set<std::string> mut_ref_params;   // mut T&: the child can write, so it has an onXChange hook
 };
 
 // Cross-component state that persists across all components in one compilation

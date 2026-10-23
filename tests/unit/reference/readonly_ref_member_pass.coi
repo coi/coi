@@ -1,0 +1,17 @@
+// Test: a member built in code with a read-only reference (no mut) to the parent's state
+component Counter(int[]& items) {
+    pub def total() : int {
+        mut int n = 0;
+        for x in items { n += x; }
+        return n;
+    }
+}
+
+component App {
+    mut int[] items = [1, 2];
+    mut Counter counter = Counter(&items);
+    def add() : void { items.push(3); }
+    view { <button onclick={add}>{items.size()}</button> }
+}
+
+app { root = App; }

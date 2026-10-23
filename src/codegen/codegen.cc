@@ -472,6 +472,8 @@ void generate_cpp_code(
             info.param_names.push_back(param->name);
             if (param->is_reference)
                 info.ref_params.insert(param->name);
+            if (param->is_reference && param->is_mutable)
+                info.mut_ref_params.insert(param->name);
         }
         // pub mut state has the same onXChange hook as a pub mut param
         for (const auto &var : comp->state)

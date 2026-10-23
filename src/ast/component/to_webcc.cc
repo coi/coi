@@ -1643,7 +1643,8 @@ std::string Component::to_webcc(CompilerSession &session)
             const std::string &param = it->second.param_names[i];
             if (!ctor->args[i].is_reference || !id || !it->second.ref_params.count(param))
                 continue;
-            member_refs.push_back({var->name, param, id->name});
+            if (it->second.mut_ref_params.count(param))
+                member_refs.push_back({var->name, param, id->name});
             child_updates[id->name].push_back("        " + cpp_name(var->name) + "._refresh_" + param + "();\n");
         }
     }
