@@ -819,7 +819,7 @@ Component Parser::parse_component()
                         params_str += ", ";
                     params_str += convert_type(callback_params[i]);
                 }
-                param->type = "webcc::function<" + retType + "(" + params_str + ")>";
+                param->type = "webcc::function<" + convert_type(retType) + "(" + params_str + ")>";
             }
             else
             {

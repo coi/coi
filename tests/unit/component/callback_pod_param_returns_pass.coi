@@ -1,0 +1,22 @@
+// Test: a callback that takes a pod and gives a string back
+pod Note { string title; }
+
+component Preview(Note note, def onDescribe(Note) : string) {
+    def text() : string { return onDescribe(note); }
+    view {
+        <div>{text()}</div>
+    }
+}
+
+component CallbackReturnsTest {
+    mut Note note = Note{title = "Plans"};
+    def describe(Note n) : string { return `A note called ${n.title}`; }
+
+    view {
+        <Preview note={note} &onDescribe={describe} />
+    }
+}
+
+app {
+    root = CallbackReturnsTest;
+}

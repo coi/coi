@@ -1,0 +1,18 @@
+// Test: a <for> body with an <if> beside its element has no single row root
+pod Row { int id; string day; }
+component TwoRootsTest {
+    mut Row[] rows = [Row{id = 1, day = "Mon"}, Row{id = 2, day = ""}];
+
+    view {
+        <div>
+            <for r in rows key={r.id}>
+                <if !r.day.isEmpty()><b>{r.day}</b></if>
+                <span>{r.id}</span>
+            </for>
+        </div>
+    }
+}
+
+app {
+    root = TwoRootsTest;
+}

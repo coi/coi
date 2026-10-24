@@ -1057,7 +1057,7 @@ std::string ComponentConstruction::to_webcc() {
                     params += (k ? ", " : "") + convert_type(types[k]) + " _a" + std::to_string(k);
                     fwd += (k ? ", _a" : "_a") + std::to_string(k);
                 }
-                result += "[this](" + params + ") { this->" + cpp_name(id->name) + "(" + fwd + "); }";
+                result += "[this](" + params + ") { return this->" + cpp_name(id->name) + "(" + fwd + "); }";
             } else {
                 result += "[](auto&&... _a) { return " + free_fn + "(_a...); }";
             }

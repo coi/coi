@@ -317,7 +317,7 @@ void ComponentInstantiation::generate_code(ViewCodegenContext& ctx)
                 // Callback with params: generate lambda that forwards args
                 std::string lambda_params = build_lambda_params_from_types(prop.callback_param_types);
                 std::string forward_args = build_forward_args(prop.callback_param_types.size());
-                ctx.ss << "        " << instance_name << "." << cpp_name(prop.name) << " = [this](" << lambda_params << ") { this->" << val << "(" << forward_args << "); };\n";
+                ctx.ss << "        " << instance_name << "." << cpp_name(prop.name) << " = [this](" << lambda_params << ") { return this->" << val << "(" << forward_args << "); };\n";
             }
             else if (ctx.method_names.count(prop.value->raw_name()) || prop.is_callback)
             {
@@ -374,7 +374,7 @@ void ComponentInstantiation::generate_code(ViewCodegenContext& ctx)
             // Callback with params: generate lambda that forwards args
             std::string lambda_params = build_lambda_params_from_types(prop.callback_param_types);
             std::string forward_args = build_forward_args(prop.callback_param_types.size());
-            ctx.ss << "        " << instance_name << "." << cpp_name(prop.name) << " = [this](" << lambda_params << ") { this->" << val << "(" << forward_args << "); };\n";
+            ctx.ss << "        " << instance_name << "." << cpp_name(prop.name) << " = [this](" << lambda_params << ") { return this->" << val << "(" << forward_args << "); };\n";
         }
         else if (ctx.method_names.count(prop.value->raw_name()) || prop.is_callback)
         {
@@ -892,7 +892,7 @@ static void generate_prop_update_code(std::stringstream &ss, ComponentInstantiat
             // Callback with params: generate lambda that forwards args
             std::string lambda_params = build_lambda_params_from_types(prop.callback_param_types);
             std::string forward_args = build_forward_args(prop.callback_param_types.size());
-            ss << prefix << "[this](" << lambda_params << ") { this->" << val << "(" << forward_args << "); };\n";
+            ss << prefix << "[this](" << lambda_params << ") { return this->" << val << "(" << forward_args << "); };\n";
         }
         else if (method_names.count(prop.value->raw_name()) || prop.is_callback)
         {
@@ -1399,17 +1399,22 @@ void ViewForEachStatement::generate_code(ViewCodegenContext& ctx)
             break;
         }
     }
-    // a nested <for> as the body is supported; an <if> (or text only) is not
-    if (!loop_component && !loop_html_element)
+    // the body is one element or component (a nested <for> works too): the keyed sync moves and
+    // removes rows by that one root, so an <if> or a second element beside it has no row to belong to
+    int roots = 0;
+    bool has_if = false;
+    for (auto &child : children)
     {
-        bool has_if = false;
-        for (auto &child : children)
-            if (dynamic_cast<ViewIfStatement *>(child.get())) has_if = true;
-        if (has_if)
-        {
-            ErrorHandler::type_error("A <for> body cannot start with an <if>: wrap the loop body in an element (e.g. a <div>)", line);
-            exit(1);
-        }
+        if (dynamic_cast<ViewIfStatement *>(child.get())) has_if = true;
+        if (dynamic_cast<HTMLElement *>(child.get()) || dynamic_cast<ComponentInstantiation *>(child.get()) ||
+            dynamic_cast<ViewIfStatement *>(child.get()) || dynamic_cast<ViewForEachStatement *>(child.get()) ||
+            dynamic_cast<ViewForRangeStatement *>(child.get()))
+            roots++;
+    }
+    if (roots > 1 || (has_if && !loop_component && !loop_html_element))
+    {
+        ErrorHandler::type_error("A keyed <for> body is one element: put an <if> or a second element inside it (e.g. wrap the body in a <div>)", line);
+        exit(1);
     }
 
     std::string loop_parent_var = "_loop_" + std::to_string(my_loop_id) + "_parent";
