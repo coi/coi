@@ -600,7 +600,7 @@ std::string Component::to_webcc(CompilerSession &session)
                 // coi::vector<string> because the child doesn't know what size array it will
                 // receive. Using coi::array<T, N> here would cause a type mismatch.
           
-                std::string vec_type = "coi::vector<" + convert_type(resolve_component_type(elem_type)) + ">";
+                std::string vec_type = convert_type(resolve_component_type(elem_type) + "[]");
                 if (seed)
                 {
                     ss << "    " << vec_type << " " << cpp_name(var->name) << ";\n";
@@ -1291,12 +1291,9 @@ std::string Component::to_webcc(CompilerSession &session)
                     }
                     ss << "        " << keys_vec << " = _new_keys;\n";
                     // the rows are rebuilt below, so the old instances go entirely; leaving them
-                    // in the vector made every sync tear down stale rows and keep the live ones
+                    // in the array made every sync tear down stale rows and keep the live ones
                     ss << "        int _new_count = (int)" << region.iterable_expr << ".size();\n";
-                    ss << "        for (auto& _c : " << vec_name << ") _c._destroy();\n";
                     ss << "        " << vec_name << ".clear();\n";
-                    // rows hand out `this` (handlers, child callbacks), so the vector must not move under them
-                    ss << "        " << vec_name << ".reserve(_new_count);\n";
                 }
 
                 // Recreate all items in current array order with fresh views using insert_before for proper DOM ordering
@@ -1333,14 +1330,8 @@ std::string Component::to_webcc(CompilerSession &session)
                 item_code = transform_to_insert_before(item_code, "_loop_" + std::to_string(region.loop_id) + "_parent", anchor_var);
                 ss << indent_code(item_code, "    ");
                 ss << "            }\n";
-
-                ss << "            for (int _i = 0; _i < old_count; _i++) " << vec_name << "[_i]._rebind();\n";
-
                 ss << "        } else {\n";
-                ss << "            while ((int)" << vec_name << ".size() > new_count) {\n";
-                ss << "                " << vec_name << "[" << vec_name << ".size() - 1]._destroy();\n";
-                ss << "                " << vec_name << ".pop_back();\n";
-                ss << "            }\n";
+                ss << "            while ((int)" << vec_name << ".size() > new_count) " << vec_name << ".pop_back();\n";
 
                 if (!region.item_update_code.empty())
                 {

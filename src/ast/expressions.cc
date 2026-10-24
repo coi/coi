@@ -53,7 +53,7 @@ static std::string typed_literal(Expression* e) {
     std::string code = e->to_webcc();
     auto* arr = dynamic_cast<ArrayLiteral*>(e);
     if (arr && !arr->element_type.empty())
-        return "coi::vector<" + convert_type(arr->element_type) + ">" + code;
+        return convert_type(arr->element_type + "[]") + code;
     return code;
 }
 
@@ -276,7 +276,7 @@ std::string BinaryOp::to_webcc() {
 std::string comparison_side(Expression *e) {
     auto *lit = dynamic_cast<ArrayLiteral *>(e);
     if (lit && !lit->element_type.empty())
-        return "coi::vector<" + convert_type(lit->element_type) + ">" + lit->to_webcc();
+        return convert_type(lit->element_type + "[]") + lit->to_webcc();
     return e->to_webcc();
 }
 
@@ -296,7 +296,7 @@ std::string FunctionCall::args_to_string() {
 static std::string to_webcc_arg(const std::string& code, const std::string& coi_type) {
     // array literal needs its vector type
     if (coi_type.ends_with("[]") && !code.empty() && code[0] == '{')
-        return "coi::vector<" + convert_type(coi_type.substr(0, coi_type.size() - 2)) + ">" + code;
+        return convert_type(coi_type) + code;
     std::string cpp = DefSchema::instance().webcc_cast_type(coi_type);
     return cpp.empty() ? code : "static_cast<" + cpp + ">((int)(" + code + "))";
 }
@@ -955,7 +955,7 @@ std::string ArrayLiteral::to_webcc() {
         auto *nested = dynamic_cast<ArrayLiteral *>(elements[i].get());
         if (nested && !inner.empty()) {
             if (nested->element_type.empty()) nested->element_type = inner;
-            code += "coi::vector<" + convert_type(inner) + ">";
+            code += convert_type(inner + "[]");
         }
         code += elements[i]->to_webcc();
     }

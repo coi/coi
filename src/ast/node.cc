@@ -2,6 +2,7 @@
 #include "../codegen/codegen_utils.h"
 #include "../defs/def_parser.h"
 #include "../cli/error.h"
+#include "../analysis/type_checker.h"
 #include <cctype>
 #include <algorithm>
 
@@ -119,7 +120,8 @@ std::string convert_type(const std::string& type) {
     // Handle dynamic arrays: T[]
     if (type.ends_with("[]")) {
         std::string inner = type.substr(0, type.length() - 2);
-        return "coi::vector<" + convert_type(inner) + ">";
+        // components live at fixed addresses, see coi::components in the prelude
+        return (is_component_name(inner) ? "coi::components<" : "coi::vector<") + convert_type(inner) + ">";
     }
     // Handle fixed-size arrays: T[N] and maps: V[K]
     size_t bracket_pos = type.rfind('[');

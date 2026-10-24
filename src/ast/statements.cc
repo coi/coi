@@ -37,7 +37,7 @@ std::string VarDeclaration::to_webcc()
         // int[] xs = [0; n]: a vector of n copies, the count can be a runtime value
         if (type.ends_with("[]"))
         {
-            std::string vec_type = "coi::vector<" + convert_type(elem_type) + ">";
+            std::string vec_type = convert_type(type);
             std::string fill = "_v.resize((size_t)(" + count_str + ")); for (size_t _i = 0; _i < _v.size(); _i++) _v[_i] = " +
                                repeat->value->to_webcc() + "; return _v; }()";
             return std::string(is_mutable ? "" : "const ") + vec_type + " " + cpp_name(name) + " = [&]{ " + vec_type + " _v; " + fill + ";";
@@ -73,7 +73,7 @@ std::string VarDeclaration::to_webcc()
             
             // T[] is a vector even when it can't change: as a fixed array it couldn't go where a
             // T[] is expected (a pod field, an argument, a return value). T[N] is the fixed one
-            std::string vec_type = "coi::vector<" + convert_type(elem_type) + ">";
+            std::string vec_type = convert_type(type);
 
             std::string result = (is_mutable ? "" : "const ") + vec_type;
             if (is_reference)
@@ -435,20 +435,14 @@ std::string ExpressionStatement::to_webcc()
 
                 if (method == "push" && call->args.size() == 1)
                 {
-                    // arr.push(item) -> add to array, bind callbacks, render view if parent exists
-                    // IMPORTANT: push_back may reallocate the vector, invalidating all existing
-                    // items' `this` pointers in their registered event handlers. We must rebind
-                    // all existing items after push_back to update their handler lambdas.
+                    // arr.push(item): into the array, then its callbacks and view, once the parent
+                    // element exists (not during init)
                     std::string item_expr = call->args[0].value->to_webcc();
                     std::string parent_var = "_loop_" + std::to_string(info.loop_id) + "_parent";
                     std::string count_var = "_loop_" + std::to_string(info.loop_id) + "_count";
                     result = "{\n";
-                    result += "int _old_count = (int)" + arr_cpp + ".size();\n";
                     result += arr_cpp + ".push_back(" + item_expr + ");\n";
-                    // Only render view if parent container exists (not during init)
                     result += "if (" + parent_var + ".is_valid()) {\n";
-                    // (IMPORTANT!!!) Rebind all existing items in case vector reallocated
-                    result += "    for (int _i = 0; _i < _old_count; _i++) " + arr_cpp + "[_i]._rebind();\n";
                     result += "    auto& " + cpp_name(var) + " = " + arr_cpp + "[" + arr_cpp + ".size() - 1];\n";
                     // Inject the item creation code (callback bindings + view call)
                     result += info.item_creation_code;
@@ -459,44 +453,40 @@ std::string ExpressionStatement::to_webcc()
                 }
                 else if (method == "pop" && call->args.empty())
                 {
-                    // arr.pop() -> remove view then pop from array
+                    // arr.pop(): the container destroys the item (handlers, timers, DOM), its
+                    // memory stays to the end of the frame in case this is its own handler
+                    std::string count_var = "_loop_" + std::to_string(info.loop_id) + "_count";
                     result = "if (!" + arr_cpp + ".empty()) {\n";
-                    result += "    " + arr_cpp + ".back()._remove_view();\n";
                     result += "    " + arr_cpp + ".pop_back();\n";
+                    result += "    if (" + count_var + " > 0) " + count_var + "--;\n";
                     result += "}\n";
                     return result;
                 }
                 else if (method == "remove" && call->args.size() == 1)
                 {
-                    // items after the hole move, their handlers point at the old slots
+                    // arr.remove(i): the slots after it close up, the items stay where they are
                     std::string count_var = "_loop_" + std::to_string(info.loop_id) + "_count";
                     result = "{ int _at = " + call->args[0].value->to_webcc() + ";\n";
                     result += "if (_at >= 0 && _at < (int)" + arr_cpp + ".size()) {\n";
-                    result += "    " + arr_cpp + "[_at]._remove_view();\n";
                     result += "    " + arr_cpp + ".remove(_at);\n";
-                    result += "    for (int _i = _at; _i < (int)" + arr_cpp + ".size(); _i++) " + arr_cpp + "[_i]._rebind();\n";
                     result += "    if (" + count_var + " > 0) " + count_var + "--;\n";
                     result += "} }\n";
                     return result;
                 }
                 else if (method == "clear" && call->args.empty())
                 {
-                    // arr.clear() -> unregister handlers then clear DOM and array
+                    // arr.clear(): the items are destroyed; when the loop is all the parent holds,
+                    // one innerHTML wipe takes their elements instead of one removal each
                     std::string parent_var = "_loop_" + std::to_string(info.loop_id) + "_parent";
                     std::string count_var = "_loop_" + std::to_string(info.loop_id) + "_count";
                     if (info.is_only_child)
                     {
-                        // Bulk optimization: unregister handlers only, then clear parent's innerHTML
-                        result = "for (auto& " + cpp_name(var) + " : " + arr_cpp + ") { " + cpp_name(var) + "._remove_view(true); }\n";
+                        result = arr_cpp + ".clear(true);\n";
                         result += "webcc::dom::set_inner_html(" + parent_var + ", \"\");\n";
                     }
                     else
-                    {
-                        // Normal path: each _remove_view removes its own DOM element
-                        result = "for (auto& " + cpp_name(var) + " : " + arr_cpp + ") { " + cpp_name(var) + "._remove_view(); }\n";
-                    }
+                        result = arr_cpp + ".clear();\n";
                     result += count_var + " = 0;\n";
-                    result += arr_cpp + ".clear();\n";
                     return result;
                 }
             }
@@ -645,7 +635,7 @@ std::string ForEachStatement::to_webcc()
     std::string over = iterable->to_webcc();
     // for c in ["a", "b"]: a brace list needs a type to loop over
     if (auto *lit = dynamic_cast<ArrayLiteral *>(iterable.get()); lit && !lit->element_type.empty())
-        over = "coi::vector<" + convert_type(lit->element_type) + ">" + over;
+        over = convert_type(lit->element_type + "[]") + over;
     std::string code = "for(auto& " + cpp_name(var_name) + " : " + over + ") ";
     code += body->to_webcc();
     return code;

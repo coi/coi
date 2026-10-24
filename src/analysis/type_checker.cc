@@ -659,6 +659,15 @@ static std::set<std::string> g_component_names;
 static bool is_enum_type(const std::string &t);
 static bool is_data_type(const std::string &t);
 
+// a component's name, bare or module-qualified either way
+bool is_component_name(const std::string &t)
+{
+    std::string flat = t;
+    for (size_t pos; (pos = flat.find("::")) != std::string::npos;)
+        flat.replace(pos, 2, "_");
+    return g_component_names.count(t) || g_component_names.count(flat);
+}
+
 static bool is_known_type(std::string t, const std::vector<std::string> &type_params)
 {
     while (!t.empty() && t.back() == ' ') t.pop_back();
@@ -679,8 +688,7 @@ static bool is_known_type(std::string t, const std::vector<std::string> &type_pa
     std::string flat = t;
     for (size_t pos; (pos = flat.find("::")) != std::string::npos;)
         flat.replace(pos, 2, "_");
-    if (DefSchema::instance().lookup_type(t) || is_enum_type(t) || is_data_type(t) || is_data_type(flat) ||
-        g_component_names.count(t) || g_component_names.count(flat))
+    if (DefSchema::instance().lookup_type(t) || is_enum_type(t) || is_data_type(t) || is_data_type(flat) || is_component_name(t))
         return true;
     if (t.size() > 4 && t.ends_with("Meta"))
         return is_data_type(t.substr(0, t.size() - 4)) || is_data_type(flat.substr(0, flat.size() - 4));

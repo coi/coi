@@ -1,0 +1,35 @@
+// a component in an array that takes itself out of the array from its own handler, then goes
+// on: the rest of the handler must still run on the row it started on (its fields, its
+// callbacks), and the rows after it must not be touched by it
+component Row(pub int id, def onGone(int) : void, def onAfter(int) : void) {
+    mut int taps = 0;
+    def go() : void {
+        onGone(id);     // the parent removes this row
+        taps++;         // still this row, not whichever moved into its slot
+        onAfter(id);    // the parent hears this row's id
+    }
+    view { <button class="row" onclick={go}>{id}:{taps}</button> }
+}
+
+component App {
+    mut Row[] rows;
+    mut int[] after;
+    mut int next = 1;
+    def add() : void { rows.push(Row(next, &gone, &heard)); next++; }
+    def gone(int id) : void { rows.remove(rows.indexOf(r => r.id == id)); }
+    def heard(int id) : void { after.push(id); }
+    def afterText() : string {
+        mut string s = "";
+        for a in after { s += `${a};`; }
+        return s;
+    }
+    mount { for i in 0:4 { add(); } }
+    view {
+        <div>
+            <p class="rows"><for r in rows key={r.id}><{r} /></for></p>
+            <p class="after">{afterText()}</p>
+        </div>
+    }
+}
+
+app { root = App; }

@@ -10,6 +10,9 @@
 // e.g., "int" -> "int32", "float" -> "float32"
 std::string normalize_type(const std::string &type);
 
+// Whether a type name (bare or module-qualified) is a component's; valid once validate_types ran
+bool is_component_name(const std::string &type);
+
 // Check if source type can be assigned to target type
 // Handles arrays, handle inheritance, numeric conversions
 bool is_compatible_type(const std::string &source, const std::string &target);

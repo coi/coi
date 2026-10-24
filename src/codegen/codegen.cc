@@ -153,6 +153,71 @@ void generate_cpp_code(
     out << "using string_view = webcc::string_view;\n";
     out << "template<typename T> using vector = webcc::vector<T>;\n";
     out << "}\n";
+    // a component kept in an array: its handlers and its children's callbacks hold `this`, so it
+    // lives at one address for life, and one taken out while an event is being handled stays in
+    // memory until the frame is over, so the handler that took it out can finish (a route
+    // component gets the same from _apply_route). The slots hold pointers; generated code reads
+    // the container like a vector of the components themselves
+    out << R"(struct CoiGrave { void* p; void (*bury)(void*); };
+inline webcc::vector<CoiGrave> g_coi_graves;
+inline void coi_reap() {
+    while (!g_coi_graves.empty()) {   // a burial can dig more: a component with arrays of its own
+        webcc::vector<CoiGrave> due(webcc::move(g_coi_graves));
+        for (size_t i = 0; i < due.size(); i++) due[i].bury(due[i].p);
+    }
+}
+namespace coi {
+template<typename T> class components {
+    webcc::vector<T*> slots;
+    static void bury(void* p) { T* t = static_cast<T*>(p); t->~T(); webcc::free(t); }
+    // out of the array already; its handlers, timers and DOM go now, its memory with the frame
+    static void let_go(T* p, bool skip_dom) { p->_destroy(skip_dom); g_coi_graves.push_back(CoiGrave{p, &bury}); }
+public:
+    components() = default;
+    template<typename... Args> components(T&& first, Args&&... rest) { push_back(webcc::move(first)); (push_back(webcc::move(rest)), ...); }
+    components(const components&) = delete;
+    components& operator=(const components&) = delete;
+    components(components&& o) noexcept : slots(webcc::move(o.slots)) {}
+    components& operator=(components&& o) noexcept { if (this != &o) { clear(); slots = webcc::move(o.slots); } return *this; }
+    ~components() { clear(); }
+    struct iterator {
+        T** p;
+        T& operator*() const { return **p; }
+        T* operator->() const { return *p; }
+        iterator& operator++() { ++p; return *this; }
+        bool operator==(const iterator& o) const { return p == o.p; }
+        bool operator!=(const iterator& o) const { return p != o.p; }
+    };
+    struct const_iterator {
+        T* const* p;
+        const T& operator*() const { return **p; }
+        const T* operator->() const { return *p; }
+        const_iterator& operator++() { ++p; return *this; }
+        bool operator==(const const_iterator& o) const { return p == o.p; }
+        bool operator!=(const const_iterator& o) const { return p != o.p; }
+    };
+    iterator begin() { return iterator{slots.data()}; }
+    iterator end() { return iterator{slots.data() + slots.size()}; }
+    const_iterator begin() const { return const_iterator{slots.data()}; }
+    const_iterator end() const { return const_iterator{slots.data() + slots.size()}; }
+    size_t size() const { return slots.size(); }
+    bool empty() const { return slots.empty(); }
+    T& operator[](size_t i) { return *slots[i]; }
+    const T& operator[](size_t i) const { return *slots[i]; }
+    T& back() { return *slots.back(); }
+    const T& back() const { return *slots.back(); }
+    T& front() { return *slots.front(); }
+    const T& front() const { return *slots.front(); }
+    void reserve(size_t n) { slots.reserve(n); }
+    void push_back(T&& v) { T* p = static_cast<T*>(webcc::malloc(sizeof(T))); new (p) T(webcc::move(v)); slots.push_back(p); }
+    template<typename... Args> void emplace_back(Args&&... args) { T* p = static_cast<T*>(webcc::malloc(sizeof(T))); new (p) T(webcc::forward<Args>(args)...); slots.push_back(p); }
+    void pop_back(bool skip_dom = false) { if (slots.empty()) return; T* p = slots.back(); slots.pop_back(); let_go(p, skip_dom); }
+    void erase(size_t i, bool skip_dom = false) { if (i >= slots.size()) return; T* p = slots[i]; slots.erase(i); let_go(p, skip_dom); }
+    void remove(size_t i) { erase(i); }
+    void clear(bool skip_dom = false) { webcc::vector<T*> gone(webcc::move(slots)); for (size_t i = 0; i < gone.size(); i++) let_go(gone[i], skip_dom); }
+};
+}
+)";
     // bytes point into the event buffer, copy them
         // an array method's inline function (b => ...) runs here, inlined into one loop
     out << R"(template<typename V, typename F> inline int32_t coi_index_where(const V& v, F pred) {
@@ -907,6 +972,8 @@ template<typename V, typename F> inline V coi_filter(const V& v, F pred) {
         out << "    if (app) app->_apply_route();\n";
     }
     out << "    webcc::flush();\n";
+    // components taken out of arrays during this frame: no handler of theirs is on the stack now
+    out << "    coi_reap();\n";
     out << "}\n\n";
 
     out << "int main() {\n";
