@@ -175,8 +175,9 @@ template<typename T> class components {
 public:
     components() = default;
     template<typename... Args> components(T&& first, Args&&... rest) { push_back(webcc::move(first)); (push_back(webcc::move(rest)), ...); }
-    components(const components&) = delete;
-    components& operator=(const components&) = delete;
+    // assigned from another array, as any array is: the components are copied as values
+    components(const components& o) { slots.reserve(o.size()); for (size_t i = 0; i < o.size(); i++) push_back(T(*o.slots[i])); }
+    components& operator=(const components& o) { if (this != &o) { components copy(o); *this = webcc::move(copy); } return *this; }
     components(components&& o) noexcept : slots(webcc::move(o.slots)) {}
     components& operator=(components&& o) noexcept { if (this != &o) { clear(); slots = webcc::move(o.slots); } return *this; }
     ~components() { clear(); }

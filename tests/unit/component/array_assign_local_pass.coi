@@ -1,0 +1,32 @@
+// an array of components built in a local, then assigned to the state array the view loops
+// over: the components are copied as values, as any array's items are
+component Row(pub int id, pub mut string label) {
+    view { <li class="row">{id}: {label}</li> }
+}
+
+component App {
+    mut Row[] rows;
+    mut int next = 1;
+
+    def fill() : void {
+        mut Row[] fresh;
+        fresh.reserve(10);
+        for i in 0:10 {
+            fresh.push(Row(next, "row"));
+            next++;
+        }
+        rows = fresh;
+    }
+
+    def drop() : void { rows.clear(); }
+
+    view {
+        <div>
+            <button onclick={fill}>fill</button>
+            <button onclick={drop}>clear</button>
+            <ul><for r in rows key={r.id}><{r} /></for></ul>
+        </div>
+    }
+}
+
+app { root = App; }
