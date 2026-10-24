@@ -1,0 +1,8 @@
+// Test: the listener's parameter must match the event
+component WrongParam {
+    listen {
+        Input.keyDown => (string key) { }
+    }
+    view { <div></div> }
+}
+app { root = WrongParam; }

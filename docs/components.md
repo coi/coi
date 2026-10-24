@@ -347,6 +347,7 @@ Several `System.requestFrame()` calls before a frame produce one frame. With `ti
 | `mount {}` | After view | ✅ Yes | Canvas setup, DOM measurements |
 | `tick(dt) {}` | Every frame (or [on demand](#frames-on-demand)) | ✅ Yes | Animations, physics, updates |
 | `unmount {}` | As the component is destroyed | ✅ Yes, still | A last word to a parent or a socket; timers and handlers are cleaned up for you |
+| `listen {}` | Registers at mount, forgotten at destroy | ✅ Yes | Another component's signals, and the page's (`System.visibilityChange`, `Input.keyDown`, …; see the language guide) |
 
 ## Logic-Only Components
 

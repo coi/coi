@@ -78,6 +78,9 @@ struct Component : ASTNode {
     std::vector<std::unique_ptr<ComponentParam>> params;
     std::vector<SignalDef> signals;
     std::vector<ListenEntry> listen_entries;
+    // listen entries on a page-wide event (System.visibilityChange => …): the registration call
+    // each one desugars to, run at the start of mount
+    std::vector<std::unique_ptr<Statement>> page_listens;
     std::vector<FunctionDef> methods;
     std::vector<std::unique_ptr<ASTNode>> render_roots;
     std::unique_ptr<RouterDef> router;  // Optional router block

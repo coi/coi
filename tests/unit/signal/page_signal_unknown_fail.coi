@@ -1,0 +1,8 @@
+// Test: System has no signal called this
+component Unknown {
+    listen {
+        System.tabChanged => (uint8 hidden) { }
+    }
+    view { <div></div> }
+}
+app { root = Unknown; }

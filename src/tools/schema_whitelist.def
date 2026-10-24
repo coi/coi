@@ -167,6 +167,11 @@ init_popstate +listen(POPSTATE)
 # installing as an app: the state now and on each change (0 no prompt, 1 can prompt, 2 installed);
 # promptInstall in a click handler
 init_install +listen(INSTALL_STATE)
+# a pointer let go anywhere, the window's size (now and on change), the page's scroll, a click anywhere
+init_pointer_up +listen(POINTER_UP)
+init_window_resize +listen(WINDOW_RESIZE)
+init_page_scroll +listen(PAGE_SCROLL)
+init_page_click +listen(PAGE_CLICK)
 prompt_install
 log
 warn
