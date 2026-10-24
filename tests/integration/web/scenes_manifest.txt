@@ -54,3 +54,4 @@ union_json|tests/integration/web/scenes/union_json.coi|web
 inline_function|tests/integration/web/scenes/inline_function.coi|web
 listen_in_array|tests/integration/web/scenes/listen_in_array.coi|web
 string_escapes|tests/integration/web/scenes/string_escapes.coi|web
+url_encode|tests/integration/web/scenes/url_encode.coi|web

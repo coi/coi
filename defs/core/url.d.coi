@@ -1,0 +1,11 @@
+// Coi URL helpers
+
+type Url {
+    // percent-encodes everything but A-Z a-z 0-9 - _ . ! ~ * ' ( ), like encodeURIComponent
+    @inline("coi::url::encode(${0})")
+    shared def encode(string text): string
+
+    // %XX back to bytes; anything else stays
+    @inline("coi::url::decode(${0})")
+    shared def decode(string text): string
+}

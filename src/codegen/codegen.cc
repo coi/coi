@@ -190,6 +190,25 @@ template<typename V, typename F> inline V coi_filter(const V& v, F pred) {
     out << "    return out;\n";
     out << "}\n";
     out << "}\n";
+    // Url.encode / Url.decode
+    out << "namespace url {\n";
+    out << "inline string encode(const string& s) {\n";
+    out << "    static const char* hex = \"0123456789ABCDEF\"; string out;\n";
+    out << "    for (uint32_t i = 0; i < s.length(); i++) { unsigned char c = (unsigned char)s.data()[i];\n";
+    out << "        bool keep = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.' || c == '!' || c == '~' || c == '*' || c == '\\'' || c == '(' || c == ')';\n";
+    out << "        if (keep) { char k = (char)c; out += string(&k, 1); }\n";
+    out << "        else { char e[3] = {'%', hex[c >> 4], hex[c & 15]}; out += string(e, 3); } }\n";
+    out << "    return out;\n";
+    out << "}\n";
+    out << "inline int hex_value(char c) { return c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : c >= 'A' && c <= 'F' ? c - 'A' + 10 : -1; }\n";
+    out << "inline string decode(const string& s) {\n";
+    out << "    string out; uint32_t n = s.length(); const char* d = s.data();\n";
+    out << "    for (uint32_t i = 0; i < n; i++) {\n";
+    out << "        if (d[i] == '%' && i + 2 < n && hex_value(d[i + 1]) >= 0 && hex_value(d[i + 2]) >= 0) { char c = (char)(hex_value(d[i + 1]) * 16 + hex_value(d[i + 2])); out += string(&c, 1); i += 2; }\n";
+    out << "        else out += string(d + i, 1); }\n";
+    out << "    return out;\n";
+    out << "}\n";
+    out << "}\n";
     out << "// Cast helpers backing the builtin toInt/toFloat/toString methods.\n";
     out << "// Overloaded so one inline template stays valid for any receiver type.\n";
     out << "inline int to_int(const string& s) { return s.to_int(); }\n";

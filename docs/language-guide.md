@@ -498,6 +498,13 @@ string text = Html.toText("<p>Hi <b>there</b></p><p>x &amp; y</p>");
 // h1-h6, tr, blockquote, pre) is a line break, the common entities are decoded
 ```
 
+## Url
+
+```tsx
+string q = Url.encode("a+b@x.com & more");   // "a%2Bb%40x.com%20%26%20more", like encodeURIComponent
+string back = Url.decode(q);                 // "a+b@x.com & more"
+```
+
 ## Date
 
 `Date.format` lays an epoch time (milliseconds, as `System.getDateNow()` gives it) out as local time. The calendar math is Coi's own; the platform only supplies the timezone offset at that instant.

@@ -1,0 +1,13 @@
+// Url.encode like encodeURIComponent, Url.decode back
+component App {
+    mut string raw = "a+b@x.com & 50% ü/?#";
+    view {
+        <div>
+            <p class="enc">{Url.encode(raw)}</p>
+            <p class="dec">{Url.decode(Url.encode(raw))}</p>
+            <p class="keep">{Url.encode("A-z_0.9!~*'()")}</p>
+        </div>
+    }
+}
+
+app { root = App; }
