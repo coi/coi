@@ -1,0 +1,21 @@
+// a pod and a component with the same bare name, in different modules: an array of the pod is a
+// plain array everywhere it appears (a state field, a function's parameter), never a component array
+import "modules/Auth.coi";
+
+component Login {
+    view { <div class="login">sign in</div> }
+}
+
+component App {
+    mut Auth::Login[] logins = [Auth::Login{provider = "google", handle = "a"}];
+    def add() : void { logins.push(Auth::Login{provider = "discord", handle = "b"}); }
+    view {
+        <div>
+            <p>{Auth::loginsText(logins)}</p>
+            <button onclick={add}>add</button>
+            <Login />
+        </div>
+    }
+}
+
+app { root = App; }

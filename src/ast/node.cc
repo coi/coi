@@ -3,6 +3,7 @@
 #include "../defs/def_parser.h"
 #include "../cli/error.h"
 #include "../analysis/type_checker.h"
+#include "../codegen/json_codegen.h"
 #include <cctype>
 #include <algorithm>
 
@@ -120,8 +121,11 @@ std::string convert_type(const std::string& type) {
     // Handle dynamic arrays: T[]
     if (type.ends_with("[]")) {
         std::string inner = type.substr(0, type.length() - 2);
-        // components live at fixed addresses, see coi::components in the prelude
-        return (is_component_name(inner) ? "coi::components<" : "coi::vector<") + convert_type(inner) + ">";
+        // components live at fixed addresses, see coi::components in the prelude; a pod that
+        // shares a component's bare name (a Login pod beside a Login screen) is the pod
+        std::string resolved = ComponentTypeContext::instance().resolve(inner);
+        bool pod = DataTypeRegistry::instance().lookup(resolved) || DataTypeRegistry::instance().lookup(inner);
+        return (!pod && is_component_name(inner) ? "coi::components<" : "coi::vector<") + convert_type(inner) + ">";
     }
     // Handle fixed-size arrays: T[N] and maps: V[K]
     size_t bracket_pos = type.rfind('[');

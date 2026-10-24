@@ -1,0 +1,10 @@
+// a module whose pod shares its bare name with a component elsewhere
+module Auth;
+
+pub pod Login { string provider; string handle; }
+
+pub def loginsText(Login[] logins) : string {
+    mut string s = "";
+    for l in logins { s += l.provider + " "; }
+    return s;
+}
