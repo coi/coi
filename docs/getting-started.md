@@ -302,6 +302,7 @@ With `pwa = true`, `coi build` also writes `manifest.webmanifest` and `sw.js` ne
 
 - **Installable.** Browsers offer to install the app (Chrome's install button, "Add to Home Screen" on phones). It then opens in its own window with `title` as its name and `icon` as its icon. Use a square PNG of at least 512×512 in `assets/`; SVG works too.
 - **Offline.** The service worker caches every file of the build and serves them from the cache first, so the app starts without a connection, on any route. Requests to your API are not cached: they go to the network as usual.
+- **On demand.** Files in a folder named `lazy` (`assets/lazy/…`, at any depth) are left out of that first download: big files only some visits need, like fonts for an export. The service worker keeps each one the first time the app fetches it, so it works offline after one use. A new build starts a new cache, and they are fetched again when next used.
 - **Updates.** Each build gets a new version. An open app checks for it when it loads, downloads it in the background, and the next start runs the new build.
 - **Development.** `coi dev` never uses the service worker, and removes one left over from a `coi build` on the same address, so you always see your latest edits.
 
