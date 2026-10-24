@@ -861,7 +861,10 @@ int main(int argc, char **argv)
     }
     catch (const std::exception &e)
     {
-        std::cerr << colors::RED << "Error:" << colors::RESET << " " << e.what() << std::endl;
+        std::string what = e.what();   // a parse error already starts with "Error:"
+        if (what.find("Error:") == std::string::npos)
+            what = std::string(colors::RED) + "Error:" + colors::RESET + " " + what;
+        std::cerr << what << std::endl;
         return 1;
     }
 

@@ -3151,6 +3151,7 @@ void validate_types(const std::vector<Component> &components,
                 if (init != "unknown" && !is_compatible_type(init, type) && !literal_fits(param->default_value.get(), type))
                 {
                     ErrorHandler::type_error(
+        ErrorHandler::current_file = comp.source_file;
                         "Parameter '" + param->name + "' expects '" + type + "' but initialized with '" + init + "'");
                     exit(1);
                 }
@@ -3448,6 +3449,7 @@ void validate_mutability(const std::vector<Component> &components)
         for (const auto &param : comp.params)
         {
             if (param->is_mutable)
+        ErrorHandler::current_file = fn->source_file;
             {
                 mutable_vars.insert(param->name);
             }
@@ -3468,6 +3470,7 @@ void validate_mutability(const std::vector<Component> &components)
 
                 for (const auto &var : comp.state)
                 {
+    ErrorHandler::current_file.clear();
                     if (var->name == var_name)
                     {
                         is_known_var = true;
@@ -4019,6 +4022,7 @@ void validate_view_hierarchy(const std::vector<Component> &components,
         else if (auto *viewForEach = dynamic_cast<ViewForEachStatement *>(node))
         {
             for (const auto &child : viewForEach->children)
+        ErrorHandler::current_file = comp.source_file;
                 if (has_route_placeholder(child.get()))
                     return true;
         }

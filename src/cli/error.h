@@ -26,11 +26,17 @@ public:
         throw std::runtime_error(oss.str());
     }
 
+    // the file whose code is being checked, named in type errors; set by the type checker
+    static inline std::string current_file;
+
     // Type checking errors (prints to stderr)
     static void type_error(const std::string& message, int line = -1) {
         std::cerr << error_colors::RED << error_colors::BOLD << "Error:" << error_colors::RESET << " " << message;
         if (line > 0) {
             std::cerr << " at line " << line;
+        }
+        if (!current_file.empty()) {
+            std::cerr << " in " << current_file;
         }
         std::cerr << std::endl;
     }
