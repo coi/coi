@@ -1,4 +1,4 @@
-// Run: expect wants a bool, so this doesn't build
+// expect wants a bool
 module Counting;
 
 test "a number is not a check" {

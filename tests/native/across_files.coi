@@ -1,4 +1,4 @@
-// Run: a test file of its own, in the module it tests, sees that module's private functions
+// a test file of its own, in the module it tests, sees that module's private functions
 module Values;
 import "values.coi";
 

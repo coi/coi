@@ -1,0 +1,1 @@
+expect takes one argument, the condition: expect(a == b) at line 5

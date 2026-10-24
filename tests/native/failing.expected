@@ -1,0 +1,5 @@
+✗ Failing: the first check holds, the second does not
+failing.coi:8  expect(twice(3) == 7)
+left   6
+right  7
+1 of 2 failed

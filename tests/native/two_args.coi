@@ -1,4 +1,4 @@
-// Run: expect takes the condition only, so this doesn't build
+// expect takes the condition only
 module Counting;
 
 test "no message argument" {

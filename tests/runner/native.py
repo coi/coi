@@ -1,12 +1,14 @@
 
+import re
 import subprocess
+import sys
 from pathlib import Path
 from .base import TestRunnerBase, GREEN, RED, NC
 
 class NativeRunner(TestRunnerBase):
     """tests/native/*.coi are run with `coi test`. A file must build and pass every test block in
-    it, unless its name says otherwise: *_fails.coi must build and have a test fail (exit code 1
-    and a failed check in the output), *_rejects.coi must not build (a compile error)."""
+    it. A file with a `name.expected` beside it must instead print each of its lines (a compile
+    error, or a failed check with both sides): that is how the runner's own output is checked."""
 
     def run(self, tests_dir):
         self.ensure_build()
@@ -21,19 +23,16 @@ class NativeRunner(TestRunnerBase):
         for i, f in enumerate(files):
             result = subprocess.run([str(self.compiler_bin), "test", str(f)], cwd=native_dir,
                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-            out = result.stdout
-            if f.name.endswith("_fails.coi"):
-                ok = result.returncode == 1 and "failed" in out and "expect(" in out
-                why = "expected a failing test"
-            elif f.name.endswith("_rejects.coi"):
-                ok = result.returncode != 0 and "Error:" in out and ">> tests" not in out and "failed in" not in out and " passed" not in out
-                why = "expected a compile error"
-            else:
-                ok = result.returncode == 0 and "passed" in out
-                why = "expected every test to pass"
-            if not ok:
+            out = re.sub(r"\x1b\[[0-9;]*m", "", result.stdout)
+            expected = f.with_suffix(".expected")
+            if expected.exists():
+                wanted = [l.strip() for l in expected.read_text().splitlines() if l.strip()]
+                missing = [l for l in wanted if l not in out]
+                if missing or result.returncode == 0:
+                    failures.append(f"{f.name} (exit {result.returncode}; not in the output: " + " | ".join(missing)[:200] + ")")
+            elif result.returncode != 0 or "passed" not in out:
                 tail = " | ".join(l.strip() for l in out.strip().splitlines()[-4:])
-                failures.append(f"{f.name} ({why}; exit {result.returncode}: {tail[:200]})")
+                failures.append(f"{f.name} (expected every test to pass; exit {result.returncode}: {tail[:200]})")
             self.draw_progress_bar(i + 1, len(files))
         print("")
 
@@ -43,5 +42,4 @@ class NativeRunner(TestRunnerBase):
             print(f"{RED}{len(failures)} native test(s) failed:{NC}")
             for msg in failures:
                 print(f"  {RED}✗{NC} {msg}")
-            import sys
             sys.exit(1)

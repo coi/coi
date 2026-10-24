@@ -1,4 +1,4 @@
-// Run: a wrong expectation fails the run (and the one after it still runs)
+// a wrong expectation fails the run and says what it saw; the test after it still runs
 module Failing;
 
 def twice(int x) : int { return x * 2; }

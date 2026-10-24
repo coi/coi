@@ -42,9 +42,8 @@ Runs the compiler unit tests found in `tests/unit`. These tests compile `.coi` f
 
 #### 3. Native Tests
 Runs the `.coi` files in `tests/native/` through `coi test`, the language's own test blocks built
-and run natively. A file must pass every test in it, unless its name says otherwise: a
-`*_fails.coi` must have a failing test (exit 1, a failed `expect(...)` in the output), a
-`*_rejects.coi` must not build at all.
+and run natively. A file must pass every test in it; a file with a `name.expected` beside it must
+print each of that file's lines instead (a compile error, or a failed check with both sides).
 
 ```bash
 ./tests/run.py native
