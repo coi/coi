@@ -1,0 +1,16 @@
+// Test: a method on a field of a call's result, inside a top-level function
+module Geo;
+
+pod Vec { int x; int[] xs; }
+
+def make(int n) : Vec { return Vec{x = n, xs = [n, n]}; }
+def pair(Vec a, Vec b) : Vec { return Vec{x = a.x + b.x, xs = [a.x, b.x]}; }
+
+def count(Vec v) : int { return pair(v, v).xs.size() + make(1).xs.size(); }
+
+component Main {
+    int n = count(make(2));
+    view { <div>{n}</div> }
+}
+
+app { root = Main; }

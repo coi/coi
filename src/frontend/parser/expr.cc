@@ -497,8 +497,12 @@ std::unique_ptr<Expression> Parser::parse_primary()
                     return std::make_unique<EnumAccess>(member, value_name, name);
                 }
 
-                // a method on a call result or an element: el.getProperty("x").trim(), xs[0].length()
-                bool call_receiver = dynamic_cast<FunctionCall *>(expr.get()) || dynamic_cast<MethodCall *>(expr.get()) ||
+                // a method on a call result or an element: el.getProperty("x").trim(), xs[0].length(),
+                // and on a field of a call result: make(v).items.size(). A field of an element
+                // (rows[i].label.append()) stays a name: a component field changed that way updates its view
+                Expression *root = expr.get();
+                while (auto *m = dynamic_cast<MemberAccess *>(root)) root = m->object.get();
+                bool call_receiver = dynamic_cast<FunctionCall *>(root) || dynamic_cast<MethodCall *>(root) ||
                                      dynamic_cast<IndexAccess *>(expr.get());
                 if (call_receiver && current().type == TokenType::LPAREN)
                 {
