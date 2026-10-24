@@ -534,6 +534,11 @@ template<typename V, typename F> inline V coi_filter(const V& v, F pred) {
     {
         session.data_type_names.insert(qualified_name(data_def->module_name, data_def->name));
     }
+    // and the module's enums: a parameter or field of one is written with its module's prefix
+    for (const auto &enum_def : all_global_enums)
+    {
+        session.data_type_names.insert(qualified_name(enum_def->module_name, enum_def->name));
+    }
 
     // Output global enums (defined outside components)
     for (const auto &enum_def : all_global_enums)
