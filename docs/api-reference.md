@@ -1086,7 +1086,7 @@ component Editor {
 |-------|---------------|
 | `Clipboard.onPasteText` | `string text` (pastes into text fields stay with the field) |
 | `Clipboard.onPasteImage` | `Blob image, string mime` |
-| `Input.onKeyDown` / `onKeyUp` | `KeyDownEvent` / `KeyUpEvent` (`keyCode`, `mods`, `repeat`, `key`) |
+| `Input.onKeyDown` / `onKeyUp` | `KeyDownEvent` (`keyCode`, `mods`, `repeat`, `key`, `inField`: 1 when a text field had the key) / `KeyUpEvent` (`keyCode`, `mods`, `key`) |
 | `System.onVisibilityChange` | `VisibilityChangeEvent` (`hidden`, `state`): the moment to save |
 | `System.onPageHide` / `onPageShow` | `uint8 persisted` |
 | `System.onOnline` | `uint8 online` |

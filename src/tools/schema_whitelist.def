@@ -29,6 +29,7 @@ set_style
 set_inner_html
 focus
 blur
+blur_active
 get_property
 request_fullscreen
 request_pointer_lock

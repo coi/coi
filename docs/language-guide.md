@@ -1363,7 +1363,7 @@ component Editor {
 
 | Signal | The listener takes |
 |---|---|
-| `Input.keyDown`, `Input.keyUp` | `KeyDownEvent` / `KeyUpEvent` (`keyCode`, `mods`, `repeat`, `key`) |
+| `Input.keyDown`, `Input.keyUp` | `KeyDownEvent` (`keyCode`, `mods`, `repeat`, `key`, `inField`: 1 when a text field had the key) / `KeyUpEvent` (`keyCode`, `mods`, `key`) |
 | `System.visibilityChange` | `VisibilityChangeEvent` (`hidden`, `state`): the moment to save |
 | `System.pageHide`, `System.pageShow` | `uint8 persisted` |
 | `System.online` | `uint8 online` |
