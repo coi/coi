@@ -111,8 +111,7 @@ Token Lexer::read_string(){
                 case '\\' : str += '\\'; break;
                 case '"' : str += '"'; break;
                 case '\'' : str += '\''; break;
-                // a literal $, marked with a byte source text can't hold, so "\\${x}" (a backslash,
-                // then x) isn't read as an escaped dollar too
+                // marker byte: "\\${x}" must stay a backslash then x
                 case '$' : str += '\x1d'; break;
                 default:
                     // a silently dropped backslash made "\r" into "r"
