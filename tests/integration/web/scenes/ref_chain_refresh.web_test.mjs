@@ -16,4 +16,6 @@ export async function run({ page, expect }) {
   await expect.textContains(page.locator(".mid-n"), "3");
   // a pub member two levels down, read by the top view
   await expect.textContains(page.locator(".top-status"), "bumped 3");
+  // and through a method of the top view that reads it
+  await expect.textContains(page.locator(".top-status-fn"), "via bumped 3");
 }

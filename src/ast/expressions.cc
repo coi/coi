@@ -865,6 +865,14 @@ std::string MemberAccess::to_webcc() {
     return object->to_webcc() + "." + cpp_name(member);
 }
 
+void FunctionCall::collect_member_dependencies(std::set<MemberDependency>& member_deps) {
+    if (auto it = g_method_member_reads.find(name); it != g_method_member_reads.end())
+        member_deps.insert(it->second.begin(), it->second.end());
+    for (auto* child : get_children()) {
+        if (child) child->collect_member_dependencies(member_deps);
+    }
+}
+
 void MemberAccess::collect_member_dependencies(std::set<MemberDependency>& member_deps) {
     // Add this object.member as a dependency
     if (auto id = dynamic_cast<Identifier*>(object.get())) {

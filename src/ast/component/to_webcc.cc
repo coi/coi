@@ -377,6 +377,37 @@ std::string Component::to_webcc(CompilerSession &session)
         g_method_reads[m.name] = out;
     }
 
+    // and the a.b of member components each one reads, over the same calls
+    g_method_member_reads.clear();
+    std::map<std::string, std::set<MemberDependency>> direct_members;
+    std::function<void(ASTNode *, std::set<MemberDependency> &)> walk_members = [&](ASTNode *n, std::set<MemberDependency> &out) {
+        if (!n) return;
+        if (auto ma = dynamic_cast<MemberAccess *>(n))
+            if (auto id = dynamic_cast<Identifier *>(ma->object.get()))
+                if (member_names.count(id->name)) out.insert({id->name, ma->member});
+        for (auto *c : n->get_child_nodes()) walk_members(c, out);
+    };
+    for (const auto &m : methods)
+        for (const auto &stmt : m.body)
+            walk_members(stmt.get(), direct_members[m.name]);
+    for (const auto &m : methods)
+    {
+        std::set<std::string> seen;
+        std::set<MemberDependency> out;
+        std::vector<std::string> todo{m.name};
+        while (!todo.empty())
+        {
+            std::string cur = todo.back();
+            todo.pop_back();
+            if (!seen.insert(cur).second || !direct.count(cur))
+                continue;
+            out.insert(direct_members[cur].begin(), direct_members[cur].end());
+            for (const auto &d : direct[cur])
+                if (direct.count(d)) todo.push_back(d);
+        }
+        if (!out.empty()) g_method_member_reads[m.name] = out;
+    }
+
     // Populate global context for reference params
     g_ref_props.clear();
     for (auto &param : params)
