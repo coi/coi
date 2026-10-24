@@ -75,16 +75,6 @@ static void emit_test_runtime(std::ostream &out)
 static bool coi_test_failed_now = false;
 static bool coi_test_color() { static int c = -1; if (c < 0) { const char* e = getenv("COI_COLOR"); c = e && *e == '1'; } return c == 1; }
 template<typename T> static coi::string coi_test_show(const T& v) { return __coi_json_stringify(v); }
-// equal as a test means it: arrays element by element, a pod by its fields (as JSON), the rest by ==
-template<typename A, typename B> static bool coi_test_eq(const A& a, const B& b) {
-    if constexpr (requires { a == b; }) return a == b;
-    else return __coi_json_stringify(a) == __coi_json_stringify(b);
-}
-template<typename T> static bool coi_test_eq(const coi::vector<T>& a, const coi::vector<T>& b) {
-    if (a.size() != b.size()) return false;
-    for (size_t i = 0; i < a.size(); i++) if (!coi_test_eq(a[i], b[i])) return false;
-    return true;
-}
 static void coi_test_fail(const char* file, int line, const char* expr, const coi::string& left, const coi::string& right) {
     coi_test_failed_now = true;
     printf("  %s✗%s %s\n", coi_test_color() ? "\033[31m" : "", coi_test_color() ? "\033[0m" : "", coi_test_current);
@@ -717,11 +707,13 @@ template<typename V, typename F> inline V coi_filter(const V& v, F pred) {
 
         for (const auto &data_def : comp.data)
         {
-            out << "struct " << qualified_name(comp.module_name, comp.name) << "_" << data_def->name << " {\n";
+            std::string local = qualified_name(comp.module_name, comp.name) + "_" + data_def->name;
+            out << "struct " << local << " {\n";
             for (const auto &field : data_def->fields)
             {
                 out << "    " << convert_type(field.type) << " " << cpp_name(field.name) << ";\n";
             }
+            out << "    bool operator==(const " << local << "&) const = default;\n";
             out << "};\n";
         }
 

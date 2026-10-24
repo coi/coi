@@ -1,0 +1,33 @@
+// Test: == and != compare pods field by field, arrays by element and maps by key and value,
+// anywhere an expression goes: a return, a condition, an inline function, a component member
+pod Point { int x; int y; }
+pod Path { string name; Point[] points; }
+pod Hit { int at; }
+pod Miss { string why; }
+union Shot(string kind) {
+    "hit" => Hit;
+    "miss" => Miss;
+}
+
+def same(Path a, Path b) : bool { return a == b; }
+def has(Point[] ps, Point p) : bool { return ps.any(q => q == p); }
+def unchanged(int[string] a, int[string] b) : bool { return a == b && !(a != b); }
+def literal(int[] xs) : bool { return xs == [1, 2] || xs != []; }
+def shots(Shot a, Shot b) : bool { return a == b; }
+
+component Main {
+    pod Local { string label; int n; }
+    Path a = Path{name = "a", points = [Point{x = 1, y = 2}]};
+    Local l = Local{label = "x", n = 1};
+    mut bool ok = false;
+
+    init {
+        int[string] m;
+        ok = same(a, a) && has(a.points, Point{x = 1, y = 2}) && unchanged(m, m) && literal([1, 2]) &&
+             shots(Shot(Hit{at = 3}), Shot(Hit{at = 3})) && l == Local{label = "x", n = 1};
+    }
+
+    view { <div>{ok}</div> }
+}
+
+app { root = Main; }

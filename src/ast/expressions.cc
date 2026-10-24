@@ -266,7 +266,18 @@ std::string BinaryOp::to_webcc() {
         return generate_formatter_expr(parts);
     }
     // Wrap in parentheses to preserve operator precedence
+    if (op == "==" || op == "!=")
+        return "(" + comparison_side(left.get()) + " " + op + " " + comparison_side(right.get()) + ")";
     return "(" + left->to_webcc() + " " + op + " " + right->to_webcc() + ")";
+}
+
+// a side of == or !=: an array literal is a brace list in C++, which can't be compared until it
+// names its vector type
+std::string comparison_side(Expression *e) {
+    auto *lit = dynamic_cast<ArrayLiteral *>(e);
+    if (lit && !lit->element_type.empty())
+        return "coi::vector<" + convert_type(lit->element_type) + ">" + lit->to_webcc();
+    return e->to_webcc();
 }
 
 std::string FunctionCall::args_to_string() {

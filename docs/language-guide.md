@@ -634,6 +634,18 @@ mut User user3 = User{"Charlie", 35, "charlie@example.com"};
 mut User user4 := user3;  // user3 is now invalid
 ```
 
+### Comparing
+
+`==` and `!=` compare values, not identity: two pods are equal when every field is, two arrays
+when they hold equal elements in the same order, two maps when they have the same keys with
+equal values. Unions compare the same way. An array literal compares with an array directly:
+
+```tsx
+bool same = user1 == user2;              // field by field
+bool none = tags == [];                  // the literal takes the array's type
+bool seen = points.any(p => p == origin);
+```
+
 ### References
 
 Pod types support references like any other type:
@@ -1416,8 +1428,8 @@ test "a word's start narrows the menu" {
   functions need `pub` and `Module::name`, as always.
 - `expect(condition);` is the check and only works inside a test. The first `expect` that fails
   ends that test; the other tests still run.
-- `==` and `!=` in an `expect` compare arrays element by element and pods field by field, so
-  `expect(got == ["a", "b"])` and `expect(p == Point{x = 1, y = 2})` work as written.
+- `expect(a == b)` compares values the way `==` always does (pods field by field, arrays element
+  by element), so `expect(got == ["a", "b"])` and `expect(p == Point{x = 1, y = 2})` work as written.
 - A normal build (`coi build`, `coi dev`) parses the test blocks and leaves them out, so they
   cost the app nothing.
 - Tests that outgrow the file go next to it as `Slash.test.coi`, starting with `module Slash;`

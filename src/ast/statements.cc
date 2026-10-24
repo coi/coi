@@ -364,15 +364,8 @@ static std::string emit_expect(FunctionCall *call)
     auto *cmp = dynamic_cast<BinaryOp *>(cond);
     if (cmp && (cmp->op == "==" || cmp->op == "!=" || cmp->op == "<" || cmp->op == ">" || cmp->op == "<=" || cmp->op == ">="))
     {
-        // a brace list needs its vector type to be a value
-        auto side = [](Expression *e) {
-            auto *lit = dynamic_cast<ArrayLiteral *>(e);
-            return lit && !lit->element_type.empty() ? "coi::vector<" + convert_type(lit->element_type) + ">" + lit->to_webcc() : e->to_webcc();
-        };
-        // == and != go through coi_test_eq: arrays by element, pods by value
-        std::string holds = cmp->op == "==" ? "coi_test_eq(_l, _r)" : cmp->op == "!=" ? "!coi_test_eq(_l, _r)" : "(_l " + cmp->op + " _r)";
-        return "{ auto&& _l = " + side(cmp->left.get()) + "; auto&& _r = " + side(cmp->right.get()) + ";\n" +
-               "      if (!" + holds + ") { coi_test_fail(" + where + ", coi_test_show(_l), coi_test_show(_r)); return; } }";
+        return "{ auto&& _l = " + comparison_side(cmp->left.get()) + "; auto&& _r = " + comparison_side(cmp->right.get()) + ";\n" +
+               "      if (!(_l " + cmp->op + " _r)) { coi_test_fail(" + where + ", coi_test_show(_l), coi_test_show(_r)); return; } }";
     }
     return "if (!(" + cond->to_webcc() + ")) { coi_test_fail(" + where + ", coi::string(), coi::string()); return; }";
 }

@@ -302,6 +302,10 @@ u = User{name = "C", age = 35, email := em};
 mut User u2 = u;      // copy (both valid)
 mut User u3 := u2;    // move (u2 now invalid)
 
+// == compares values: pods field by field, arrays by element, maps by key and value
+bool same = u == u2;
+bool none = users == [];   // an array literal takes the array's type
+
 // Reference parameter:
 def bump(mut User& user) : void { user.age = user.age + 1; }
 bump(&u);

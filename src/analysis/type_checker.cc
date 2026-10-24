@@ -1389,17 +1389,6 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                 exit(1);
             }
             std::string t = infer_expression_type(func->args[0].value.get(), scope);
-            // expect(xs == ["a", "b"]): the literal takes the array's type
-            if (auto *cmp = dynamic_cast<BinaryOp *>(func->args[0].value.get()); cmp && (cmp->op == "==" || cmp->op == "!="))
-            {
-                std::string lt = infer_expression_type(cmp->left.get(), scope), rt = infer_expression_type(cmp->right.get(), scope);
-                std::string array_type = lt.ends_with("[]") && !lt.starts_with("unknown") ? lt
-                                       : rt.ends_with("[]") && !rt.starts_with("unknown") ? rt : "";
-                if (!array_type.empty())
-                    for (Expression *side : {cmp->left.get(), cmp->right.get()})
-                        if (auto *lit = dynamic_cast<ArrayLiteral *>(side); lit && lit->element_type.empty())
-                            lit->propagate_element_type(array_type.substr(0, array_type.size() - 2));
-            }
             if (t != "unknown" && normalize_type(t) != "bool")
             {
                 ErrorHandler::type_error("expect wants a bool, not a '" + display_type_name(normalize_type(t)) + "': expect(" +
@@ -1942,6 +1931,16 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
         // Comparison operators return bool
         if (op == "==" || op == "!=" || op == "<" || op == ">" || op == "<=" || op == ">=")
         {
+            // xs == ["a", "b"]: the literal takes the array's type, so it is a value to compare with
+            if (op == "==" || op == "!=")
+            {
+                std::string array_type = l.ends_with("[]") && !l.starts_with("unknown") ? l
+                                       : r.ends_with("[]") && !r.starts_with("unknown") ? r : "";
+                if (!array_type.empty())
+                    for (Expression *side : {bin->left.get(), bin->right.get()})
+                        if (auto *lit = dynamic_cast<ArrayLiteral *>(side); lit && lit->element_type.empty())
+                            lit->propagate_element_type(array_type.substr(0, array_type.size() - 2));
+            }
             // different enums can share values
             std::string ln = normalize_type(l), rn = normalize_type(r);
             if (is_enum_type(ln) && is_enum_type(rn))

@@ -106,6 +106,7 @@ static std::string emit_union(const DataDef &u) {
         ss << "    struct _As" << i << " { const " << convert_type(u.alts[i].type) << "& _0; };\n";
         ss << "    _As" << i << " as_" << u.alts[i].name << "() const { return _As" << i << "{_" << i << "}; }\n";
     }
+    ss << "    bool operator==(const " << me << "&) const = default;\n";
     ss << "};\n";
     return ss.str();
 }
@@ -130,6 +131,8 @@ std::string DataDef::to_webcc() {
     for(const auto& field : fields){
         ss << "    " << convert_type(field.type) << " " << cpp_name(field.name) << ";\n";
     }
+    // == compares field by field; only compiled where a program compares two of them
+    ss << "    bool operator==(const " << qualified_name(module_name, name) << "&) const = default;\n";
     ss << "};\n";
     return ss.str();
 }

@@ -65,6 +65,9 @@ struct TypeLiteral : Expression {
     bool is_static() override { return true; }
 };
 
+// a side of == or != as C++, an array literal with its vector type
+std::string comparison_side(Expression *e);
+
 struct BinaryOp : Expression {
     std::unique_ptr<Expression> left;
     std::string op;
