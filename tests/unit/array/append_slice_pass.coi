@@ -1,0 +1,17 @@
+// Test: append adds another array's elements, slice copies a range
+component App {
+    mut uint8[] bytes = [1, 2, 3];
+    def grow() : void {
+        uint8[] more = [4, 5];
+        bytes.append(more);
+        bytes.append(bytes);
+    }
+    def middle() : uint8[] { return bytes.slice(1, 3); }
+    def tail() : int[] {
+        int[] nums = [1, 2, 3, 4];
+        return nums.slice(2);
+    }
+    view { <p>{bytes.size()} {middle().size()} {tail().size()}</p> }
+}
+
+app { root = App; }

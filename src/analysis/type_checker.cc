@@ -7,6 +7,19 @@
 #include <functional>
 #include <cctype>
 
+// a builtin array method's declared type with T as the array's element: slice on a uint8[] is a
+// uint8[], not a T[]
+static std::string array_method_type(const std::string &declared, const std::string &array_type)
+{
+    if (declared.empty()) return "void";
+    std::string t = normalize_type(array_type);
+    size_t open = t.rfind('[');
+    std::string elem = open == std::string::npos ? t : t.substr(0, open);
+    if (declared == "T") return elem;
+    if (declared == "T[]") return elem + "[]";
+    return normalize_type(declared);
+}
+
 // Global set of known enum type names (populated during validation)
 static std::set<std::string> g_enum_types;
 // Global map of known data types to their field names (for Meta.has(Type.field))
@@ -1344,6 +1357,8 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                                      std::to_string(mc->args.size()) + " argument(s)", mc->line);
             exit(1);
         }
+        if (def_t == "array")
+            return array_method_type(m->return_type, t);
         return m->return_type.empty() ? "void" : normalize_type(m->return_type);
     }
 
@@ -1531,13 +1546,10 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
             // Use DefSchema for array method lookups
             if (is_dynamic_array || is_fixed_array)
             {
-                if (auto* method_def = DefSchema::instance().lookup_method("array", method_name)) {
-                    if (method_def->params.size() == func->args.size()) {
-                        return method_def->return_type.empty() ? "void" : normalize_type(method_def->return_type);
-                    }
-                }
-                if (!DefSchema::instance().lookup_method("array", method_name, func->args.size()))
-                    builtin_method_error("array");
+                // a default argument may be left out: slice(2)
+                if (auto* method_def = DefSchema::instance().lookup_method("array", method_name, func->args.size()))
+                    return array_method_type(method_def->return_type, obj_type);
+                builtin_method_error("array");
             }
             
             // Use DefSchema for string method lookups

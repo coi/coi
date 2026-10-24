@@ -114,6 +114,20 @@ template<typename V, typename F> inline int32_t coi_count_where(const V& v, F pr
 template<typename V, typename F> inline void coi_remove_where(V& v, F pred) {
     for (int32_t i = 0; i < (int32_t)v.size();) { if (pred(v[i])) v.remove(i); else i++; }
 }
+template<typename V> inline void coi_append(V& v, const V& other) {
+    if (&v == &other) { V copy = other; coi_append(v, copy); return; }
+    v.reserve(v.size() + other.size());
+    for (int32_t i = 0; i < (int32_t)other.size(); i++) v.push_back(other[i]);
+}
+template<typename V> inline V coi_slice(const V& v, int32_t start, int32_t count) {
+    int32_t n = (int32_t)v.size();
+    if (start < 0) start = 0;
+    int32_t end = count < 0 ? n : (start + count > n ? n : start + count);
+    V out;
+    if (start < end) out.reserve(end - start);
+    for (int32_t i = start; i < end; i++) out.push_back(v[i]);
+    return out;
+}
 template<typename V, typename F> inline V coi_filter(const V& v, F pred) {
     V out;
     for (int32_t i = 0; i < (int32_t)v.size(); i++) if (pred(v[i])) out.push_back(v[i]);

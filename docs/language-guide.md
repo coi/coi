@@ -202,6 +202,7 @@ nums.pop();                  // Remove last element
 nums.clear();                // Remove all elements
 nums.remove(0);              // Remove element at index
 nums.sort();                 // Sort in ascending order
+nums.append([5, 6]);         // Add every element of another array
 
 // Search
 int idx = nums.indexOf(2);   // Find index of value (-1 if not found)
@@ -210,6 +211,10 @@ bool has = nums.contains(2); // Check if value exists
 // Index access
 int first = nums[0];
 nums[0] = 100;               // Requires mut
+
+// Copies
+int[] some = nums.slice(1, 2); // 2 elements from index 1 (fewer past the end)
+int[] rest = nums.slice(2);    // from index 2 to the end
 ```
 
 ### Searching with an Inline Function

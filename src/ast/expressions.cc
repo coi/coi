@@ -517,9 +517,10 @@ std::string FunctionCall::to_webcc() {
                             DefSchema::instance().lookup_type(type_or_obj) != nullptr;
         bool builtin_receiver = !type_by_name && (receiver_type.empty() || receiver_type == "string" || receiver_type.back() == ']');
         if (!handle_receiver && builtin_receiver) {
-            // For string methods, we need to check against the "string" type
-            // Use arg_count to find the correct overload
-                        if (!has_inline_function(args))
+            // string's methods first, unless the receiver is known to be an array (append and
+            // the like are both a string's and an array's); arg_count picks the overload
+            bool array_receiver = !receiver_type.empty() && receiver_type.back() == ']';
+            if (!array_receiver && !has_inline_function(args))
                 if (auto* method_def = DefSchema::instance().lookup_method("string", method, args.size())) {
                     if (method_def->mapping_type == MappingType::Inline) {
                         return expand_inline_template(method_def->mapping_value, resolved_receiver, args);
