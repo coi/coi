@@ -1113,7 +1113,7 @@ Events of a handle you create in code (`img.onLoaded(&h)`) need that handle's li
 | `FetchRequest.request(method, url, headers, bytes, &onDone = h, &onError = e)` | Any method, binary body; `h(int status, Blob body)` for every response |
 | `Image.fromBlob(blob, mime, &onLoaded = h)` | Image from bytes; `img.free()` releases it |
 | `PdfDocument.open(blob, &onOpened = h)`, `doc.renderPage(page, canvas, scale)` | PDF import (`Pdf.setLibrary(lib, worker)` first, see webcc's pdf docs) |
-| `PdfWriter.createWriter(&onWritten = h)`, `addPage`, `moveTo`, `lineTo`, `stroke`, `drawImage`, `drawText`, `finish` | PDF export |
+| `PdfWriter.createWriter(&onWritten = h)`, `addPage`, `moveTo`, `lineTo`, `stroke`, `drawImage`, `addFont`, `setFont`, `drawText`, `finish` | PDF export (`addFont` embeds a .ttf, only the glyphs used) |
 | `System.getDevicePixelRatio()`, `System.isOnline()` | Screen and connection |
 | `el.setStyle(name, value)`, `el.focus()`, `el.blur()`, `el.getProperty(name)` | Text boxes over a canvas |
 | `ws.sendBinary(bytes)`, `ws.closeWithCode(code, reason)`, `ws.getBufferedAmount()` | WebSocket extras |

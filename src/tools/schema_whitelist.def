@@ -294,6 +294,8 @@ fill
 save
 restore
 draw_image
+add_font
+set_font
 draw_text
 finish
 
