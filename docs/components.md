@@ -381,7 +381,7 @@ component App {
 }
 ```
 
-A parent can also read a child's `pub mut` state in its view, as `{timer.elapsed}` above, and through a chain of members (`{clock.timer.elapsed}` when `Clock` has a `pub mut Timer timer`): a change anywhere down the chain updates the binding.
+A parent can also read a child's `pub mut` state in its view, as `{timer.elapsed}` above, and through a chain of members (`{clock.timer.elapsed}` when `Clock` has a `pub mut Timer timer`): a change anywhere down the chain updates the binding. Calling one of the child's methods works the same way: `{timer.isOver(60)}` updates when a `pub mut` member that method reads changes, including through the child's other methods it calls. State the child keeps private doesn't announce its changes, so a method that depends only on that won't update the parent.
 
 ## Persisting Component State
 

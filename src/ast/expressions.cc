@@ -870,6 +870,8 @@ std::string MemberAccess::to_webcc() {
 void FunctionCall::collect_member_dependencies(std::set<MemberDependency>& member_deps) {
     if (auto it = g_method_member_reads.find(name); it != g_method_member_reads.end())
         member_deps.insert(it->second.begin(), it->second.end());
+    if (auto it = g_child_method_reads.find(name); it != g_child_method_reads.end())
+        member_deps.insert(it->second.begin(), it->second.end());
     for (auto* child : get_children()) {
         if (child) child->collect_member_dependencies(member_deps);
     }

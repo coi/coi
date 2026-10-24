@@ -673,6 +673,20 @@ template<typename V, typename F> inline V coi_filter(const V& v, F pred) {
         session.component_info[qualified_name(comp->module_name, comp->name)] = info;
     }
 
+    // what each component's methods read of its pub mut members, for owners that call them
+    g_component_method_reads.clear();
+    for (auto *comp : sorted_components)
+    {
+        const auto &pub = session.component_info[qualified_name(comp->module_name, comp->name)].pub_mut_members;
+        std::map<std::string, std::set<std::string>> direct, closed;
+        comp->compute_method_reads(direct, closed);
+        auto &out = g_component_method_reads[qualified_name(comp->module_name, comp->name)];
+        for (const auto &[method, reads] : closed)
+            for (const auto &r : reads)
+                if (pub.count(r)) out[method].insert(r);
+    }
+    g_method_reads.clear();
+
     // Populate global data type names for module-level type resolution
     for (const auto &data_def : all_global_data)
     {

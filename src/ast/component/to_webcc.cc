@@ -277,6 +277,47 @@ static void collect_loop_components(ASTNode *node, std::set<std::string> &loop_c
     }
 }
 
+void Component::compute_method_reads(std::map<std::string, std::set<std::string>> &direct,
+                                     std::map<std::string, std::set<std::string>> &closed)
+{
+    g_method_reads.clear();
+    closed.clear();
+    std::set<std::string> member_names;
+    for (const auto &v : state) member_names.insert(v->name);
+    for (const auto &p : params) member_names.insert(p->name);
+    direct.clear();
+    g_method_reads_building = true;
+    for (const auto &m : methods)
+    {
+        std::set<std::string> reads, kept;
+        for (const auto &stmt : m.body)
+            stmt->collect_dependencies(reads);
+        for (const auto &r : reads)
+            if (member_names.count(r) || std::any_of(methods.begin(), methods.end(), [&](const FunctionDef &o) { return o.name == r; }))
+                kept.insert(r);
+        direct[m.name] = kept;
+    }
+    g_method_reads_building = false;
+    for (const auto &m : methods)
+    {
+        std::set<std::string> seen, out;
+        std::vector<std::string> todo{m.name};
+        while (!todo.empty())
+        {
+            std::string cur = todo.back();
+            todo.pop_back();
+            if (!seen.insert(cur).second || !direct.count(cur))
+                continue;
+            for (const auto &d : direct[cur])
+            {
+                if (direct.count(d)) todo.push_back(d);
+                else out.insert(d);
+            }
+        }
+        closed[m.name] = out;
+    }
+}
+
 std::string Component::to_webcc(CompilerSession &session)
 {
     std::stringstream ss;
@@ -341,41 +382,23 @@ std::string Component::to_webcc(CompilerSession &session)
     }
 
     // what each method reads of the component's state, closed over the methods it calls
-    g_method_reads.clear();
     std::set<std::string> member_names;
     for (const auto &v : state) member_names.insert(v->name);
     for (const auto &p : params) member_names.insert(p->name);
     std::map<std::string, std::set<std::string>> direct;
-    g_method_reads_building = true;
-    for (const auto &m : methods)
-    {
-        std::set<std::string> reads, kept;
-        for (const auto &stmt : m.body)
-            stmt->collect_dependencies(reads);
-        for (const auto &r : reads)
-            if (member_names.count(r) || std::any_of(methods.begin(), methods.end(), [&](const FunctionDef &o) { return o.name == r; }))
-                kept.insert(r);
-        direct[m.name] = kept;
-    }
-    g_method_reads_building = false;
-    for (const auto &m : methods)
-    {
-        std::set<std::string> seen, out;
-        std::vector<std::string> todo{m.name};
-        while (!todo.empty())
-        {
-            std::string cur = todo.back();
-            todo.pop_back();
-            if (!seen.insert(cur).second || !direct.count(cur))
-                continue;
-            for (const auto &d : direct[cur])
-            {
-                if (direct.count(d)) todo.push_back(d);
-                else out.insert(d);
-            }
-        }
-        g_method_reads[m.name] = out;
-    }
+    compute_method_reads(direct, g_method_reads);
+
+    // a member component's methods: what each reads of its pub mut members, as a.b dependencies
+    g_child_method_reads.clear();
+    auto add_child_methods = [&](const std::string &var, const std::string &type) {
+        auto it = g_component_method_reads.find(resolve_component_type(type));
+        if (it == g_component_method_reads.end()) return;
+        for (const auto &[method, reads] : it->second)
+            for (const auto &r : reads)
+                g_child_method_reads[var + "." + method].insert({var, r});
+    };
+    for (const auto &v : state) add_child_methods(v->name, v->type);
+    for (const auto &p : params) add_child_methods(p->name, p->type);
 
     // child members (a.b) each method reads
     g_method_member_reads.clear();
@@ -385,6 +408,9 @@ std::string Component::to_webcc(CompilerSession &session)
         if (auto ma = dynamic_cast<MemberAccess *>(n))
             if (auto id = dynamic_cast<Identifier *>(ma->object.get()))
                 if (member_names.count(id->name)) out.insert({id->name, ma->member});
+        if (auto fc = dynamic_cast<FunctionCall *>(n))
+            if (auto it = g_child_method_reads.find(fc->name); it != g_child_method_reads.end())
+                out.insert(it->second.begin(), it->second.end());
         for (auto *c : n->get_child_nodes()) walk_members(c, out);
     };
     for (const auto &m : methods)

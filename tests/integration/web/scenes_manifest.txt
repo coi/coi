@@ -46,6 +46,7 @@ events_burst|tests/integration/web/scenes/events_burst.coi|web
 autofocus_late|tests/integration/web/scenes/autofocus_late.coi|web
 router_rest_keep|tests/integration/web/scenes/router_rest_keep.coi|web
 member_chain_prop|tests/integration/web/scenes/member_chain_prop.coi|web
+member_method_reactive|tests/integration/web/scenes/member_method_reactive.coi|web
 svg_text|tests/integration/web/scenes/svg_text.coi|web
 prevent_key_outside_fields|tests/integration/web/scenes/prevent_key_outside_fields.coi|web
 view_transition|tests/integration/web/scenes/view_transition.coi|web

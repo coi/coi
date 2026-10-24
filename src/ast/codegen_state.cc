@@ -10,3 +10,5 @@ std::map<std::string, HtmlLoopVarInfo> g_html_loop_var_infos;
 std::map<std::string, std::set<std::string>> g_method_reads;
 bool g_method_reads_building = false;
 std::map<std::string, std::set<MemberDependency>> g_method_member_reads;
+std::map<std::string, std::map<std::string, std::set<std::string>>> g_component_method_reads;
+std::map<std::string, std::set<MemberDependency>> g_child_method_reads;

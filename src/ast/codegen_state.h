@@ -63,3 +63,8 @@ extern std::map<std::string, std::set<std::string>> g_method_reads;
 extern bool g_method_reads_building;
 // child members (a.b) each method reads, including through the methods it calls
 extern std::map<std::string, std::set<MemberDependency>> g_method_member_reads;
+// per component (qualified name), the pub mut members each of its methods reads, so an owner's
+// binding that calls box.isOpen() refreshes through box.onOpenChange like one reading box.open
+extern std::map<std::string, std::map<std::string, std::set<std::string>>> g_component_method_reads;
+// for the component being emitted: "box.isOpen" -> {box, open}, one entry per member component's method
+extern std::map<std::string, std::set<MemberDependency>> g_child_method_reads;

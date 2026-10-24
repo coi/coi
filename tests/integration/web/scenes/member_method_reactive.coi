@@ -1,0 +1,31 @@
+// a member component's method called from the owner's view: as text, as a child's prop, inside
+// one of the owner's own methods, and through a method that calls another. Each follows the
+// pub mut member the method reads when it changes inside the member
+component Box {
+    pub mut string leaving = "";
+    pub def isLeaving(string which) : bool { return leaving == which; }
+    pub def busy() : bool { return !idle(); }
+    def idle() : bool { return leaving.isEmpty(); }
+    def close() : void { leaving = "a"; }
+    view { <button class="close" onclick={close}>close</button> }
+}
+
+component Show(bool on) {
+    view { <p class="shown">{on ? "out" : "in"}</p> }
+}
+
+component App {
+    mut Box box;
+    def gone() : bool { return box.isLeaving("a"); }
+    view {
+        <div>
+            <p class="text">{box.isLeaving("a") ? "out" : "in"}</p>
+            <Show on={box.isLeaving("a")} />
+            <p class={gone() ? "own out" : "own in"}>own</p>
+            <p class="busy">{box.busy() ? "out" : "in"}</p>
+            <{box} />
+        </div>
+    }
+}
+
+app { root = App; }

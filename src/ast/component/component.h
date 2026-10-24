@@ -91,6 +91,10 @@ struct Component : ASTNode {
                                std::map<MemberDependency, std::vector<std::string>>* member_updates = nullptr);
     std::string to_webcc() override { static CompilerSession s; return to_webcc(s); }
     std::string to_webcc(CompilerSession& session);
+    // what each method reads of this component's state and params: direct (with the names of
+    // the methods it calls) and closed over those calls
+    void compute_method_reads(std::map<std::string, std::set<std::string>>& direct,
+                              std::map<std::string, std::set<std::string>>& closed);
 };
 
 struct AppConfig {
