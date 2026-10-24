@@ -47,6 +47,16 @@ static std::string expand_inline_template(const std::string& tmpl, const std::st
 static std::string to_webcc_arg(const std::string& code, const std::string& coi_type);
 static std::string from_webcc_value(const std::string& code, const std::string& coi_type);
 
+// an expression's C++; a bare brace list the checker typed gets its vector type, so it can be
+// passed, stringified or called on
+static std::string typed_literal(Expression* e) {
+    std::string code = e->to_webcc();
+    auto* arr = dynamic_cast<ArrayLiteral*>(e);
+    if (arr && !arr->element_type.empty())
+        return "coi::vector<" + convert_type(arr->element_type) + ">" + code;
+    return code;
+}
+
 // b => ...: an array method given an inline function uses its ...Where form (defs/core/array.d.coi)
 static bool has_inline_function(const std::vector<CallArg>& args) {
     return args.size() == 1 && dynamic_cast<LambdaExpr*>(args[0].value.get()) != nullptr;
@@ -85,13 +95,8 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
         return "(webcc::system::is_hidden() != 0)";
     }
     
-    if (intrinsic_name == "json_stringify" && args.size() == 1) {
-        std::string value = args[0].value->to_webcc();
-        auto* arr = dynamic_cast<ArrayLiteral*>(args[0].value.get());
-        if (arr && !arr->element_type.empty())
-            value = "coi::vector<" + convert_type(arr->element_type) + ">" + value;
-        return "__coi_json_stringify(" + value + ")";
-    }
+    if (intrinsic_name == "json_stringify" && args.size() == 1)
+        return "__coi_json_stringify(" + typed_literal(args[0].value.get()) + ")";
 
     if (intrinsic_name == "json_parse") {
         if (args.size() != 2) {
@@ -1255,10 +1260,10 @@ std::string MethodCall::to_webcc() {
         }
     }
     std::string def_type = !type.empty() && type.back() == ']' ? "array" : DefSchema::instance().resolve_alias(type);
-    std::string recv = receiver->to_webcc();
+    std::string recv = typed_literal(receiver.get());
     if (dynamic_cast<StringLiteral*>(receiver.get()) && receiver->is_static())
         recv = "coi::string(" + recv + ")";
-        bool inline_fn = has_inline_function(args);
+    bool inline_fn = has_inline_function(args);
     std::string want = predicate_method(method, args);
     const auto* m = DefSchema::instance().lookup_method(inline_fn ? "array" : def_type, want, args.size());
     if (!m && (type.empty() || type == "unknown")) {

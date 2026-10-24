@@ -1281,6 +1281,9 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
     {
         std::string t = normalize_type(infer_expression_type(mc->receiver.get(), scope));
         mc->receiver_type = t;
+        // ["a", "b"].contains(x): the brace list needs its type in C++
+        if (auto *arr = dynamic_cast<ArrayLiteral *>(mc->receiver.get()); arr && t.ends_with("[]"))
+            arr->element_type = t.substr(0, t.size() - 2);
         for (auto &a : mc->args)
             infer_expression_type(a.value.get(), scope);
         if (t == "unknown")

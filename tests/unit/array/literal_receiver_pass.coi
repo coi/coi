@@ -1,0 +1,16 @@
+// Test: an array method called on a literal list
+component LiteralReceiverTest {
+    mut string key = "ArrowDown";
+
+    def scrolls() : bool { return ["ArrowUp", "ArrowDown", "PageUp"].contains(key); }
+    def slot() : int { return [10, 20, 30].indexOf(20); }
+    def big() : bool { return [1.5, 2.5].any(v => v > 2.0); }
+
+    view {
+        <div>{scrolls() ? "scrolls" : "stays"} {slot()} {big() ? "big" : "small"}</div>
+    }
+}
+
+app {
+    root = LiteralReceiverTest;
+}
