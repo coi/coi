@@ -1,0 +1,11 @@
+// Test: an array literal as a branch of ?: is a vector like the other branch
+component App {
+    mut bool code = true;
+    def words(string s) : string[] { return [s, s]; }
+    def pick(string s) : string[] { return code ? [s] : words(s); }
+    def other(string s) : string[] { return code ? words(s) : [s, "x"]; }
+    def nums() : int[] { return code ? [1, 2] : [3]; }
+    view { <p>{pick("a").size()} {other("b").size()} {nums().size()}</p> }
+}
+
+app { root = App; }

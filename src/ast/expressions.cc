@@ -937,7 +937,7 @@ TernaryOp::TernaryOp(std::unique_ptr<Expression> cond, std::unique_ptr<Expressio
     : condition(std::move(cond)), true_expr(std::move(t)), false_expr(std::move(f)) {}
 
 std::string TernaryOp::to_webcc() {
-    return "(" + condition->to_webcc() + " ? " + true_expr->to_webcc() + " : " + false_expr->to_webcc() + ")";
+    return "(" + condition->to_webcc() + " ? " + typed_literal(true_expr.get()) + " : " + typed_literal(false_expr.get()) + ")";
 }
 
 bool TernaryOp::is_static() {

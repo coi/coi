@@ -1186,6 +1186,15 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
         std::string true_type = infer_expression_type(ternary->true_expr.get(), scope);
         std::string false_type = infer_expression_type(ternary->false_expr.get(), scope);
         
+        // an array literal on a side ([x] : list()) is a vector of the array's element type in
+        // C++, where a bare brace list can't stand in a ?: branch
+        std::string array_type = true_type.ends_with("[]") && !true_type.starts_with("unknown") ? true_type
+                               : false_type.ends_with("[]") && !false_type.starts_with("unknown") ? false_type : "";
+        if (!array_type.empty())
+            for (Expression *side : {ternary->true_expr.get(), ternary->false_expr.get()})
+                if (auto *lit = dynamic_cast<ArrayLiteral *>(side); lit && lit->element_type.empty())
+                    lit->propagate_element_type(array_type.substr(0, array_type.size() - 2));
+
         // If one side is unknown, return the other
         if (true_type == "unknown") return false_type;
         if (false_type == "unknown") return true_type;
