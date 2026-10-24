@@ -103,6 +103,8 @@ struct HandleBlock {
 };
 
 // Context for view code generation - bundles common parameters
+struct Skeleton;
+
 struct ViewCodegenContext {
     std::stringstream& ss;
     std::string parent;
@@ -119,6 +121,11 @@ struct ViewCodegenContext {
     int* if_counter = nullptr;
     std::string loop_var_name;
     HandleBlock* handles = nullptr;  // block of the snippet that ss belongs to
+    // inside a static skeleton (see Skeleton in view.cc): the template being built, the node
+    // index of the parent (-1 at the root) and of this element
+    Skeleton* tpl = nullptr;
+    int tpl_parent = -1;
+    int tpl_k = 0;
 
     // Create a child context with a new parent element
     ViewCodegenContext with_parent(const std::string& new_parent) const {
@@ -156,6 +163,7 @@ struct HTMLElement : ASTNode {
     std::vector<HTMLAttribute> attributes;
     std::vector<std::unique_ptr<ASTNode>> children;
     std::string ref_binding;
+    int tpl_size = 0;   // nodes of the static skeleton rooted here, counted before it is generated
 
     std::string to_webcc() override;
     void generate_code(ViewCodegenContext& ctx);

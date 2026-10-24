@@ -179,7 +179,7 @@ static void emit_loop_vector_members(std::stringstream &ss, const std::set<std::
 {
     for (const auto &comp_name : loop_component_types)
     {
-        ss << "    coi::vector<" << comp_name << "> _loop_" << comp_name << "s;\n";
+        ss << "    coi::components<" << comp_name << "> _loop_" << comp_name << "s;\n";
     }
     ss << "    void _forget_row(webcc::handle row) {\n";
     for (const auto &comp_name : loop_component_types)

@@ -282,6 +282,96 @@ static std::string decode_entities(const std::string &s)
 
 std::string TextNode::to_webcc() { return cpp_string_literal(decode_entities(text)); }
 
+// ---- static skeletons -------------------------------------------------------------------------
+// An element whose tag, static attributes and static text are known when compiling, together with
+// the static elements and text under it, is built once (by the first instance, with the usual
+// commands) into a subtree kept off the page and saved as a template; every instance after that
+// takes a clone of it with one command instead of one per node. Only what differs per instance is
+// set on the clone: attribute and text expressions, listeners, refs, and the dynamic children
+// (components, if and for regions, expressions), each inserted before the static sibling that
+// follows it. A lone element stays as it was; a template pays off from two nodes up.
+struct Skeleton {
+    int id;
+    int count = 0;        // nodes in document order, the root is 0
+    std::string build;    // the one-time construction, on the handles _td<id> + k
+    std::string node(int k) const { return "webcc::DOMElement(_td" + std::to_string(id) + " + " + std::to_string(k) + ")"; }
+    std::string clone_node(int k) const { return "_tb" + std::to_string(id) + " + " + std::to_string(k); }
+};
+static int g_template_counter = 0;
+
+// a string literal with nothing to interpolate: the attribute values and text a skeleton can carry
+static const StringLiteral *plain_string(ASTNode *node)
+{
+    auto *lit = dynamic_cast<StringLiteral *>(node);
+    return lit && lit->is_static() ? lit : nullptr;
+}
+static std::string plain_text(const StringLiteral &lit)
+{
+    std::string text;
+    for (auto &p : lit.parts) text += p.content;
+    return text;
+}
+
+static bool is_listener_attr(const std::string &name)
+{
+    return DefSchema::instance().find_view_event_attr(name) || DefSchema::instance().view_option_attrs().count(name) ||
+           name == "onclick" || name == "oninput" || name == "onchange" || name == "onkeydown";
+}
+
+// an attribute the skeleton can carry: a plain literal, not a listener, not a select's value (a property)
+static bool skeleton_attr(const HTMLElement &el, const HTMLAttribute &attr)
+{
+    if (is_listener_attr(attr.name)) return false;
+    if (el.tag == "select" && attr.name == "value") return false;
+    return plain_string(attr.value.get()) != nullptr;
+}
+
+static bool has_element_children(const HTMLElement &el)
+{
+    for (auto &child : el.children)
+        if (dynamic_cast<HTMLElement *>(child.get()) || dynamic_cast<ComponentInstantiation *>(child.get()) ||
+            dynamic_cast<ViewIfStatement *>(child.get()) || dynamic_cast<ViewForRangeStatement *>(child.get()) ||
+            dynamic_cast<ViewForEachStatement *>(child.get()) || dynamic_cast<ViewRawElement *>(child.get()) ||
+            dynamic_cast<RoutePlaceholder *>(child.get()))
+            return true;
+    return false;
+}
+
+// a static text node beside elements: literal text, or a plain string in braces
+static bool skeleton_text_node(ASTNode *node) { return dynamic_cast<TextNode *>(node) || plain_string(node); }
+
+// the element's whole text when every child is literal: one text node in the skeleton. Text with a
+// newline stays on the per-instance path, where innerText turns it into <br>s
+static bool skeleton_text_content(const HTMLElement &el, std::string &text)
+{
+    if (el.children.empty() || has_element_children(el)) return false;
+    text.clear();
+    for (auto &child : el.children)
+    {
+        if (auto *t = dynamic_cast<TextNode *>(child.get())) text += decode_entities(t->text);
+        else if (auto *lit = plain_string(child.get())) text += plain_text(*lit);
+        else return false;
+    }
+    return text.find('\n') == std::string::npos;
+}
+
+// the nodes a skeleton rooted at el would have, remembered on every element under it
+static int plan_skeleton(HTMLElement &el)
+{
+    int n = 1;
+    std::string text;
+    if (skeleton_text_content(el, text))
+        n += text.empty() ? 0 : 1;
+    else if (has_element_children(el))
+        for (auto &child : el.children)
+        {
+            if (auto *e = dynamic_cast<HTMLElement *>(child.get())) n += plan_skeleton(*e);
+            else if (skeleton_text_node(child.get())) n += 1;
+        }
+    el.tpl_size = n;
+    return n;
+}
+
 std::string ComponentInstantiation::to_webcc() { return ""; }
 
 void ComponentInstantiation::generate_code(ViewCodegenContext& ctx)
@@ -523,34 +613,67 @@ static void generate_view_child(ASTNode *child, ViewCodegenContext& ctx)
 
 void HTMLElement::generate_code(ViewCodegenContext& ctx)
 {
+    // a skeleton of two nodes or more: built once, cloned per instance (see Skeleton)
+    if (!ctx.tpl && plan_skeleton(*this) >= 2)
+    {
+        Skeleton sk{g_template_counter++, tpl_size};
+        std::stringstream inst;
+        ViewCodegenContext tctx{inst, ctx.parent, ctx.counter, ctx.event_handlers, ctx.bindings,
+            ctx.component_counters, ctx.method_names, ctx.parent_component_name, ctx.in_loop,
+            ctx.loop_regions, ctx.loop_counter, ctx.if_regions, ctx.if_counter, ctx.loop_var_name, ctx.handles,
+            &sk, -1, 0};
+        generate_code(tctx);
+        std::string id = std::to_string(sk.id), n = std::to_string(sk.count);
+        ctx.ss << "        static bool _tpl" << id << " = false;\n";
+        ctx.ss << "        if (!_tpl" << id << ") {\n";
+        ctx.ss << "            _tpl" << id << " = true;\n";
+        ctx.ss << "            int32_t _td" << id << " = webcc::reserve_deferred_handles(" << n << ");\n";
+        ctx.ss << sk.build;
+        ctx.ss << "            webcc::dom::save_template(" << id << ", webcc::handle(_td" << id << "), " << n << ");\n";
+        ctx.ss << "        }\n";
+        ctx.ss << "        int32_t _tb" << id << " = webcc::reserve_deferred_handles(" << n << ");\n";
+        ctx.ss << "        webcc::dom::clone_template(webcc::handle(_tb" << id << "), " << id << ", " << n << ");\n";
+        ctx.ss << inst.str();
+        return;
+    }
+    Skeleton *tpl = ctx.tpl;
+    int k = ctx.tpl_k;
+
     int my_id = ctx.counter++;
     std::string var;
     std::string select_value;
 
     bool has_scoped_css = g_components_with_scoped_css.count(ctx.parent_component_name) > 0;
 
+    // the element: a node of the clone, or made here
+    std::string handle_expr = tpl ? tpl->clone_node(k) : ctx.next_handle();
     if (ctx.in_loop)
     {
-        // In loops, use local variable but still deferred creation
         var = "_el_" + std::to_string(my_id);
-        ctx.ss << "        webcc::handle " << var << " = webcc::handle(" << ctx.next_handle() << ");\n";
-        if (has_scoped_css) {
-            ctx.ss << "        webcc::dom::create_element_deferred_scoped(" << var << ", \"" << tag << "\", \"" << ctx.parent_component_name << "\");\n";
-        } else {
-            ctx.ss << "        webcc::dom::create_element_deferred(" << var << ", \"" << tag << "\");\n";
-        }
+        ctx.ss << "        webcc::handle " << var << " = webcc::handle(" << handle_expr << ");\n";
     }
     else
     {
-        // Outside loops, store in _el[] array with deferred creation
         var = "_el[" + std::to_string(my_id) + "]";
-        ctx.ss << "        " << var << " = webcc::DOMElement(" << ctx.next_handle() << ");\n";
-        if (has_scoped_css) {
-            ctx.ss << "        webcc::dom::create_element_deferred_scoped(" << var << ", \"" << tag << "\", \"" << ctx.parent_component_name << "\");\n";
-        } else {
-            ctx.ss << "        webcc::dom::create_element_deferred(" << var << ", \"" << tag << "\");\n";
-        }
+        ctx.ss << "        " << var << " = webcc::DOMElement(" << handle_expr << ");\n";
     }
+    if (tpl)
+    {
+        std::string node = tpl->node(k);
+        if (has_scoped_css)
+            tpl->build += "            webcc::dom::create_element_deferred_scoped(" + node + ", \"" + tag + "\", \"" + ctx.parent_component_name + "\");\n";
+        else
+            tpl->build += "            webcc::dom::create_element_deferred(" + node + ", \"" + tag + "\");\n";
+        for (auto &attr : attributes)
+            if (skeleton_attr(*this, attr))
+                tpl->build += "            webcc::dom::set_attribute(" + node + ", \"" + attr.name + "\", " + attr.value->to_webcc() + ");\n";
+        if (ctx.tpl_parent >= 0)
+            tpl->build += "            webcc::dom::append_child(" + tpl->node(ctx.tpl_parent) + ", " + node + ");\n";
+    }
+    else if (has_scoped_css)
+        ctx.ss << "        webcc::dom::create_element_deferred_scoped(" << var << ", \"" << tag << "\", \"" << ctx.parent_component_name << "\");\n";
+    else
+        ctx.ss << "        webcc::dom::create_element_deferred(" << var << ", \"" << tag << "\");\n";
 
     if (!ref_binding.empty())
     {
@@ -700,6 +823,8 @@ void HTMLElement::generate_code(ViewCodegenContext& ctx)
         }
         else
         {
+            if (tpl && skeleton_attr(*this, attr))
+                continue;
             std::string val = attr.value->to_webcc();
             // a select's value only takes once its options exist, and only as a property
             if (tag == "select" && attr.name == "value")
@@ -722,8 +847,8 @@ void HTMLElement::generate_code(ViewCodegenContext& ctx)
         }
     }
 
-    // Append to parent
-    if (!ctx.parent.empty())
+    // Append to parent; a node inside a skeleton is in the clone already
+    if (!ctx.parent.empty() && !(tpl && ctx.tpl_parent >= 0))
     {
         ctx.ss << "        webcc::dom::append_child(" << ctx.parent << ", " << var << ");\n";
     }
@@ -752,13 +877,62 @@ void HTMLElement::generate_code(ViewCodegenContext& ctx)
                 forEach->is_only_child = true;
             }
         }
-        for (auto &child : children)
+        int next_k = k + 1;   // in a skeleton: the node index the next static child takes
+        for (size_t ci = 0; ci < children.size(); ci++)
         {
-            auto child_ctx = ctx.with_parent(var);
-            generate_view_child(child.get(), child_ctx);
+            ASTNode *child = children[ci].get();
+            if (!tpl)
+            {
+                auto child_ctx = ctx.with_parent(var);
+                generate_view_child(child, child_ctx);
+                continue;
+            }
+            if (auto *e = dynamic_cast<HTMLElement *>(child))
+            {
+                auto child_ctx = ctx.with_parent(var);
+                child_ctx.tpl = tpl;
+                child_ctx.tpl_parent = k;
+                child_ctx.tpl_k = next_k;
+                e->generate_code(child_ctx);
+                next_k += e->tpl_size;
+                continue;
+            }
+            if (skeleton_text_node(child))
+            {
+                // a static text node, with a handle of its own as before (a sibling may be put before it)
+                int text_id = ctx.counter++;
+                std::string text_var = ctx.in_loop ? "_el_" + std::to_string(text_id) : "_el[" + std::to_string(text_id) + "]";
+                if (ctx.in_loop)
+                    ctx.ss << "        webcc::handle " << text_var << " = webcc::handle(" << tpl->clone_node(next_k) << ");\n";
+                else
+                    ctx.ss << "        " << text_var << " = webcc::DOMElement(" << tpl->clone_node(next_k) << ");\n";
+                tpl->build += "            webcc::dom::create_text_node_deferred(" + tpl->node(next_k) + ", " + child->to_webcc() + ");\n";
+                tpl->build += "            webcc::dom::append_child(" + tpl->node(k) + ", " + tpl->node(next_k) + ");\n";
+                next_k++;
+                continue;
+            }
+            // dynamic: made as always, and put before the static sibling that follows it, if any
+            bool follows = false;
+            for (size_t j = ci + 1; j < children.size() && !follows; j++)
+                follows = dynamic_cast<HTMLElement *>(children[j].get()) || skeleton_text_node(children[j].get());
+            std::stringstream dyn;
+            ViewCodegenContext dctx{dyn, var, ctx.counter, ctx.event_handlers, ctx.bindings,
+                ctx.component_counters, ctx.method_names, ctx.parent_component_name, ctx.in_loop,
+                ctx.loop_regions, ctx.loop_counter, ctx.if_regions, ctx.if_counter, ctx.loop_var_name, ctx.handles};
+            generate_view_child(child, dctx);
+            ctx.ss << (follows ? transform_to_insert_before(dyn.str(), var, "webcc::handle(" + tpl->clone_node(next_k) + ")") : dyn.str());
         }
         if (!select_value.empty())
             ctx.ss << "        webcc::dom::set_property(" << var << ", \"value\", " << select_value << ");\n";
+    }
+    else if (std::string text; tpl && skeleton_text_content(*this, text))
+    {
+        // one static text node in the skeleton
+        if (!text.empty())
+        {
+            tpl->build += "            webcc::dom::create_text_node_deferred(" + tpl->node(k + 1) + ", " + cpp_string_literal(text) + ");\n";
+            tpl->build += "            webcc::dom::append_child(" + tpl->node(k) + ", " + tpl->node(k + 1) + ");\n";
+        }
     }
     else
     {

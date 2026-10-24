@@ -1,0 +1,38 @@
+// a view whose static part (elements, literal attributes and text) is a template built once and
+// cloned per instance: the dynamic parts land in their places inside it (an attribute and a text
+// expression, a child component, an <if>, a keyed <for> whose rows are skeletons of their own,
+// a text expression beside static text, listeners), scoped CSS marks the cloned nodes, and
+// changes still reach everything
+component Badge(pub string text) {
+    view { <b class="badge">{text}</b> }
+}
+
+component App {
+    mut int n = 0;
+    mut bool open = true;
+    mut int[] items = [1, 2];
+    def bump() : void { n++; }
+    def toggle() : void { open = !open; }
+    def more() : void { items.push(items.size() + 1); }
+    style { .box { padding: 2px; } }
+    view {
+        <div class="box" id="root" data-fixed="yes">
+            <h2 class="title">Static title</h2>
+            <p class={n % 2 == 0 ? "even" : "odd"}>count {n}</p>
+            <span class="lead">lead</span>
+            <if open><em class="shown">shown</em></if>
+            <Badge text={`n=${n}`} />
+            <span class="mid">mid</span>
+            <ul class="list"><for it in items key={it}>
+                <li class="item">{it}<i class="dot">·</i></li>
+            </for></ul>
+            <span class="tail">tail</span>
+            {n} tail-text
+            <button id="bump" onclick={bump}>bump</button>
+            <button id="toggle" onclick={toggle}>toggle</button>
+            <button id="more" onclick={more}>more</button>
+        </div>
+    }
+}
+
+app { root = App; }
