@@ -1,0 +1,33 @@
+// pushing an item of one component array into another: the filter-then-assign shape
+component Row(pub int id, pub mut string label) {
+    view { <li class="row">{id}: {label}</li> }
+}
+
+component App {
+    mut Row[] rows;
+
+    init {
+        rows.push(Row(1, "a"));
+        rows.push(Row(2, "b"));
+        rows.push(Row(3, "c"));
+    }
+
+    def drop(int id) : void {
+        mut Row[] kept;
+        for row in rows {
+            if (row.id != id) {
+                kept.push(row);
+            }
+        }
+        rows = kept;
+    }
+
+    view {
+        <div>
+            <button onclick={drop(2)}>drop</button>
+            <ul><for r in rows key={r.id}><{r} /></for></ul>
+        </div>
+    }
+}
+
+app { root = App; }

@@ -211,6 +211,8 @@ public:
     const T& front() const { return *slots.front(); }
     void reserve(size_t n) { slots.reserve(n); }
     void push_back(T&& v) { T* p = static_cast<T*>(webcc::malloc(sizeof(T))); new (p) T(webcc::move(v)); slots.push_back(p); }
+    // one already in an array (a loop variable): copied as a value, like assignment does
+    void push_back(const T& v) { push_back(T(v)); }
     template<typename... Args> void emplace_back(Args&&... args) { T* p = static_cast<T*>(webcc::malloc(sizeof(T))); new (p) T(webcc::forward<Args>(args)...); slots.push_back(p); }
     void pop_back(bool skip_dom = false) { if (slots.empty()) return; T* p = slots.back(); slots.pop_back(); let_go(p, skip_dom); }
     void erase(size_t i, bool skip_dom = false) { if (i >= slots.size()) return; T* p = slots[i]; slots.erase(i); let_go(p, skip_dom); }
