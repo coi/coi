@@ -933,6 +933,40 @@ static std::string check_free_function_call(const FunctionDef *fn, FunctionCall 
     return fn->return_type.empty() ? "void" : normalize_type(fn->return_type);
 }
 
+// an inline function given to an array's indexOf, contains, remove, filter, count, any or all:
+// it runs on each element, so its parameter is an element and its body must say true or false.
+// Returns the call's type
+static std::string inline_function_type(LambdaExpr *lam, const std::string &method, const std::string &array_type, bool fixed,
+                                        const std::map<std::string, std::string> &scope, int line)
+{
+    static const std::set<std::string> dynamic_only = {"remove", "filter"};
+    static const std::set<std::string> takes = {"indexOf", "contains", "remove", "filter", "count", "any", "all"};
+    if (!takes.count(method) || (fixed && dynamic_only.count(method)))
+    {
+        ErrorHandler::type_error("'" + method + "' on " + (fixed ? "a fixed-size array" : "an array") +
+                                     " doesn't take an inline function (" +
+                                     (fixed ? "indexOf, contains, count, any and all do)" : "indexOf, contains, remove, filter, count, any and all do)"),
+                                 line);
+        exit(1);
+    }
+    std::string elem = fixed ? array_type.substr(0, array_type.rfind('[')) : array_type.substr(0, array_type.size() - 2);
+    lam->placed = true;
+    lam->param_type = elem;
+    auto inner = scope;
+    inner[lam->param] = elem;
+    std::string said = normalize_type(infer_expression_type(lam->body.get(), inner));
+    if (said != "bool" && said != "unknown")
+    {
+        ErrorHandler::type_error("The inline function given to '" + method + "' must say true or false for each element; this one is a '" +
+                                     display_type_name(said) + "'", lam->line);
+        exit(1);
+    }
+    if (method == "filter") return elem + "[]";
+    if (method == "remove") return "void";
+    if (method == "indexOf" || method == "count") return normalize_type("int");
+    return "bool";
+}
+
 std::string infer_expression_type(Expression *expr, const std::map<std::string, std::string> &scope)
 {
     if (auto *lit = dynamic_cast<IntLiteral *>(expr))
@@ -1284,6 +1318,9 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
         // ["a", "b"].contains(x): the brace list needs its type in C++
         if (auto *arr = dynamic_cast<ArrayLiteral *>(mc->receiver.get()); arr && t.ends_with("[]"))
             arr->element_type = t.substr(0, t.size() - 2);
+        LambdaExpr *lam = mc->args.size() == 1 ? dynamic_cast<LambdaExpr *>(mc->args[0].value.get()) : nullptr;
+        if (lam && t.ends_with("[]"))
+            return inline_function_type(lam, mc->method, t, false, scope, mc->line);
         for (auto &a : mc->args)
             infer_expression_type(a.value.get(), scope);
         if (t == "unknown")
@@ -1472,38 +1509,10 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                 exit(1);
             };
 
-                        // an inline function: the array's indexOf, contains, remove, filter, count, any and all
-            // run it on each element; its parameter is an element, its body must say true or false
+            // an inline function: typed against the array's element, see inline_function_type
             LambdaExpr *lam = func->args.size() == 1 ? dynamic_cast<LambdaExpr *>(func->args[0].value.get()) : nullptr;
             if (lam && (is_dynamic_array || is_fixed_array))
-            {
-                static const std::set<std::string> dynamic_only = {"remove", "filter"};
-                static const std::set<std::string> takes = {"indexOf", "contains", "remove", "filter", "count", "any", "all"};
-                if (!takes.count(method_name) || (is_fixed_array && dynamic_only.count(method_name)))
-                {
-                    ErrorHandler::type_error("'" + method_name + "' on " + (is_fixed_array ? "a fixed-size array" : "an array") +
-                                                 " doesn't take an inline function (" +
-                                                 (is_fixed_array ? "indexOf, contains, count, any and all do)" : "indexOf, contains, remove, filter, count, any and all do)"),
-                                             func->line);
-                    exit(1);
-                }
-                std::string elem = is_dynamic_array ? obj_type.substr(0, obj_type.size() - 2) : obj_type.substr(0, obj_type.rfind('['));
-                lam->placed = true;
-                lam->param_type = elem;
-                auto inner = scope;
-                inner[lam->param] = elem;
-                std::string said = normalize_type(infer_expression_type(lam->body.get(), inner));
-                if (said != "bool" && said != "unknown")
-                {
-                    ErrorHandler::type_error("The inline function given to '" + method_name + "' must say true or false for each element; this one is a '" +
-                                                 display_type_name(said) + "'", lam->line);
-                    exit(1);
-                }
-                if (method_name == "filter") return elem + "[]";
-                if (method_name == "remove") return "void";
-                if (method_name == "indexOf" || method_name == "count") return normalize_type("int");
-                return "bool";
-            }
+                return inline_function_type(lam, method_name, obj_type, is_fixed_array, scope, func->line);
             // the arguments are typed here too: xs.push(cs[k].getContext2d()) returns before the
             // schema walk below, and the inner call needs its receiver type for codegen
             if (is_dynamic_array || is_fixed_array || normalize_type(obj_type) == "string")
