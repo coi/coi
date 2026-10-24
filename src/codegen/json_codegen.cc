@@ -799,5 +799,7 @@ std::string generate_json_writers(const std::vector<JsonPod>& pods) {
     ss << "    __coi_json_writer w; __coi_json_write(w, v);\n";
     ss << "    return coi::string(w.buf.data(), (uint32_t)w.buf.size());\n";
     ss << "}\n";
+    // a string literal is a char array, not a coi::string
+    ss << "inline coi::string __coi_json_stringify(const char* s) { return __coi_json_stringify(coi::string(s)); }\n";
     return ss.str();
 }

@@ -1,0 +1,12 @@
+// Json.stringify of a string literal and of a string variable: a JSON string, quotes escaped
+component App {
+    mut string text = "say \"hi\"";
+    view {
+        <div>
+            <p class="lit">{Json.stringify("a \"b\" \\ c")}</p>
+            <p class="var">{Json.stringify(text)}</p>
+        </div>
+    }
+}
+
+app { root = App; }
