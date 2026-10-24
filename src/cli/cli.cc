@@ -800,7 +800,7 @@ void print_help(const char *program_name)
     std::cout << "  " << BOLD << "Examples:" << RESET << std::endl;
     std::cout << "    " << DIM << "$" << RESET << " coi init my-app" << std::endl;
     std::cout << "    " << DIM << "$" << RESET << " cd my-app && coi dev" << std::endl;
-    std::cout << "    " << DIM << "$" << RESET << " coi add supabase" << std::endl;
+    std::cout << "    " << DIM << "$" << RESET << " coi add pdf" << std::endl;
     std::cout << "    " << DIM << "$" << RESET << " coi add @google/package" << std::endl;
     std::cout << "    " << DIM << "$" << RESET << " coi self-upgrade" << std::endl;
     std::cout << "    " << DIM << "$" << RESET << " coi llms > coi-context.txt   " << DIM << "# full language context for AI assistants" << RESET << std::endl;

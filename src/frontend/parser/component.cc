@@ -741,7 +741,7 @@ Component Parser::parse_component()
     comp.line = current().line;
 
     // Check for collisions with built-in types (only for non-namespaced components)
-    // Namespaced components like Supabase::Storage can safely shadow built-in types
+    // Namespaced components like Pdf::Writer can safely shadow built-in types
     if (module_name.empty() && DefSchema::instance().is_handle(comp.name))
     {
         throw std::runtime_error("Component name '" + comp.name + "' conflicts with a built-in type name at line " + std::to_string(current().line));

@@ -22,9 +22,9 @@ Coi includes a built-in package manager for installing community packages from t
 ## Add a Package
 
 ```bash
-coi add @coi/supabase
+coi add @coi/pdf
 # or pin a specific release
-coi add @coi/supabase 0.1.0
+coi add @coi/pdf 0.1.0
 ```
 
 This command:
@@ -37,7 +37,7 @@ See [Versioning](versioning.md) for the Pond & Drop compatibility model.
 Then import it in your Coi code:
 
 ```tsx
-import "@coi/supabase";
+import "@coi/pdf";
 ```
 
 ## Install from `coi.lock`
@@ -55,7 +55,7 @@ This reads `coi.lock` and installs exact versions into `.coi/pkgs/`.
 Upgrade one package:
 
 ```bash
-coi upgrade @coi/supabase
+coi upgrade @coi/pdf
 ```
 
 Upgrade all packages:
@@ -67,7 +67,7 @@ coi upgrade
 Remove a package:
 
 ```bash
-coi remove @coi/supabase
+coi remove @coi/pdf
 ```
 
 ## Import Resolution
@@ -75,7 +75,7 @@ coi remove @coi/supabase
 Package imports use the `@` prefix:
 
 ```tsx
-import "@coi/supabase";       // .coi/pkgs/coi/supabase/Mod.coi
+import "@coi/pdf";            // .coi/pkgs/coi/pdf/Mod.coi
 import "@acme/utils";              // .coi/pkgs/acme/utils/Mod.coi
 import "@acme/utils/Button";       // .coi/pkgs/acme/utils/Button.coi
 ```

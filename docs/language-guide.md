@@ -72,7 +72,7 @@ import "ui/Button.coi";
 import "utils/Math.coi";
 
 // Package imports (from .coi/pkgs/)
-import "@coi/supabase";       // resolves to .coi/pkgs/coi-lang/supabase/Mod.coi
+import "@coi/pdf";            // resolves to .coi/pkgs/coi/pdf/Mod.coi
 import "@acme/utils/Button.coi";       // resolves to .coi/pkgs/acme/utils/Button.coi
 ```
 

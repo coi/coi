@@ -178,14 +178,14 @@ This also generates `dist/App.cc` so you can inspect the generated C++ code.
 Coi has a built-in package manager for adding community packages:
 
 ```bash
-coi add @coi/supabase  # Add a package
+coi add @coi/pdf       # Add a package
 coi install                # Install from coi.lock
 ```
 
 Then import it:
 
 ```tsx
-import "@coi/supabase";
+import "@coi/pdf";
 ```
 
 See [Package Manager](package-manager.md) for the full workflow.
@@ -363,7 +363,7 @@ import "components/Button.coi";
 import "layout/Header.coi";
 
 // Package imports (from .coi/pkgs/)
-import "@coi/supabase";       // resolves to .coi/pkgs/coi-lang/supabase/Mod.coi
+import "@coi/pdf";            // resolves to .coi/pkgs/coi/pdf/Mod.coi
 import "@acme/utils/Button.coi";       // resolves to .coi/pkgs/acme/utils/Button.coi
 ```
 

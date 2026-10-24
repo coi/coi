@@ -37,7 +37,7 @@ static bool normalize_package_name(const std::string& raw_input, std::string& no
 
     size_t slash_pos = name.find('/');
     if (slash_pos == std::string::npos) {
-        error = "Package names must include a scope: @scope/name (e.g. @coi/supabase)";
+        error = "Package names must include a scope: @scope/name (e.g. @coi/pdf)";
         return false;
     }
 
@@ -561,7 +561,7 @@ int add_package(const std::string& package_name, const std::string& version) {
     if (!normalize_package_name(package_name, normalized_name, normalize_error)) {
         std::cerr << RED << "Error:" << RESET << " Invalid package name '" << package_name << "'" << std::endl;
         std::cerr << "  " << normalize_error << std::endl;
-        std::cerr << "  Example: @coi/supabase or @acme/utils" << std::endl;
+        std::cerr << "  Example: @coi/pdf or @acme/utils" << std::endl;
         return 1;
     }
     
@@ -724,7 +724,7 @@ int remove_package(const std::string& package_name) {
     if (!normalize_package_name(package_name, normalized_name, normalize_error)) {
         std::cerr << RED << "Error:" << RESET << " Invalid package name '" << package_name << "'" << std::endl;
         std::cerr << "  " << normalize_error << std::endl;
-        std::cerr << "  Example: @coi/supabase or @acme/utils" << std::endl;
+        std::cerr << "  Example: @coi/pdf or @acme/utils" << std::endl;
         return 1;
     }
     
@@ -806,7 +806,7 @@ int update_package(const std::string& package_name) {
     if (!normalize_package_name(package_name, normalized_name, normalize_error)) {
         std::cerr << RED << "Error:" << RESET << " Invalid package name '" << package_name << "'" << std::endl;
         std::cerr << "  " << normalize_error << std::endl;
-        std::cerr << "  Example: @coi/supabase or @acme/utils" << std::endl;
+        std::cerr << "  Example: @coi/pdf or @acme/utils" << std::endl;
         return 1;
     }
     

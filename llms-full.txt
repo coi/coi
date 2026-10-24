@@ -61,7 +61,7 @@ coi build                # build to dist/
 | Command | Description |
 |---------|-------------|
 | `coi build` | Compile `src/App.coi` to `dist/` (index.html, app.js, app.wasm, app.css) |
-| `coi add <pkg> [version]` | Add a registry package (e.g. `coi add @coi/supabase`) |
+| `coi add <pkg> [version]` | Add a registry package (e.g. `coi add @coi/pdf`) |
 | `coi install` | Install packages pinned in `coi.lock` |
 | `coi remove <pkg>` | Remove a package |
 | `coi upgrade [pkg]` | Upgrade one or all packages |
@@ -899,7 +899,7 @@ pub component Button { ... }     // pub -> visible to other modules
 
 // Imports are explicit and relative; no transitive imports.
 import "ui/Button.coi";          // local, relative to this file
-import "@coi/supabase";          // package -> .coi/pkgs/coi-lang/supabase/Mod.coi
+import "@coi/pdf";               // package -> .coi/pkgs/coi/pdf/Mod.coi
 import "@acme/utils/Button.coi"; // package -> .coi/pkgs/acme/utils/Button.coi
 ```
 Rules:
