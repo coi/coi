@@ -436,8 +436,16 @@ component Dashboard(mut Timer& timer) { // receives the emitter by reference
     mut int last = 0;
     listen {
         timer.tick => (int seconds) { last = seconds; }
+        // the page's own events are signals of System and Input, same block, same cleanup:
+        System.visibilityChange => (VisibilityChangeEvent v) { if (v.hidden == 1) save(); }
+        Input.keyDown => (KeyDownEvent k) { if (k.key == "Escape") close(); }
+        System.pointerUp => (PointerUpEvent p) { dragging = false; }   // anywhere on the page
     }
 }
+// page signals: Input.keyDown/keyUp (KeyDownEvent/KeyUpEvent), System.visibilityChange (VisibilityChangeEvent),
+// pageHide/pageShow (uint8 persisted), online (uint8), popstate (string path), installState (uint8),
+// pointerUp (PointerUpEvent), windowResize (WindowResizeEvent: width,height,dpr, once at start),
+// pageScroll (PageScrollEvent: left,top), pageClick (PageClickEvent: x,y)
 ```
 
 ### Math library (all via `Math.`)

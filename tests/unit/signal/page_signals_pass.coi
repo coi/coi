@@ -1,0 +1,24 @@
+// Test: page-wide events are signals of System and Input, heard in a listen block
+component PageSignals {
+    mut bool hidden = false;
+    mut string lastKey = "";
+    mut float width = 0.0;
+    mut int ups = 0;
+    mut float clickX = 0.0;
+
+    listen {
+        System.visibilityChange => (VisibilityChangeEvent v) { hidden = v.hidden == 1; }
+        Input.keyDown => (KeyDownEvent k) { lastKey = k.key; }
+        System.windowResize => (WindowResizeEvent r) { width = r.width; }
+        System.pointerUp => (PointerUpEvent p) { ups += 1; }
+        System.pageClick => (float x, float y) { clickX = x; }
+    }
+
+    view {
+        <div>{hidden ? "hidden" : "shown"} {lastKey} {width} {ups} {clickX}</div>
+    }
+}
+
+app {
+    root = PageSignals;
+}

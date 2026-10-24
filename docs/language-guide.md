@@ -1341,6 +1341,43 @@ component Dashboard(mut Timer& timer) {
     }
 }
 ```
+
+### Page signals
+
+What the page as a whole reports is a signal too: of `System` or `Input`, the platform types that
+carry it. A component listens to them in the same block, with the same cleanup when it goes:
+
+```tsx
+component Editor {
+    mut bool away = false;
+    mut float width = 0.0;
+
+    listen {
+        System.visibilityChange => (VisibilityChangeEvent v) { away = v.hidden == 1; if (away) save(); }
+        Input.keyDown => (KeyDownEvent k) { if (k.key == "Escape") close(); }
+        System.windowResize => (WindowResizeEvent r) { width = r.width; }
+        System.pointerUp => (PointerUpEvent p) { dragging = false; }   // let go anywhere, even off this component
+    }
+}
+```
+
+| Signal | The listener takes |
+|---|---|
+| `Input.keyDown`, `Input.keyUp` | `KeyDownEvent` / `KeyUpEvent` (`keyCode`, `mods`, `repeat`, `key`) |
+| `System.visibilityChange` | `VisibilityChangeEvent` (`hidden`, `state`): the moment to save |
+| `System.pageHide`, `System.pageShow` | `uint8 persisted` |
+| `System.online` | `uint8 online` |
+| `System.popstate` | `string path`: back or forward, with the path arrived at |
+| `System.installState` | `uint8 state`: 0 no install prompt, 1 the browser offers one, 2 installed |
+| `System.pointerUp` | `PointerUpEvent` (`pointerId`, `pointerType`, `x`, `y`): a pointer let go anywhere on the page, cancel included |
+| `System.windowResize` | `WindowResizeEvent` (`width`, `height`, `dpr`): once at the start, then on every change |
+| `System.pageScroll` | `PageScrollEvent` (`left`, `top`): the page's own scroll, at most once a frame |
+| `System.pageClick` | `PageClickEvent` (`x`, `y`): a click anywhere, after the element's own handlers |
+
+A signal's name is its event method without the `on` (`System.onVisibilityChange(&h)` is the same
+registration, written by hand). Both are forgotten when the component is destroyed, so neither
+needs an `unmount`. An unknown name lists the signals the type has.
+
 ## Next Steps
 
 - [Components](components.md) — Component syntax, lifecycle, props

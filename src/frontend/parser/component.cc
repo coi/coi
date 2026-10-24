@@ -475,6 +475,9 @@ void Parser::parse_listen_block(Component &comp)
         expect(TokenType::DOT, "Expected '.' before signal name in listen entry");
         entry.signal_name = current().value;
         expect(TokenType::IDENTIFIER, "Expected signal name in listen entry");
+        // System.visibilityChange, Input.keyDown: a page-wide event is a signal of the platform
+        // type that reports it (the on… methods with no handle in defs/web)
+        const MethodDef *page_event = page_signal(entry.target_name, entry.signal_name, entry.line);
 
         expect(TokenType::ARROW, "Expected '=>' in listen entry");
 
@@ -529,7 +532,7 @@ void Parser::parse_listen_block(Component &comp)
         }
         expect(TokenType::RPAREN, "Expected ')' after listener parameters");
 
-        std::string method_name = "_listen_" + std::to_string(comp.listen_entries.size());
+        std::string method_name = "_listen_" + std::to_string(comp.listen_entries.size() + comp.page_listens.size());
         entry.handler_method_name = method_name;
 
         FunctionDef handler;
@@ -545,7 +548,22 @@ void Parser::parse_listen_block(Component &comp)
         expect(TokenType::RBRACE, "Expected '}' after listener body");
 
         comp.methods.push_back(std::move(handler));
-        comp.listen_entries.push_back(std::move(entry));
+        if (page_event)
+        {
+            // the same registration System.onVisibilityChange(&handler) makes: the checker
+            // matches the parameters to the event, the component's destroy forgets the handler
+            auto call = std::make_unique<FunctionCall>(entry.target_name + "." + page_event->name);
+            call->line = entry.line;
+            CallArg arg;
+            arg.is_reference = true;
+            arg.value = std::make_unique<Identifier>(method_name);
+            call->args.push_back(std::move(arg));
+            auto stmt = std::make_unique<ExpressionStatement>();
+            stmt->expression = std::move(call);
+            comp.page_listens.push_back(std::move(stmt));
+        }
+        else
+            comp.listen_entries.push_back(std::move(entry));
 
         if (current().type == TokenType::SEMICOLON)
         {
@@ -554,6 +572,29 @@ void Parser::parse_listen_block(Component &comp)
     }
 
     expect(TokenType::RBRACE, "Expected '}' after listen block");
+}
+
+// the event method behind a listen entry on a platform type, or null for a component instance;
+// a platform type with no such event is an error that names the events it has
+const MethodDef *Parser::page_signal(const std::string &target, const std::string &signal, int line)
+{
+    const TypeDef *type = DefSchema::instance().lookup_type(target);
+    if (!type)
+        return nullptr;
+    std::string method = "on" + std::string(1, (char)std::toupper(signal[0])) + signal.substr(1);
+    const MethodDef *ev = DefSchema::instance().lookup_method(target, method);
+    if (ev && ev->mapping_type == MappingType::Event && ev->is_shared)
+        return ev;
+    std::string have;
+    for (const auto &m : type->methods)
+    {
+        if (m.mapping_type != MappingType::Event || !m.is_shared || m.name.rfind("on", 0) != 0 || m.name.size() < 3)
+            continue;
+        std::string name = std::string(1, (char)std::tolower(m.name[2])) + m.name.substr(3);
+        have += (have.empty() ? "" : ", ") + name;
+    }
+    ErrorHandler::type_error("'" + target + "' has no signal '" + signal + "'" + (have.empty() ? "" : ". Its signals: " + have), line);
+    exit(1);
 }
 
 void Parser::parse_app()
@@ -1375,6 +1416,25 @@ Component Parser::parse_component()
     }
 
     expect(TokenType::RBRACE, "Expected '}' to close component '" + comp.name + "'");
+    // listeners on page-wide events register at the start of mount (made here when there is none)
+    if (!comp.page_listens.empty())
+    {
+        FunctionDef *mount = nullptr;
+        for (auto &m : comp.methods)
+            if (m.name == "mount")
+                mount = &m;
+        if (!mount)
+        {
+            FunctionDef m;
+            m.name = "mount";
+            m.return_type = "void";
+            comp.methods.push_back(std::move(m));
+            mount = &comp.methods.back();
+        }
+        for (auto it = comp.page_listens.rbegin(); it != comp.page_listens.rend(); ++it)
+            mount->body.insert(mount->body.begin(), std::move(*it));
+        comp.page_listens.clear();
+    }
     return comp;
 }
 

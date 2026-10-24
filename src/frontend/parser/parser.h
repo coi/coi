@@ -1,5 +1,6 @@
 #pragma once
 
+#include "defs/def_parser.h"
 #include "../token.h"
 #include "ast/ast.h"
 #include <vector>
@@ -89,6 +90,7 @@ class Parser{
         std::unique_ptr<RouterDef> parse_router();  // Parse router block
         SignalDef parse_signal(bool is_public);
         void parse_listen_block(Component &comp);
+        const MethodDef *page_signal(const std::string &target, const std::string &signal, int line);
         Component parse_component();
         FunctionDef parse_function_def(bool is_public);  // Assumes current token is DEF
         void parse_app();

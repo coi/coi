@@ -1090,6 +1090,13 @@ component Editor {
 | `System.onVisibilityChange` | `VisibilityChangeEvent` (`hidden`, `state`): the moment to save |
 | `System.onPageHide` / `onPageShow` | `uint8 persisted` |
 | `System.onOnline` | `uint8 online` |
+| `System.onPointerUp` | `PointerUpEvent` (`pointerId`, `pointerType`, `x`, `y`): a pointer let go anywhere, cancel included |
+| `System.onWindowResize` | `WindowResizeEvent` (`width`, `height`, `dpr`): once at the start, then on every change |
+| `System.onPageScroll` | `PageScrollEvent` (`left`, `top`): the page's own scroll |
+| `System.onPageClick` | `PageClickEvent` (`x`, `y`): a click anywhere on the page |
+
+The same events are signals of `System` and `Input`: a `listen { System.visibilityChange => (VisibilityChangeEvent v) { … } }` block
+registers them like any component signal (language guide, "Page signals"). Either way the handler goes when the component does.
 
 Events of a handle you create in code (`img.onLoaded(&h)`) need that handle's listener turned on where there is one (`surface.addPointerListener(flags)` before `surface.onPointer(&h)`); the view attributes (`onpointerdown=`) and page-wide events do it for you.
 
