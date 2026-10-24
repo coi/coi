@@ -427,7 +427,18 @@ int main(int argc, char **argv)
 
             // Parsing
             Parser parser(tokens);
-            parser.parse_file();
+            try
+            {
+                parser.parse_file();
+            }
+            catch (const std::exception &e)
+            {
+                // where it went wrong: the file, and the line unless the message has one
+                std::string what = e.what();
+                if (what.find(" at line ") == std::string::npos)
+                    what += " at line " + std::to_string(parser.line_now());
+                throw std::runtime_error(what + " in " + current_file_path);
+            }
 
             // Add components with duplicate name check (allow same name in different modules)
             for (auto &comp : parser.components)
