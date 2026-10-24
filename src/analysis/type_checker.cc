@@ -2996,6 +2996,8 @@ void validate_types(const std::vector<Component> &components,
     for (const auto &e : global_enums)
     {
         g_enum_types.insert(e->name);
+        if (!e->module_name.empty())
+            g_enum_types.insert(e->module_name + "::" + e->name);
     }
     
     // Add component enums

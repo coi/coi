@@ -1,0 +1,9 @@
+module Pen;
+
+pub enum Cap { Butt, Round, Square }
+
+pub component Brush {
+    mut int cap = 0;
+    pub def setCap(Cap c) : void { cap = c; }
+    view { <span>{cap}</span> }
+}

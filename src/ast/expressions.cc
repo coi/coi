@@ -1011,6 +1011,8 @@ std::string IndexAccess::to_webcc() {
 std::string EnumAccess::to_webcc() {
     if (!component_name.empty())
         return convert_type(component_name + "." + enum_name) + "::" + value_name;
+    if (enum_name.find("::") != std::string::npos)
+        return convert_type(enum_name) + "::" + value_name;
     return ComponentTypeContext::instance().resolve(enum_name) + "::" + value_name;
 }
 

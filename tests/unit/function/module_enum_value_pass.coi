@@ -1,0 +1,11 @@
+// Test: Module::Enum::Value, passed to a module component's method that takes the enum
+import "modules/Pen.coi";
+
+component App {
+    mut Pen::Brush brush = Pen::Brush();
+    mut Pen::Cap last = Pen::Cap::Round;
+    def round() : void { brush.setCap(Pen::Cap::Round); last = Pen::Cap::Square; }
+    view { <div onclick={round}><{brush} /></div> }
+}
+
+app { root = App; }

@@ -416,6 +416,14 @@ std::unique_ptr<Expression> Parser::parse_primary()
             }
             else
             {
+                // Module::Enum::Value
+                if (current().type == TokenType::DOUBLE_COLON && std::isupper(value_name[0]))
+                {
+                    advance();
+                    std::string member = current().value;
+                    expect_name("Expected enum value after '::'");
+                    return std::make_unique<EnumAccess>(name + "::" + value_name, member);
+                }
                 // Otherwise treat as enum access
                 return std::make_unique<EnumAccess>(name, value_name);
             }
