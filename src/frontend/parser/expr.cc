@@ -804,7 +804,7 @@ std::unique_ptr<Expression> Parser::parse_match()
 std::unique_ptr<StringLiteral> Parser::make_string_literal(const std::string &value, bool is_template, int line)
 {
     auto lit = std::make_unique<StringLiteral>(value, is_template);
-    lit->parts = StringLiteral::split(value);
+    lit->parts = StringLiteral::split(value, is_template);
     for (auto &part : lit->parts)
     {
         if (!part.is_expr)

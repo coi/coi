@@ -111,7 +111,9 @@ Token Lexer::read_string(){
                 case '\\' : str += '\\'; break;
                 case '"' : str += '"'; break;
                 case '\'' : str += '\''; break;
-                case '$' : str += "\\$"; break;  // Escape $ for ${} interpolation
+                // a literal $, marked with a byte source text can't hold, so "\\${x}" (a backslash,
+                // then x) isn't read as an escaped dollar too
+                case '$' : str += '\x1d'; break;
                 default:
                     // a silently dropped backslash made "\r" into "r"
                     ErrorHandler::compiler_error(std::string("Unknown escape '\\") + current() +

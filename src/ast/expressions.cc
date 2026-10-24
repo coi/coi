@@ -188,11 +188,16 @@ static size_t skip_quoted(const std::string& v, size_t i) {
     return i;
 }
 
-std::vector<StringLiteral::Part> StringLiteral::split(const std::string& value) {
+std::vector<StringLiteral::Part> StringLiteral::split(const std::string& value, bool is_template) {
     std::vector<Part> parts;
     std::string text;
     for (size_t i = 0; i < value.size(); ++i) {
-        if (value[i] == '\\' && i + 1 < value.size() && value[i + 1] == '$') {
+        // a "..." string's \$ comes from the lexer as one marker byte; a `...` one keeps it raw
+        if (!is_template && value[i] == '\x1d') {
+            text += '$';
+            continue;
+        }
+        if (is_template && value[i] == '\\' && i + 1 < value.size() && value[i + 1] == '$') {
             text += '$';
             i++;
             continue;

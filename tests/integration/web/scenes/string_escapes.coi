@@ -1,0 +1,14 @@
+// a backslash before an interpolation stays a backslash; an escaped dollar stays a dollar
+component App {
+    mut int n = 7;
+    view {
+        <div>
+            <p class="backslash">{"a\\${n}b"}</p>
+            <p class="dollar">{"a\${n}b"}</p>
+            <p class="both">{"\\\${n}"}</p>
+            <p class="tmpl">{`a\${n}b`}</p>
+        </div>
+    }
+}
+
+app { root = App; }

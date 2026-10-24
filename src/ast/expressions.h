@@ -41,7 +41,7 @@ struct StringLiteral : Expression {
     std::vector<Part> parts;
 
     // text and ${...} pieces, expr left empty
-    static std::vector<Part> split(const std::string& value);
+    static std::vector<Part> split(const std::string& value, bool is_template);
     const std::vector<Part>& parse() const { return parts; }
     std::string to_webcc() override;
     bool is_static() override;
