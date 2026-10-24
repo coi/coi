@@ -1,0 +1,29 @@
+// page-wide listeners (listen { Input.keyDown }) on components kept in an array: the array
+// grows (and moves them), loses its first item (and shifts the rest) and is replaced; a key
+// must reach every item that is there, once, and nothing that is gone
+component Item(pub int id) {
+    mut int keys = 0;
+    listen {
+        Input.keyDown => (KeyDownEvent e) { if (e.key == "k") keys++; }
+    }
+    view { <span class="item">{id}:{keys};</span> }
+}
+
+component App {
+    mut Item[] items;
+    mut int next = 1;
+    def add() : void { items.push(Item(next)); next++; }
+    def addMany() : void { for i in 0:40 { add(); } }
+    def dropFirst() : void { if (items.size() > 0) items.remove(0); }
+    def reset() : void { items = []; for i in 0:3 { add(); } }
+    view {
+        <div>
+            <button class="add" onclick={addMany}>add</button>
+            <button class="drop" onclick={dropFirst}>drop</button>
+            <button class="reset" onclick={reset}>reset</button>
+            <p class="items"><for it in items key={it.id}><{it} /></for></p>
+        </div>
+    }
+}
+
+app { root = App; }

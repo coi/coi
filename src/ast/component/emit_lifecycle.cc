@@ -77,6 +77,7 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
             ss << "        _user_unmount();\n";
     // every handler / fetch callback this component registered
     ss << "        coi_forget_owner(this);\n";
+    ss << "        if (_coi_page_key) coi_forget_handle(webcc::handle(_coi_page_key));\n";
     // children own their own entries: view children, loop items, mounted members
     for (auto const &[comp_name, count] : component_members)
         for (int i = 0; i < count; ++i)
@@ -278,6 +279,8 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
         ss << "        if (!_if_" << root_if_id << "_anchor.is_valid()) return;\n";
     else if (element_count > 0)
         ss << "        if (!_el[0].is_valid()) return;\n";
+    // its page-wide listeners go with the view; showing it again (mount) files them anew
+    ss << "        if (_coi_page_key) coi_forget_handle(webcc::handle(_coi_page_key));\n";
 
     // If we have if/else at root level, handle both branches
     if (root_if_id >= 0 && !if_regions.empty())

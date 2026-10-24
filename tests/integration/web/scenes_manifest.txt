@@ -52,3 +52,4 @@ view_transition|tests/integration/web/scenes/view_transition.coi|web
 unmount_child|tests/integration/web/scenes/unmount_child.coi|web
 union_json|tests/integration/web/scenes/union_json.coi|web
 inline_function|tests/integration/web/scenes/inline_function.coi|web
+listen_in_array|tests/integration/web/scenes/listen_in_array.coi|web

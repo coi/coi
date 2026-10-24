@@ -1431,9 +1431,18 @@ Component Parser::parse_component()
             comp.methods.push_back(std::move(m));
             mount = &comp.methods.back();
         }
-        for (auto it = comp.page_listens.rbegin(); it != comp.page_listens.rend(); ++it)
-            mount->body.insert(mount->body.begin(), std::move(*it));
+        // in a method of their own, so a component an array has moved can file them again
+        FunctionDef reg;
+        reg.name = "_page_listen";
+        reg.return_type = "void";
+        for (auto &stmt : comp.page_listens)
+            reg.body.push_back(std::move(stmt));
         comp.page_listens.clear();
+        auto call = std::make_unique<FunctionCall>("_page_listen");
+        auto stmt = std::make_unique<ExpressionStatement>();
+        stmt->expression = std::move(call);
+        mount->body.insert(mount->body.begin(), std::move(stmt));
+        comp.methods.push_back(std::move(reg));
     }
     return comp;
 }

@@ -451,6 +451,9 @@ template<typename V, typename F> inline V coi_filter(const V& v, F pred) {
     out << "inline void coi_note_span(webcc::handle root, int32_t lo) {\n";
     out << "    g_coi_spans.push_back(CoiSpan{(int32_t)root, lo, webcc::deferred_handle_counter()});\n";
     out << "}\n";
+    // page-wide listeners (Input.keyDown, System.pointerUp…) are filed under a key per component,
+    // negative so it never meets an element handle; it moves with the component, unlike `this`
+    out << "inline int32_t g_coi_page_keys = 0;\n";
     out << "inline void coi_forget_handle(webcc::handle h) {\n";
     out << "    for (DispatcherBase* d = DispatcherBase::g_first; d; d = d->next) d->forget_handle(d, h);\n";
     out << "    int32_t hid = (int32_t)h;\n";

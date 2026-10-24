@@ -391,7 +391,7 @@ static std::string generate_page_event_registration(const MethodDef& event_metho
         }
         listen += "), ";
     }
-    return "(" + listen + "coi_events<" + full + ">.set(webcc::handle((int32_t)(uintptr_t)this), [this](const " + full +
+    return "(" + listen + "coi_events<" + full + ">.set(_page_key(), [this](const " + full +
            "& _e) { (void)_e; " + call + "; }, this))";
 }
 

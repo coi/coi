@@ -828,6 +828,8 @@ std::string Component::to_webcc(CompilerSession &session)
     // Child component members
     emit_component_members(ss, component_members);
     ss << "    bool _coi_alive = false; // view() mounted and _destroy() not yet run\n";
+    ss << "    int32_t _coi_page_key = 0; // where its page-wide listeners are filed; an array that moves it keeps it\n";
+    ss << "    webcc::handle _page_key() { if (!_coi_page_key) _coi_page_key = --g_coi_page_keys; return webcc::handle(_coi_page_key); }\n";
     if (!seeded_state.empty())
         ss << "    bool _coi_seeded = false; // state that reads params, set on the first _view\n";
 
@@ -2012,6 +2014,9 @@ std::string Component::to_webcc(CompilerSession &session)
 
     // Re-wire listen block signal handlers after reallocation
     emit_listen_registrations();
+    // and its page-wide listeners (same key, the new this), while it is mounted
+    if (std::any_of(methods.begin(), methods.end(), [](const FunctionDef &m) { return m.name == "_page_listen"; }))
+        ss << "        if (_coi_alive && _coi_page_key) " << cpp_name("_page_listen") << "();\n";
 
     // Re-wire member dependency callbacks after reallocation
     emit_member_dependency_callbacks();
