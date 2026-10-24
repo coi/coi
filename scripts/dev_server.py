@@ -121,7 +121,9 @@ class DevHandler(http.server.SimpleHTTPRequestHandler):
                 self.serve_bytes(content, 'text/html; charset=utf-8')
                 return
             
-            script = b'''<script>(function(){var k='__coi_scroll';if('scrollRestoration' in history)history.scrollRestoration='manual';var s=sessionStorage.getItem(k);if(s){sessionStorage.removeItem(k);var y=parseInt(s);var n=0;function r(){if(n++>30)return;window.scrollTo(0,y);if(Math.abs(window.scrollY-y)>1)setTimeout(r,60)}window.addEventListener('load',function(){requestAnimationFrame(r)});document.addEventListener('DOMContentLoaded',function(){requestAnimationFrame(r)})}var e=new EventSource('/__hot_reload');e.onmessage=function(m){if(m.data==='reload'){sessionStorage.setItem(k,window.scrollY||document.documentElement.scrollTop);location.reload()}};e.onerror=function(){console.log('[Coi] Reconnecting...')}})();</script></body>'''
+            # the stream closes on pagehide: a page kept in the back/forward cache would hold its
+            # connection, and after five of them Chrome has no connection left for this host
+            script = b'''<script>(function(){var k='__coi_scroll';if('scrollRestoration' in history)history.scrollRestoration='manual';var s=sessionStorage.getItem(k);if(s){sessionStorage.removeItem(k);var y=parseInt(s);var n=0;function r(){if(n++>30)return;window.scrollTo(0,y);if(Math.abs(window.scrollY-y)>1)setTimeout(r,60)}window.addEventListener('load',function(){requestAnimationFrame(r)});document.addEventListener('DOMContentLoaded',function(){requestAnimationFrame(r)})}var e=null;function open(){e=new EventSource('/__hot_reload');e.onmessage=function(m){if(m.data==='reload'){sessionStorage.setItem(k,window.scrollY||document.documentElement.scrollTop);location.reload()}};e.onerror=function(){console.log('[Coi] Reconnecting...')}}open();window.addEventListener('pagehide',function(){if(e){e.close();e=null}});window.addEventListener('pageshow',function(){if(!e)open()})})();</script></body>'''
             content = content.replace(b'</body>', script)
             
             self.send_response(200)
