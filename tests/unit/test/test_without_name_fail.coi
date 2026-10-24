@@ -1,0 +1,10 @@
+// Test: a test needs a name
+module Counting;
+
+component Main { view { <div>hi</div> } }
+
+test "" {
+    expect(true);
+}
+
+app { root = Main; }

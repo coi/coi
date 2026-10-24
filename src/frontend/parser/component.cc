@@ -1448,6 +1448,56 @@ Component Parser::parse_component()
 }
 
 // Parse `def name<T>(params) : Ret { body }` starting at 'def'.
+// test "what it checks" { statements }: a function with no parameters that only `coi test`
+// builds; a normal build drops it. Its name is given once every file is read
+FunctionDef Parser::parse_test()
+{
+    FunctionDef test;
+    test.test_name = current().value;
+    test.line = current().line;
+    test.return_type = "void";
+    advance();
+    if (test.test_name.empty())
+        ErrorHandler::compiler_error("A test needs a name: test \"what it checks\" { ... }", test.line);
+    expect(TokenType::LBRACE, "Expected '{' after the test's name");
+    while (current().type != TokenType::RBRACE && current().type != TokenType::END_OF_FILE)
+        test.body.push_back(parse_statement());
+    expect(TokenType::RBRACE, "Expected '}' to end the test");
+    return test;
+}
+
+// the tokens put back into a line of source: a space between words, none around '.', '(' and
+// the like, strings in their quotes again
+std::string Parser::source_text(size_t from, size_t to)
+{
+    std::string out;
+    for (size_t i = from; i < to && i < tokens.size(); i++)
+    {
+        const Token &t = tokens[i];
+        std::string text = t.value;
+        if (t.type == TokenType::STRING_LITERAL) text = "\"" + text + "\"";
+        else if (t.type == TokenType::TEMPLATE_STRING) text = "`" + text + "`";
+        else if (t.type == TokenType::INT_LITERAL || t.type == TokenType::FLOAT_LITERAL || t.type == TokenType::TRUE || t.type == TokenType::FALSE) {}
+        else if (text.empty()) continue;
+        bool tight_before = t.type == TokenType::RPAREN || t.type == TokenType::RBRACKET || t.type == TokenType::COMMA ||
+                            t.type == TokenType::DOT || t.type == TokenType::LBRACKET || t.type == TokenType::DOUBLE_COLON ||
+                            t.type == TokenType::LPAREN || t.type == TokenType::RBRACE ||
+                            (t.type == TokenType::LBRACE && !out.empty() && (std::isalnum((unsigned char)out.back()) || out.back() == '_'));   // a pod literal: P{a = 1}
+        if (!out.empty() && !tight_before)
+        {
+            char last = out.back();
+            bool tight_after = last == '(' || last == '[' || last == '{' || last == '.' || last == '!' || last == '&' || last == ':';
+            if (!tight_after) out += ' ';
+        }
+        // a call's '(' hugs its name, a grouping '(' doesn't
+        if (t.type == TokenType::LPAREN && !out.empty() && !std::isalnum((unsigned char)out.back()) && out.back() != '_' && out.back() != ')' && out.back() != ']')
+            out += ' ';
+        if (t.type == TokenType::AMPERSAND && !out.empty() && out.back() != ' ' && out.back() != '(' && out.back() != ',') out += ' ';
+        out += text;
+    }
+    return out;
+}
+
 FunctionDef Parser::parse_function_def(bool is_public)
 {
     advance();

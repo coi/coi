@@ -20,6 +20,9 @@ struct FunctionDef {
     };
     std::vector<Param> params;
     std::vector<std::unique_ptr<Statement>> body;
+    // a test block: test "what it checks" { ... }, a function with no params that `coi test` runs
+    std::string test_name;
+    std::string display_name() const { return test_name.empty() ? name : "test \"" + test_name + "\""; }
 
     std::string to_webcc(const std::string& injected_code = "");
     std::string free_declaration();

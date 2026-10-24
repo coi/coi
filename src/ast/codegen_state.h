@@ -11,6 +11,9 @@
 
 extern std::set<std::string> g_ref_props;
 
+// the file of the test being generated, as its failures should name it; "" outside a test
+extern std::string g_test_file;
+
 // webcc events with a registered callback
 struct UsedEvent
 {

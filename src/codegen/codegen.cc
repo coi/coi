@@ -1,5 +1,7 @@
 #include <functional>
 #include "codegen.h"
+#include <filesystem>
+namespace fs = std::filesystem;
 #include "codegen_utils.h"
 #include "ast/ast.h"
 #include "ast/codegen_state.h"
@@ -65,6 +67,69 @@ static std::string qualify_pod_type(const std::string &t, const std::string &mod
     return out;
 }
 
+// what a test's expect() calls: one failure ends the test, printed as it happens under the
+// test's name. Values print as JSON, which every Coi value can be written as
+static void emit_test_runtime(std::ostream &out)
+{
+    out << R"(static const char* coi_test_current = "";
+static bool coi_test_failed_now = false;
+static bool coi_test_color() { static int c = -1; if (c < 0) { const char* e = getenv("COI_COLOR"); c = e && *e == '1'; } return c == 1; }
+template<typename T> static coi::string coi_test_show(const T& v) { return __coi_json_stringify(v); }
+// equal as a test means it: arrays element by element, a pod by its fields (as JSON), the rest by ==
+template<typename A, typename B> static bool coi_test_eq(const A& a, const B& b) {
+    if constexpr (requires { a == b; }) return a == b;
+    else return __coi_json_stringify(a) == __coi_json_stringify(b);
+}
+template<typename T> static bool coi_test_eq(const coi::vector<T>& a, const coi::vector<T>& b) {
+    if (a.size() != b.size()) return false;
+    for (size_t i = 0; i < a.size(); i++) if (!coi_test_eq(a[i], b[i])) return false;
+    return true;
+}
+static void coi_test_fail(const char* file, int line, const char* expr, const coi::string& left, const coi::string& right) {
+    coi_test_failed_now = true;
+    printf("  %s✗%s %s\n", coi_test_color() ? "\033[31m" : "", coi_test_color() ? "\033[0m" : "", coi_test_current);
+    printf("    %s:%d  expect(%s)\n", file, line, expr);
+    if (left.length() || right.length()) {
+        printf("      left   %.*s\n", (int)left.length(), left.data());
+        printf("      right  %.*s\n", (int)right.length(), right.data());
+    }
+    printf("\n");
+}
+)";
+}
+
+// runs every test in order; the last line is for the tool that started the program
+static void emit_test_main(std::ostream &out, const std::vector<std::unique_ptr<FunctionDef>> &functions)
+{
+    out << "void g_app_navigate(const coi::string& route) {}\n";
+    out << "coi::string g_app_get_route() { return \"\"; }\n\n";
+    out << "int main() {\n";
+    out << "    struct CoiTest { const char* name; void (*run)(); };\n";
+    out << "    static const CoiTest tests[] = {\n";
+    size_t count = 0;
+    for (const auto &func : functions)
+    {
+        if (func->test_name.empty()) continue;
+        std::string shown = func->module_name.empty() ? func->test_name : func->module_name + ": " + func->test_name;
+        out << "        {" << cpp_string_literal(shown) << ", " << cpp_name(qualified_name(func->module_name, func->name)) << "},\n";
+        count++;
+    }
+    out << "    };\n";
+    out << "    bool verbose = getenv(\"COI_TEST_VERBOSE\") != nullptr;\n";
+    out << "    int passed = 0, failed = 0;\n";
+    out << "    for (size_t i = 0; i < " << count << "; i++) {\n";
+    out << "        coi_test_current = tests[i].name;\n";
+    out << "        coi_test_failed_now = false;\n";
+    out << "        tests[i].run();\n";
+    out << "        if (coi_test_failed_now) failed++;\n";
+    out << "        else { passed++; if (verbose) printf(\"  %s✓%s %s\\n\", coi_test_color() ? \"\\033[32m\" : \"\", coi_test_color() ? \"\\033[0m\" : \"\", tests[i].name); }\n";
+    out << "    }\n";
+    out << "    printf(\">> tests %d %d\\n\", passed, failed);\n";
+    out << "    fflush(stdout);\n";
+    out << "    return failed ? 1 : 0;\n";
+    out << "}\n";
+}
+
 void generate_cpp_code(
     std::ostream &out,
     std::vector<Component> &all_components,
@@ -73,13 +138,16 @@ void generate_cpp_code(
     const std::vector<std::unique_ptr<FunctionDef>> &all_global_functions,
     const AppConfig &final_app_config,
     const std::set<std::string> &required_headers,
-    const FeatureFlags &features)
+    const FeatureFlags &features,
+    bool test_program)
 {
     // Include required headers
     for (const auto &header : required_headers)
     {
         out << "#include \"webcc/" << header << ".h\"\n";
     }
+    if (test_program)   // built for the host: the C library is there
+        out << "#include <cstdio>\n#include <cstdlib>\n";
     out << "#include \"webcc/core/function.h\"\n";
     out << "#include \"webcc/core/allocator.h\"\n";
     out << "#include \"webcc/core/new.h\"\n";
@@ -729,6 +797,8 @@ template<typename V, typename F> inline V coi_filter(const V& v, F pred) {
         ComponentTypeContext::instance().clear();
         ComponentTypeContext::instance().set_module_scope(func.module_name, session.data_type_names);
         g_ref_props.clear();
+        // a test's failures name its file as the project sees it
+        g_test_file = func.test_name.empty() ? "" : fs::relative(func.source_file, fs::current_path()).string();
     };
 
     // declarations first, generics are defined here too
@@ -738,10 +808,13 @@ template<typename V, typename F> inline V coi_filter(const V& v, F pred) {
         out << (func->type_params.empty() ? func->free_declaration() : func->free_definition());
     }
     ComponentTypeContext::instance().clear();
+    g_test_file.clear();
     if (!all_global_functions.empty())
     {
         out << "\n";
     }
+    if (test_program)
+        emit_test_runtime(out);
 
     for (auto *comp : sorted_components)
     {
@@ -757,6 +830,13 @@ template<typename V, typename F> inline V coi_filter(const V& v, F pred) {
     }
     ComponentTypeContext::instance().clear();
     g_ref_props.clear();
+    g_test_file.clear();
+
+    if (test_program)
+    {
+        emit_test_main(out, all_global_functions);
+        return;
+    }
 
     if (final_app_config.root_component.empty())
     {

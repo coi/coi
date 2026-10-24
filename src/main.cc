@@ -1,4 +1,5 @@
 #include <sstream>
+#include <sys/wait.h>
 #include "cli/log.h"
 #include "frontend/lexer.h"
 #include "frontend/parser/parser.h"
@@ -234,6 +235,14 @@ int main(int argc, char **argv)
         return build_project(keep_cc, cc_only, rebuild);
     }
 
+    if (first_arg == "test")
+    {
+        std::vector<std::string> files;   // none: the project's src/
+        for (int i = 2; i < argc; ++i)
+            if (argv[i][0] != '-') files.push_back(argv[i]);
+        return test_project(files);
+    }
+
     if (first_arg == "dev")
     {
         bool hot_reloading = true;  // Hot reload is now the default
@@ -313,8 +322,10 @@ int main(int argc, char **argv)
     load_def_schema();
 
     std::string input_file;
+    std::vector<std::string> input_files;   // --test: every file given, all their tests run
     std::string output_dir;
     bool dev = false;   // a dev build: quick to compile, no manifest or service worker
+    bool test = false;  // --test: build the test blocks into a program for this machine and run it
 
     for (int i = 1; i < argc; ++i)
     {
@@ -329,6 +340,8 @@ int main(int argc, char **argv)
             g_progress = true;
         else if (arg == "--dev")
             dev = true;
+        else if (arg == "--test")
+            test = true;
         else if (arg == "--out" || arg == "-o")
         {
             if (i + 1 < argc)
@@ -343,6 +356,8 @@ int main(int argc, char **argv)
         }
         else if (input_file.empty())
             input_file = arg;
+        else if (test)
+            input_files.push_back(arg);
         else
         {
             std::cerr << "Unknown argument or multiple input files: " << arg << std::endl;
@@ -353,6 +368,12 @@ int main(int argc, char **argv)
     if (input_file.empty())
     {
         std::cerr << "No input file specified." << std::endl;
+        return 1;
+    }
+    input_files.insert(input_files.begin(), input_file);
+    if (test && output_dir.empty())
+    {
+        std::cerr << "--test needs --out, the directory for the test program" << std::endl;
         return 1;
     }
 
@@ -381,6 +402,7 @@ int main(int argc, char **argv)
     std::vector<std::unique_ptr<DataDef>> all_global_data;
     std::vector<std::unique_ptr<EnumDef>> all_global_enums;
     std::vector<std::unique_ptr<FunctionDef>> all_global_functions;
+    std::vector<std::unique_ptr<FunctionDef>> all_tests;   // the test blocks, kept only for --test
     AppConfig final_app_config;
     std::set<std::string> processed_files;
     std::queue<std::string> file_queue;
@@ -391,7 +413,8 @@ int main(int argc, char **argv)
 
     try
     {
-        file_queue.push(fs::canonical(input_file).string());
+        for (const auto &f : input_files)
+            file_queue.push(fs::canonical(f).string());
     }
     catch (const std::exception &e)
     {
@@ -483,6 +506,14 @@ int main(int argc, char **argv)
                 }
                 func->source_file = current_file_path;
                 all_global_functions.push_back(std::move(func));
+            }
+
+            // test blocks: named here, once, since a module can span files
+            for (auto &t : parser.tests)
+            {
+                t->name = "_test" + std::to_string(all_tests.size());
+                t->source_file = current_file_path;
+                all_tests.push_back(std::move(t));
             }
 
             if (!parser.app_config.root_component.empty())
@@ -595,6 +626,13 @@ int main(int argc, char **argv)
         if (g_verbose) std::cerr << "All files processed. Total components: " << all_components.size() << std::endl;
         progress("generating code for " + std::to_string(all_components.size()) + " components");
 
+        // a test is a function with no parameters that nothing can call (its name starts with
+        // '_'); a normal build leaves them out here
+        if (test)
+            for (auto &t : all_tests)
+                all_global_functions.push_back(std::move(t));
+        all_tests.clear();
+
         register_free_functions(all_global_functions);
 
         // platform enums are Coi enums in every program
@@ -677,6 +715,8 @@ int main(int argc, char **argv)
         {
             cache_dir = fs::current_path() / ".coi" / "cache";
         }
+        if (test)   // the test program's own place, nothing else goes there
+            cache_dir = final_output_dir;
         fs::create_directories(cache_dir);
 
         // Generate .cc in output dir if --keep-cc or --cc-only, otherwise in cache
@@ -726,6 +766,37 @@ int main(int argc, char **argv)
             }
             all_components = std::move(kept);
         }
+        // a test program has no page, only the components its functions take as parameters
+        // (a package's component, say) and what those reach
+        if (test)
+        {
+            std::set<std::string> keep;
+            for (const auto &fn : all_global_functions)
+            {
+                std::vector<std::string> types = {fn->return_type};
+                for (const auto &p : fn->params) types.push_back(p.type);
+                for (std::string t : types)
+                {
+                    for (char &c : t) if (!std::isalnum((unsigned char)c) && c != '_' && c != ':') c = ' ';
+                    std::istringstream words(t);
+                    for (std::string w; words >> w;)
+                    {
+                        size_t dc = w.find("::");
+                        std::string q = dc == std::string::npos ? w : w.substr(0, dc) + "_" + w.substr(dc + 2);
+                        for (const auto &c : all_components)
+                        {
+                            std::string cq = qualified_name(c.module_name, c.name);
+                            if (cq == q || cq == qualified_name(fn->module_name, w))
+                                for (const auto &r : reachable_components(all_components, cq)) keep.insert(r);
+                        }
+                    }
+                }
+            }
+            std::vector<Component> kept;
+            for (auto &c : all_components)
+                if (keep.count(qualified_name(c.module_name, c.name))) kept.push_back(std::move(c));
+            all_components = std::move(kept);
+        }
 
         // a dev build serves the app as it is; prerendering is for what gets deployed
         if (dev || cc_only)
@@ -736,7 +807,7 @@ int main(int argc, char **argv)
 
         // Generate C++ code
         generate_cpp_code(out, all_components, all_global_data, all_global_enums, all_global_functions,
-                          final_app_config, required_headers, features);
+                          final_app_config, required_headers, features, test);
 
         out.close();
         std::error_code rename_err;
@@ -751,6 +822,30 @@ int main(int argc, char **argv)
         if (keep_cc)
         {
             std::cerr << "Generated " << output_cc << std::endl;
+        }
+
+        // the test program: built for this machine by webcc and run; its exit code is ours
+        if (test && !cc_only)
+        {
+            fs::path webcc_path = fs::path(get_executable_dir()) / "deps" / "webcc" / "webcc";
+            if (!fs::exists(webcc_path))
+            {
+                std::cerr << colors::RED << "Error:" << colors::RESET << " Could not find webcc at " << webcc_path << std::endl;
+                return 1;
+            }
+            std::string cmd = webcc_path.string() + " " + fs::absolute(output_path).string() +
+                              " --cache-dir " + (cache_dir / "webcc").string() + " --run";
+            if (!g_verbose)
+                cmd += " --quiet";
+            else
+                std::cerr << "Running: " << cmd << std::endl;
+            if (g_progress)
+                cmd += " --progress";
+            std::cout.flush();
+            int status = system(cmd.c_str());
+            if (!keep_cc)
+                fs::remove(output_path);
+            return WIFEXITED(status) ? WEXITSTATUS(status) : 1;
         }
 
         if (!cc_only)

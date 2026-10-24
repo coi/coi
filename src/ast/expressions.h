@@ -90,6 +90,7 @@ struct FunctionCall : Expression {
     int line = 0;
 
     std::string receiver_type;  // set by the checker for obj.method() on a plain variable (a loop variable, a local): the codegen's symbol table only knows fields and params
+    std::string source_text;    // expect(...): the condition as written, for the failure message
     explicit FunctionCall(const std::string& n) : name(n){}
     std::string args_to_string();
     std::string to_webcc() override;

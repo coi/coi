@@ -42,6 +42,22 @@ inline std::string mangle_path(const std::string& path)
     return out;
 }
 
+// text as a C++ string literal's content
+inline std::string escape_cpp(const std::string& text) {
+    std::string escaped;
+    for (char c : text) {
+        if (c == '"') escaped += "\\\"";
+        else if (c == '\\') escaped += "\\\\";
+        else if (c == '\n') escaped += "\\n";
+        else if (c == '\t') escaped += "\\t";
+        else if (c == '\r') escaped += "\\r";
+        else if (c == '\0') escaped += "\\000";   // three digits, so a digit after it isn't read as part of the octal
+        else escaped += c;
+    }
+    return escaped;
+}
+inline std::string cpp_string_literal(const std::string& text) { return "\"" + escape_cpp(text) + "\""; }
+
 inline std::string strip_outer_parens(const std::string& expr) {
     if (expr.size() >= 2 && expr.front() == '(' && expr.back() == ')') {
         // Check if the outer parens are actually matching

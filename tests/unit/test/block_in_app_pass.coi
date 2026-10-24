@@ -1,0 +1,13 @@
+// Test: a test block in an app file is parsed and left out of the build
+component Main {
+    int n = double(2);
+    view { <div>{n}</div> }
+}
+
+def double(int x) : int { return x * 2; }
+
+test "double doubles" {
+    expect(double(2) == 4);
+}
+
+app { root = Main; }

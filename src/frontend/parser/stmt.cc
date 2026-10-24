@@ -924,8 +924,11 @@ std::unique_ptr<Statement> Parser::parse_statement()
     }
 
     // Expression statement
-    // try {
+    size_t start = pos;
     auto expr = parse_expression();
+    // expect(...) in a test: the condition as written goes into the failure message
+    if (auto *call = dynamic_cast<FunctionCall *>(expr.get()); call && call->name == "expect" && pos >= start + 3)
+        call->source_text = source_text(start + 2, pos - 1);
     expect(TokenType::SEMICOLON, "Expected ';'");
     auto stmt = std::make_unique<ExpressionStatement>();
     stmt->expression = std::move(expr);

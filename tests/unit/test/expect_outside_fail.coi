@@ -1,0 +1,11 @@
+// Test: expect only works inside a test block
+module Counting;
+
+component Main { view { <div>hi</div> } }
+
+def check(int x) : bool {
+    expect(x > 0);
+    return true;
+}
+
+app { root = Main; }

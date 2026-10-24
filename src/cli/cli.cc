@@ -19,6 +19,8 @@
 #include <chrono>
 #include <iomanip>
 #include <array>
+#include <algorithm>
+#include <functional>
 #include <regex>
 #include <sys/wait.h>
 
@@ -511,8 +513,9 @@ static fs::path find_entry_point()
 
 // The compiler runs in a pipe. Its ">> phase" lines become one status line that is redrawn
 // in place with a spinner while the build works; anything else it prints (errors) goes
-// through as it is, above the status line. Without a terminal the phases print as plain lines
-static int run_with_status(const std::string& cmd)
+// through as it is, above the status line. Without a terminal the phases print as plain lines.
+// on_status sees each phase first and takes it (true) when it means something to the caller
+static int run_with_status(const std::string& cmd, std::function<bool(const std::string&)> on_status = nullptr)
 {
     FILE* pipe = popen(cmd.c_str(), "r");
     if (!pipe) return 1;
@@ -538,6 +541,7 @@ static int run_with_status(const std::string& cmd)
     auto take_line = [&](const std::string& line) {
         if (line.rfind(">> ", 0) == 0)
         {
+            if (on_status && on_status(line.substr(3))) return;
             std::string next = in_coi_terms(line.substr(3));
             if (next == status) return;   // the same stage, another file: nothing new to say
             status = next;
@@ -662,6 +666,80 @@ int build_project(bool keep_cc, bool cc_only, bool silent_banner)
     return 0;
 }
 
+// every .coi file under src/, the tests' default
+static std::vector<std::string> source_files(const fs::path &src)
+{
+    std::vector<std::string> files;
+    for (const auto &entry : fs::recursive_directory_iterator(src))
+        if (entry.is_regular_file() && entry.path().extension() == ".coi")
+            files.push_back(entry.path().string());
+    std::sort(files.begin(), files.end());
+    return files;
+}
+
+int test_project(const std::vector<std::string> &files_arg)
+{
+    print_banner("test");
+
+    std::vector<std::string> files = files_arg;
+    if (files.empty())
+    {
+        fs::path src = fs::current_path() / "src";
+        if (!fs::is_directory(src))
+        {
+            ErrorHandler::cli_error("No src/ in the current directory.",
+                                    "Run coi test in a Coi project, or name the files: coi test src/Thing.coi");
+            return 1;
+        }
+        files = source_files(src);
+    }
+    for (const auto &f : files)
+        if (!fs::is_regular_file(f))
+        {
+            ErrorHandler::cli_error("No such file: " + f);
+            return 1;
+        }
+
+    fs::path coi_bin = get_executable_dir() / "coi";
+    fs::path out_dir = fs::current_path() / ".coi" / "cache" / "test";
+    // the program colours its lines when we have a terminal; -V lists every test
+    std::string cmd = std::string(isatty(STDOUT_FILENO) ? "COI_COLOR=1 " : "") + (g_verbose ? "COI_TEST_VERBOSE=1 " : "") +
+                      coi_bin.string() + " --test";
+    for (const auto &f : files)
+        cmd += " \"" + f + "\"";
+    cmd += " --out \"" + out_dir.string() + "\" --progress";
+    if (g_verbose)
+        cmd += " --verbose";
+    cmd += " 2>&1";
+
+    int passed = -1, failed = 0;
+    auto started = std::chrono::steady_clock::now();
+    int ret = run_with_status(cmd, [&](const std::string &status) {
+        if (status.rfind("tests ", 0) != 0) return false;
+        std::sscanf(status.c_str(), "tests %d %d", &passed, &failed);
+        return true;
+    });
+    double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
+    char took[32];
+    std::snprintf(took, sizeof(took), "%.2fs", seconds);
+
+    if (passed < 0)   // the program never ran: a compile error, printed above
+    {
+        ErrorHandler::build_failed();
+        return ret ? ret : 1;
+    }
+    if (failed == 0 && passed == 0)
+    {
+        std::cout << "  " << YELLOW << "–" << RESET << " no tests" << DIM << " (test \"what it checks\" { expect(...); } in any file)" << RESET << std::endl;
+        return 0;
+    }
+    if (failed == 0)
+        std::cout << "  " << GREEN << "✓" << RESET << " " << BOLD << passed << (passed == 1 ? " test" : " tests") << RESET << " passed" << DIM << " in " << took << RESET << std::endl;
+    else
+        std::cout << "  " << RED << "✗" << RESET << " " << BOLD << failed << " of " << (passed + failed) << RESET << " failed" << DIM << " in " << took << RESET << std::endl;
+    return failed ? 1 : 0;
+}
+
 int dev_project(bool keep_cc, bool cc_only, bool hot_reloading)
 {
     print_banner("dev");
@@ -779,6 +857,7 @@ void print_help(const char *program_name)
     std::cout << "    " << CYAN << program_name << " init" << RESET << " [name] [--pkg]      Create a new project" << std::endl;
     std::cout << "    " << CYAN << program_name << " build" << RESET << "                    Build the project" << std::endl;
     std::cout << "    " << CYAN << program_name << " dev" << RESET << " [--no-watch]         Build and start dev server" << std::endl;
+    std::cout << "    " << CYAN << program_name << " test" << RESET << " [files]             Run the test blocks (all of src/, or the files given)" << std::endl;
     std::cout << "    " << CYAN << program_name << " add" << RESET << " <package>            Add a package from registry (scope/name)" << std::endl;
     std::cout << "    " << CYAN << program_name << " install" << RESET << "                  Install packages from coi.lock" << std::endl;
     std::cout << "    " << CYAN << program_name << " remove" << RESET << " <package>         Remove a package" << std::endl;
@@ -800,6 +879,7 @@ void print_help(const char *program_name)
     std::cout << "  " << BOLD << "Examples:" << RESET << std::endl;
     std::cout << "    " << DIM << "$" << RESET << " coi init my-app" << std::endl;
     std::cout << "    " << DIM << "$" << RESET << " cd my-app && coi dev" << std::endl;
+    std::cout << "    " << DIM << "$" << RESET << " coi test                     " << DIM << "# every test block in src/; -V lists them" << RESET << std::endl;
     std::cout << "    " << DIM << "$" << RESET << " coi add pdf" << std::endl;
     std::cout << "    " << DIM << "$" << RESET << " coi add @google/package" << std::endl;
     std::cout << "    " << DIM << "$" << RESET << " coi self-upgrade" << std::endl;

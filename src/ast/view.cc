@@ -280,21 +280,6 @@ static std::string decode_entities(const std::string &s)
     return out;
 }
 
-static std::string cpp_string_literal(const std::string &s)
-{
-    std::string out = "\"";
-    for (char c : s)
-    {
-        if (c == '\\') out += "\\\\";
-        else if (c == '"') out += "\\\"";
-        else if (c == '\n') out += "\\n";
-        else if (c == '\r') out += "\\r";
-        else if (c == '\t') out += "\\t";
-        else out += c;
-    }
-    return out + "\"";
-}
-
 std::string TextNode::to_webcc() { return cpp_string_literal(decode_entities(text)); }
 
 std::string ComponentInstantiation::to_webcc() { return ""; }

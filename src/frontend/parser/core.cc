@@ -330,11 +330,18 @@ void Parser::parse_file()
             advance();
             parse_app();
         }
+        else if (current().type == TokenType::IDENTIFIER && current().value == "test" && peek().type == TokenType::STRING_LITERAL)
+        {
+            advance();
+            auto test = std::make_unique<FunctionDef>(parse_test());
+            test->module_name = module_name;
+            tests.push_back(std::move(test));
+        }
         else
         {
             std::string tok = current().value.empty() ? std::to_string((int)current().type) : current().value;
             ErrorHandler::compiler_error("Unexpected '" + tok +
-                "' at top level (expected component, pod, enum, def, import or app)", current().line);
+                "' at top level (expected component, pod, enum, def, test, import or app)", current().line);
         }
     }
 

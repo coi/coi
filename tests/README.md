@@ -27,7 +27,7 @@ Run from the project root:
 ### Commands
 
 #### 1. Run All Tests
-Runs both unit and integration tests in sequence.
+Runs unit, native and integration tests in sequence.
 
 ```bash
 ./tests/run.py all
@@ -40,7 +40,17 @@ Runs the compiler unit tests found in `tests/unit`. These tests compile `.coi` f
 ./tests/run.py unit
 ```
 
-#### 3. Integration Tests
+#### 3. Native Tests
+Runs the `.coi` files in `tests/native/` through `coi test`, the language's own test blocks built
+and run natively. A file must pass every test in it, unless its name says otherwise: a
+`*_fails.coi` must have a failing test (exit 1, a failed `expect(...)` in the output), a
+`*_rejects.coi` must not build at all.
+
+```bash
+./tests/run.py native
+```
+
+#### 4. Integration Tests
 Runs web-based integration tests using Playwright. These compile scenes, serve them, and run assertions in a browser.
 
 ```bash
@@ -54,7 +64,7 @@ Runs web-based integration tests using Playwright. These compile scenes, serve t
 ./tests/run.py integration --headed --scene paint_rects
 ```
 
-#### 4. Visual Gallery
+#### 5. Visual Gallery
 Builds and serves scenes, captures screenshots, and generates an HTML gallery for manual visual inspection.
 
 ```bash
@@ -68,7 +78,7 @@ Builds and serves scenes, captures screenshots, and generates an HTML gallery fo
 ./tests/run.py gallery --open
 ```
 
-#### 5. List Scenes
+#### 6. List Scenes
 List all available scenes defined in `tests/integration/web/scenes_manifest.txt`.
 
 ```bash

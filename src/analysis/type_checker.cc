@@ -653,6 +653,7 @@ static const std::map<std::string, std::set<std::string>> *g_file_imports = null
 static std::string g_ctx_module;
 static std::string g_ctx_file;
 static const Component *g_ctx_component = nullptr;
+static bool g_ctx_test = false;   // checking a test block: expect() is allowed
 static std::set<std::string> g_component_names;
 
 static bool is_enum_type(const std::string &t);
@@ -1373,6 +1374,39 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                 exit(1);
             }
             return "string";
+        }
+        // expect(condition): a test's check
+        if (func->name == "expect" && !scope.count("expect"))
+        {
+            if (!g_ctx_test)
+            {
+                ErrorHandler::type_error("expect only works inside a test block: test \"what it checks\" { expect(...); }", func->line);
+                exit(1);
+            }
+            if (func->args.size() != 1 || !func->args[0].name.empty())
+            {
+                ErrorHandler::type_error("expect takes one argument, the condition: expect(a == b)", func->line);
+                exit(1);
+            }
+            std::string t = infer_expression_type(func->args[0].value.get(), scope);
+            // expect(xs == ["a", "b"]): the literal takes the array's type
+            if (auto *cmp = dynamic_cast<BinaryOp *>(func->args[0].value.get()); cmp && (cmp->op == "==" || cmp->op == "!="))
+            {
+                std::string lt = infer_expression_type(cmp->left.get(), scope), rt = infer_expression_type(cmp->right.get(), scope);
+                std::string array_type = lt.ends_with("[]") && !lt.starts_with("unknown") ? lt
+                                       : rt.ends_with("[]") && !rt.starts_with("unknown") ? rt : "";
+                if (!array_type.empty())
+                    for (Expression *side : {cmp->left.get(), cmp->right.get()})
+                        if (auto *lit = dynamic_cast<ArrayLiteral *>(side); lit && lit->element_type.empty())
+                            lit->propagate_element_type(array_type.substr(0, array_type.size() - 2));
+            }
+            if (t != "unknown" && normalize_type(t) != "bool")
+            {
+                ErrorHandler::type_error("expect wants a bool, not a '" + display_type_name(normalize_type(t)) + "': expect(" +
+                                         (func->source_text.empty() ? "..." : func->source_text) + " == ...)", func->line);
+                exit(1);
+            }
+            return "void";
         }
         if (const FunctionDef *free_fn = resolve_free_function(func->name, scope, func->line))
         {
@@ -2766,7 +2800,7 @@ static void check_free_function_names(const FunctionDef &fn, const std::set<std:
         // a built-in type with shared methods: string.fromBytes(...), int.parse(...)
         if (DefSchema::instance().lookup_type(name) != nullptr)
             return;
-        ErrorHandler::type_error("Unknown identifier '" + name + "' in function '" + fn.name + "'", line);
+        ErrorHandler::type_error("Unknown identifier '" + name + "' in " + (fn.test_name.empty() ? "function '" + fn.name + "'" : fn.display_name()), line);
         exit(1);
     };
 
@@ -2804,12 +2838,17 @@ static void check_free_function_names(const FunctionDef &fn, const std::set<std:
                 if (!base.empty() && std::islower(static_cast<unsigned char>(base[0])))
                     check_name(base, scope, line);
             }
-            else if (!scope.count(call->name))
+            else if (!scope.count(call->name) && !(call->name == "expect" && !fn.test_name.empty()))
             {
                 const FunctionDef *target = resolve_free_function(call->name, no_scope, line);
+                if (!target && call->name == "expect")
+                {
+                    ErrorHandler::type_error("expect only works inside a test block: test \"what it checks\" { expect(...); }", line);
+                    exit(1);
+                }
                 if (!target)
                 {
-                    ErrorHandler::type_error("Unknown function '" + call->name + "' in function '" + fn.name + "'", line);
+                    ErrorHandler::type_error("Unknown function '" + call->name + "' in " + (fn.test_name.empty() ? "function '" + fn.name + "'" : fn.display_name()), line);
                     exit(1);
                 }
                 // `&x` into a `mut T&` param modifies x
@@ -3112,6 +3151,7 @@ void validate_types(const std::vector<Component> &components,
     {
         g_ctx_module = comp.module_name;
         g_ctx_file = comp.source_file;
+        ErrorHandler::current_file = comp.source_file;
         g_ctx_component = &comp;
 
         for (const auto &param : comp.params)
@@ -3151,7 +3191,6 @@ void validate_types(const std::vector<Component> &components,
                 if (init != "unknown" && !is_compatible_type(init, type) && !literal_fits(param->default_value.get(), type))
                 {
                     ErrorHandler::type_error(
-        ErrorHandler::current_file = comp.source_file;
                         "Parameter '" + param->name + "' expects '" + type + "' but initialized with '" + init + "'");
                     exit(1);
                 }
@@ -3410,7 +3449,9 @@ void validate_types(const std::vector<Component> &components,
     {
         g_ctx_module = fn->module_name;
         g_ctx_file = fn->source_file;
+        ErrorHandler::current_file = fn->source_file;
         g_ctx_component = nullptr;
+        g_ctx_test = !fn->test_name.empty();
 
         for (const auto &stmt : fn->body)
             validate_variant_binding_types(stmt.get());
@@ -3429,7 +3470,9 @@ void validate_types(const std::vector<Component> &components,
 
     g_ctx_module.clear();
     g_ctx_file.clear();
+    ErrorHandler::current_file.clear();
     g_ctx_component = nullptr;
+    g_ctx_test = false;
     g_file_imports = nullptr;
 }
 
@@ -3449,7 +3492,6 @@ void validate_mutability(const std::vector<Component> &components)
         for (const auto &param : comp.params)
         {
             if (param->is_mutable)
-        ErrorHandler::current_file = fn->source_file;
             {
                 mutable_vars.insert(param->name);
             }
@@ -3470,7 +3512,6 @@ void validate_mutability(const std::vector<Component> &components)
 
                 for (const auto &var : comp.state)
                 {
-    ErrorHandler::current_file.clear();
                     if (var->name == var_name)
                     {
                         is_known_var = true;
@@ -3981,6 +4022,7 @@ void validate_view_hierarchy(const std::vector<Component> &components,
     {
         g_ctx_module = comp.module_name;
         g_ctx_file = comp.source_file;
+        ErrorHandler::current_file = comp.source_file;
         g_ctx_component = &comp;
         std::map<std::string, std::string> scope = build_scope(&comp);
         for (const auto &root : comp.render_roots)
@@ -4022,7 +4064,6 @@ void validate_view_hierarchy(const std::vector<Component> &components,
         else if (auto *viewForEach = dynamic_cast<ViewForEachStatement *>(node))
         {
             for (const auto &child : viewForEach->children)
-        ErrorHandler::current_file = comp.source_file;
                 if (has_route_placeholder(child.get()))
                     return true;
         }

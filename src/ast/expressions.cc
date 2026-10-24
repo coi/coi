@@ -156,20 +156,6 @@ std::string FloatLiteral::to_webcc() {
     return s;  // No 'f' suffix - using double (64-bit)
 }
 
-static std::string escape_cpp(const std::string& text) {
-    std::string escaped;
-    for (char c : text) {
-        if (c == '"') escaped += "\\\"";
-        else if (c == '\\') escaped += "\\\\";
-        else if (c == '\n') escaped += "\\n";
-        else if (c == '\t') escaped += "\\t";
-        else if (c == '\r') escaped += "\\r";
-        else if (c == '\0') escaped += "\\000";   // three digits, so a digit after it isn't read as part of the octal
-        else escaped += c;
-    }
-    return escaped;
-}
-
 // end of a quoted string or nested template starting at i
 static size_t skip_quoted(const std::string& v, size_t i) {
     char q = v[i++];

@@ -1,0 +1,7 @@
+// Run: a test in another module sees only what is pub, so this doesn't build
+module Other;
+import "values.coi";
+
+test "shift is private to Values" {
+    expect(Values::shift(Values::origin(), 1).x == 1);
+}

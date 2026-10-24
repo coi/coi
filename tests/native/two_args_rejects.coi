@@ -1,0 +1,6 @@
+// Run: expect takes the condition only, so this doesn't build
+module Counting;
+
+test "no message argument" {
+    expect(1 == 1, "ones");
+}

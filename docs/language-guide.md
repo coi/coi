@@ -1390,6 +1390,62 @@ A signal's name is its event method without the `on` (`System.onVisibilityChange
 registration, written by hand). Both are forgotten when the component is destroyed, so neither
 needs an `unmount`. An unknown name lists the signals the type has.
 
+## Tests
+
+A test sits next to the code it checks, at the top level of any file, and `coi test` runs them
+all without a browser:
+
+```tsx
+module Slash;
+
+pub pod Entry { string name; string key; }
+
+def choices(string typed) : Entry[] {
+    return all().filter(e => e.name.toLower().indexOf(typed, 0) == 0);
+}
+
+test "a word's start narrows the menu" {
+    expect(choices("co").size() == 2);
+    expect(choices("co")[0].name == "Code");
+    expect(choices("zz") == []);
+}
+```
+
+- `test "what it checks" { … }` is a block of ordinary statements with no parameters. It belongs
+  to the file's module, so it calls the module's private functions directly; another module's
+  functions need `pub` and `Module::name`, as always.
+- `expect(condition);` is the check and only works inside a test. The first `expect` that fails
+  ends that test; the other tests still run.
+- `==` and `!=` in an `expect` compare arrays element by element and pods field by field, so
+  `expect(got == ["a", "b"])` and `expect(p == Point{x = 1, y = 2})` work as written.
+- A normal build (`coi build`, `coi dev`) parses the test blocks and leaves them out, so they
+  cost the app nothing.
+- Tests that outgrow the file go next to it as `Slash.test.coi`, starting with `module Slash;`
+  and `import "Slash.coi";`: the same module, so the same access, and the app never imports it.
+
+```bash
+coi test                    # every test block under src/
+coi test src/model/Merge.coi   # one file (and what it imports)
+coi test -V                 # list every test, not only the failures
+```
+
+The tests are built into a program for your machine (no WebAssembly, no browser) and run, in
+about a second. A failed check prints the test, the file and line, the condition as written and
+both sides of a comparison as JSON:
+
+```
+  ✗ Slash: a word's start narrows the menu
+    src/workspace/Slash.coi:14  expect(choices("co").size() == 2)
+      left   3
+      right  2
+
+  ✗ 1 of 12 failed in 0.8s
+```
+
+Browser calls (DOM, storage, fetch, canvas) do nothing and return nothing in a test, so test the
+pure functions: parsing, merging, formatting, layout maths. `coi test` exits with 1 when a test
+fails, for a script or CI.
+
 ## Next Steps
 
 - [Components](components.md) — Component syntax, lifecycle, props

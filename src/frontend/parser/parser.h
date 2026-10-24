@@ -95,6 +95,8 @@ class Parser{
         const MethodDef *page_signal(const std::string &target, const std::string &signal, int line);
         Component parse_component();
         FunctionDef parse_function_def(bool is_public);  // Assumes current token is DEF
+        FunctionDef parse_test();   // test "name" { ... }, current token is the name
+        std::string source_text(size_t from, size_t to);   // tokens [from, to) as the source spelled them
         void parse_app();
 
     public:
@@ -103,6 +105,7 @@ class Parser{
         std::vector<std::unique_ptr<DataDef>> global_data;    // Data types declared outside components
         std::vector<std::unique_ptr<EnumDef>> global_enums;  // Enums declared outside components
         std::vector<std::unique_ptr<FunctionDef>> global_functions;  // Top-level def functions
+        std::vector<std::unique_ptr<FunctionDef>> tests;  // test blocks, in file order
         std::vector<ImportDecl> imports;  // Import declarations (path + pub status)
         AppConfig app_config;
         Parser(const std::vector<Token>& toks);

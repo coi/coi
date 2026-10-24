@@ -1,0 +1,8 @@
+// Run: a test file of its own, in the module it tests, sees that module's private functions
+module Values;
+import "values.coi";
+
+test "a second file of the module" {
+    expect(shift(origin(), 1) == Point{x = 1, y = 1});
+    expect(letters("x") == ["x"]);
+}

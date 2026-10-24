@@ -1,0 +1,6 @@
+// Run: expect wants a bool, so this doesn't build
+module Counting;
+
+test "a number is not a check" {
+    expect(5);
+}

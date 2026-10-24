@@ -61,6 +61,7 @@ coi build                # build to dist/
 | Command | Description |
 |---------|-------------|
 | `coi build` | Compile `src/App.coi` to `dist/` (index.html, app.js, app.wasm, app.css) |
+| `coi test [files]` | Run the `test` blocks of every file under `src/` (or the files given) natively, no browser; `-V` lists each test |
 | `coi add <pkg> [version]` | Add a registry package (e.g. `coi add @coi/pdf`) |
 | `coi install` | Install packages pinned in `coi.lock` |
 | `coi remove <pkg>` | Remove a package |
@@ -911,6 +912,24 @@ Rules:
 - `pub import "path";` re-exports (used in a package's `Mod.coi`).
 - Package imports start with `@scope/name` and resolve under `.coi/pkgs/`. Commit `coi.lock`.
 
+### Tests
+```coi
+module Merge;
+def pick(string base, string mine, string theirs) : string { return mine == base ? theirs : mine; }
+
+test "a change on one side is taken" {        // top level of any file, no parameters
+    expect(pick("a", "a", "b") == "b");       // expect(bool): only inside a test
+    expect(pick("a", "b", "a") == "b");
+    expect(["x"].filter(s => s == "y") == []); // arrays by element, pods by field
+}
+```
+- `coi test` builds every test block into a native program and runs it: about a second, exit 1 on
+  a failure. The output names the test, `file:line`, the condition as written, and both sides of a
+  failed comparison as JSON. A normal build leaves test blocks out.
+- A test belongs to the file's module and calls its private functions directly. Browser calls do
+  nothing in a test: test pure functions (parsing, merging, formatting, maths).
+- Many tests: a `Name.test.coi` next to `Name.coi`, starting `module Name; import "Name.coi";`.
+
 ---
 
 ## 10. Complete Example Programs (copy-paste ready)
@@ -1089,6 +1108,7 @@ Before returning code, confirm:
 - [ ] Imports are explicit and paths are correct; cross-module uses `Module::Name`.
 - [ ] There is exactly one `app { root = ...; }` block (in the root file).
 - [ ] Prefer to verify with `coi build` (or `coi dev`) and fix any reported errors.
+- [ ] Pure logic in a module has a `test "..." { expect(...); }` block next to it, and `coi test` passes.
 
 ---
 

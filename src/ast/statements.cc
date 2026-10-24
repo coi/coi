@@ -355,11 +355,35 @@ void ReturnStatement::collect_dependencies(std::set<std::string> &deps)
         value->collect_dependencies(deps);
 }
 
+// expect(cond) in a test: a failed check records where and what, with both sides of a
+// comparison as they were, and leaves the test (its function) there
+static std::string emit_expect(FunctionCall *call)
+{
+    std::string where = cpp_string_literal(g_test_file) + ", " + std::to_string(call->line) + ", " + cpp_string_literal(call->source_text);
+    Expression *cond = call->args[0].value.get();
+    auto *cmp = dynamic_cast<BinaryOp *>(cond);
+    if (cmp && (cmp->op == "==" || cmp->op == "!=" || cmp->op == "<" || cmp->op == ">" || cmp->op == "<=" || cmp->op == ">="))
+    {
+        // a brace list needs its vector type to be a value
+        auto side = [](Expression *e) {
+            auto *lit = dynamic_cast<ArrayLiteral *>(e);
+            return lit && !lit->element_type.empty() ? "coi::vector<" + convert_type(lit->element_type) + ">" + lit->to_webcc() : e->to_webcc();
+        };
+        // == and != go through coi_test_eq: arrays by element, pods by value
+        std::string holds = cmp->op == "==" ? "coi_test_eq(_l, _r)" : cmp->op == "!=" ? "!coi_test_eq(_l, _r)" : "(_l " + cmp->op + " _r)";
+        return "{ auto&& _l = " + side(cmp->left.get()) + "; auto&& _r = " + side(cmp->right.get()) + ";\n" +
+               "      if (!" + holds + ") { coi_test_fail(" + where + ", coi_test_show(_l), coi_test_show(_r)); return; } }";
+    }
+    return "if (!(" + cond->to_webcc() + ")) { coi_test_fail(" + where + ", coi::string(), coi::string()); return; }";
+}
+
 std::string ExpressionStatement::to_webcc()
 {
     // Check for array method calls on component arrays used in loops
     if (auto call = dynamic_cast<FunctionCall *>(expression.get()))
     {
+        if (call->name == "expect" && !g_test_file.empty() && call->args.size() == 1)
+            return emit_expect(call);
         size_t dot_pos = call->name.rfind('.');
         if (dot_pos != std::string::npos)
         {

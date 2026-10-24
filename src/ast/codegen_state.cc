@@ -1,6 +1,7 @@
 #include "codegen_state.h"
 
 std::set<std::string> g_ref_props;
+std::string g_test_file;
 std::map<std::string, UsedEvent> g_used_events;
 
 std::map<std::string, ComponentArrayLoopInfo> g_component_array_loops;

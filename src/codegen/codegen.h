@@ -23,5 +23,6 @@ void generate_cpp_code(
     const std::vector<std::unique_ptr<FunctionDef>> &all_global_functions,
     const AppConfig &final_app_config,
     const std::set<std::string> &required_headers,
-    const FeatureFlags &features);
+    const FeatureFlags &features,
+    bool test_program = false);   // a program that runs the test blocks among the functions and reports, no app
 

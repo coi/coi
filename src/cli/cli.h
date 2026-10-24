@@ -2,6 +2,7 @@
 
 #include <string>
 #include <filesystem>
+#include <vector>
 
 // ANSI color codes for terminal output
 namespace colors {
@@ -38,6 +39,10 @@ int build_project(bool keep_cc = false, bool cc_only = false, bool silent_banner
 // Build and start dev server
 // Returns 0 on success, non-zero on error  
 int dev_project(bool keep_cc = false, bool cc_only = false, bool hot_reloading = false);
+
+// Run the test blocks of the given files, or of every file under src/ when none are given.
+// Returns 0 when every test passed
+int test_project(const std::vector<std::string> &files);
 
 // Upgrade the local Coi compiler checkout by pulling latest changes and rebuilding
 // Returns 0 on success, non-zero on error

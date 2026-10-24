@@ -1,0 +1,30 @@
+// Test: tests next to a module's functions see its private ones, and build with the app
+module Counting;
+
+component Main {
+    view { <div>{count(["a", "b"])}</div> }
+}
+
+pod Tally { int hits; string last; }
+
+def bump(Tally t, string s) : Tally {
+    mut Tally out = t;
+    out.hits = t.hits + 1;
+    out.last = s;
+    return out;
+}
+
+pub def count(string[] xs) : int { return xs.size(); }
+
+test "bump adds one" {
+    Tally t = bump(Tally{hits = 0, last = ""}, "a");
+    expect(t.hits == 1);
+    expect(t == Tally{hits = 1, last = "a"});
+}
+
+test "arrays compare by element" {
+    expect([1, 2, 3].filter(x => x > 1) == [2, 3]);
+    expect(count(["a"]) == 1);
+}
+
+app { root = Main; }
