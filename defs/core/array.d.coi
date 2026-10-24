@@ -34,15 +34,15 @@ type array<T> {
     @inline("${this}.sort()")
     def sort(): void
 
-    // every element of another array added at the end, in one go
+    // adds every element of other
     @inline("coi_append(${this}, ${0})")
     def append(T[] other): void
 
-    // a copy of count elements from start (fewer past the end)
+    // count elements from start
     @inline("coi_slice(${this}, ${0}, ${1})")
     def slice(int start, int count): T[]
 
-    // a copy from start to the end
+    // from start to the end
     @inline("coi_slice(${this}, ${0}, -1)")
     def slice(int start): T[]
 

@@ -18,7 +18,6 @@ struct ImportDecl {
 
 class Parser{
     public:
-        // the line the parser has reached, for an error that doesn't name one
         int line_now() { return current().line; }
     private:
         std::vector<Token> tokens;

@@ -96,7 +96,6 @@ struct FunctionCall : Expression {
     std::vector<Expression*> get_children() override;
     // Custom: also handles object.method() dot notation
     void collect_dependencies(std::set<std::string>& deps) override;
-    // a call to one of the component's methods reads what that method reads
     void collect_member_dependencies(std::set<MemberDependency>& member_deps) override;
 };
 

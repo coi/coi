@@ -7,8 +7,7 @@
 #include <functional>
 #include <cctype>
 
-// a builtin array method's declared type with T as the array's element: slice on a uint8[] is a
-// uint8[], not a T[]
+// T / T[] in a builtin array method's return type, as the element type
 static std::string array_method_type(const std::string &declared, const std::string &array_type)
 {
     if (declared.empty()) return "void";
@@ -1199,8 +1198,7 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
         std::string true_type = infer_expression_type(ternary->true_expr.get(), scope);
         std::string false_type = infer_expression_type(ternary->false_expr.get(), scope);
         
-        // an array literal on a side ([x] : list()) is a vector of the array's element type in
-        // C++, where a bare brace list can't stand in a ?: branch
+        // a brace list can't be a ?: branch in C++: give array literals their type
         std::string array_type = true_type.ends_with("[]") && !true_type.starts_with("unknown") ? true_type
                                : false_type.ends_with("[]") && !false_type.starts_with("unknown") ? false_type : "";
         if (!array_type.empty())
@@ -1546,7 +1544,6 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
             // Use DefSchema for array method lookups
             if (is_dynamic_array || is_fixed_array)
             {
-                // a default argument may be left out: slice(2)
                 if (auto* method_def = DefSchema::instance().lookup_method("array", method_name, func->args.size()))
                     return array_method_type(method_def->return_type, obj_type);
                 builtin_method_error("array");

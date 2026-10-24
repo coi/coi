@@ -58,6 +58,5 @@ extern std::map<std::string, HtmlLoopVarInfo> g_html_loop_var_infos;
 extern std::map<std::string, std::set<std::string>> g_method_reads;
 // true while g_method_reads is being computed: a plain call then counts as a dependency on the callee
 extern bool g_method_reads_building;
-// the a.b each method of the current component reads (a child component's pub member), closed
-// over the methods it calls, so a binding that calls it hears a.onBChange too
+// child members (a.b) each method reads, including through the methods it calls
 extern std::map<std::string, std::set<MemberDependency>> g_method_member_reads;

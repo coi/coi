@@ -465,8 +465,7 @@ template<typename V, typename F> inline V coi_filter(const V& v, F pred) {
     out << "inline void coi_note_span(webcc::handle root, int32_t lo) {\n";
     out << "    g_coi_spans.push_back(CoiSpan{(int32_t)root, lo, webcc::deferred_handle_counter()});\n";
     out << "}\n";
-    // page-wide listeners (Input.keyDown, System.pointerUp…) are filed under a key per component,
-    // negative so it never meets an element handle; it moves with the component, unlike `this`
+    // keys for page listeners: negative, stable across moves
     out << "inline int32_t g_coi_page_keys = 0;\n";
     out << "inline void coi_forget_handle(webcc::handle h) {\n";
     out << "    for (DispatcherBase* d = DispatcherBase::g_first; d; d = d->next) d->forget_handle(d, h);\n";
@@ -534,7 +533,7 @@ template<typename V, typename F> inline V coi_filter(const V& v, F pred) {
     {
         session.data_type_names.insert(qualified_name(data_def->module_name, data_def->name));
     }
-    // and the module's enums: a parameter or field of one is written with its module's prefix
+    // and module enums
     for (const auto &enum_def : all_global_enums)
     {
         session.data_type_names.insert(qualified_name(enum_def->module_name, enum_def->name));

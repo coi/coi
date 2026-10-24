@@ -192,7 +192,7 @@ std::vector<StringLiteral::Part> StringLiteral::split(const std::string& value, 
     std::vector<Part> parts;
     std::string text;
     for (size_t i = 0; i < value.size(); ++i) {
-        // a "..." string's \$ comes from the lexer as one marker byte; a `...` one keeps it raw
+        // \x1d: an escaped $ from the lexer ("..." strings only)
         if (!is_template && value[i] == '\x1d') {
             text += '$';
             continue;
@@ -522,8 +522,7 @@ std::string FunctionCall::to_webcc() {
                             DefSchema::instance().lookup_type(type_or_obj) != nullptr;
         bool builtin_receiver = !type_by_name && (receiver_type.empty() || receiver_type == "string" || receiver_type.back() == ']');
         if (!handle_receiver && builtin_receiver) {
-            // string's methods first, unless the receiver is known to be an array (append and
-            // the like are both a string's and an array's); arg_count picks the overload
+            // string methods, unless the receiver is an array (both have append)
             bool array_receiver = !receiver_type.empty() && receiver_type.back() == ']';
             if (!array_receiver && !has_inline_function(args))
                 if (auto* method_def = DefSchema::instance().lookup_method("string", method, args.size())) {

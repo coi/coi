@@ -182,8 +182,7 @@ void generate_pwa_files(const fs::path &out_dir, const AppConfig &config)
         if (!entry.is_regular_file()) continue;
         std::string r = fs::relative(entry.path(), out_dir).generic_string();
         if (r == "sw.js" || r[0] == '.' || r.find("/.") != std::string::npos) continue;
-        // a folder named lazy holds what only some visits need (big, used on demand): left out
-        // of the install, kept by the worker the first time it is fetched
+        // lazy/ folders: not precached
         if (r.rfind("lazy/", 0) == 0 || r.find("/lazy/") != std::string::npos) continue;
         files.push_back(r);
     }
@@ -226,7 +225,7 @@ self.addEventListener('fetch', (e) => {
         for (let n = parts.length; n >= 1; n--) { const hit = await c.match(parts.slice(0, n).join('/') + '/index.html'); if (hit) return hit; }
         return c.match('./');
     };
-    // a file under a lazy/ folder: from the network the first time, then from the cache
+    // lazy/ files: cached on first fetch
     const lazy = (c) => fetch(req).then((res) => { if (res.ok) c.put(req, res.clone()); return res; });
     e.respondWith(caches.open(CACHE).then((c) => c.match(req).then((hit) => hit || (req.mode === 'navigate' ? page(c) : undefined))
         .then((hit) => hit || (/\/lazy\//.test(new URL(req.url).pathname) ? lazy(c) : fetch(req)))));

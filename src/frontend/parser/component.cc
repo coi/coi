@@ -1431,7 +1431,7 @@ Component Parser::parse_component()
             comp.methods.push_back(std::move(m));
             mount = &comp.methods.back();
         }
-        // in a method of their own, so a component an array has moved can file them again
+        // own method, so _rebind can run it again
         FunctionDef reg;
         reg.name = "_page_listen";
         reg.return_type = "void";

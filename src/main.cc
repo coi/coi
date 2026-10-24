@@ -433,7 +433,7 @@ int main(int argc, char **argv)
             }
             catch (const std::exception &e)
             {
-                // where it went wrong: the file, and the line unless the message has one
+                // add file and line
                 std::string what = e.what();
                 if (what.find(" at line ") == std::string::npos)
                     what += " at line " + std::to_string(parser.line_now());

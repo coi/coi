@@ -52,7 +52,6 @@ set_attribute
 
 [canvas]
 create_canvas
-# RGBA bytes of a rectangle
 get_image_data
 # the canvas as a data: URL, for thumbnails
 to_data_url
@@ -124,7 +123,6 @@ get_current_time
 get_duration
 
 [compression]
-# bytes deflated (or gzipped) by the browser; DONE brings a blob
 compress +events
 decompress +events
 

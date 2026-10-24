@@ -377,7 +377,7 @@ std::string Component::to_webcc(CompilerSession &session)
         g_method_reads[m.name] = out;
     }
 
-    // and the a.b of member components each one reads, over the same calls
+    // child members (a.b) each method reads
     g_method_member_reads.clear();
     std::map<std::string, std::set<MemberDependency>> direct_members;
     std::function<void(ASTNode *, std::set<MemberDependency> &)> walk_members = [&](ASTNode *n, std::set<MemberDependency> &out) {
@@ -2014,7 +2014,7 @@ std::string Component::to_webcc(CompilerSession &session)
 
     // Re-wire listen block signal handlers after reallocation
     emit_listen_registrations();
-    // and its page-wide listeners (same key, the new this), while it is mounted
+    // page listeners point at the moved instance
     if (std::any_of(methods.begin(), methods.end(), [](const FunctionDef &m) { return m.name == "_page_listen"; }))
         ss << "        if (_coi_alive && _coi_page_key) " << cpp_name("_page_listen") << "();\n";
 
