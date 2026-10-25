@@ -3931,6 +3931,12 @@ void validate_view_hierarchy(const std::vector<Component> &components,
                         else if (auto *id = dynamic_cast<Identifier *>(attr.value.get()))
                             handler_name = id->name;
                         
+                        // written as a call, f(i): those arguments first, the value last
+                        auto *call = dynamic_cast<FunctionCall *>(attr.value.get());
+                        size_t bound = call ? call->args.size() : 0;
+                        if (call)
+                            for (auto &a : call->args)
+                                infer_expression_type(a.value.get(), scope);
                         if (!handler_name.empty() && scope.count(handler_name))
                         {
                             std::string sig = scope.at(handler_name);
@@ -3939,16 +3945,20 @@ void validate_view_hierarchy(const std::vector<Component> &components,
                             {
                                 std::string params = sig.substr(7, sig.find("):") - 7);
                                 std::string expected_type = (attr.name == "onkeydown") ? "int32" : "string";
-                                
-                                if (params.empty())
-                                    throw std::runtime_error("Event '" + attr.name + "' handler '" + handler_name + 
-                                        "' needs 1 " + expected_type + " parameter at line " + std::to_string(el->line));
-                                if (params.find(',') != std::string::npos)
-                                    throw std::runtime_error("Event '" + attr.name + "' handler '" + handler_name + 
-                                        "' should have 1 parameter, not multiple at line " + std::to_string(el->line));
-                                if (!is_compatible_type(expected_type, normalize_type(params)))
-                                    throw std::runtime_error("Event '" + attr.name + "' handler '" + handler_name + 
-                                        "' parameter must be " + expected_type + ", not '" + params + "' at line " + std::to_string(el->line));
+                                std::vector<std::string> types;
+                                for (size_t s = 0, e; !params.empty() && s <= params.size(); s = e + 1)
+                                {
+                                    e = params.find(',', s);
+                                    if (e == std::string::npos) e = params.size();
+                                    types.push_back(params.substr(s, e - s));
+                                }
+                                std::string what = bound == 0 ? "1 " + expected_type + " parameter" :
+                                    std::to_string(bound + 1) + " parameters: the " + std::to_string(bound) + " given here, then the " + expected_type;
+                                if (types.size() != bound + 1)
+                                    throw std::runtime_error("Event '" + attr.name + "' handler '" + handler_name + "' needs " + what + " at line " + std::to_string(el->line));
+                                if (!is_compatible_type(expected_type, normalize_type(types.back())))
+                                    throw std::runtime_error("Event '" + attr.name + "' handler '" + handler_name +
+                                        "' takes the " + expected_type + " last, not '" + types.back() + "' at line " + std::to_string(el->line));
                             }
                         }
                     }

@@ -1933,7 +1933,9 @@ std::string Component::to_webcc(CompilerSession &session)
         ss << "    void _handler_" << handler.element_id << "_" << handler.event_type << "(" << spec->handler_param_decl << ") {\n";
         if (handler.is_function_call)
         {
-            ss << "        " << handler.handler_code << ";\n";
+            // input, change and keydown hand their value to a call as its last argument
+            bool valued = handler.event_type == "input" || handler.event_type == "change" || handler.event_type == "keydown";
+            ss << "        " << (valued ? call_with_last_arg(handler.handler_code, spec->handler_call_arg) : handler.handler_code) << ";\n";
         }
         else
         {

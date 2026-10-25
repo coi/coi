@@ -43,6 +43,15 @@ inline std::string mangle_path(const std::string& path)
 }
 
 // text as a C++ string literal's content
+// oninput={typed(i)}: a handler written as a call gets the event's value as its last argument,
+// typed(i, value); "f()" becomes "f(value)"
+inline std::string call_with_last_arg(const std::string& call, const std::string& arg) {
+    if (call.empty() || call.back() != ')') return call;
+    size_t open = call.find('(');
+    bool none = open != std::string::npos && call.find_first_not_of(" ", open + 1) == call.size() - 1;
+    return call.substr(0, call.size() - 1) + (none ? "" : ", ") + arg + ")";
+}
+
 inline std::string escape_cpp(const std::string& text) {
     std::string escaped;
     for (char c : text) {

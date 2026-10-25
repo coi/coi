@@ -59,3 +59,4 @@ skeleton_mixed|tests/integration/web/scenes/skeleton_mixed.coi|web
 string_escapes|tests/integration/web/scenes/string_escapes.coi|web
 url_encode|tests/integration/web/scenes/url_encode.coi|web
 json_string_literal|tests/integration/web/scenes/json_string_literal.coi|web
+input_bound_args|tests/integration/web/scenes/input_bound_args.coi|web

@@ -155,6 +155,16 @@ component KeyboardInput {
 | `onchange` | `def handler(string value) : void` | Input lost focus after change |
 | `onkeydown` | `def handler(int keycode) : void` | Key pressed |
 
+A handler written as a call takes those arguments first and the value last, which is how a row of a loop says which one it is:
+
+```tsx
+mut string[] links = ["", ""];
+def typed(int i, string v) : void { links[i] = v; }
+view { <div><for i in 0:links.size()><input value={links[i]} oninput={typed(i)} /></for></div> }
+```
+
+`onkeydown={key(i)}` likewise calls `key(i, keycode)`.
+
 An input with `autofocus="true"` takes focus when it appears, also later on, inside an `<if>` or a new row of a loop. (The browser alone honors the attribute once per page; Coi focuses the element itself when it is created.)
 
 ### Pointer, wheel, resize, focus, click target and drop

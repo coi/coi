@@ -1,0 +1,8 @@
+// Test: a handler written as a call needs the given arguments, then the event's value
+component App {
+    mut string[] rows = [""];
+    def typed(int i) : void { }
+    view { <div><for i in 0:rows.size()><input oninput={typed(i)} /></for></div> }
+}
+
+app { root = App; }

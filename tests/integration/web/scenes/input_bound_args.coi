@@ -1,0 +1,19 @@
+// a handler written as a call gets the event's value last: oninput={typed(i)} is typed(i, value),
+// in a loop and outside one, for input, change and keydown
+component InputBoundArgs {
+    mut string[] rows = ["", ""];
+    mut string single = "";
+    mut int lastKey = 0;
+    def typed(int i, string v) : void { rows[i] = v; }
+    def named(string who, string v) : void { single = who + ":" + v; }
+    def key(int i, int code) : void { lastKey = i * 1000 + code; }
+    view {
+        <div>
+            <for i in 0:rows.size()><input class={`row${i}`} value={rows[i]} oninput={typed(i)} onkeydown={key(i)} /></for>
+            <input class="single" onchange={named("solo")} />
+            <p class="out">{rows[0]}|{rows[1]}|{single}|{lastKey}</p>
+        </div>
+    }
+}
+
+app { root = InputBoundArgs; }
