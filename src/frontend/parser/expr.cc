@@ -507,10 +507,16 @@ std::unique_ptr<Expression> Parser::parse_primary()
                 }
 
                 // a method on a call result or an element: el.getProperty("x").trim(), xs[0].length(),
-                // and on a field of a call result: make(v).items.size(). A field of an element
-                // (rows[i].label.append()) stays a name: a component field changed that way updates its view
+                // and on a field of a call result: make(v).items.size(), make(v)[0].tags.size(). A
+                // field of a variable's element (rows[i].label.append()) stays a name: a component
+                // field changed that way updates its view
                 Expression *root = expr.get();
-                while (auto *m = dynamic_cast<MemberAccess *>(root)) root = m->object.get();
+                while (true)
+                {
+                    if (auto *m = dynamic_cast<MemberAccess *>(root)) root = m->object.get();
+                    else if (auto *ix = dynamic_cast<IndexAccess *>(root); ix && expr.get() != root) root = ix->array.get();
+                    else break;
+                }
                 bool call_receiver = dynamic_cast<FunctionCall *>(root) || dynamic_cast<MethodCall *>(root) ||
                                      dynamic_cast<IndexAccess *>(expr.get());
                 if (call_receiver && current().type == TokenType::LPAREN)
