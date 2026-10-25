@@ -1,0 +1,20 @@
+// A link to a part of the page (href="#there") keeps the page's path and query: the generated
+// head has a base href, against which the browser alone would resolve "#there" to the base's
+// page and load that afresh.
+component App {
+    style {
+        html, body { margin: 0; padding: 0; font-family: system-ui, sans-serif; }
+        .top { padding: 20px; }
+        .spacer { height: 3000px; }
+        .there { padding: 20px; font-size: 28px; }
+    }
+    view {
+        <div class="root">
+            <div class="top"><a class="jump" href="#there">Down there</a></div>
+            <div class="spacer"></div>
+            <div id="there" class="there">There</div>
+        </div>
+    }
+}
+
+app { root = App; }
