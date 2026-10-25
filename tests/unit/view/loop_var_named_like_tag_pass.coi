@@ -1,0 +1,9 @@
+// Test: a loop variable called like an HTML element (a, p, b) leaves the element alone
+pod Item { string id; string url; }
+
+component App {
+    mut Item[] items = [];
+    view { <ul><for a in items key={a.id}><li><a href={a.url}>{a.url}</a><p>{a.id}</p></li></for></ul> }
+}
+
+app { root = App; }

@@ -1,8 +1,27 @@
+#include <unordered_set>
 #include "parser.h"
 #include "defs/def_parser.h"
 #include "cli/error.h"
 #include <stdexcept>
 #include <cctype>
+
+// the standard HTML and SVG element names, for telling <a> the element from a member called a
+static bool is_html_element(const std::string &tag)
+{
+    static const std::unordered_set<std::string> names = {
+        "a", "abbr", "address", "area", "article", "aside", "audio", "b", "bdi", "bdo", "blockquote", "br", "button",
+        "canvas", "caption", "cite", "code", "col", "colgroup", "data", "datalist", "dd", "del", "details", "dfn",
+        "dialog", "div", "dl", "dt", "em", "embed", "fieldset", "figcaption", "figure", "footer", "form", "h1", "h2",
+        "h3", "h4", "h5", "h6", "header", "hgroup", "hr", "i", "iframe", "img", "input", "ins", "kbd", "label",
+        "legend", "li", "main", "map", "mark", "menu", "meter", "nav", "object", "ol", "optgroup", "option",
+        "output", "p", "picture", "pre", "progress", "q", "rp", "rt", "ruby", "s", "samp", "search", "section",
+        "select", "slot", "small", "source", "span", "strong", "sub", "summary", "sup", "table", "tbody", "td",
+        "template", "textarea", "tfoot", "th", "thead", "time", "tr", "track", "u", "ul", "var", "video", "wbr",
+        "svg", "g", "path", "circle", "ellipse", "line", "polyline", "polygon", "rect", "text", "tspan", "use",
+        "defs", "symbol", "mask", "pattern", "image", "marker", "filter", "stop", "linearGradient",
+        "radialGradient", "clipPath", "foreignObject"};
+    return names.count(tag) > 0;
+}
 
 // Parse a prop/attribute value: string, number (with optional unary -), or {expression}
 std::unique_ptr<Expression> Parser::parse_prop_or_attr_value()
@@ -209,7 +228,9 @@ std::unique_ptr<ASTNode> Parser::parse_html_element()
 
     std::string tag = current().value;
     expect(TokenType::IDENTIFIER, "Expected tag name");
-    if (component_member_types.count(tag) && !DefSchema::instance().is_handle(component_member_types.at(tag)))
+    // a member called like an HTML element (a loop's a, b or p) leaves the element alone: a member
+    // is shown with <{a} />, so <a> is always the link
+    if (component_member_types.count(tag) && !DefSchema::instance().is_handle(component_member_types.at(tag)) && !is_html_element(tag))
         throw std::runtime_error("'" + tag + "' is a component member: write <{" + tag + "} /> at line " + std::to_string(start_line));
     // Special tag: <raw> - raw HTML injection
     if (tag == "raw")
