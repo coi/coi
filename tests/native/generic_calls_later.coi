@@ -1,0 +1,17 @@
+// a generic function may call a plain function written after it
+module Later;
+
+pub pod Box { int id; float y; }
+
+def lowered<T>(T[] list, float dy) : T[] {
+    mut T[] out;
+    for x in list { mut T c = x; c.y += dy; if (band(c.y) >= 1) out.push(c); }
+    return out;
+}
+
+def band(float y) : int { return Math.floor(y / 100.0).toInt(); }
+
+test "a generic calls a function declared below it" {
+    Box[] boxes = [Box{id = 1, y = 50.0}, Box{id = 2, y = 10.0}];
+    expect(lowered(boxes, 60.0) == [Box{id = 1, y = 110.0}]);
+}

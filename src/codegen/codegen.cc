@@ -875,11 +875,18 @@ template<typename V, typename F> inline V coi_filter(const V& v, F pred) {
         g_test_file = func.test_name.empty() ? "" : fs::relative(func.source_file, fs::current_path()).string();
     };
 
-    // declarations first, generics are defined here too
+    // every function declared first, so a generic body can call any function in any order;
+    // then the generic definitions, which have to come before the components that use them
     for (const auto &func : all_global_functions)
     {
         enter_function_scope(*func);
-        out << (func->type_params.empty() ? func->free_declaration() : func->free_definition());
+        out << func->free_declaration();
+    }
+    for (const auto &func : all_global_functions)
+    {
+        if (func->type_params.empty()) continue;
+        enter_function_scope(*func);
+        out << func->free_definition();
     }
     ComponentTypeContext::instance().clear();
     g_test_file.clear();
