@@ -1404,7 +1404,25 @@ Component Parser::parse_component()
         }
     }
 
-    // a method and a variable by one name are one name in the generated code
+    // a method and a variable by one name are one name in the generated code; two methods by one
+    // name need different parameters
+    for (size_t i = 0; i < comp.methods.size(); i++)
+    {
+        const auto &m = comp.methods[i];
+        for (size_t j = 0; j < i; j++)
+        {
+            const auto &o = comp.methods[j];
+            if (o.name != m.name || o.params.size() != m.params.size())
+                continue;
+            bool same = true;
+            for (size_t k = 0; k < m.params.size(); k++)
+                if (o.params[k].type != m.params[k].type)
+                    same = false;
+            if (same)
+                ErrorHandler::compiler_error("'" + m.name + "' is defined twice in " + comp.name + " (first at line " +
+                                             std::to_string(o.line) + "). Rename one of them", m.line);
+        }
+    }
     for (const auto &m : comp.methods)
     {
         for (const auto &p : comp.params)

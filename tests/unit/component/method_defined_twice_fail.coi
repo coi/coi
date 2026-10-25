@@ -1,0 +1,9 @@
+// Test: two methods with one name and the same parameters are an error, not a C++ one
+component App {
+    mut int n = 0;
+    def load() : void { n = 1; }
+    def load() : void { n = 2; }
+    view { <p>{n}</p> }
+}
+
+app { root = App; }

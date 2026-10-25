@@ -1,0 +1,10 @@
+// Test: two methods by one name with different parameters are fine
+component App {
+    mut int n = 0;
+    def set() : void { n = 1; }
+    def set(int v) : void { n = v; }
+    mount { set(); set(3); }
+    view { <p>{n}</p> }
+}
+
+app { root = App; }
