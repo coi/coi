@@ -951,6 +951,15 @@ static std::string check_free_function_call(const FunctionDef *fn, FunctionCall 
         }
 
         std::string actual = infer_expression_type(arg.value.get(), scope);
+        if (mentions_type_param(param.type, fn->type_params))
+        {
+            auto *lit = dynamic_cast<ArrayLiteral *>(arg.value.get());
+            if (lit && actual.size() > 2 && actual.ends_with("[]"))
+            {
+                if (lit->element_type.empty()) lit->element_type = actual.substr(0, actual.size() - 2);
+                lit->named = true;
+            }
+        }
         if (is_function_param || mentions_type_param(param.type, fn->type_params))
             continue;
         std::string expected = normalize_type(param.type);

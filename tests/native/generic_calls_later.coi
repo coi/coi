@@ -1,4 +1,5 @@
-// a generic function may call a plain function written after it
+// generic functions: one may call a plain function written after it, and an array literal
+// can go straight into one
 module Later;
 
 pub pod Box { int id; float y; }
@@ -11,7 +12,14 @@ def lowered<T>(T[] list, float dy) : T[] {
 
 def band(float y) : int { return Math.floor(y / 100.0).toInt(); }
 
+def last<T>(T[] list) : T { return list[list.size() - 1]; }
+
 test "a generic calls a function declared below it" {
     Box[] boxes = [Box{id = 1, y = 50.0}, Box{id = 2, y = 10.0}];
     expect(lowered(boxes, 60.0) == [Box{id = 1, y = 110.0}]);
+}
+
+test "an array literal is a generic's argument" {
+    expect(last([3, 4, 5]) == 5);
+    expect(lowered([Box{id = 1, y = 150.0}], 0.0).size() == 1);
 }

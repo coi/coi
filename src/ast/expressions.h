@@ -179,6 +179,7 @@ struct TernaryOp : Expression {
 struct ArrayLiteral : Expression {
     std::vector<std::unique_ptr<Expression>> elements;
     std::string element_type;  // Inferred or specified type of elements
+    bool named = false;        // written with its type: a generic parameter can't deduce from a bare brace list
 
     ArrayLiteral() = default;
     std::string to_webcc() override;

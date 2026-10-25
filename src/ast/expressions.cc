@@ -962,6 +962,7 @@ std::string ArrayLiteral::to_webcc() {
         code += elements[i]->to_webcc();
     }
     code += "}";
+    if (named && !element_type.empty()) code = convert_type(element_type + "[]") + code;
     return code;
 }
 
