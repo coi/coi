@@ -187,6 +187,7 @@ set_title
 set_theme_color
 reload
 open_url
+go_to
 get_time
 get_date_now
 get_timezone_offset_ms
