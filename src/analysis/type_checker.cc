@@ -28,6 +28,8 @@ static std::map<std::string, std::set<std::string>> g_data_type_fields;
 static std::map<std::string, std::set<std::string>> g_union_alts;
 // global pod name -> the modules that define one ("" for files without a module line)
 static std::map<std::string, std::set<std::string>> g_pod_modules;
+// the module whose code is being checked ("" for the default one)
+static std::string g_ctx_module;
 // Global map of known data types to their field types (for member access type inference)
 static std::map<std::string, std::map<std::string, std::string>> g_data_type_field_types;
 
@@ -307,8 +309,20 @@ static std::string member_path_type(const std::string &path, const std::map<std:
     }
 }
 
+// A pod named without its module: from code in a module that has a pod of that name, it's that
+// one. Two modules may each have their own Run; the bare name is registered for whichever came
+// last, the module's own under Module_Run
+static std::string pod_key(const std::string &t)
+{
+    if (g_ctx_module.empty() || t.find("::") != std::string::npos || t.find('.') != std::string::npos)
+        return t;
+    std::string own = g_ctx_module + "_" + t;
+    return g_data_type_fields.count(own) ? own : t;
+}
+
 // Check if a type is a known data type
-static bool is_data_type(const std::string &t) {
+static bool is_data_type(const std::string &raw) {
+    std::string t = pod_key(raw);
     if (g_data_type_fields.count(t))
         return true;
     size_t dot_pos = t.find('.');
@@ -321,7 +335,8 @@ static bool is_data_type(const std::string &t) {
 }
 
 // Check if a field exists on a known data type
-static bool has_data_field(const std::string& type_name, const std::string& field_name) {
+static bool has_data_field(const std::string& raw, const std::string& field_name) {
+    std::string type_name = pod_key(raw);
     auto it = g_data_type_fields.find(type_name);
     if (it != g_data_type_fields.end() && it->second.count(field_name)) {
         return true;
@@ -387,7 +402,7 @@ static bool is_json_type(const std::string &raw, int depth = 0)
     size_t br = t.rfind('[');
     if (br != std::string::npos && t.back() == ']')
         return is_json_type(t.substr(0, br), depth + 1);
-    std::string base = t.substr(0, t.find('<'));
+    std::string base = pod_key(t.substr(0, t.find('<')));
     auto it = g_data_type_field_types.find(base);
     if (it == g_data_type_field_types.end() && base.find("::") != std::string::npos)
     {
@@ -408,7 +423,8 @@ static bool is_json_type(const std::string &raw, int depth = 0)
 }
 
 // Get the type of a field on a known data type (returns empty string if not found)
-static std::string get_data_field_type(const std::string& type_name, const std::string& field_name) {
+static std::string get_data_field_type(const std::string& raw, const std::string& field_name) {
+    std::string type_name = pod_key(raw);
     auto it = g_data_type_field_types.find(type_name);
     if (it != g_data_type_field_types.end()) {
         auto fit = it->second.find(field_name);
@@ -650,7 +666,6 @@ bool is_compatible_type(const std::string &source, const std::string &target)
 // top-level functions and the module/file/component being checked
 static std::vector<const FunctionDef *> g_free_functions;
 static const std::map<std::string, std::set<std::string>> *g_file_imports = nullptr;
-static std::string g_ctx_module;
 static std::string g_ctx_file;
 static const Component *g_ctx_component = nullptr;
 static bool g_ctx_test = false;   // checking a test block: expect() is allowed
@@ -1318,7 +1333,7 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
     if (auto *cc = dynamic_cast<ComponentConstruction *>(expr))
     {
         const std::string &name = cc->component_name;
-        bool known_pod = g_data_type_field_types.count(name) > 0;
+        bool known_pod = g_data_type_field_types.count(pod_key(name)) > 0;
         for (auto &a : cc->args)
         {
             std::string t = normalize_type(infer_expression_type(a.value.get(), scope));
@@ -2013,7 +2028,7 @@ static bool is_known_variant_binding_type(const std::string &raw_type)
         return t;
     };
     auto is_pod = [&](const std::string &t) {
-        return g_data_type_fields.count(t) > 0 ||
+        return g_data_type_fields.count(pod_key(t)) > 0 ||
                g_data_type_fields.count(to_underscore(t)) > 0;
     };
 

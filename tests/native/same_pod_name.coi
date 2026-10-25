@@ -1,0 +1,18 @@
+// two modules may each have a pod of the same name; a module's own code means its own
+module Words;
+import "same_pod_name_laps.coi";
+
+pub pod Run { string text; bool bold; }
+
+def joined(Run[] runs) : string {
+    mut string out = "";
+    for r in runs { out += r.text; }
+    return out;
+}
+
+test "the module's own pod, while an imported module has a private one of that name" {
+    Run r = Run{text = "hi", bold = true};
+    expect(r.text == "hi" && r.bold);
+    expect(joined([r, Run{text = "!"}]) == "hi!");
+    expect(Laps::laps() == 3);
+}

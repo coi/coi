@@ -1,0 +1,12 @@
+// the other half of same_pod_name.coi: a private pod named like Words' public one
+module Laps;
+
+pod Run { int laps; }
+
+pub def laps() : int {
+    mut Run r = Run{laps = 1};
+    r.laps += 2;
+    return r.laps;
+}
+
+test "a private pod with a name another module uses too" { expect(laps() == 3); }
