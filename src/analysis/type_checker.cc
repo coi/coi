@@ -3921,6 +3921,17 @@ void validate_view_hierarchy(const std::vector<Component> &components,
 
                 if (is_event_handler)
                 {
+                    // a handler that isn't there would only fail in the generated C++
+                    {
+                        std::string name;
+                        if (auto *func = dynamic_cast<FunctionCall *>(attr.value.get()))
+                            name = func->name;
+                        else if (auto *id = dynamic_cast<Identifier *>(attr.value.get()))
+                            name = id->name;
+                        if (!name.empty() && name.find('.') == std::string::npos && name.find(':') == std::string::npos && !scope.count(name))
+                            throw std::runtime_error("'" + attr.name + "' handler '" + name + "' isn't a method of " +
+                                                     (parent_comp ? parent_comp->name : std::string("this component")) + " at line " + std::to_string(el->line));
+                    }
                     // Validate event handler parameter types
                     // oninput/onchange pass a string, onkeydown passes an int (keycode)
                     if (attr.name == "oninput" || attr.name == "onchange" || attr.name == "onkeydown")

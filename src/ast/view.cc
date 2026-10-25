@@ -853,10 +853,18 @@ void HTMLElement::generate_code(ViewCodegenContext& ctx)
         ctx.ss << "        webcc::dom::append_child(" << ctx.parent << ", " << var << ");\n";
     }
     // autofocus: the browser honors the attribute once per document, so an input that shows up
-    // later (an <if>, a new row) is focused here, once it is in the page
+    // later (an <if>, a new row) is focused here, once it is in the page. "false" means no
     for (auto &attr : attributes)
-        if (attr.name == "autofocus")
+    {
+        if (attr.name != "autofocus")
+            continue;
+        if (auto *str = dynamic_cast<StringLiteral *>(attr.value.get()); str && !str->value.empty() && str->value != "true" && str->value != "autofocus")
+            continue;
+        if (dynamic_cast<StringLiteral *>(attr.value.get()))
             ctx.ss << "        webcc::dom::focus(" << var << ");\n";
+        else
+            ctx.ss << "        if (coi::string(" << attr.value->to_webcc() << ") != \"false\") webcc::dom::focus(" << var << ");\n";
+    }
 
     // Children
     bool has_elements = false;

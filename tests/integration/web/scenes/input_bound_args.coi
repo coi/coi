@@ -9,7 +9,7 @@ component InputBoundArgs {
     def key(int i, int code) : void { lastKey = i * 1000 + code; }
     view {
         <div>
-            <for i in 0:rows.size()><input class={`row${i}`} value={rows[i]} oninput={typed(i)} onkeydown={key(i)} /></for>
+            <for i in 0:rows.size()><input class={`row${i}`} value={rows[i]} oninput={typed(i)} onkeydown={key(i)} autofocus={i == 1 ? "true" : "false"} /></for>
             <input class="single" onchange={named("solo")} />
             <p class="out">{rows[0]}|{rows[1]}|{single}|{lastKey}</p>
         </div>

@@ -1,0 +1,7 @@
+// Test: an event handler that isn't a method is a Coi error, not a C++ one
+component App {
+    mut string text = "";
+    view { <textarea oninput={typedText}></textarea> }
+}
+
+app { root = App; }

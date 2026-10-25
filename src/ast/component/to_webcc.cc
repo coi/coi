@@ -1370,15 +1370,14 @@ std::string Component::to_webcc(CompilerSession &session)
             else if (region.is_html_loop)
             {
                 // elements over a range: a sync runs when the range or anything the body reads
-                // changed, so the items are rebuilt in full, like a keyed loop's. The loop variable
+                // changed, so the items are built fresh, like a keyed loop's, and the live ones
+                // take their look (morph): an input being typed in keeps its node, focus and caret,
+                // and only rows that are really new appear (and take autofocus). The loop variable
                 // runs from the start expression, not from zero
                 std::string vec_name = "_loop_" + std::to_string(region.loop_id) + "_elements";
                 std::string anchor_var = "_loop_" + std::to_string(region.loop_id) + "_anchor";
 
-                ss << "        for (auto& _el : " << vec_name << ") {\n";
-                ss << "            _forget_row(_el);\n";
-                ss << "            webcc::dom::remove_element(_el);\n";
-                ss << "        }\n";
+                ss << "        coi::vector<webcc::handle> _live = " << vec_name << ";\n";
                 ss << "        " << vec_name << ".clear();\n";
                 ss << "        g_view_depth++;\n";
                 ss << "        for (int " << cpp_name(region.var_name) << " = " << region.start_expr << "; " << cpp_name(region.var_name) << " < " << region.end_expr << "; " << cpp_name(region.var_name) << "++) {\n";
@@ -1390,6 +1389,16 @@ std::string Component::to_webcc(CompilerSession &session)
                 item_code = transform_to_insert_before(item_code, loop_parent, anchor_var);
                 item_code = track_top_level_inserts(item_code, loop_parent, vec_name);
                 ss << indent_code(item_code, "    ");
+                ss << "        }\n";
+                // element by element: the live one keeps its place and becomes the fresh one,
+                // the fresh one goes; live ones past the end go too
+                ss << "        for (size_t _j = 0; _j < " << vec_name << ".size() && _j < _live.size(); _j++) {\n";
+                ss << "            _forget_row(_live[_j]);\n";
+                ss << "            webcc::dom::morph(_live[_j], " << vec_name << "[_j]);\n";
+                ss << "        }\n";
+                ss << "        for (size_t _j = " << vec_name << ".size(); _j < _live.size(); _j++) {\n";
+                ss << "            _forget_row(_live[_j]);\n";
+                ss << "            webcc::dom::remove_element(_live[_j]);\n";
                 ss << "        }\n";
                 ss << "        if (--g_view_depth == 0) webcc::flush();\n";
             }
