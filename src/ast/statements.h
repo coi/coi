@@ -36,6 +36,7 @@ struct Assignment : Statement {
     std::string name;
     std::unique_ptr<Expression> value;
     std::string target_type;
+    std::string compound_op;  // "+" for +=: value is then `name + x`, kept whole for the type checker
     bool is_move = false;  // true if assigned with &expr (move semantics)
 
     std::string to_webcc() override;

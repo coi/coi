@@ -1,0 +1,41 @@
+// s += x appends in place: a long string built a piece at a time takes time in proportion to
+// its length (it used to copy the whole string on every append)
+module Append;
+
+pod Doc { string text; int words; }
+
+test "a string built a character at a time" {
+    mut string s = "";
+    for i in 0:2000000 { s += "x"; }
+    expect(s.length() == 2000000);
+    expect(s.subStr(1999998) == "xx");
+}
+
+test "what can be appended, the way + writes it" {
+    mut string s = "n=";
+    s += 42;
+    s += " f=";
+    s += 1.5;
+    s += " ";
+    s += true ? "yes" : "no";
+    mut string t = "!";
+    s += t;
+    s += t + "?";
+    s += `${t}${t}`;
+    expect(s == "n=42 f=1.5 yes!!?!!");
+    mut int n = 3;
+    n += 4;
+    expect(n == 7);
+}
+
+test "a string member and an array item grow the same way" {
+    mut Doc d = Doc{text = "a", words = 1};
+    for i in 0:100000 { d.text += "b"; }
+    d.words += 2;
+    expect(d.text.length() == 100001);
+    expect(d.words == 3);
+    mut string[] parts = ["x", "y"];
+    for i in 0:100000 { parts[1] += "z"; }
+    expect(parts[1].length() == 100001);
+    expect(parts[0] == "x");
+}

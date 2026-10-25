@@ -208,6 +208,14 @@ std::string Assignment::to_webcc()
         return result;
     }
 
+    // s += x on a string appends in place: s = s + x would copy all of s every time, so a string
+    // built a piece at a time would cost the square of its length
+    if (compound_op == "+" && !is_move && target_type == "string")
+    {
+        if (auto *bin = dynamic_cast<BinaryOp *>(value.get()))
+            return lhs + " += " + bin->right->to_webcc() + ";";
+    }
+
     return lhs + " = " + rhs + ";";
 }
 
@@ -269,7 +277,8 @@ std::string IndexAssignment::to_webcc()
     std::string arr = array->to_webcc();
     std::string idx = index->to_webcc();
     std::string result = compound_op.empty() ? arr + "[" + idx + "] = " + val + ";"
-                                             : arr + "[" + idx + "] = " + arr + "[" + idx + "] " + compound_op + " " + val + ";";
+                       : compound_op == "+" ? arr + "[" + idx + "] += " + val + ";"
+                                            : arr + "[" + idx + "] = " + arr + "[" + idx + "] " + compound_op + " " + val + ";";
     // pages[i] = info: the <for> over pages shows the new item
     if (auto id = dynamic_cast<Identifier *>(array.get()))
     {
@@ -303,6 +312,11 @@ std::string MemberAssignment::to_webcc()
     if (compound_op.empty())
     {
         result = obj + "." + cpp_name(member) + " = " + val + ";";
+    }
+    else if (compound_op == "+")
+    {
+        // in place, as for a variable: a string member grows without being copied whole
+        result = obj + "." + cpp_name(member) + " += " + val + ";";
     }
     else
     {

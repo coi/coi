@@ -853,6 +853,7 @@ std::unique_ptr<Statement> Parser::parse_statement()
         }
 
         auto val = parse_expression();
+        assign->compound_op = compound_op_of(opType);
 
         if (opType == TokenType::PLUS_ASSIGN)
         {
