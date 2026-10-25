@@ -1,0 +1,14 @@
+// a cast chained on what a shared def or a builtin method returns
+module Chained;
+
+def cents(string euros) : int64 { return Math.round(euros.toFloat() * 100.0).toInt64(); }
+def count(int[] xs) : int64 { return xs.size().toInt64(); }
+
+test "a cast on Math.round's result" {
+    expect(cents("12.34") == 1234);
+    expect(Math.floor(2.7).toInt() == 2);
+}
+
+test "a cast on an array's size" {
+    expect(count([1, 2, 3]) == 3);
+}

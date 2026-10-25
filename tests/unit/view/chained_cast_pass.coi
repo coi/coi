@@ -1,0 +1,8 @@
+// Test: a cast chained on a method's result inside the view, where the checker doesn't type it
+component App {
+    mut int[] xs = [];
+    mut string name = "pond";
+    view { <p>{xs.size().toInt64()} {name.length().toInt64()} {Math.round(1.5).toInt64()} {System.getDateNow().toInt64()}</p> }
+}
+
+app { root = App; }

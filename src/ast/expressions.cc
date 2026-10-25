@@ -1257,22 +1257,49 @@ std::vector<Expression*> MethodCall::get_children() {
     return children;
 }
 
-std::string MethodCall::to_webcc() {
-    std::string type = receiver_type;
-    if (type.empty()) {
-        if (dynamic_cast<StringLiteral*>(receiver.get())) type = "string";
-        else if (dynamic_cast<IntLiteral*>(receiver.get())) type = "int32";
-        else if (dynamic_cast<FloatLiteral*>(receiver.get())) type = "float64";
-        else if (dynamic_cast<BoolLiteral*>(receiver.get())) type = "bool";
-        else if (auto* call = dynamic_cast<FunctionCall*>(receiver.get())) {
-            // System.getDateNow().toInt64() in a view: the checker didn't type it, the def says
-            size_t dot = call->name.rfind('.');
-            if (dot != std::string::npos) {
-                const auto* m = DefSchema::instance().lookup_method(call->name.substr(0, dot), call->name.substr(dot + 1));
-                if (m && !m->return_type.empty()) type = m->return_type;
-            }
-        }
+// what an expression the checker left untyped returns, as far as the defs tell: a literal,
+// Type.method(...), or a method on one of those (xs.size() in a view, whose receiver is a
+// field: an array's or a string's method, the same fallback to_webcc takes). "" when unknown
+static std::string untyped_result(Expression* e) {
+    if (dynamic_cast<StringLiteral*>(e)) return "string";
+    if (dynamic_cast<IntLiteral*>(e)) return "int32";
+    if (dynamic_cast<FloatLiteral*>(e)) return "float64";
+    if (dynamic_cast<BoolLiteral*>(e)) return "bool";
+    if (auto* call = dynamic_cast<FunctionCall*>(e)) {
+        size_t dot = call->name.rfind('.');
+        if (dot == std::string::npos) return "";
+        std::string owner = call->name.substr(0, dot), method = call->name.substr(dot + 1);
+        // xs.size() with xs a field of the component: the field's type owns the method
+        std::string field = call->receiver_type.empty() ? ComponentTypeContext::instance().get_symbol_type(owner) : call->receiver_type;
+        if (!field.empty() && field != "unknown")
+            owner = field.back() == ']' ? "array" : DefSchema::instance().resolve_alias(field);
+        const auto* m = DefSchema::instance().lookup_method(owner, method, call->args.size());
+        if (!m) m = DefSchema::instance().lookup_method(owner, method);
+        if (!m) return "";
+        const std::string& rt = m->return_type;
+        return rt == "T" || rt.rfind("T[", 0) == 0 ? "" : rt;
     }
+    if (auto* mc = dynamic_cast<MethodCall*>(e)) {
+        std::string t = mc->receiver_type == "unknown" ? "" : mc->receiver_type;
+        if (t.empty()) t = untyped_result(mc->receiver.get());
+        const auto* m = DefSchema::instance().lookup_method("", "", 0);
+        if (!t.empty()) m = DefSchema::instance().lookup_method(t.back() == ']' ? "array" : DefSchema::instance().resolve_alias(t), mc->method, mc->args.size());
+        else {
+            m = DefSchema::instance().lookup_method("string", mc->method, mc->args.size());
+            if (!m) m = DefSchema::instance().lookup_method("array", mc->method, mc->args.size());
+        }
+        if (!m) return "";
+        // an array's element type in its return (T, T[]) isn't known here
+        const std::string& rt = m->return_type;
+        return rt == "T" || rt.rfind("T[", 0) == 0 ? "" : rt;
+    }
+    return "";
+}
+
+std::string MethodCall::to_webcc() {
+    std::string type = receiver_type == "unknown" ? "" : receiver_type;
+    // System.getDateNow().toInt64() or xs.size().toInt64() in a view: the checker didn't type it, the defs say
+    if (type.empty()) type = untyped_result(receiver.get());
     std::string def_type = !type.empty() && type.back() == ']' ? "array" : DefSchema::instance().resolve_alias(type);
     std::string recv = typed_literal(receiver.get());
     if (dynamic_cast<StringLiteral*>(receiver.get()) && receiver->is_static())

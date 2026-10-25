@@ -1915,6 +1915,18 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
         }
         else
         {
+            // a shared def of the type itself, Math.round(x): its return type, so a method
+            // chained on the result (Math.round(x).toInt64()) knows what it's called on
+            if (own_method && !scope.count(obj_name))
+            {
+                const MethodDef *md = DefSchema::instance().lookup_method(obj_name, method_name);
+                if (md && md->is_shared)
+                {
+                    for (auto &a : func->args)
+                        infer_expression_type(a.value.get(), scope);
+                    return md->return_type.empty() ? "void" : normalize_type(md->return_type);
+                }
+            }
             if (!obj_name.empty() && scope.count(obj_name))
             {
                 std::string type = scope.at(obj_name);
