@@ -379,7 +379,16 @@ std::unique_ptr<Expression> Parser::parse_primary()
         {
             advance();
             std::string value_name = current().value;
-            expect(TokenType::IDENTIFIER, "Expected name after '::'");
+            // a word that's a keyword elsewhere (tick, view, style) is still a name after '::':
+            // a module may define a function called tick
+            bool word = !value_name.empty() && (std::isalpha((unsigned char)value_name[0]) || value_name[0] == '_');
+            for (char ch : value_name)
+                if (!std::isalnum((unsigned char)ch) && ch != '_')
+                    word = false;
+            if (word)
+                advance();
+            else
+                expect(TokenType::IDENTIFIER, "Expected name after '::'");
             
             // Check if this is a namespaced constructor call: Module::Type(...)
             if (current().type == TokenType::LPAREN && std::isupper(value_name[0]))

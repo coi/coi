@@ -1,0 +1,8 @@
+// a module function named like a keyword (tick) is called through its module
+module Clock;
+
+pub def tick() : int { return 80; }
+
+test "a function called tick, reached with Clock::" {
+    expect(Clock::tick() == 80);
+}
