@@ -1,13 +1,15 @@
 // a long press on a row of a scrolling list: held, then its moves drag instead of scrolling,
-// and no click on release. A quick swipe still scrolls, a tap still clicks
+// and no click on release. A quick swipe still scrolls, a tap still clicks. The press re-renders
+// the list (presses shows), so the rows are morphed with the finger still down
 component PointerHold {
     mut string held = "-";
     mut int dragMoves = 0;
     mut bool holding = false;
     mut int clicks = 0;
+    mut int presses = 0;
     mut int[] rows = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
-    def press(PointerEvent e) : void { holding = false; }
+    def press(PointerEvent e) : void { holding = false; presses++; }
     def hold(int row, PointerEvent e) : void { held = `${row} ${e.y.toInt()}`; holding = true; dragMoves = 0; }
     def move(PointerEvent e) : void { if (holding) dragMoves++; }
     def up(PointerEvent e) : void { holding = false; }
@@ -25,6 +27,7 @@ component PointerHold {
             <p class="held">{held}</p>
             <p class="dragmoves">{dragMoves}</p>
             <p class="clicks">{clicks}</p>
+            <p class="presses">{presses}</p>
         </div>
     }
 }
