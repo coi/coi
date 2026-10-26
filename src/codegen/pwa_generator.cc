@@ -209,8 +209,14 @@ void generate_pwa_files(const fs::path &out_dir, const AppConfig &config)
     for (const auto &f : files)
         s << ", './" << url_path(f) << "'";
     s << "];\n";
-    s << R"JS(self.addEventListener('install', (e) => {
-    e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES.map((f) => new Request(f, { cache: 'reload' })))).then(() => self.skipWaiting()));
+    // a host may answer "x/index.html" with a redirect to "x" or "x/": the copy kept is the
+    // page the redirect led to, as a fresh response, since a page load refuses a redirected one
+    s << R"JS(const keep = (c, f) => fetch(new Request(f, { cache: 'reload' })).then((res) => {
+    if (!res.ok) throw new Error(f + ': ' + res.status);
+    return c.put(f, res.redirected ? new Response(res.body, { status: res.status, statusText: res.statusText, headers: res.headers }) : res);
+});
+self.addEventListener('install', (e) => {
+    e.waitUntil(caches.open(CACHE).then((c) => Promise.all(FILES.map((f) => keep(c, f)))).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', (e) => {
     e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k.startsWith('coi-') && k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
