@@ -635,6 +635,11 @@ void Parser::parse_app()
             app_config.base = current().value;
             expect(TokenType::STRING_LITERAL, "Expected string");
         }
+        else if (key == "start")
+        {
+            app_config.start = current().value;
+            expect(TokenType::STRING_LITERAL, "Expected string");
+        }
         else if (key == "pwa")
         {
             if (current().type == TokenType::TRUE)

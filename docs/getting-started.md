@@ -253,6 +253,7 @@ app {
 | `lang` | String | No | Sets the `<html lang="">` attribute (default: `"en"`) |
 | `base` | String | No | Deploy base path, emitted as `<base href="">` (default: `"/"`) |
 | `pwa` | `true` / `false` | No | Generates a manifest and a service worker so the app can be installed and starts offline, see [Installable and offline](#installable-and-offline) |
+| `start` | `"/app"` | No | Where the installed app opens (the manifest's `start_url`): a site with a start page in front of an app opens on the app. The `base` by default |
 | `icon` | String | No | Path in the build output, e.g. `"assets/icon.png"`. Used as favicon and app icon |
 | `theme` | String | No | CSS color for the browser's UI (address bar, title bar of the installed app). `System.setThemeColor` changes it at runtime, e.g. for a dark theme |
 | `titlebar` | `system` / `overlay` | No | `overlay` lets the installed app draw into its title bar, see [Your own title bar](#your-own-title-bar) |
@@ -265,7 +266,7 @@ app {
 `prerender = true;` renders every page to HTML at build time, so it shows at once and search engines and link previews can read it. When the app has loaded, it hydrates the page.
 
 - Every static route of the root's `router` is rendered (`"/"` without one): `"/"` into `index.html`, `"/about"` into `about/index.html`. Routes with parameters aren't.
-- Browser-only calls (storage, fetch, canvas) return nothing at build time; the app fills those parts in when it hydrates.
+- Browser-only calls (storage, fetch, canvas) return nothing at build time; the app fills those parts in when it hydrates. `System.isPrerender()` is `true` then, and `System.navigate` does nothing: a page is the page at its path, so a mount that sends a signed-out visitor to `/login` renders its own screen at build and redirects in the browser.
 - `coi dev` doesn't prerender.
 - A `"/app/*"` route gets one page, `app/index.html`, which a host serves for every path under it (the generated service worker and `coi dev` do). `prerender = ["/app/note"];` renders more pages under such a route: the app runs with that pathname, so it can render that screen's frame (an empty note) for `/app/note/<id>` links. A page served for a path outside its own route hides its markup until the app has taken over.
 

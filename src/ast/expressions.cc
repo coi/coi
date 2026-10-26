@@ -94,6 +94,9 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
     if (intrinsic_name == "is_hidden" && args.empty()) {
         return "(webcc::system::is_hidden() != 0)";
     }
+    if (intrinsic_name == "is_prerender" && args.empty()) {
+        return "(webcc::system::is_prerender() != 0)";
+    }
     
     if (intrinsic_name == "json_stringify" && args.size() == 1)
         return "__coi_json_stringify(" + typed_literal(args[0].value.get()) + ")";

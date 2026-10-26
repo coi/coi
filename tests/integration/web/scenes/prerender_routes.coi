@@ -49,6 +49,14 @@ component Docs {
     view { <p class="at">{at}</p> }
 }
 
+// a mount that redirects (a signed-out visitor to a login, say): at build the page stays its own,
+// in the browser the redirect happens
+component Gate {
+    mut string mode = "";
+    mount { mode = System.isPrerender() ? "build" : "live"; System.navigate("/tool"); }
+    view { <p class="gate">{mode}</p> }
+}
+
 // a route whose whole view is a child with an <if> on a prop: its root is the child's
 component Panel(bool on) { view { <section class="panel"><if on><p class="shown">on</p></if></section> } }
 component Wrapped { view { <Panel on={true} /> } }
@@ -60,6 +68,7 @@ component PrerenderRoutes {
         "/sketch" => Sketch;
         "/docs/*" => Docs;
         "/wrapped" => Wrapped;
+        "/gate" => Gate;
     }
     view { <div class="site"><route /></div> }
 }

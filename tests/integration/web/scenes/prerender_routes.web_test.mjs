@@ -39,6 +39,12 @@ export async function run({ page, expect }) {
   await page.waitForFunction(() => !document.querySelector("[data-hydrate]"));
   await expect.ok(await page.locator(".panel").count() === 1 && await page.locator(".shown").count() === 1, "child-rooted route doubled or missing");
 
+  // a mount that navigates away: the page rendered at build is its own, the browser redirects
+  const gate = await (await page.request.get(root + "gate/")).text();
+  await expect.ok(gate.includes('<p class="gate">build</p>'), "a page whose mount redirects was rendered as the redirect's target");
+  await page.goto(root + "gate/");
+  await page.waitForFunction(() => location.pathname === "/tool" || location.pathname === "/tool/");
+
   // a folder route, with its trailing slash
   await page.goto(root + "tool/");
   await page.waitForFunction(() => !document.querySelector("[data-hydrate]"));

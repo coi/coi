@@ -946,7 +946,8 @@ template<typename V, typename F> inline V coi_filter(const V& v, F pred) {
 
     if (features.router)
     {
-        out << "void g_app_navigate(const coi::string& route) { if (app) app->navigate(route); }\n";
+        // at build time a page is the page at its path: a redirect in a mount (to a login, say) waits for the browser
+        out << "void g_app_navigate(const coi::string& route) { if (app && !webcc::system::is_prerender()) app->navigate(route); }\n";
         out << "coi::string g_app_get_route() { return app ? app->_current_route : \"\"; }\n";
     }
     else

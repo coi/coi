@@ -110,6 +110,8 @@ struct AppConfig {
     bool tick_on_demand = false;
     // manifest + service worker
     bool pwa = false;
+    // where the installed app opens (the manifest's start_url), under base; base itself by default
+    std::string start;
     // favicon and manifest icon, relative to the output dir
     std::string icon;
     // theme-color

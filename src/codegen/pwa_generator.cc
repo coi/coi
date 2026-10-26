@@ -131,7 +131,7 @@ void generate_pwa_files(const fs::path &out_dir, const AppConfig &config)
         m << "  \"description\": " << json_str(config.description) << ",\n";
     m << "  \"lang\": " << json_str(config.lang.empty() ? "en" : config.lang) << ",\n";
     m << "  \"id\": " << json_str(base) << ",\n";
-    m << "  \"start_url\": " << json_str(base) << ",\n";
+    m << "  \"start_url\": " << json_str(config.start.empty() ? base : config.start) << ",\n";
     m << "  \"scope\": " << json_str(base) << ",\n";
     m << "  \"display\": \"standalone\",\n";
     // where it's supported (desktop Chrome and Edge) the page gets the title bar; elsewhere standalone

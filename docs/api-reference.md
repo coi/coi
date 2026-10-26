@@ -356,6 +356,7 @@ Logging, page title, time, and URL navigation.
 | `System.getTimezoneOffsetAt(float64 ms)` | The same offset at that instant (daylight saving time). `Date.format` uses it |
 | `System.getVisibilityState()` | Get document visibility state (`"visible"`, `"hidden"`, etc.) |
 | `System.isHidden()` | Check if document is hidden (`true` hidden, `false` visible) |
+| `System.isPrerender()` | `true` while the page is rendered at build time (`app.prerender`), `false` in a browser: for what only makes sense live, like a redirect that depends on storage |
 
 ### Example
 
