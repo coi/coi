@@ -233,7 +233,8 @@ self.addEventListener('fetch', (e) => {
     };
     // lazy/ files: cached on first fetch
     const lazy = (c) => fetch(req).then((res) => { if (res.ok) c.put(req, res.clone()); return res; });
-    e.respondWith(caches.open(CACHE).then((c) => c.match(req).then((hit) => hit || (req.mode === 'navigate' ? page(c) : undefined))
+    // a page asked for with a query ("checkout.html?account=…") is the same built file
+    e.respondWith(caches.open(CACHE).then((c) => c.match(req, { ignoreSearch: req.mode === 'navigate' }).then((hit) => hit || (req.mode === 'navigate' ? page(c) : undefined))
         .then((hit) => hit || (/\/lazy\//.test(new URL(req.url).pathname) ? lazy(c) : fetch(req)))));
 });
 )JS";
