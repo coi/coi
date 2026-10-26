@@ -1,0 +1,18 @@
+// Test: the service worker looked for a newer version, and a new one taking over heard as a signal
+component Updates {
+    mut bool fresh = false;
+
+    def check() : void { System.updateServiceWorker(); }
+
+    listen {
+        System.controllerChange => (uint8 controlled) { fresh = controlled == 1; }
+    }
+
+    view {
+        <button onclick={check}>{fresh ? "new version" : "look for one"}</button>
+    }
+}
+
+app {
+    root = Updates;
+}
