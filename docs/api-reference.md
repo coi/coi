@@ -1092,6 +1092,7 @@ component Editor {
 | `System.onPageHide` / `onPageShow` | `uint8 persisted` |
 | `System.onOnline` | `uint8 online` |
 | `System.onPointerUp` | `PointerUpEvent` (`pointerId`, `pointerType`, `x`, `y`): a pointer let go anywhere, cancel included |
+| `System.controllerChange` | `(uint8 controlled)`: the page's service worker changed. `1` the first one took the page (a first visit), `2` a newer build's worker took over (the page still runs the old build; a reload gets the new one), `0` none. `System.updateServiceWorker()` asks for a look for a newer build now |
 | `System.onWindowResize` | `WindowResizeEvent` (`width`, `height`, `dpr`): once at the start, then on every change |
 | `System.onPageScroll` | `PageScrollEvent` (`left`, `top`): the page's own scroll |
 | `System.onPageClick` | `PageClickEvent` (`x`, `y`): a click anywhere on the page |
