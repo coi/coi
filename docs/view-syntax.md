@@ -195,7 +195,10 @@ component Sketch {
 | `onscroll` | `ScrollEvent` | The element's `left` and `top` scroll offsets, at most once per frame; scrolling itself is never delayed |
 | `onfocus`, `onblur` | nothing | |
 | `onclicktarget` | `(DOMElement target, float x, float y, Mods mods)` | Any click inside the element, with the element actually clicked (a line of an editor, a link), where on it in its own px, and the modifier keys. For a plain button use `onclick` |
+| `onpresstarget` | `(DOMElement target, float x, float y, Mods mods)` | The same for a press (pointer down). What the handler changes is in place before the browser acts on the press with focus and text selection |
 | `ondrop` | `(Blob data, string name, string mime, float x, float y, int index, int count)` | One call per dropped file. No pod, since `Blob` is a handle |
+
+An `onclicktarget` or `onpresstarget` handler may return `bool`: `true` cancels the browser's own action for that click or press, as `preventDefault()` does in JavaScript (a link clicked isn't followed), `false` lets it happen. A handler for any other event returns nothing.
 
 Written as a call, these handlers too take their own arguments first and the event after them: in a loop, `onpointerheld={grab(row)}` calls `def grab(int row, PointerEvent e)`.
 

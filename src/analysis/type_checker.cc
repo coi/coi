@@ -3946,6 +3946,11 @@ void validate_view_hierarchy(const std::vector<Component> &components,
                             if (!err.empty())
                                 throw std::runtime_error(err + " at line " + std::to_string(el->line));
                         }
+                        // returning bool says whether the browser's own action is cancelled
+                        if (handler->return_type == "bool" && !SchemaEventSpec::parse(ev->mapping_value).cancel)
+                            throw std::runtime_error("'" + attr.name + "' handler '" + id->name +
+                                                     "' returns bool, but this event can't be cancelled; make it return nothing at line " +
+                                                     std::to_string(el->line));
                     }
                     continue;
                 }

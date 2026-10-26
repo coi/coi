@@ -1,0 +1,6 @@
+// only a click or press target handler can cancel the browser's action; a pointer handler returns nothing
+component App {
+    def down(PointerEvent e) : bool { return true; }
+    view { <div onpointerdown={down}>x</div> }
+}
+app { root = App; }

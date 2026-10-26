@@ -348,7 +348,7 @@ Logging, page title, time, and URL navigation.
 | `System.setTitle(string title)` | Set page title |
 | `System.setThemeColor(string color)` | Set the browser's UI color (address bar, the installed app's title bar) |
 | `System.reload()` | Reload the page |
-| `System.openUrl(string url)` | Open URL in new tab |
+| `System.openUrl(string url)` | Open URL in a new tab, with no way back to this page (noopener) |
 | `System.navigate(string path)` | Navigate to route (client-side routing) |
 | `System.getTime()` | Milliseconds since the page started loading (float64, `performance.now()`) |
 | `System.getDateNow()` | Get milliseconds since epoch, UTC (float64) |

@@ -711,6 +711,14 @@ void HTMLElement::generate_code(ViewCodegenContext& ctx)
             PerEvent &pe = events[spec->type];
             pe.spec = spec;
             std::string call = view_event_call(attr, *spec);
+            // a handler of a cancellable event that returns true: the browser does nothing more with it
+            if (SchemaEventSpec::parse(spec->method->mapping_value).cancel)
+            {
+                auto *fc = dynamic_cast<FunctionCall *>(attr.value.get());
+                auto *sig = ComponentTypeContext::instance().get_method_signature(fc ? fc->name : attr.value->raw_name());
+                if (sig && sig->return_type == "bool")
+                    call = "if (" + call + ") webcc::dom::prevent_default()";
+            }
             if (spec->phase.empty())
                 pe.whole = call + ";";
             else

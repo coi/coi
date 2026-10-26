@@ -20,6 +20,8 @@
 //   name +events              - optional callback per event of the returned handle
 //   name +events(A, B)        - only the listed events
 //   name +listen(A, B) p=v    - turns on view attributes for A, B; p=v sets a param
+//   name +listen(A) +cancel   - the listener cancels the browser's action when the handler says so
+//                               (webcc's prevent_default during the update), so a handler may return bool
 //   @cleanup("ns::func")      - run on owned members on destroy
 // Loaded from src/tools/schema_whitelist.def at runtime
 //
@@ -39,6 +41,7 @@ struct ListenEntry
 {
     std::vector<std::string> events;              // event names it turns on
     std::map<std::string, std::string> overrides; // param -> value Coi passes
+    bool cancel = false;                          // +cancel
 };
 static std::map<std::string, ListenEntry> LISTENS; // ns::func -> events it turns on
 
@@ -122,7 +125,7 @@ bool load_whitelist(const std::string &path)
             }
             else
             {
-                // Function name, then modifiers: +events, +events(A, B), +listen(A, B), p=v
+                // Function name, then modifiers: +events, +events(A, B), +listen(A, B), +cancel, p=v
                 std::istringstream ls(line);
                 std::string fn, word;
                 ls >> fn;
@@ -155,6 +158,8 @@ bool load_whitelist(const std::string &path)
                     std::string args = open == std::string::npos ? "" : mod.substr(open + 1, mod.size() - open - 2);
                     if (mod.rfind("+events", 0) == 0)
                         FACTORY_EVENTS[key] = list_of(args); // empty = every event
+                    else if (mod == "+cancel")
+                        LISTENS[key].cancel = true;
                     else if (mod.rfind("+listen", 0) == 0)
                         LISTENS[key].events = list_of(args);
                     else if (mod.find('=') != std::string::npos)
@@ -375,7 +380,7 @@ void emit_event_pods(std::ostream &out, const webcc::SchemaDefs &defs, const std
     }
 }
 
-// " listen:func(param:Type=value,...)", "" if nothing turns it on
+// " listen:func(param:Type=value,...)" (and " cancel"), "" if nothing turns it on
 std::string event_listen_token(const webcc::SchemaDefs &defs, const webcc::SchemaEvent &e)
 {
     for (const auto &[key, entry] : LISTENS)
@@ -416,12 +421,12 @@ std::string event_listen_token(const webcc::SchemaDefs &defs, const webcc::Schem
                 exit(1);
             }
         }
-        return " listen:" + fn + "(" + args + ")";
+        return " listen:" + fn + "(" + args + ")" + (entry.cancel ? " cancel" : "");
     }
     return "";
 }
 
-// @event("ns::NAME key fields [last] [pod:P] [listen:f(...)]"); key is "-" for a page-wide event
+// @event("ns::NAME key fields [last] [pod:P] [listen:f(...)] [cancel]"); key is "-" for a page-wide event
 std::string event_annotation(const webcc::SchemaDefs &defs, const webcc::SchemaEvent &e)
 {
     size_t first = first_field(defs, e);

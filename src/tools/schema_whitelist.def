@@ -44,7 +44,9 @@ get_caret_offset
 insert_at_text_offset
 closest
 contains
-add_click_target_listener +listen(CLICK_TARGET)
+# a handler returning true: the browser does nothing more with the click or press (a link isn't followed)
+add_click_target_listener +listen(CLICK_TARGET) +cancel
+add_press_target_listener +listen(PRESS_TARGET) +cancel
 add_class
 remove_class
 get_attribute

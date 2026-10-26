@@ -63,6 +63,7 @@ struct SchemaEventSpec
     };
     std::string listen;
     std::vector<ListenParam> listen_params;
+    bool cancel = false; // a handler returning true cancels the browser's own action
 
     static SchemaEventSpec parse(const std::string &value);
     std::string struct_name() const; // webcc's C++ struct: ns::NameEvent

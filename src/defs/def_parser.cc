@@ -799,6 +799,8 @@ SchemaEventSpec SchemaEventSpec::parse(const std::string &value)
     {
         if (tokens[i] == "last")
             s.last = true;
+        else if (tokens[i] == "cancel")
+            s.cancel = true;
         else if (tokens[i].rfind("pod:", 0) == 0)
             s.pod = tokens[i].substr(4);
         else if (tokens[i].rfind("listen:", 0) == 0)

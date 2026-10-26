@@ -1,15 +1,27 @@
-// a contenteditable's own nodes: the clicked one (onclicktarget), the caret's (getSelectionAnchor),
-// closest/contains on them, classes set on them, exists on call results
+// a contenteditable's own nodes: the clicked one (onclicktarget), the pressed one (onpresstarget),
+// the caret's (getSelectionAnchor), closest/contains on them, classes set on them, exists on call
+// results; a press on a link makes the editor read-only for it, so it takes no focus, and
+// the click handler returning true keeps the browser from following the link
 component App {
     mut DOMElement ed;
     mut string log = "";
+    mut string press = "";
+    mut bool still = false;     // a link was pressed: not editable until its click
 
-    def clicked(DOMElement t, float x, float y, Mods m) : void {
+    def pressed(DOMElement t, float x, float y, Mods m) : void {
+        DOMElement a = t.closest("a[href]");
+        still = a.exists() && ed.contains(a) == 1;
+        press = `${t.getProperty("tagName")} ${(m & Mods.Ctrl) != 0 ? "ctrl" : "plain"}`;
+    }
+
+    def clicked(DOMElement t, float x, float y, Mods m) : bool {
+        still = false;
         DOMElement li = t.closest("li");
-        if (!li.exists() || ed.contains(li) == 0) { log = "outside"; return; }
+        if (!li.exists() || ed.contains(li) == 0) { log = "outside"; return false; }
         if (li.getProperty("className").contains("done")) li.removeClass("done");
         else li.addClass("done");
         log = `${t.getProperty("tagName")} ${x < 30.0 ? "left" : "right"} ${(m & Mods.Shift) != 0 ? "shift" : "plain"}`;
+        return t.closest("a[href]").exists();
     }
 
     def where() : void {
@@ -18,13 +30,14 @@ component App {
         log = `${inEd} ${a.closest("b").exists() ? "bold" : "plain"} [${Dom.getSelectionText()}]`;
     }
 
-    mount { ed.setInnerHtml("<ul><li id=\"one\">one</li><li id=\"two\">two <b id=\"b\">bold</b></li></ul>"); }
+    mount { ed.setInnerHtml("<ul><li id=\"one\">one</li><li id=\"two\">two <b id=\"b\">bold</b></li><li id=\"three\"><a id=\"ln\" href=\"#followed\">link</a></li></ul>"); }
 
     view {
         <div>
-            <div &={ed} class="ed" contenteditable="true" onclicktarget={clicked}></div>
+            <div &={ed} class="ed" contenteditable={still ? "false" : "true"} onclicktarget={clicked} onpresstarget={pressed}></div>
             <button class="where" onclick={where}>where</button>
             <p class="log">{log}</p>
+            <p class="press">{press}</p>
         </div>
     }
 }
