@@ -31,4 +31,8 @@ export async function run({ page }) {
   await page.evaluate(() => getSelection().removeAllRanges());
   await page.locator(".where").dispatchEvent("click");
   await expect("out plain []");
+
+  // the span under the cover, and nothing outside the element
+  await page.locator(".probe").dispatchEvent("click");
+  await expect("deep none");
 }

@@ -496,6 +496,7 @@ Reference handle for browser APIs and measurements.
 | `scrollToTop()` | Scroll element to top |
 | `exists()` | `false` for the "no element" handle (see below) |
 | `closest(selector)` | The element or its nearest ancestor matching the selector; the "no element" handle when none |
+| `elementAt(x, y)` | The innermost element of this one under a point in its own px, measured from where it is on screen, even with something drawn over it there (a canvas on top); "no element" outside it |
 | `contains(other)` | `1` when `other` is the element or inside it |
 | `getAttribute(name)`, `getProperty(name)`, `setProperty(name, value)`, `setStyle(name, value)` | Read and write an element |
 | `addClass(cls)`, `removeClass(cls)` | Toggle a class on an element the page made itself (typed into an editor, set by `setInnerHtml`) |
@@ -506,7 +507,7 @@ Reference handle for browser APIs and measurements.
 
 ### The "no element" handle
 
-A `DOMElement` is a value, not a reference: it names an element in the page, and there is one value that names none. Lookups that can miss (`closest`, `getSelectionAnchor`, `DOMElement.getElementById`) return it, and a freshly declared `DOMElement` holds it. There is no null in Coi; this is an ordinary value like `""` or `[]`, and calling a method on it does nothing (webcc logs a warning). `exists()` tells the two apart. As with every condition in Coi, that check is explicit: a handle is not a `bool`, so `if (el)` is an error and `if (el.exists())` is how it is written.
+A `DOMElement` is a value, not a reference: it names an element in the page, and there is one value that names none. Lookups that can miss (`closest`, `elementAt`, `getSelectionAnchor`, `DOMElement.getElementById`) return it, and a freshly declared `DOMElement` holds it. There is no null in Coi; this is an ordinary value like `""` or `[]`, and calling a method on it does nothing (webcc logs a warning). `exists()` tells the two apart. As with every condition in Coi, that check is explicit: a handle is not a `bool`, so `if (el)` is an error and `if (el.exists())` is how it is written.
 
 ```tsx
 // the list item under the caret, if the caret is in this editor

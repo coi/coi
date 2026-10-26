@@ -1,17 +1,19 @@
 // a contenteditable's own nodes: the clicked one (onclicktarget), the pressed one (onpresstarget),
 // the caret's (getSelectionAnchor), closest/contains on them, classes set on them, exists on call
 // results; a press on a link makes the editor read-only for it, so it takes no focus, and
-// the click handler returning true keeps the browser from following the link
+// the click handler returning true keeps the browser from following the link; elementAt finds the
+// element under a point through a cover drawn over it
 component App {
     mut DOMElement ed;
+    mut DOMElement under;
     mut string log = "";
     mut string press = "";
     mut bool still = false;     // a link was pressed: not editable until its click
 
-    def pressed(DOMElement t, float x, float y, Mods m) : void {
+    def pressed(DOMElement t, float x, float y, Mods m, PointerType p) : void {
         DOMElement a = t.closest("a[href]");
         still = a.exists() && ed.contains(a) == 1;
-        press = `${t.getProperty("tagName")} ${(m & Mods.Ctrl) != 0 ? "ctrl" : "plain"}`;
+        press = `${t.getProperty("tagName")} ${(m & Mods.Ctrl) != 0 ? "ctrl" : "plain"}${p == PointerType::Mouse ? "" : " not a mouse"}`;
     }
 
     def clicked(DOMElement t, float x, float y, Mods m) : bool {
@@ -22,6 +24,12 @@ component App {
         else li.addClass("done");
         log = `${t.getProperty("tagName")} ${x < 30.0 ? "left" : "right"} ${(m & Mods.Shift) != 0 ? "shift" : "plain"}`;
         return t.closest("a[href]").exists();
+    }
+
+    def probe() : void {
+        DOMElement inner = under.elementAt(6.0, 6.0);
+        DOMElement outside = under.elementAt(500.0, 6.0);
+        log = `${inner.getProperty("id")} ${outside.exists() ? "found" : "none"}`;
     }
 
     def where() : void {
@@ -36,6 +44,11 @@ component App {
         <div>
             <div &={ed} class="ed" contenteditable={still ? "false" : "true"} onclicktarget={clicked} onpresstarget={pressed}></div>
             <button class="where" onclick={where}>where</button>
+            <div style="position:relative;width:120px;height:40px">
+                <div &={under} id="under" style="width:120px;height:40px"><span id="deep">deep</span></div>
+                <div style="position:absolute;inset:0;background:rgba(0,0,0,.1)"></div>
+            </div>
+            <button class="probe" onclick={probe}>probe</button>
             <p class="log">{log}</p>
             <p class="press">{press}</p>
         </div>

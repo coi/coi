@@ -1,6 +1,6 @@
 // a click or press target handler returning true cancels the browser's own action
 component App {
-    def pressed(DOMElement t, float x, float y, Mods m) : bool { return t.closest("a[href]").exists(); }
+    def pressed(DOMElement t, float x, float y, Mods m, PointerType p) : bool { return t.closest("a[href]").exists(); }
     def clicked(DOMElement t, float x, float y, Mods m) : bool { return false; }
     view { <div onpresstarget={pressed} onclicktarget={clicked}>x</div> }
 }
