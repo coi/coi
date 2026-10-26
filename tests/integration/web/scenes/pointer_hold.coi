@@ -1,0 +1,32 @@
+// a long press on a row of a scrolling list: held, then its moves drag instead of scrolling,
+// and no click on release. A quick swipe still scrolls, a tap still clicks
+component PointerHold {
+    mut string held = "-";
+    mut int dragMoves = 0;
+    mut bool holding = false;
+    mut int clicks = 0;
+    mut int[] rows = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
+    def press(PointerEvent e) : void { holding = false; }
+    def hold(int row, PointerEvent e) : void { held = `${row} ${e.y.toInt()}`; holding = true; dragMoves = 0; }
+    def move(PointerEvent e) : void { if (holding) dragMoves++; }
+    def up(PointerEvent e) : void { holding = false; }
+    def click() : void { clicks++; }
+
+    view {
+        <div>
+            <div class="list" style="height:120px;overflow:auto">
+                <for row in rows key={row}>
+                    <div class={`row row${row}`} style="height:40px" onclick={click}
+                         onpointerdown={press} onpointerheld={hold(row)} onpointermove={move} onpointerup={up}
+                         pointerflags={PointerFlags.Hold}>row {row}</div>
+                </for>
+            </div>
+            <p class="held">{held}</p>
+            <p class="dragmoves">{dragMoves}</p>
+            <p class="clicks">{clicks}</p>
+        </div>
+    }
+}
+
+app { root = PointerHold; }

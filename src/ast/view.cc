@@ -190,11 +190,19 @@ static std::string build_lambda_call(FunctionCall *func_call)
 
 // Build minimal lambda capture: [this] outside loops, [this, var] inside loops.
 // handler body for a webcc event attribute
+// a handler written as a call gets the event after its own arguments, as oninput={typed(i)}
+// gets the value: onpointerdown={grab(row)} calls grab(row, e) when grab takes the event too
 static std::string view_event_call(const HTMLAttribute &attr, const ViewEventAttr &spec)
 {
-    if (dynamic_cast<FunctionCall *>(attr.value.get()))
-        return attr.value->to_webcc();
-    return generate_event_call(*spec.method, "DOMElement", attr.value->raw_name(), "_e");
+    auto *call = dynamic_cast<FunctionCall *>(attr.value.get());
+    if (!call)
+        return generate_event_call(*spec.method, "DOMElement", attr.value->raw_name(), "_e");
+    std::string code = attr.value->to_webcc();
+    auto *sig = ComponentTypeContext::instance().get_method_signature(call->name);
+    if (!sig || sig->param_types.size() <= call->args.size())
+        return code;
+    std::string rest = event_call_args(*spec.method, "DOMElement", call->name, call->args.size(), "_e");
+    return call_with_last_arg(code, rest);
 }
 
 static std::string build_lambda_capture(const std::string &loop_var_name)

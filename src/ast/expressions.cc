@@ -346,23 +346,21 @@ static SplitArgs split_call_args(const MethodDef& method, const std::vector<Call
     return out;
 }
 
-// handler may take fewer params than the event has fields
-std::string generate_event_call(const MethodDef& event_method, const std::string& handle_type,
-                                const std::string& callback, const std::string& evt) {
+// the event as a handler's arguments from its param `skip` on: the event's pod when that one
+// param takes it, else its fields in order, as many as the params left (fewer is fine)
+std::string event_call_args(const MethodDef& event_method, const std::string& handle_type,
+                            const std::string& callback, size_t skip, const std::string& evt) {
     SchemaEventSpec spec = SchemaEventSpec::parse(event_method.mapping_value);
     std::vector<std::string> field_types;
     for (const auto& p : event_method.params)
         if (is_callback_param(p)) field_types = callback_param_types(p.type);
-    int n = ComponentTypeContext::instance().get_method_param_count(callback);
+    auto* sig = ComponentTypeContext::instance().get_method_signature(callback);
+    int n = sig ? (int)sig->param_types.size() - (int)skip : ComponentTypeContext::instance().get_method_param_count(callback);
     if (n < 0 || n > (int)spec.fields.size()) n = (int)spec.fields.size();
-    // whole event as one pod
-    bool as_pod = false;
-    if (!spec.pod.empty()) {
-        auto* sig = ComponentTypeContext::instance().get_method_signature(callback);
-        as_pod = sig && sig->param_types.size() == 1 && DefSchema::instance().resolve_alias(sig->param_types[0]) == spec.pod;
-    }
+    bool as_pod = !spec.pod.empty() && sig && sig->param_types.size() == skip + 1 &&
+                  DefSchema::instance().resolve_alias(sig->param_types[skip]) == spec.pod;
     if (as_pod) n = (int)spec.fields.size();
-    std::string code = "this->" + cpp_name(callback) + "(";
+    std::string code;
     if (as_pod) code += spec.pod + "{";
     for (int i = 0; i < n; i++) {
         if (i) code += ", ";
@@ -373,10 +371,15 @@ std::string generate_event_call(const MethodDef& event_method, const std::string
         else code += from_webcc_value(f, ft);
     }
     if (as_pod) code += "}";
-    code += ")";
     std::string full = "webcc::" + spec.struct_name();
     g_used_events[spec.ns + "::" + spec.name] = {spec.ns, spec.name, spec.key, full, handle_type, spec.last};
     return code;
+}
+
+// handler may take fewer params than the event has fields
+std::string generate_event_call(const MethodDef& event_method, const std::string& handle_type,
+                                const std::string& callback, const std::string& evt) {
+    return "this->" + cpp_name(callback) + "(" + event_call_args(event_method, handle_type, callback, 0, evt) + ")";
 }
 
 // page-wide event, turned on with the +listen values

@@ -189,13 +189,15 @@ component Sketch {
 | Attribute | Handler takes | Notes |
 |-----------|---------------|-------|
 | `onpointer` | `PointerEvent` | Every pointer event; `e.phase` says which |
-| `onpointerdown`, `onpointermove`, `onpointerup`, `onpointercancel`, `onpointerpredicted` | `PointerEvent` | One phase each. Cancel means the browser took over (e.g. a touch became a scroll): not a finished stroke |
+| `onpointerdown`, `onpointermove`, `onpointerup`, `onpointercancel`, `onpointerpredicted`, `onpointerheld` | `PointerEvent` | One phase each. Cancel means the browser took over (e.g. a touch became a scroll): not a finished stroke |
 | `onwheel` | `WheelEvent` | The page doesn't scroll or zoom while over the element. A trackpad pinch has `Mods.Ctrl` set. `wheelflags={WheelFlags.ZoomOnly}` keeps normal scrolling and only takes ctrl/meta wheel and pinches |
 | `onresize` | `ResizeEvent` | Once when the element appears, then on every size or pixel-ratio change |
 | `onscroll` | `ScrollEvent` | The element's `left` and `top` scroll offsets, at most once per frame; scrolling itself is never delayed |
 | `onfocus`, `onblur` | nothing | |
 | `onclicktarget` | `(DOMElement target, float x, float y, Mods mods)` | Any click inside the element, with the element actually clicked (a line of an editor, a link), where on it in its own px, and the modifier keys. For a plain button use `onclick` |
 | `ondrop` | `(Blob data, string name, string mime, float x, float y, int index, int count)` | One call per dropped file. No pod, since `Blob` is a handle |
+
+Written as a call, these handlers too take their own arguments first and the event after them: in a loop, `onpointerheld={grab(row)}` calls `def grab(int row, PointerEvent e)`.
 
 **Pointer flags.** By default the pointer is captured, so `onpointerup` arrives even when it's released outside the element. A drawing surface wants more, and sets `pointerflags`:
 
@@ -205,6 +207,7 @@ component Sketch {
 | `PointerFlags.Coalesced` | Report every move sample, not one per frame: smoother fast strokes |
 | `PointerFlags.NoScroll` | Touch and pen don't scroll the page or select text, and a tap doesn't take focus away |
 | `PointerFlags.Predict` | Also report predicted samples (`onpointerpredicted`), to draw ahead of the pen |
+| `PointerFlags.Hold` | A finger held still for 500 ms reports `onpointerheld`, then stops scrolling the page so it can drag; no callout, context menu or click after it |
 
 A misspelled event attribute is a compile error that lists the real ones.
 

@@ -6,6 +6,8 @@ struct MethodDef;
 // this->callback(...) for a webcc event in evt
 std::string generate_event_call(const MethodDef& event_method, const std::string& handle_type,
                                 const std::string& callback, const std::string& evt);
+std::string event_call_args(const MethodDef& event_method, const std::string& handle_type,
+                            const std::string& callback, size_t skip, const std::string& evt);
 
 struct IntLiteral : Expression {
     int64_t value;
