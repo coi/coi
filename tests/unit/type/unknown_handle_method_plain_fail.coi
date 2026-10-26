@@ -1,0 +1,11 @@
+// a method nothing has: Coi says so, not the C++ compiler
+component App {
+    mut Canvas c;
+    mount {
+        c = Canvas.createCanvas("x", 10.0, 10.0);
+        c.fillRect(0.0, 0.0, 1.0, 1.0);
+    }
+    view { <div></div> }
+}
+
+app { root = App; }

@@ -1,0 +1,12 @@
+// drawImageScaled is the 2D context's, not the canvas's; the same name on another type doesn't count
+component App {
+    mut Canvas c;
+    mut Image img;
+    mount {
+        c = Canvas.createCanvas("x", 10.0, 10.0);
+        c.drawImageScaled(img, 0.0, 0.0, 10.0, 10.0);
+    }
+    view { <div></div> }
+}
+
+app { root = App; }

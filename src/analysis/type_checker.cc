@@ -1729,6 +1729,13 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                 }
                 else if (md)
                     own_method = true;
+                // a value of a browser type: the method is its own or doesn't exist, never one
+                // of another type that happens to share the name
+                else if (scope.count(obj_name) && DefSchema::instance().is_handle(owner))
+                {
+                    ErrorHandler::type_error("'" + owner + "' has no method '" + method_name + "'", func->line);
+                    exit(1);
+                }
             }
         }
         if (!entry && !own_method)
