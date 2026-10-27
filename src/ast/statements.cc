@@ -378,8 +378,11 @@ static std::string emit_expect(FunctionCall *call)
     auto *cmp = dynamic_cast<BinaryOp *>(cond);
     if (cmp && (cmp->op == "==" || cmp->op == "!=" || cmp->op == "<" || cmp->op == ">" || cmp->op == "<=" || cmp->op == ">="))
     {
-        return "{ auto&& _l = " + comparison_side(cmp->left.get()) + "; auto&& _r = " + comparison_side(cmp->right.get()) + ";\n" +
-               "      if (!(_l " + cmp->op + " _r)) { coi_test_fail(" + where + ", coi_test_show(_l), coi_test_show(_r)); return; } }";
+        // both sides are arguments of one call, so a temporary either reads from (the array
+        // in choices("x")[0].name) lives until the check is done
+        return "if (![&](auto&& _l, auto&& _r) { if (_l " + cmp->op + " _r) return true; coi_test_fail(" + where +
+               ", coi_test_show(_l), coi_test_show(_r)); return false; }(" + comparison_side(cmp->left.get()) + ", " +
+               comparison_side(cmp->right.get()) + ")) return;";
     }
     return "if (!(" + cond->to_webcc() + ")) { coi_test_fail(" + where + ", coi::string(), coi::string()); return; }";
 }

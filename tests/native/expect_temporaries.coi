@@ -1,0 +1,18 @@
+// expect(a == b) where a side reads from a temporary: the array choices() returns lives until
+// the comparison is done, not only until its side has been read
+module Temporaries;
+
+pub pod Entry { string name; string words; }
+
+def choices(string q) : Entry[] {
+    return [Entry{name = `${q} heading, a name long enough to live on the heap`, words = "h1 title"},
+            Entry{name = "Second", words = "h2"}];
+}
+
+def same(string q) : string { return `${q} heading, a name long enough to live on the heap`; }
+
+test "a side read from a returned array" {
+    expect(choices("First")[0].name == same("First"));
+    expect(choices("First")[1].words == "h2");
+    expect(same("x") == choices("x")[0].name);
+}
