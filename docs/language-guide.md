@@ -1488,7 +1488,8 @@ test "save counts up" {
   `onchange`), `key(sel, keyCode)` (`onkeydown`).
 - Reading: `text(sel)` (all the text inside), `attr(sel, name)`, `has(sel)`, `count(sel)`, and
   `html()` for the whole page.
-- Selectors: tag, `#id`, `.class`, `[attr]`, `[attr=value]`, descendant, `>` and `,`. An action
+- Selectors: tag, `#id`, `.class`, `[attr]`, `[attr=value]`, `:first-child`, `:last-child`,
+  `:nth-child(n)`, `:not(...)`, descendant, `>` and `,`. An action
   or `text`/`attr` on a selector nothing matches fails the test there and prints the page.
 
 Other browser calls (storage, fetch, canvas, timers) do nothing and return nothing in a test.

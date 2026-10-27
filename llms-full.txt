@@ -949,7 +949,8 @@ test "save counts up" {
 ```
 - Actions: `click(sel)`, `fill(sel, text)`, `select(sel, value)`, `check(sel)`, `uncheck(sel)`,
   `key(sel, keyCode)`. Reading: `text(sel)`, `attr(sel, name)`, `has(sel)`, `count(sel)`, `html()`.
-- Selectors: tag, `#id`, `.class`, `[attr]`, `[attr=value]`, descendant, `>`, `,` (no `:` pseudos).
+- Selectors: tag, `#id`, `.class`, `[attr]`, `[attr=value]`, `:first-child`, `:last-child`,
+  `:nth-child(n)`, `:not(...)`, descendant, `>`, `,`.
   An action on a selector nothing matches fails the test there and prints the page's HTML.
 - Other browser calls (storage, fetch, canvas, timers) do nothing in a test, and there is no
   layout (sizes read 0).

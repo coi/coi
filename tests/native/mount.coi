@@ -99,3 +99,18 @@ test "each test has a page of its own" {
     expect(m.count(".list") == 1);
     expect(m.count("li") == 0);
 }
+
+test "one of many by its place" {
+    Mounted m = mount(List());
+    m.fill(".draft", "milk");
+    m.click(".add");
+    m.fill(".draft", "eggs");
+    m.click(".add");
+    m.fill(".draft", "jam");
+    m.click(".add");
+    expect(m.text("li:first-child .text") == "milk");
+    expect(m.text("li:last-child .text") == "jam");
+    m.click("li:nth-child(2) .remove");
+    expect(m.text("ul") == "milkxjamx");
+    expect(m.count("li:not(:first-child)") == 1);
+}
