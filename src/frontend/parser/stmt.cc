@@ -21,7 +21,17 @@ static std::string compound_op_of(TokenType t)
     }
 }
 
+// a statement without its own line gets the line it starts on, for its errors
 std::unique_ptr<Statement> Parser::parse_statement()
+{
+    int line = current().line;
+    auto stmt = parse_statement_body();
+    if (stmt && stmt->line == 0)
+        stmt->line = line;
+    return stmt;
+}
+
+std::unique_ptr<Statement> Parser::parse_statement_body()
 {
     // Block
     if (current().type == TokenType::LBRACE)
