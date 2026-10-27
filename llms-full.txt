@@ -69,7 +69,9 @@ coi build                # build to dist/
 | `coi list` | List installed packages |
 | `coi version` | Show compiler version (Pond/Drop) |
 | `coi self-upgrade` | Pull latest Coi source and rebuild the compiler |
+| `coi mcp` | MCP server for AI assistants: check, lookup, docs, search_packages, test |
 | `coi <file.coi> --out <dir>` | Compile a single file. Flags: `--cc-only`, `--keep-cc` |
+| `coi --check <files>` | Report the first error in the files and what they import, write nothing (no `app {}` needed) |
 
 ### App project layout (from `coi init`)
 ```
@@ -1111,7 +1113,8 @@ Before returning code, confirm:
 - [ ] No `null`, `let/const/var`, `new`, promises, or direct DOM access.
 - [ ] Imports are explicit and paths are correct; cross-module uses `Module::Name`.
 - [ ] There is exactly one `app { root = ...; }` block (in the root file).
-- [ ] Prefer to verify with `coi build` (or `coi dev`) and fix any reported errors.
+- [ ] Verify with `coi --check src/*.coi` (errors only, nothing written; the `check` tool when
+      `coi mcp` is connected) or `coi build`, and fix every reported error.
 - [ ] Pure logic in a module has a `test "..." { expect(...); }` block next to it, and `coi test` passes.
 
 ---

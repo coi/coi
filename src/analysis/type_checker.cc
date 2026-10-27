@@ -3676,6 +3676,8 @@ void validate_view_hierarchy(const std::vector<Component> &components,
                 if (component_map.count(same_module_key))
                 {
                     lookup_key = same_module_key;
+                    // Fill in the module name for code generation
+                    comp_inst->module_prefix = parent_comp->module_name;
                 }
                 else
                 {

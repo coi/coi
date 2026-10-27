@@ -9,6 +9,8 @@ For AI assistants and agents: the complete, self-contained language and API refe
 [llms-full.txt](llms-full.txt). If the Coi compiler is installed, run `coi llms` to print that
 full context to stdout, or `coi llms --path` to print its file path. Load it before writing or
 fixing Coi code so you use correct Coi syntax instead of JavaScript/TypeScript idioms.
+`coi mcp` is an MCP server with tools to check code, look up the exact APIs, read this guide by
+section, search packages and run tests against the installed compiler.
 
 ## Docs
 

@@ -1,0 +1,20 @@
+// Test: a module's component names a private sibling bare in its view, once and in a loop
+module Shelf;
+
+component Book(string title) {
+    view { <li>{title}</li> }
+}
+
+component Main {
+    mut string[] titles = ["a", "b"];
+    view {
+        <ul>
+            <Book title="first" />
+            <for t in titles key={t}>
+                <Book title={t} />
+            </for>
+        </ul>
+    }
+}
+
+app { root = Main; }

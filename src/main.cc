@@ -9,6 +9,7 @@
 #include "cli/cli.h"
 #include "cli/error.h"
 #include "cli/package_manager.h"
+#include "cli/mcp.h"
 #include "analysis/include_detector.h"
 #include "analysis/feature_detector.h"
 #include "analysis/dependency_resolver.h"
@@ -316,6 +317,12 @@ int main(int argc, char **argv)
                 path_only = true;
         }
         return llms_command(path_only);
+    }
+
+    // an MCP server on stdin/stdout for AI assistants
+    if (first_arg == "mcp")
+    {
+        return mcp_command();
     }
 
     // From here on, we're doing actual compilation - load DefSchema

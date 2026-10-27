@@ -168,6 +168,7 @@ Open `http://localhost:8000` in your browser.
 | `coi list` | List installed packages |
 | `coi version` | Show the Coi compiler version |
 | `coi llms [--path]` | Print the full language context for AI assistants (`--path` prints the file path) |
+| `coi mcp` | MCP server for AI assistants (check, lookup, docs, packages, tests) |
 | `coi <file.coi> --out <dir>` | Compile a single file |
 
 ## Documentation
@@ -196,6 +197,8 @@ coi llms --path              # prints the path to llms-full.txt
 ```
 
 Using an AI agent with terminal access? It can find this on its own. `coi --help` lists `coi llms`, which points to the same context.
+
+Even better, hook your assistant up to the compiler itself. `coi mcp` is an MCP server that lets it check its code, look up the exact APIs instead of guessing, read the guide section by section, search packages and run your tests, all against the Coi you have installed. In Claude Code that's `claude mcp add coi -- coi mcp`; for other clients see [Editor & AI Tooling](docs/tooling.md#coi-mcp).
 
 ## Community
 

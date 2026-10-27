@@ -866,11 +866,13 @@ void print_help(const char *program_name)
     std::cout << "    " << CYAN << program_name << " list" << RESET << "                     List installed packages" << std::endl;
     std::cout << "    " << CYAN << program_name << " version" << RESET << "                  Show version" << std::endl;
     std::cout << "    " << CYAN << program_name << " llms" << RESET << " [--path]            Full Coi language context for AI agents (--path: file path)" << std::endl;
+    std::cout << "    " << CYAN << program_name << " mcp" << RESET << "                      MCP server for AI assistants: check, lookup, docs, packages, tests" << std::endl;
     std::cout << "    " << CYAN << program_name << RESET << " <file.coi> [options]    Compile a .coi file" << std::endl;
     std::cout << std::endl;
     std::cout << "  " << BOLD << "Options:" << RESET << std::endl;
     std::cout << "    " << DIM << "--out, -o <dir>" << RESET << "   Output directory" << std::endl;
     std::cout << "    " << DIM << "--cc-only" << RESET << "         Generate C++ only, skip WASM" << std::endl;
+    std::cout << "    " << DIM << "--check" << RESET << "           Report errors only, write nothing (several files at once)" << std::endl;
     std::cout << "    " << DIM << "--keep-cc" << RESET << "         Keep generated C++ files" << std::endl;
     std::cout << "    " << DIM << "--no-watch" << RESET << "        Disable hot reloading (dev only)" << std::endl;
     std::cout << "    " << DIM << "--verbose, -V" << RESET << "     Show every file processed and tool run" << std::endl;

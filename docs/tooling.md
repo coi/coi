@@ -60,6 +60,45 @@ coi llms > coi-context.txt   # save it to hand to an assistant
 An agent with shell access can discover this on its own: `coi --help` lists `coi llms`, which
 resolves to the same `llms-full.txt` that sits next to the compiler.
 
+### `coi mcp`
+
+`coi mcp` is a [Model Context Protocol](https://modelcontextprotocol.io) server, so an assistant
+can use the compiler directly instead of guessing. It answers from the Coi you have installed, so
+what it says matches your version. Tools:
+
+| Tool | What it does |
+|------|--------------|
+| `check` | Compile-checks the project, some files, or a snippet, and writes nothing. Errors come back as `file:line` with the line's code, plus a hint when it's a JavaScript habit (`let`, `null`, ...). |
+| `lookup` | Exact declarations from the compiler's definition files: `string`, `string.split`, `Canvas`, `System.setTimeout`, or a word like `clipboard`. |
+| `docs` | The guide (`llms-full.txt`) by section: no topic lists the sections, `"routing"` or `"common mistakes"` returns them, `"all"` returns everything. |
+| `search_packages` | Searches the registry. Shows the release your compiler can use and how to add and import it. |
+| `test` | Runs the project's `test` blocks and reports failures with both sides of the comparison. |
+
+The guide is also available as the resource `coi://guide`. The server tells the assistant to
+look up APIs before using them and to run `check` before it finishes.
+
+Add it to Claude Code (run in your project):
+
+```bash
+claude mcp add coi -- coi mcp
+```
+
+Most other clients (Cursor, Claude Desktop, Zed, VS Code) take a JSON entry like this:
+
+```json
+{
+  "mcpServers": {
+    "coi": { "command": "coi", "args": ["mcp"] }
+  }
+}
+```
+
+The tools work on the project in the client's working directory (or the nearest one above it),
+and each takes a `project` argument for another folder. `check` writes nothing, so it is safe
+while `coi dev` runs.
+
+For an agent with a shell, `coi --check src/*.coi` runs the same check from the command line.
+
 ## Contributing
 
 Don't see your editor? Contributions are welcome! Open a PR to add support for additional editors.

@@ -1447,7 +1447,7 @@ void ViewForRangeStatement::generate_code(ViewCodegenContext& ctx)
     {
         if (auto comp = dynamic_cast<ComponentInstantiation *>(child.get()))
         {
-            region.component_type = comp->component_name;
+            region.component_type = qualified_name(comp->module_prefix, comp->component_name);
             loop_component = comp;
             break;
         }
@@ -1566,7 +1566,7 @@ void ViewForEachStatement::generate_code(ViewCodegenContext& ctx)
     {
         if (auto comp = dynamic_cast<ComponentInstantiation *>(child.get()))
         {
-            region.component_type = comp->component_name;
+            region.component_type = qualified_name(comp->module_prefix, comp->component_name);
             // Check if this is a member reference loop (e.g., <row/> where row is loop var)
             if (comp->is_member_reference && comp->member_name == var_name)
             {
