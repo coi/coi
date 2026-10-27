@@ -4408,6 +4408,7 @@ void validate_type_imports(const std::vector<Component> &components,
     // Check types used in each component
     for (const auto &comp : components)
     {
+        ErrorHandler::current_file = comp.source_file;
         // Check parameter types
         for (const auto &param : comp.params)
         {
