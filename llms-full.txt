@@ -953,7 +953,7 @@ test "save counts up" {
   `:nth-child(n)`, `:not(...)`, descendant, `>`, `,`.
   An action on a selector nothing matches fails the test there and prints the page's HTML.
 - Other browser calls (storage, fetch, canvas, timers) do nothing in a test, and there is no
-  layout (sizes read 0).
+  layout (sizes read 0). `System.log` prints.
 - Props in `mount(...)` go by name like in code; a reference prop takes the test's variable:
   `mut Note[] notes = []; mount(List(&notes = notes))`. Callbacks left out do nothing.
 - A test has no callbacks or method calls of its own: to see what a component tells its parent

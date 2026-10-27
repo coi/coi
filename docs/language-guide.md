@@ -1492,7 +1492,8 @@ test "save counts up" {
   `:nth-child(n)`, `:not(...)`, descendant, `>` and `,`. An action
   or `text`/`attr` on a selector nothing matches fails the test there and prints the page.
 
-Other browser calls (storage, fetch, canvas, timers) do nothing and return nothing in a test.
+Other browser calls (storage, fetch, canvas, timers) do nothing and return nothing in a test;
+`System.log` prints, to see what a test is looking at.
 There is no layout either: sizes and positions read as 0. Keep what depends on those for a
 browser.
 
