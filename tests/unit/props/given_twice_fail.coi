@@ -1,0 +1,11 @@
+// Test: a prop given by position and again by name
+component Pair(string a = "A", string b = "B") {
+    view { <p>{a}{b}</p> }
+}
+
+component GivenTwice {
+    mut Pair p = Pair("x", a = "y");
+    view { <div><{p} /></div> }
+}
+
+app { root = GivenTwice; }

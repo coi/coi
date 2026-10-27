@@ -1702,10 +1702,13 @@ std::string Component::to_webcc(CompilerSession &session)
         auto it = session.component_info.find(resolve_component_qname(session, module_name, ctor->component_name));
         if (it == session.component_info.end())
             continue;
-        for (size_t i = 0; i < ctor->args.size() && i < it->second.param_names.size(); i++)
+        for (size_t i = 0; i < ctor->args.size(); i++)
         {
+            size_t at = i < ctor->arg_props.size() ? (size_t)ctor->arg_props[i] : i;
+            if (at >= it->second.param_names.size())
+                continue;
             auto *id = dynamic_cast<Identifier *>(ctor->args[i].value.get());
-            const std::string &param = it->second.param_names[i];
+            const std::string &param = it->second.param_names[at];
             if (!ctor->args[i].is_reference || !id || !it->second.ref_params.count(param))
                 continue;
             if (it->second.mut_ref_params.count(param))

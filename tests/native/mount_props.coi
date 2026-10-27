@@ -1,0 +1,49 @@
+// props by name in mount(...) and in code: each lands on its own prop, a reference prop takes &
+module Props;
+
+component Pair(string a = "A", string b = "B", def onGo : void) {
+    view { <p class="pair">{a}{b}</p> }
+}
+
+component Tally(mut string[]& items, string label = "n") {
+    def add() : void { items.push("x"); }
+    view { <div><button onclick={add}>+</button><p class="tally">{label}{items.size()}</p></div> }
+}
+
+component Host {
+    mut string[] list = [];
+    mut Tally tally = Tally(label = "in code ", &items = list);
+    view { <div><{tally} /><p class="list">{list.size()}</p></div> }
+}
+
+test "a prop by name skips the ones before it" {
+    Mounted m = mount(Pair(b = "y"));
+    expect(m.text(".pair") == "Ay");
+}
+
+test "names in any order" {
+    Mounted m = mount(Pair(b = "2", a = "1"));
+    expect(m.text(".pair") == "12");
+}
+
+test "a reference prop sees the test's array" {
+    mut string[] items = ["a"];
+    Mounted m = mount(Tally(items = &items));
+    m.click("button");
+    expect(m.text(".tally") == "n2");
+    expect(items.size() == 2);
+}
+
+test "the & on the name works the same" {
+    mut string[] items = [];
+    Mounted m = mount(Tally(label = "k", &items = items));
+    m.click("button");
+    expect(m.text(".tally") == "k1");
+}
+
+test "a member built in code with props by name" {
+    Mounted m = mount(Host());
+    m.click("button");
+    expect(m.text(".tally") == "in code 1");
+    expect(m.text(".list") == "1");
+}

@@ -126,6 +126,10 @@ component App {
 | `mut Type& name` | Reference | `comp(&value)` | Component can read/modify parent's state |
 | `def name(args) : ret` | Callback | `comp(&callback)` | Function passed from parent |
 
+A component built in code takes the same props in parentheses: in order (`Editor(text, &count)`), or
+by name, in any order, with the rest keeping their defaults (`Editor(step = 2, &value = count, label = "x")`;
+`value = &count` works too). A reference prop always needs its `&`, by position or by name.
+
 ### Reference Parameters (`&`)
 
 Reference parameters allow child components to modify the parent's state directly. A change made through the reference updates every component that holds it, however many levels apart: a write at the top refreshes the children built with `&value` and their children, and a write at the bottom refreshes the owner and its other children.

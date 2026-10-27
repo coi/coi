@@ -670,6 +670,7 @@ static std::string g_ctx_file;
 static const Component *g_ctx_component = nullptr;
 static bool g_ctx_test = false;   // checking a test block: expect() is allowed
 static std::set<std::string> g_component_names;
+static std::map<std::string, const Component *> g_components;   // by name, and Module_Name
 
 static bool is_enum_type(const std::string &t);
 static bool is_data_type(const std::string &t);
@@ -1010,6 +1011,90 @@ static std::string inline_function_type(LambdaExpr *lam, const std::string &meth
     if (method == "remove") return "void";
     if (method == "indexOf" || method == "count") return normalize_type("int");
     return "bool";
+}
+
+// the component a construction names: the current module's first, then any
+static const Component *find_component(const std::string &name)
+{
+    std::string flat = name;
+    for (size_t pos; (pos = flat.find("::")) != std::string::npos;)
+        flat.replace(pos, 2, "_");
+    if (flat == name && !g_ctx_module.empty())
+        if (auto it = g_components.find(g_ctx_module + "_" + name); it != g_components.end())
+            return it->second;
+    auto it = g_components.find(flat);
+    return it == g_components.end() ? nullptr : it->second;
+}
+
+// Box(&list, title = "x") in code: positional args fill the props in order, named ones by name.
+// A reference prop takes &value (written &items = list, or items = &list). Each arg's prop goes
+// on the construction for the C++, which sets them by name
+static void check_component_args(ComponentConstruction *cc, const Component &comp, const std::map<std::string, std::string> &scope)
+{
+    const auto &params = comp.params;
+    auto names = [&] {
+        std::string out;
+        for (const auto &p : params) out += (out.empty() ? "" : ", ") + p->name;
+        return out;
+    };
+    cc->props.clear();
+    for (const auto &p : params) cc->props.push_back(p->name);
+    cc->arg_props.assign(cc->args.size(), -1);
+    std::set<int> given;
+    for (size_t i = 0; i < cc->args.size(); i++)
+    {
+        auto &a = cc->args[i];
+        if (auto *ref = dynamic_cast<ReferenceExpression *>(a.value.get()); ref && !a.name.empty())
+        {
+            a.value = std::move(ref->operand);
+            a.is_reference = true;
+        }
+        int at = -1;
+        if (!a.name.empty())
+        {
+            for (size_t k = 0; k < params.size(); k++)
+                if (params[k]->name == a.name) at = (int)k;
+            if (at < 0)
+            {
+                ErrorHandler::type_error("'" + comp.name + "' has no prop '" + a.name + "'" +
+                                         (params.empty() ? "" : " (props: " + names() + ")"), cc->line);
+                exit(1);
+            }
+        }
+        else
+        {
+            if (i >= params.size())
+            {
+                ErrorHandler::type_error("'" + comp.name + "' takes " + std::to_string(params.size()) + " prop(s) but got " +
+                                         std::to_string(cc->args.size()), cc->line);
+                exit(1);
+            }
+            at = (int)i;
+        }
+        const ComponentParam &p = *params[at];
+        if (!given.insert(at).second)
+        {
+            ErrorHandler::type_error("'" + comp.name + "' gets '" + p.name + "' twice", cc->line);
+            exit(1);
+        }
+        if (!p.is_callback && p.is_reference && !a.is_reference)
+        {
+            ErrorHandler::type_error("'" + p.name + "' of '" + comp.name + "' is a reference: pass &" +
+                                     (a.name.empty() ? "value" : a.name + " = value"), cc->line);
+            exit(1);
+        }
+        if (!p.is_callback && !a.is_move)
+        {
+            std::string t = normalize_type(infer_expression_type(a.value.get(), scope));
+            std::string want = normalize_type(p.type);
+            if (t != "unknown" && !is_compatible_type(t, want) && !literal_fits(a.value.get(), want))
+            {
+                ErrorHandler::type_error("Prop '" + p.name + "' of '" + comp.name + "' is '" + want + "' but got '" + t + "'", cc->line);
+                exit(1);
+            }
+        }
+        cc->arg_props[i] = at;
+    }
 }
 
 std::string infer_expression_type(Expression *expr, const std::map<std::string, std::string> &scope)
@@ -1361,6 +1446,9 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                 exit(1);
             }
         }
+        if (!known_pod)
+            if (const Component *comp = find_component(name))
+                check_component_args(cc, *comp, scope);
         return name.empty() ? "unknown" : name;
     }
 
@@ -3092,8 +3180,12 @@ void validate_types(const std::vector<Component> &components,
         component_names.insert(c.name);
         component_map[c.name] = &c;
         g_component_names.insert(c.name);
+        g_components.emplace(c.name, &c);
         if (!c.module_name.empty())
+        {
             g_component_names.insert(c.module_name + "_" + c.name);
+            g_components[c.module_name + "_" + c.name] = &c;
+        }
     }
 
     // Collect all enum type names (for enum <-> int conversion checking)

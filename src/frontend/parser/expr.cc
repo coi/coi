@@ -399,6 +399,7 @@ std::unique_ptr<Expression> Parser::parse_primary()
                 
                 // Create a component construction with qualified name
                 auto comp_expr = std::make_unique<ComponentConstruction>(name + "::" + value_name);
+                comp_expr->line = current().line;
                 comp_expr->args = std::move(parsed_args);
                 return comp_expr;
             }
@@ -476,6 +477,7 @@ std::unique_ptr<Expression> Parser::parse_primary()
                 {
                     // Component construction
                     auto comp_expr = std::make_unique<ComponentConstruction>(expr->raw_name());
+                    comp_expr->line = identifier_line;
                     comp_expr->args = std::move(parsed_args);
                     expr = std::move(comp_expr);
                 }

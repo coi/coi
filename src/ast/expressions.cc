@@ -8,6 +8,7 @@
 #include "../cli/error.h"
 #include "../analysis/type_checker.h"
 #include <cctype>
+#include <algorithm>
 
 // Helper to expand @inline templates like "${this}.length()" or "$self.is_valid()" or "${0}"
 static std::string expand_inline_template(const std::string& tmpl, const std::string& receiver,
@@ -1079,33 +1080,43 @@ std::string ComponentConstruction::to_webcc() {
         }
     }
 
-    std::string result = resolved_name + "(";
-    for (size_t i = 0; i < args.size(); i++) {
-        if (i > 0) result += ", ";
+    auto arg_code = [&](size_t i) {
         std::string value = args[i].value->to_webcc();
         auto* id = dynamic_cast<Identifier*>(args[i].value.get());
         const auto& sigs = ComponentTypeContext::instance().method_signatures;
         std::string free_fn = id ? FreeFunctionRegistry::instance().resolve_call(id->name) : "";
         if (args[i].is_reference && id && (sigs.count(id->name) || !free_fn.empty())) {
             // &method as a callback: Box(1, &changed)
+            if (!sigs.count(id->name))
+                return "[](auto&&... _a) { return " + free_fn + "(_a...); }";
             std::string params, fwd;
-            if (sigs.count(id->name)) {
-                const auto& types = sigs.at(id->name).param_types;
-                for (size_t k = 0; k < types.size(); k++) {
-                    params += (k ? ", " : "") + convert_type(types[k]) + " _a" + std::to_string(k);
-                    fwd += (k ? ", _a" : "_a") + std::to_string(k);
-                }
-                result += "[this](" + params + ") { return this->" + cpp_name(id->name) + "(" + fwd + "); }";
-            } else {
-                result += "[](auto&&... _a) { return " + free_fn + "(_a...); }";
+            const auto& types = sigs.at(id->name).param_types;
+            for (size_t k = 0; k < types.size(); k++) {
+                params += (k ? ", " : "") + convert_type(types[k]) + " _a" + std::to_string(k);
+                fwd += (k ? ", _a" : "_a") + std::to_string(k);
             }
+            return "[this](" + params + ") { return this->" + cpp_name(id->name) + "(" + fwd + "); }";
         }
-        else if (args[i].is_reference)
-            result += "&(" + value + ")";
-        else if (args[i].is_move)
-            result += "coi::move(" + value + ")";
-        else
-            result += value;
+        if (args[i].is_reference) return "&(" + value + ")";
+        if (args[i].is_move) return "coi::move(" + value + ")";
+        return value;
+    };
+
+    // a component with props by name: each set by name, in the order the props are declared
+    if (any_named && arg_props.size() == args.size()) {
+        std::vector<size_t> order;
+        for (size_t i = 0; i < args.size(); i++) order.push_back(i);
+        std::sort(order.begin(), order.end(), [&](size_t a, size_t b) { return arg_props[a] < arg_props[b]; });
+        std::string result = resolved_name + "{";
+        for (size_t k = 0; k < order.size(); k++)
+            result += (k ? ", ." : ".") + cpp_name(props[arg_props[order[k]]]) + " = " + arg_code(order[k]);
+        return result + "}";
+    }
+
+    std::string result = resolved_name + "(";
+    for (size_t i = 0; i < args.size(); i++) {
+        if (i > 0) result += ", ";
+        result += arg_code(i);
     }
     result += ")";
     return result;

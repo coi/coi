@@ -233,6 +233,10 @@ using ComponentArg = CallArg;
 struct ComponentConstruction : Expression {
     std::string component_name;
     std::vector<CallArg> args;
+    // a component's, set by the type checker: its props in declaration order, and each arg's
+    // index in them (positional args fill them in order, named ones by name)
+    std::vector<std::string> props;
+    std::vector<int> arg_props;
 
     explicit ComponentConstruction(const std::string& name) : component_name(name) {}
     std::string cpp_type();

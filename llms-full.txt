@@ -572,7 +572,9 @@ component Timer {
 
 ### Construction: pods vs components
 - Pod: `User{...}` (braces).
-- Component instance in code: `TodoItem(id, text, done)` (parens, positional args).
+- Component instance in code: `TodoItem(id, text, done)` (parens, in order) or by name in any
+  order, the rest keeping their defaults: `TodoItem(text = "hi", &items = list)`. A reference
+  prop needs `&` either way (`items = &list` works too).
 - Component in a view: `<TodoItem id={1} text="hi" />` (element syntax).
 - A component declared as a member is auto-constructed and persists:
 ```coi
@@ -951,6 +953,12 @@ test "save counts up" {
   An action on a selector nothing matches fails the test there and prints the page's HTML.
 - Other browser calls (storage, fetch, canvas, timers) do nothing in a test, and there is no
   layout (sizes read 0).
+- Props in `mount(...)` go by name like in code; a reference prop takes the test's variable:
+  `mut Note[] notes = []; mount(List(&notes = notes))`. Callbacks left out do nothing.
+- A test has no callbacks or method calls of its own: to see what a component tells its parent
+  or what its `pub def`s do, mount a small parent written in the test file that holds it as a
+  member (`mut Toast toast = Toast(&undone);`), calls its methods from buttons, and shows what
+  it heard in its view (`<p class="heard">{heard}</p>`).
 
 ---
 

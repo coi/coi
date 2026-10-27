@@ -1,0 +1,11 @@
+// Test: a prop given in code is checked against its type
+component Pair(string a = "A") {
+    view { <p>{a}</p> }
+}
+
+component CodeMismatch {
+    mut Pair p = Pair(a = 3);
+    view { <div><{p} /></div> }
+}
+
+app { root = CodeMismatch; }

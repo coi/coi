@@ -1,0 +1,11 @@
+// Test: a prop by name that the component doesn't have
+component Pair(string a = "A", string b = "B") {
+    view { <p>{a}{b}</p> }
+}
+
+component UnknownName {
+    mut Pair p = Pair(c = "x");
+    view { <div><{p} /></div> }
+}
+
+app { root = UnknownName; }

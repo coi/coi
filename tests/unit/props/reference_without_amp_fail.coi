@@ -1,0 +1,12 @@
+// Test: a reference prop built in code needs &, a copy can't stand in for it
+component Tally(mut string[]& items) {
+    view { <p>{items.size()}</p> }
+}
+
+component NoAmp {
+    mut string[] list = [];
+    mut Tally t = Tally(list);
+    view { <div><{t} /></div> }
+}
+
+app { root = NoAmp; }

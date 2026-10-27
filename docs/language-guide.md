@@ -1478,7 +1478,9 @@ test "save counts up" {
 ```
 
 - `mount(Counter())` builds the component as `Counter(...)` does in code, props included, and
-  renders it. Each test starts on an empty page.
+  renders it. Each test starts on an empty page. Props go by name, any left out keep their
+  defaults (a callback left out does nothing), and a reference prop takes the test's own variable:
+  `mut Note[] notes = []; mount(List(title = "Week", &notes = notes))`.
 - Actions: `click(sel)` (bubbles to the ancestors' handlers; a checkbox flips), `fill(sel, text)`
   (sets the value, then `oninput`), `select(sel, value)` and `check(sel)` / `uncheck(sel)` (then
   `onchange`), `key(sel, keyCode)` (`onkeydown`).
@@ -1490,6 +1492,33 @@ test "save counts up" {
 Other browser calls (storage, fetch, canvas, timers) do nothing and return nothing in a test.
 There is no layout either: sizes and positions read as 0. Keep what depends on those for a
 browser.
+
+A test can't hold a callback of its own or call a component's methods, so to check what a
+component tells its parent, or what its `pub def`s do, mount a small parent written in the test
+file: it builds the component, calls its methods from buttons, and shows what it heard.
+
+```tsx
+component Host {
+    mut Toast toast = Toast(&undone);
+    mut string heard = "";
+    def undone(string id) : void { heard = id; }
+    def trashed() : void { toast.show("Moved to trash", "n1"); }
+    view {
+        <div>
+            <button class="trash" onclick={trashed}>t</button>
+            <p class="heard">{heard}</p>
+            <{toast} />
+        </div>
+    }
+}
+
+test "undo hands back the id" {
+    Mounted m = mount(Host());
+    m.click(".trash");
+    m.click(".toast .undo");
+    expect(m.text(".heard") == "n1");
+}
+```
 
 ## Next Steps
 
