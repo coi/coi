@@ -326,6 +326,7 @@ int main(int argc, char **argv)
     std::string output_dir;
     bool dev = false;   // a dev build: quick to compile, no manifest or service worker
     bool test = false;  // --test: build the test blocks into a program for this machine and run it
+    bool check = false; // --check: every error of the files, tests included, and nothing written
 
     for (int i = 1; i < argc; ++i)
     {
@@ -342,6 +343,8 @@ int main(int argc, char **argv)
             dev = true;
         else if (arg == "--test")
             test = true;
+        else if (arg == "--check")
+            check = true;
         else if (arg == "--out" || arg == "-o")
         {
             if (i + 1 < argc)
@@ -356,7 +359,7 @@ int main(int argc, char **argv)
         }
         else if (input_file.empty())
             input_file = arg;
-        else if (test)
+        else if (test || check)
             input_files.push_back(arg);
         else
         {
@@ -628,7 +631,7 @@ int main(int argc, char **argv)
 
         // a test is a function with no parameters that nothing can call (its name starts with
         // '_'); a normal build leaves them out here
-        if (test)
+        if (test || check)
             for (auto &t : all_tests)
                 all_global_functions.push_back(std::move(t));
         all_tests.clear();
@@ -681,6 +684,26 @@ int main(int argc, char **argv)
         validate_type_imports(all_components, all_global_enums, all_global_data, file_imports);
         validate_mutability(all_components);
         validate_types(all_components, all_global_enums, all_global_data, all_global_functions, file_imports);
+
+        // --check: code generation finds errors too, so it runs over every component, reachable
+        // or not, as the test program (no app block needed: a library file checks as well), and
+        // what it generates is thrown away
+        if (check)
+        {
+            if (!final_app_config.root_component.empty() &&
+                std::none_of(all_components.begin(), all_components.end(),
+                             [&](const Component &c) { return c.name == final_app_config.root_component; }))
+            {
+                std::cerr << colors::RED << "Error:" << colors::RESET << " Root component '" << final_app_config.root_component << "' not found." << std::endl;
+                return 1;
+            }
+            std::set<std::string> required_headers = get_required_headers(all_components, all_global_functions);
+            FeatureFlags features = detect_features(all_components, required_headers, all_global_functions);
+            std::ostringstream discard;
+            generate_cpp_code(discard, all_components, all_global_data, all_global_enums, all_global_functions,
+                              final_app_config, required_headers, features, true);
+            return 0;
+        }
 
 
         // Determine output filename
