@@ -8,6 +8,7 @@ namespace fs = std::filesystem;
 #include "../analysis/feature_detector.h"
 #include "../analysis/dependency_resolver.h"
 #include "json_codegen.h"
+#include "cli/error.h"
 #include <iostream>
 
 // one case per webcc event with a bound callback
@@ -871,6 +872,7 @@ template<typename V, typename F> inline V coi_filter(const V& v, F pred) {
         ComponentTypeContext::instance().clear();
         ComponentTypeContext::instance().set_module_scope(func.module_name, session.data_type_names);
         g_ref_props.clear();
+        ErrorHandler::current_file = func.source_file;   // an error here names its file
         // a test's failures name its file as the project sees it
         g_test_file = func.test_name.empty() ? "" : fs::relative(func.source_file, fs::current_path()).string();
     };
@@ -899,6 +901,7 @@ template<typename V, typename F> inline V coi_filter(const V& v, F pred) {
 
     for (auto *comp : sorted_components)
     {
+        ErrorHandler::current_file = comp->source_file;
         out << comp->to_webcc(session);
     }
 
@@ -912,6 +915,7 @@ template<typename V, typename F> inline V coi_filter(const V& v, F pred) {
     ComponentTypeContext::instance().clear();
     g_ref_props.clear();
     g_test_file.clear();
+    ErrorHandler::current_file.clear();
 
     if (test_program)
     {

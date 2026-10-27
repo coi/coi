@@ -23,6 +23,9 @@ public:
         if (line > 0) {
             oss << " at line " << line;
         }
+        if (!current_file.empty()) {
+            oss << " in " << current_file;
+        }
         throw std::runtime_error(oss.str());
     }
 
