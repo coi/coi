@@ -1,0 +1,28 @@
+// an <if> whose condition is the owner's own method reading a member's pod field (through a
+// plain function) follows the member when the pod changes inside it, like the same method as text
+pod Use { int bytes; }
+
+def overText(int bytes, int max) : string { return bytes > max ? "over" : ""; }
+
+component Box {
+    pub mut Use usage;
+    pub mut bool known = false;
+    def fill() : void { usage = Use{bytes = 10}; known = true; }
+    view { <button class="fill" onclick={fill}>fill</button> }
+}
+
+component App {
+    mut Box box;
+    def over() : string { return box.known ? overText(box.usage.bytes, 5) : ""; }
+    view {
+        <div>
+            <p class="text">{over()}</p>
+            <if !over().isEmpty()>
+                <p class="banner">{over()}</p>
+            </if>
+            <{box} />
+        </div>
+    }
+}
+
+app { root = App; }

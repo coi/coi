@@ -1093,6 +1093,12 @@ std::string Component::to_webcc(CompilerSession &session)
         }
     }
 
+    // an <if> whose condition reads a.b re-checks itself from the same a.onBChange: one callback
+    // per member, so it has to run every reader of it, bindings, props and conditions alike
+    for (const auto &region : if_regions)
+        for (const auto &mem_dep : region.member_dependencies)
+            member_dep_update_methods[mem_dep].insert("_sync_if_" + std::to_string(region.if_id));
+
     // Generate shared element+attribute update methods first
     for (const auto &[key, binding] : element_attr_bindings)
     {
@@ -1994,19 +2000,7 @@ std::string Component::to_webcc(CompilerSession &session)
     // Register event handlers
     emit_all_event_registrations(ss, element_count, event_handlers, masks);
 
-    // Wire up onChange callbacks for child component pub mut members (in if conditions)
-    for (const auto &region : if_regions)
-    {
-        for (const auto &mem_dep : region.member_dependencies)
-        {
-            if (!member_dep_is_reactive(mem_dep))
-                continue;
-            std::string callback_name = make_callback_name(mem_dep.member);
-            ss << "        " << cpp_name(mem_dep.object) << "." << callback_name << " = [this]() { _sync_if_" << region.if_id << "(); };\n";
-        }
-    }
-
-    // Wire up onChange callbacks for child component pub mut members (in view bindings)
+    // Wire up onChange callbacks for child component pub mut members (bindings, props, if conditions)
     emit_member_dependency_callbacks();
 
     // Wire up nested component reactivity (e.g., Vector.x/y -> Ball._update_x/y)
