@@ -249,7 +249,7 @@ scores[0] = 99;                // requires mut
 
 ### Maps: `ValueType[KeyType]`
 ```coi
-mut int[string] ages;          // string keys, int values
+mut int[string] ages;          // string keys, int values; starts empty (= {} says the same)
 ages["alice"] = 25;
 int a  = ages["alice"];
 int n  = ages.size();

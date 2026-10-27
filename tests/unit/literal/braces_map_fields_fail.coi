@@ -1,0 +1,10 @@
+// Test: a map isn't a pod, { key = value } can't fill it
+component BracesMap {
+    def make() : int {
+        mut int[string] m = {a = 1};
+        return m.size();
+    }
+    view { <div>{make()}</div> }
+}
+
+app { root = BracesMap; }

@@ -1059,6 +1059,9 @@ std::string ComponentConstruction::cpp_type() {
 }
 
 std::string ComponentConstruction::to_webcc() {
+    // {} for a map or an array: an empty one
+    if (component_name.ends_with("]"))
+        return convert_type(component_name) + "{}";
     std::string resolved_name = cpp_type();
     // named fields go out in declaration order
     bool any_named = false;

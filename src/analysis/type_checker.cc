@@ -1013,6 +1013,21 @@ static std::string inline_function_type(LambdaExpr *lam, const std::string &meth
     return "bool";
 }
 
+// { x = 1 } or {} as a declaration's value: the brace literal is of the declared type. A map
+// or an array starts empty that way and takes no fields
+static void type_brace_literal(Expression *init, const std::string &type, int line)
+{
+    auto *cc = dynamic_cast<ComponentConstruction *>(init);
+    if (!cc || !cc->component_name.empty())
+        return;
+    if (type.ends_with("]") && !cc->args.empty())
+    {
+        ErrorHandler::type_error("'" + type + "' isn't a pod, so { ... } can't fill it: start it empty ({}) and add to it", line);
+        exit(1);
+    }
+    cc->component_name = type;
+}
+
 // the component a construction names: the current module's first, then any
 static const Component *find_component(const std::string &name)
 {
@@ -1449,6 +1464,8 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
         if (!known_pod)
             if (const Component *comp = find_component(name))
                 check_component_args(cc, *comp, scope);
+        if (name.ends_with("]"))
+            return normalize_type(name);
         return name.empty() ? "unknown" : name;
     }
 
@@ -2372,6 +2389,7 @@ static void check_function_body(const FunctionDef &method, const Component *comp
         {
             check_known_type(decl->type, method.type_params, decl->line);
             std::string type = normalize_type(decl->type);
+            type_brace_literal(decl->initializer.get(), decl->type, decl->line);
             
             if (decl->initializer)
             {
@@ -3321,7 +3339,10 @@ void validate_types(const std::vector<Component> &components,
         for (const auto &param : comp.params)
             check_known_type(param->type, {}, comp.line);
         for (const auto &var : comp.state)
+        {
             check_known_type(var->type, {}, var->line);
+            type_brace_literal(var->initializer.get(), var->type, var->line);
+        }
         for (const auto &method : comp.methods)
         {
             for (const auto &p : method.params)

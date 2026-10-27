@@ -341,12 +341,14 @@ std::unique_ptr<Expression> Parser::parse_primary()
     // Type is inferred from context (e.g., array element type)
     if (current().type == TokenType::LBRACE && allow_brace_init)
     {
+        int brace_line = current().line;
         advance();
         auto parsed_args = parse_call_args(TokenType::RBRACE);
         expect(TokenType::RBRACE, "Expected '}'");
 
         // Create ComponentConstruction with empty name - type will be inferred
         auto data_expr = std::make_unique<ComponentConstruction>("");
+        data_expr->line = brace_line;
         data_expr->args = std::move(parsed_args);
         return data_expr;
     }

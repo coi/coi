@@ -187,6 +187,8 @@ ages["bob"] = 30;
 int aliceAge = ages["alice"];    // Returns 25
 ```
 
+A map declared without a value starts empty; `= {}` says the same (`mut int[string] seen = {};`).
+
 ### Dynamic Array Methods (T[])
 
 ```tsx

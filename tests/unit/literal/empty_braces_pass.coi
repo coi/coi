@@ -1,0 +1,18 @@
+// Test: {} starts a map or an array empty, { x = 1 } fills a pod, wherever it's declared
+pod Pt { int x; int y; }
+
+def count() : int {
+    mut string[string] names = {};
+    names["a"] = "b";
+    mut int[] none = {};
+    Pt p = {x = 2};
+    return names.size() + none.size() + p.x;
+}
+
+component EmptyBraces {
+    mut int[string] seen = {};
+    mut Pt at = {y = 3};
+    view { <div>{seen.size()}{at.y}{count()}</div> }
+}
+
+app { root = EmptyBraces; }
