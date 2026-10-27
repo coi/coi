@@ -1,4 +1,8 @@
 ✗ Missing: a button that isn't there
-mount_missing.coi:11  click(".save"): nothing on the page matches
+mount_missing.coi:16  click(".save"): nothing on the page matches
 page   <p class="hi">Hello</p>
-1 of 2 failed
+✗ Missing: a link that isn't in the menu
+mount_missing.coi:27  click(".menu > a.b"): nothing on the page matches
+under  ".menu"
+html   <nav class="menu"><a href="/a">A</a></nav>
+2 of 3 failed

@@ -1,8 +1,13 @@
-// an action on a selector nothing matches fails the test where it is, with the page
+// an action on a selector nothing matches fails the test where it is, with the page, or the
+// part of it where the selector stops matching
 module Missing;
 
 component Hello {
     view { <p class="hi">Hello</p> }
+}
+
+component Menu {
+    view { <div><nav class="menu"><a href="/a">A</a></nav><p>other</p></div> }
 }
 
 test "a button that isn't there" {
@@ -15,4 +20,9 @@ test "a button that isn't there" {
 test "the next test still runs" {
     Mounted m = mount(Hello());
     expect(m.text(".hi") == "Hello");
+}
+
+test "a link that isn't in the menu" {
+    Mounted m = mount(Menu());
+    m.click(".menu > a.b");
 }

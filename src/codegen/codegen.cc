@@ -110,9 +110,34 @@ static void coi_test_page_fail(const char* action, const coi::string& selector) 
     coi_test_failed_now = true;
     printf("  %s✗%s %s\n", coi_test_color() ? "\033[31m" : "", coi_test_color() ? "\033[0m" : "", coi_test_current);
     printf("    %s:%d  %s(\"%.*s\"): nothing on the page matches\n", coi_test_where, coi_test_line, action, (int)selector.length(), selector.data());
-    coi::string page = webcc::host::html(webcc::DOMElement(0));
+    // the part of the page where the selector stops matching: its steps dropped from the end
+    // until what's left finds something (not across a list with ,)
+    webcc::DOMElement at(0);
+    coi::string near;
+    bool list = false;
+    for (uint32_t i = 0; i < selector.length(); i++) list = list || selector.data()[i] == ',';
+    for (uint32_t end = selector.length(); !list && end > 0;) {
+        while (end > 0 && selector.data()[end - 1] != ' ' && selector.data()[end - 1] != '>') end--;
+        while (end > 0 && (selector.data()[end - 1] == ' ' || selector.data()[end - 1] == '>')) end--;
+        if (end == 0) break;
+        coi::string head = selector.substr(0, end);
+        webcc::DOMElement el = webcc::host::query(head);
+        if (el.is_valid()) { at = el; near = head; break; }
+    }
+    // without the scoping attribute every element carries
+    coi::string raw = webcc::host::html(at), page;
+    const char* mark = " coi-scope=\"";
+    for (uint32_t i = 0; i < raw.length();) {
+        bool scope = raw.length() - i > 12;
+        for (int k = 0; scope && k < 12; k++) scope = raw.data()[i + k] == mark[k];
+        if (!scope) { page += raw.data()[i++]; continue; }
+        i += 12;
+        while (i < raw.length() && raw.data()[i] != '"') i++;
+        i++;
+    }
+    if (near.length()) printf("      under  \"%.*s\"\n", (int)near.length(), near.data());
     int shown = page.length() > 2000 ? 2000 : (int)page.length();
-    printf("      page   %.*s%s\n\n", shown, page.data(), page.length() > 2000 ? " ..." : "");
+    printf("      %s   %.*s%s\n\n", near.length() ? "html" : "page", shown, page.data(), page.length() > 2000 ? " ..." : "");
 }
 static void coi_test_update() {
     static webcc::Event events[64];
