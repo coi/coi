@@ -1,0 +1,7 @@
+// Test: a keyword can't name a method (shared is the language's)
+component KeywordMethod {
+    def shared() : void { }
+    view { <div></div> }
+}
+
+app { root = KeywordMethod; }

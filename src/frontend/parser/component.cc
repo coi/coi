@@ -1,3 +1,4 @@
+#include <algorithm>
 #include "parser.h"
 #include "defs/def_parser.h"
 #include "cli/error.h"
@@ -1535,7 +1536,13 @@ FunctionDef Parser::parse_function_def(bool is_public)
     int func_line = current().line;
     func.line = func_line;
     if (!is_identifier_token())
+    {
+        // def shared() : a word of the language, written like a name
+        if (!func.name.empty() && std::islower((unsigned char)func.name[0]) &&
+            std::all_of(func.name.begin(), func.name.end(), [](char c) { return std::isalnum((unsigned char)c) || c == '_'; }))
+            ErrorHandler::compiler_error("'" + func.name + "' is a keyword, it can't name a function: pick another name", func_line);
         expect(TokenType::IDENTIFIER, "Expected function name");
+    }
     advance();
 
     // Method names must start with lowercase (to distinguish from component/type construction)
