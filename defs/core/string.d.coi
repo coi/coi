@@ -23,6 +23,12 @@ type string {
     @inline("${this}.contains(${0})")
     def contains(string needle): bool
 
+    @inline("${this}.starts_with(${0})")
+    def startsWith(string prefix): bool
+
+    @inline("${this}.ends_with(${0})")
+    def endsWith(string suffix): bool
+
     @inline("${this}.index_of(${0})")
     def indexOf(string needle): int
 

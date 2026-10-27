@@ -307,6 +307,8 @@ string sub2 = text.subStr(0, 5);  // "Hello" - from index with length
 
 // Search
 bool has = text.contains("World"); // Check if substring exists
+bool hi = text.startsWith("Hello"); // true; "" always matches
+bool bang = text.endsWith("!");     // true
 int at = text.indexOf("o");         // 4: first occurrence, -1 when there is none
 int next = text.indexOf("o", 5);    // 7: the first one at or after an index
 

@@ -1,0 +1,19 @@
+// startsWith and endsWith: the whole prefix or suffix, nothing longer than the string, and an
+// empty one always matching
+module StringEnds;
+
+test "a prefix and a suffix" {
+    string key = "img/note1/3";
+    expect(key.startsWith("img/"));
+    expect(!key.startsWith("page/"));
+    expect(key.endsWith("/3"));
+    expect(!key.endsWith("/4"));
+}
+
+test "the string itself, longer ones and empty ones" {
+    string s = "abc";
+    expect(s.startsWith("abc") && s.endsWith("abc"));
+    expect(!s.startsWith("abcd") && !s.endsWith("zabc"));
+    expect(s.startsWith("") && s.endsWith(""));
+    expect("".startsWith("") && !"".endsWith("a"));
+}
