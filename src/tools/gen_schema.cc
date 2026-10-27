@@ -923,19 +923,31 @@ int main()
             {
                 handle_ns = ns_it->second;
             }
-            // [namespace] applies to every handle type of the namespace, [Type] only to that type
+            // [namespace] applies to every handle type of the namespace, [Type] only to that type;
+            // a shared def of [namespace] belongs to the namespace's own type (System.navigate), not
+            // to another handle of it (Timeout)
             for (const std::string &key : {handle_ns, handle_type})
             {
                 if (key.empty() || !INTRINSIC_DEFS.count(key))
                     continue;
+                bool other_type = key == handle_ns && handle_type != capitalize(handle_ns);
+                std::vector<std::string> comments;   // emitted with the def they come before
                 for (const auto &def : INTRINSIC_DEFS[key])
                 {
-                    out << "    " << def << "\n";
-                    // Add blank line after @intrinsic/@inline definitions (not after comments)
-                    if (def[0] == '@')
+                    if (def[0] != '@')
                     {
-                        out << "\n";
+                        comments.push_back(def);
+                        continue;
                     }
+                    if (other_type && def.find(" shared def ") != std::string::npos)
+                    {
+                        comments.clear();
+                        continue;
+                    }
+                    for (const auto &c : comments)
+                        out << "    " << c << "\n";
+                    comments.clear();
+                    out << "    " << def << "\n\n";
                 }
             }
 
