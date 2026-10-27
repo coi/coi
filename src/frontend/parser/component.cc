@@ -655,6 +655,11 @@ void Parser::parse_app()
             app_config.icon = current().value;
             expect(TokenType::STRING_LITERAL, "Expected string");
         }
+        else if (key == "touchIcon")
+        {
+            app_config.touch_icon = current().value;
+            expect(TokenType::STRING_LITERAL, "Expected string");
+        }
         else if (key == "theme")
         {
             app_config.theme = current().value;

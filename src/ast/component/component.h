@@ -114,6 +114,9 @@ struct AppConfig {
     std::string start;
     // favicon and manifest icon, relative to the output dir
     std::string icon;
+    // the home screen icon on an iPhone or iPad (apple-touch-icon): a square PNG without
+    // transparency, 180x180; iOS ignores an SVG there and uses a screenshot of the page instead
+    std::string touch_icon;
     // theme-color
     std::string theme;
     // overlay: an installed app draws into its title bar, the window buttons float over it

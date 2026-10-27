@@ -238,6 +238,7 @@ app {
     tick = always;                                 // Frame loop: always (default) or demand
     pwa = true;                                    // Installable, works offline
     icon = "assets/icon.png";                      // Favicon and app icon
+    touchIcon = "assets/touch-icon.png";           // iPhone and iPad home screen icon
     theme = "#0b3d2e";                             // Browser UI color
     titlebar = overlay;                            // Installed app draws its own title bar
     prerender = true;                              // Every route as HTML at build time
@@ -255,6 +256,7 @@ app {
 | `pwa` | `true` / `false` | No | Generates a manifest and a service worker so the app can be installed and starts offline, see [Installable and offline](#installable-and-offline) |
 | `start` | `"/app"` | No | Where the installed app opens (the manifest's `start_url`): a site with a start page in front of an app opens on the app. The `base` by default |
 | `icon` | String | No | Path in the build output, e.g. `"assets/icon.png"`. Used as favicon and app icon |
+| `touchIcon` | String | No | The icon on an iPhone or iPad home screen: a square 180×180 PNG without transparency (iOS rounds the corners itself). `icon` by default; iOS can't use an SVG and shows a screenshot of the page instead |
 | `theme` | String | No | CSS color for the browser's UI (address bar, title bar of the installed app). `System.setThemeColor` changes it at runtime, e.g. for a dark theme |
 | `titlebar` | `system` / `overlay` | No | `overlay` lets the installed app draw into its title bar, see [Your own title bar](#your-own-title-bar) |
 | `prerender` | `true` / `false` / `["/app/note"]` | No | Renders every static route to HTML at build time, plus the listed paths, see [Prerendering](#prerendering) |
@@ -301,7 +303,7 @@ Leave `base` as `"/"` (the default) for root deploys. `coi dev` serves the app u
 
 With `pwa = true`, `coi build` also writes `manifest.webmanifest` and `sw.js` next to `index.html`:
 
-- **Installable.** Browsers offer to install the app (Chrome's install button, "Add to Home Screen" on phones). It then opens in its own window with `title` as its name and `icon` as its icon. Use a square PNG of at least 512×512 in `assets/`; SVG works too.
+- **Installable.** Browsers offer to install the app (Chrome's install button, "Add to Home Screen" on phones). It then opens in its own window with `title` as its name and `icon` as its icon. Use a square PNG of at least 512×512 in `assets/`; SVG works too, but then give `touchIcon` a PNG for iPhones and iPads. Safari has no install prompt: people install from Share, then Add to Home Screen (iPhone, iPad), or File, then Add to Dock (Mac). `System.installState` says which (3 or 4), so the app can show those steps where its install button would be.
 - **Offline.** The service worker caches every file of the build and serves them from the cache first, so the app starts without a connection, on any route. Requests to your API are not cached: they go to the network as usual.
 - **On demand.** Files in a folder named `lazy` (`assets/lazy/…`, at any depth) are left out of that first download: big files only some visits need, like fonts for an export. The service worker keeps each one the first time the app fetches it, so it works offline after one use. A new build starts a new cache, and they are fetched again when next used.
 - **Updates.** Each build gets a new version. An open app checks for it when it loads, downloads it in the background, and the next start runs the new build.

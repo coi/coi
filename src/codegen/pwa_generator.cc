@@ -109,8 +109,9 @@ std::string pwa_head_tags(const AppConfig &config)
     if (config.pwa)
     {
         o << "    <link rel=\"manifest\" href=\"./manifest.webmanifest\">\n";
-        if (!config.icon.empty())
-            o << "    <link rel=\"apple-touch-icon\" href=\"./" << html_attr(rel(config.icon)) << "\">\n";
+        std::string touch = config.touch_icon.empty() ? config.icon : config.touch_icon;
+        if (!touch.empty())
+            o << "    <link rel=\"apple-touch-icon\" href=\"./" << html_attr(rel(touch)) << "\">\n";
         // skipped under coi dev; update() checks for a new build right away
         o << "    <script>if ('serviceWorker' in navigator) addEventListener('load', () => { if (!window.__coi_dev) navigator.serviceWorker.register('./sw.js').then(r => r.update()).catch(e => console.warn('[Coi] service worker not registered:', e)); });</script>\n";
     }
@@ -174,6 +175,10 @@ void generate_pwa_files(const fs::path &out_dir, const AppConfig &config)
     }
     m << "]\n}\n";
     std::ofstream(out_dir / "manifest.webmanifest") << m.str();
+
+    std::string touch = config.touch_icon.empty() ? config.icon : config.touch_icon;
+    if (!touch.empty() && icon_mime(touch) != "image/png")
+        std::cerr << "[Coi] Warning: an iPhone or iPad shows a screenshot of the page on the home screen, not '" << rel(touch) << "'; give app.touchIcon a 180x180 PNG" << std::endl;
 
     // --- precache list and build hash ---
     std::vector<std::string> files;
