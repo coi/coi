@@ -1,0 +1,1 @@
+mount takes a component, built in place: mount(Counter()) or mount(Counter(start = 2))

@@ -1,0 +1,18 @@
+// an action on a selector nothing matches fails the test where it is, with the page
+module Missing;
+
+component Hello {
+    view { <p class="hi">Hello</p> }
+}
+
+test "a button that isn't there" {
+    Mounted m = mount(Hello());
+    expect(m.text(".hi") == "Hello");
+    m.click(".save");
+    expect(false);
+}
+
+test "the next test still runs" {
+    Mounted m = mount(Hello());
+    expect(m.text(".hi") == "Hello");
+}

@@ -932,9 +932,25 @@ test "a change on one side is taken" {        // top level of any file, no param
 - `coi test` builds every test block into a native program and runs it: about a second, exit 1 on
   a failure. The output names the test, `file:line`, the condition as written, and both sides of a
   failed comparison as JSON. A normal build leaves test blocks out.
-- A test belongs to the file's module and calls its private functions directly. Browser calls do
-  nothing in a test: test pure functions (parsing, merging, formatting, maths).
+- A test belongs to the file's module and calls its private functions directly.
 - Many tests: a `Name.test.coi` next to `Name.coi`, starting `module Name; import "Name.coi";`.
+
+A component is tested on an in-memory page, no browser:
+```coi
+test "save counts up" {
+    Mounted m = mount(Counter(start = 2));   // built like Counter(...) in code; a fresh page per test
+    m.click(".save");                        // bubbles to ancestors' onclick; a checkbox flips
+    m.fill(".name", "Ada");                  // value, then oninput
+    expect(m.text(".count") == "3");         // all the text inside the first match
+    expect(m.count("li") == 0 && !m.has(".menu"));
+}
+```
+- Actions: `click(sel)`, `fill(sel, text)`, `select(sel, value)`, `check(sel)`, `uncheck(sel)`,
+  `key(sel, keyCode)`. Reading: `text(sel)`, `attr(sel, name)`, `has(sel)`, `count(sel)`, `html()`.
+- Selectors: tag, `#id`, `.class`, `[attr]`, `[attr=value]`, descendant, `>`, `,` (no `:` pseudos).
+  An action on a selector nothing matches fails the test there and prints the page's HTML.
+- Other browser calls (storage, fetch, canvas, timers) do nothing in a test, and there is no
+  layout (sizes read 0).
 
 ---
 
@@ -1116,6 +1132,7 @@ Before returning code, confirm:
 - [ ] Verify with `coi --check src/*.coi` (errors only, nothing written; the `check` tool when
       `coi mcp` is connected) or `coi build`, and fix every reported error.
 - [ ] Pure logic in a module has a `test "..." { expect(...); }` block next to it, and `coi test` passes.
+- [ ] UI logic (what a click or typing changes) is checked with `mount(...)` in a test.
 
 ---
 

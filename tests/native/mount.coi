@@ -1,0 +1,101 @@
+// components mounted on the test's page: found by selector, clicked, typed into, read back
+module Todos;
+
+pub pod Todo { int id; string text; }
+
+component Row(Todo todo, def onRemove(int id) : void) {
+    def remove() : void { onRemove(todo.id); }
+    view {
+        <li class="row" data-id="${todo.id}">
+            <input type="checkbox" />
+            <span class="text">{todo.text}</span>
+            <button class="remove" onclick={remove}>x</button>
+        </li>
+    }
+}
+
+component List(string title = "Todos") {
+    mut Todo[] todos = [];
+    mut string draft = "";
+    mut int nextId = 1;
+    mut string sort = "new";
+    mut string clicked = "";
+    mut int ticked = 0;
+
+    def typed(string v) : void { draft = v; }
+    def add() : void {
+        if (draft.isEmpty()) return;
+        todos.push(Todo{id = nextId, text = draft});
+        nextId += 1;
+        draft = "";
+    }
+    def key(int code) : void { if (code == 13) add(); }
+    def remove(int id) : void { todos = todos.filter(t => t.id != id); }
+    def sorted(string v) : void { sort = v; }
+    def ticks(string v) : void { if (v == "true") ticked += 1; }
+    def where(DOMElement target, float x, float y, Mods mods) : void { clicked = target.getAttribute("class"); }
+
+    view {
+        <div class="list" onclicktarget={where}>
+            <h1>{title}</h1>
+            <input class="draft" value={draft} oninput={typed} onkeydown={key} />
+            <button class="add" onclick={add}><b>Add</b></button>
+            <select class="sort" onchange={sorted}>
+                <option value="new">Newest</option>
+                <option value="old">Oldest</option>
+            </select>
+            <ul onchange={ticks}>
+                <for todo in todos key={todo.id}>
+                    <Row todo={todo} &onRemove={remove} />
+                </for>
+            </ul>
+            <if todos.isEmpty()>
+                <p class="empty">Nothing to do</p>
+            </if>
+            <p class="status">{todos.size()} by {sort}, {ticked} ticked</p>
+            <p class="clicked">{clicked}</p>
+        </div>
+    }
+}
+
+test "props and the first render" {
+    Mounted m = mount(List(title = "Week"));
+    expect(m.text("h1") == "Week");
+    expect(m.has(".empty"));
+    expect(m.count("li") == 0);
+    expect(m.html().startsWith("<div class=\"list\"><h1>Week</h1>"));
+}
+
+test "typing, clicking and keys" {
+    Mounted m = mount(List());
+    m.fill(".draft", "milk");
+    m.click(".add b");
+    m.fill(".draft", "eggs");
+    m.key(".draft", 13);
+    expect(m.count("ul > li.row") == 2);
+    expect(m.has(".empty") == false);
+    expect(m.attr(".draft", "value") == "");
+    expect(m.text("li[data-id='2'] .text") == "eggs");
+    expect(m.text(".clicked") == "");
+    m.click("li[data-id='1'] .remove");
+    expect(m.text("ul") == "eggsx");
+    expect(m.text(".clicked") == "remove");
+}
+
+test "checkboxes and selects" {
+    Mounted m = mount(List());
+    m.fill(".draft", "milk");
+    m.click(".add");
+    m.check("li input");
+    expect(m.has("li input[checked]"));
+    m.uncheck("li input");
+    m.click("li [type=checkbox]");
+    m.select(".sort", "old");
+    expect(m.text(".status") == "1 by old, 2 ticked");
+}
+
+test "each test has a page of its own" {
+    Mounted m = mount(List());
+    expect(m.count(".list") == 1);
+    expect(m.count("li") == 0);
+}

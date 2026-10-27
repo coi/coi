@@ -39,6 +39,20 @@ static void emit_event_dispatch(std::ostream &out, const FeatureFlags &features)
     }
 }
 
+// every event of a frame to its handlers
+static void emit_dispatch_events(std::ostream &out, const FeatureFlags &features)
+{
+    out << "void dispatch_events(const webcc::Event* events, uint32_t event_count) {\n";
+    out << "    for (uint32_t i = 0; i < event_count; i++) {\n";
+    out << "        const auto& e = events[i];\n";
+    out << "        if (false) {\n"; // Dummy to allow all handlers to use "} else if"
+    emit_feature_event_handlers(out, features);
+    emit_event_dispatch(out, features);
+    out << "        }\n";
+    out << "    }\n";
+    out << "}\n\n";
+}
+
 // A module's pods name each other without the module (Login, not Account::Login), and any
 // pod may name another module's as Geo::Point. Written out as C++ every name carries its
 // module (Account_Login, Geo_Point); the structs, the JSON code and its registry all read
@@ -69,14 +83,18 @@ static std::string qualify_pod_type(const std::string &t, const std::string &mod
 }
 
 // what a test's expect() calls: one failure ends the test, printed as it happens under the
-// test's name. Values print as JSON, which every Coi value can be written as
+// test's name. Values print as JSON, which every Coi value can be written as. mount() puts a
+// component on the host's page (webcc/host.h), cleared after each test
 static void emit_test_runtime(std::ostream &out)
 {
     out << R"(static const char* coi_test_current = "";
 static bool coi_test_failed_now = false;
+static const char* coi_test_where = "";
+static int coi_test_line = 0;
 static bool coi_test_color() { static int c = -1; if (c < 0) { const char* e = getenv("COI_COLOR"); c = e && *e == '1'; } return c == 1; }
 template<typename T> static coi::string coi_test_show(const T& v) { return __coi_json_stringify(v); }
 static void coi_test_fail(const char* file, int line, const char* expr, const coi::string& left, const coi::string& right) {
+    if (coi_test_failed_now) return;
     coi_test_failed_now = true;
     printf("  %s✗%s %s\n", coi_test_color() ? "\033[31m" : "", coi_test_color() ? "\033[0m" : "", coi_test_current);
     printf("    %s:%d  expect(%s)\n", file, line, expr);
@@ -86,14 +104,92 @@ static void coi_test_fail(const char* file, int line, const char* expr, const co
     }
     printf("\n");
 }
+void dispatch_events(const webcc::Event* events, uint32_t event_count);
+static void coi_test_page_fail(const char* action, const coi::string& selector) {
+    if (coi_test_failed_now) return;
+    coi_test_failed_now = true;
+    printf("  %s✗%s %s\n", coi_test_color() ? "\033[31m" : "", coi_test_color() ? "\033[0m" : "", coi_test_current);
+    printf("    %s:%d  %s(\"%.*s\"): nothing on the page matches\n", coi_test_where, coi_test_line, action, (int)selector.length(), selector.data());
+    coi::string page = webcc::host::html(webcc::DOMElement(0));
+    int shown = page.length() > 2000 ? 2000 : (int)page.length();
+    printf("      page   %.*s%s\n\n", shown, page.data(), page.length() > 2000 ? " ..." : "");
+}
+static void coi_test_update() {
+    static webcc::Event events[64];
+    webcc::Event e;
+    for (;;) {
+        uint32_t count = 0;
+        while (count < 64 && webcc::poll_event(e)) events[count++] = e;
+        if (count == 0) break;
+        dispatch_events(events, count);
+        if (count < 64) break;
+    }
+    webcc::flush();
+    coi_reap();
+}
+struct Mounted {
+    webcc::DOMElement find(const char* action, const coi::string& selector) const {
+        if (coi_test_failed_now) return webcc::DOMElement();
+        webcc::DOMElement el = webcc::host::query(selector);
+        if (!el.is_valid()) coi_test_page_fail(action, selector);
+        return el;
+    }
+    void click(const coi::string& selector) const {
+        webcc::DOMElement el = find("click", selector);
+        if (el.is_valid()) { webcc::host::click(el); coi_test_update(); }
+    }
+    void fill(const coi::string& selector, const coi::string& text) const {
+        webcc::DOMElement el = find("fill", selector);
+        if (el.is_valid()) { webcc::host::input(el, text); coi_test_update(); }
+    }
+    void select(const coi::string& selector, const coi::string& value) const {
+        webcc::DOMElement el = find("select", selector);
+        if (el.is_valid()) { webcc::host::change(el, value); coi_test_update(); }
+    }
+    void check(const coi::string& selector, bool on) const {
+        webcc::DOMElement el = find(on ? "check" : "uncheck", selector);
+        if (el.is_valid()) { webcc::host::change(el, on ? "true" : "false"); coi_test_update(); }
+    }
+    void key(const coi::string& selector, int32_t code) const {
+        webcc::DOMElement el = find("key", selector);
+        if (el.is_valid()) { webcc::host::keydown(el, code); coi_test_update(); }
+    }
+    coi::string text(const coi::string& selector) const {
+        webcc::DOMElement el = find("text", selector);
+        return el.is_valid() ? webcc::host::text(el) : coi::string();
+    }
+    coi::string attr(const coi::string& selector, const coi::string& name) const {
+        webcc::DOMElement el = find("attr", selector);
+        return el.is_valid() ? webcc::dom::get_attribute(el, name) : coi::string();
+    }
+    bool has(const coi::string& selector) const { return webcc::host::query(selector).is_valid(); }
+    int32_t count(const coi::string& selector) const { return webcc::host::count(selector); }
+    coi::string html() const { return webcc::host::html(webcc::DOMElement(0)); }
+};
+struct CoiMounted { void* p; void (*drop)(void*); };
+static webcc::vector<CoiMounted> coi_test_mounted;
+template<typename T> static void coi_test_drop(void* p) { T* c = static_cast<T*>(p); c->_destroy(); c->~T(); webcc::free(c); }
+template<typename T> static Mounted coi_test_mount(T* c) {
+    c->_view();
+    webcc::flush();
+    coi_test_mounted.push_back(CoiMounted{c, &coi_test_drop<T>});
+    return Mounted{};
+}
+static void coi_test_unmount() {
+    for (size_t i = coi_test_mounted.size(); i-- > 0;) coi_test_mounted[i].drop(coi_test_mounted[i].p);
+    coi_test_mounted.clear();
+    coi_reap();
+    webcc::host::clear();
+}
 )";
 }
 
 // runs every test in order; the last line is for the tool that started the program
-static void emit_test_main(std::ostream &out, const std::vector<std::unique_ptr<FunctionDef>> &functions)
+static void emit_test_main(std::ostream &out, const std::vector<std::unique_ptr<FunctionDef>> &functions, const FeatureFlags &features)
 {
     out << "void g_app_navigate(const coi::string& route) {}\n";
     out << "coi::string g_app_get_route() { return \"\"; }\n\n";
+    emit_dispatch_events(out, features);
     out << "int main() {\n";
     out << "    struct CoiTest { const char* name; void (*run)(); };\n";
     out << "    static const CoiTest tests[] = {\n";
@@ -112,6 +208,7 @@ static void emit_test_main(std::ostream &out, const std::vector<std::unique_ptr<
     out << "        coi_test_current = tests[i].name;\n";
     out << "        coi_test_failed_now = false;\n";
     out << "        tests[i].run();\n";
+    out << "        coi_test_unmount();\n";
     out << "        if (coi_test_failed_now) failed++;\n";
     out << "        else { passed++; if (verbose) printf(\"  %s✓%s %s\\n\", coi_test_color() ? \"\\033[32m\" : \"\", coi_test_color() ? \"\\033[0m\" : \"\", tests[i].name); }\n";
     out << "    }\n";
@@ -137,8 +234,8 @@ void generate_cpp_code(
     {
         out << "#include \"webcc/" << header << ".h\"\n";
     }
-    if (test_program)   // built for the host: the C library is there
-        out << "#include <cstdio>\n#include <cstdlib>\n";
+    if (test_program)   // built for the host: the C library is there, and the page to mount on
+        out << "#include <cstdio>\n#include <cstdlib>\n#include \"webcc/dom.h\"\n#include \"webcc/host.h\"\n";
     out << "#include \"webcc/core/function.h\"\n";
     out << "#include \"webcc/core/allocator.h\"\n";
     out << "#include \"webcc/core/new.h\"\n";
@@ -919,7 +1016,7 @@ template<typename V, typename F> inline V coi_filter(const V& v, F pred) {
 
     if (test_program)
     {
-        emit_test_main(out, all_global_functions);
+        emit_test_main(out, all_global_functions, features);
         return;
     }
 
@@ -961,15 +1058,7 @@ template<typename V, typename F> inline V coi_filter(const V& v, F pred) {
         out << "coi::string g_app_get_route() { return \"\"; }\n";
     }
 
-    out << "void dispatch_events(const webcc::Event* events, uint32_t event_count) {\n";
-    out << "    for (uint32_t i = 0; i < event_count; i++) {\n";
-    out << "        const auto& e = events[i];\n";
-    out << "        if (false) {\n"; // Dummy to allow all handlers to use "} else if"
-    emit_feature_event_handlers(out, features);
-    emit_event_dispatch(out, features);
-    out << "        }\n";
-    out << "    }\n";
-    out << "}\n\n";
+    emit_dispatch_events(out, features);
 
     out << "void update_wrapper(double time) {\n";
     out << "    static double last_time = 0;\n";

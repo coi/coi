@@ -6,6 +6,7 @@
 #include "../defs/def_parser.h"
 #include "../codegen/json_codegen.h"
 #include "../cli/error.h"
+#include "../analysis/type_checker.h"
 #include <cctype>
 
 // Helper to expand @inline templates like "${this}.length()" or "$self.is_valid()" or "${0}"
@@ -435,6 +436,12 @@ static bool def_method_named(const std::string& method) {
 }
 
 std::string FunctionCall::to_webcc() {
+    // mount(Counter()) in a test: the component on the heap, it stays where the page's handlers point
+    if (name == "mount" && !g_test_file.empty() && args.size() == 1 && FreeFunctionRegistry::instance().resolve_call("mount").empty())
+        if (auto *cc = dynamic_cast<ComponentConstruction *>(args[0].value.get())) {
+            std::string t = cc->cpp_type();
+            return "coi_test_mount(new (webcc::malloc(sizeof(" + t + "))) " + t + "(" + cc->to_webcc() + "))";
+        }
     // Parse Type.method or instance.method
     size_t dot_pos = name.rfind('.');
     std::string type_or_obj = "";
@@ -1022,19 +1029,24 @@ std::string EnumAccess::to_webcc() {
     return ComponentTypeContext::instance().resolve(enum_name) + "::" + value_name;
 }
 
-std::string ComponentConstruction::to_webcc() {
+std::string ComponentConstruction::cpp_type() {
     // Resolve component-local data types (e.g., Body -> App_Body)
-    std::string resolved_name = ComponentTypeContext::instance().resolve(component_name);
+    const auto &ctx = ComponentTypeContext::instance();
+    std::string resolved_name = ctx.resolve(component_name);
     if (resolved_name == component_name &&
         component_name.find("::") == std::string::npos &&
         !component_name.empty() &&
         std::isupper(component_name[0])) {
-        const std::string &current_component = ComponentTypeContext::instance().component_name;
+        const std::string &current_component = ctx.component_name;
         size_t module_sep = current_component.find('_');
         if (module_sep != std::string::npos) {
             std::string module_name = current_component.substr(0, module_sep);
             std::string qualified_ctor = module_name + "::" + component_name;
             resolved_name = convert_type(qualified_ctor);
+        }
+        // a module's component built in a top-level function
+        else if (current_component.empty() && !ctx.module_name.empty() && is_component_name(ctx.module_name + "_" + component_name)) {
+            resolved_name = ctx.module_name + "_" + component_name;
         }
     }
     // Explicit namespaced constructors (e.g., Pdf::Writer(...))
@@ -1042,6 +1054,11 @@ std::string ComponentConstruction::to_webcc() {
     if (resolved_name.find("::") != std::string::npos) {
         resolved_name = convert_type(resolved_name);
     }
+    return resolved_name;
+}
+
+std::string ComponentConstruction::to_webcc() {
+    std::string resolved_name = cpp_type();
     // named fields go out in declaration order
     bool any_named = false;
     for (const auto& a : args) any_named = any_named || !a.name.empty();

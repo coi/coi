@@ -778,6 +778,7 @@ int main(int argc, char **argv)
         // Code generation - automatically detect required headers and features
         // only what the app reaches from its root goes into the build (every component was
         // checked above): what nothing uses costs no code and no CSS
+        if (!test)
         {
             std::vector<std::string> roots;
             for (const auto &c : all_components)
@@ -797,14 +798,20 @@ int main(int argc, char **argv)
             all_components = std::move(kept);
         }
         // a test program has no page, only the components its functions take as parameters
-        // (a package's component, say) and what those reach
+        // (a package's component, say) or build (mount(Counter())) and what those reach
         if (test)
         {
             std::set<std::string> keep;
+            std::function<void(ASTNode *, std::vector<std::string> &)> built = [&](ASTNode *node, std::vector<std::string> &types) {
+                if (!node) return;
+                if (auto *cc = dynamic_cast<ComponentConstruction *>(node)) types.push_back(cc->component_name);
+                for (ASTNode *child : node->get_child_nodes()) built(child, types);
+            };
             for (const auto &fn : all_global_functions)
             {
                 std::vector<std::string> types = {fn->return_type};
                 for (const auto &p : fn->params) types.push_back(p.type);
+                for (const auto &stmt : fn->body) built(stmt.get(), types);
                 for (std::string t : types)
                 {
                     for (char &c : t) if (!std::isalnum((unsigned char)c) && c != '_' && c != ':') c = ' ';

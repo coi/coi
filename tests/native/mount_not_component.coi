@@ -1,0 +1,8 @@
+// mount takes a component built in place
+module Points;
+
+pub pod Point { int x; int y; }
+
+test "a pod is no component" {
+    Mounted m = mount(Point{x = 1, y = 2});
+}

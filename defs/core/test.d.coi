@@ -1,0 +1,45 @@
+// A component mounted in a test: mount(Counter(start = 2)). Elements are found by CSS
+// selector, the first match; an action on a selector nothing matches fails the test.
+
+@builtin
+type Mounted {
+    // a click, bubbling up as in a browser; a checkbox flips
+    @inline("${this}.click(${0})")
+    def click(string selector): void
+
+    // types the text into an input or textarea: its value, then oninput
+    @inline("${this}.fill(${0}, ${1})")
+    def fill(string selector, string text): void
+
+    // a select's value, then onchange
+    @inline("${this}.select(${0}, ${1})")
+    def select(string selector, string value): void
+
+    @inline("${this}.check(${0}, true)")
+    def check(string selector): void
+
+    @inline("${this}.check(${0}, false)")
+    def uncheck(string selector): void
+
+    // onkeydown with the key code (13 is Enter)
+    @inline("${this}.key(${0}, ${1})")
+    def key(string selector, int keyCode): void
+
+    // the text inside the element, all of it
+    @inline("${this}.text(${0})")
+    def text(string selector): string
+
+    // "" when the element has no such attribute
+    @inline("${this}.attr(${0}, ${1})")
+    def attr(string selector, string name): string
+
+    @inline("${this}.has(${0})")
+    def has(string selector): bool
+
+    @inline("${this}.count(${0})")
+    def count(string selector): int
+
+    // the page as HTML
+    @inline("${this}.html()")
+    def html(): string
+}

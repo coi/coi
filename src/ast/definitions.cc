@@ -1,6 +1,8 @@
 #include "definitions.h"
 #include "../codegen/codegen_utils.h"
 #include "node.h"
+#include "codegen_state.h"
+#include "expressions.h"
 
 // template header + signature, registers params in scope
 static std::string function_signature(const FunctionDef& fn, const std::string& emitted_name) {
@@ -55,11 +57,27 @@ std::string FunctionDef::free_declaration() {
     return result;
 }
 
+// the line of a statement's first call
+static int call_line(ASTNode* node) {
+    if (!node) return 0;
+    if (auto* call = dynamic_cast<FunctionCall*>(node); call && call->line > 0) return call->line;
+    if (auto* call = dynamic_cast<MethodCall*>(node); call && call->line > 0) return call->line;
+    for (ASTNode* child : node->get_child_nodes())
+        if (int line = call_line(child)) return line;
+    return 0;
+}
+
 std::string FunctionDef::free_definition() {
     ComponentTypeContext::instance().begin_method_scope();
     std::string result = function_signature(*this, cpp_name(qualified_name(module_name, name))) + " {\n";
+    // a test says where it is for a failed page action, and stops at one
+    if (!test_name.empty())
+        result += "    coi_test_where = " + cpp_string_literal(g_test_file) + ";\n";
     for(auto& stmt : body){
+        int line = test_name.empty() ? 0 : call_line(stmt.get());
+        if (line) result += "    coi_test_line = " + std::to_string(line) + ";\n";
         result += "    " + stmt->to_webcc() + "\n";
+        if (!test_name.empty()) result += "    if (coi_test_failed_now) return;\n";
     }
     result += "}\n";
     ComponentTypeContext::instance().end_method_scope();

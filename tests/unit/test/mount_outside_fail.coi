@@ -1,0 +1,10 @@
+// Test: mount only works inside a test block
+module Counting;
+
+component Main { view { <div>hi</div> } }
+
+def show() : void {
+    Mounted m = mount(Main());
+}
+
+app { root = Main; }

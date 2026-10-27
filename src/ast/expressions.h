@@ -235,6 +235,7 @@ struct ComponentConstruction : Expression {
     std::vector<CallArg> args;
 
     explicit ComponentConstruction(const std::string& name) : component_name(name) {}
+    std::string cpp_type();
     std::string to_webcc() override;
     std::vector<Expression*> get_children() override;
 };

@@ -1429,6 +1429,23 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
             }
             return "void";
         }
+        // mount(Counter(start = 2)): a component on a test's page
+        if (func->name == "mount" && !scope.count("mount") && !resolve_free_function("mount", scope, func->line))
+        {
+            if (!g_ctx_test)
+            {
+                ErrorHandler::type_error("mount only works inside a test block: test \"what it checks\" { Mounted m = mount(Counter()); }", func->line);
+                exit(1);
+            }
+            auto *cc = func->args.size() == 1 && func->args[0].name.empty() ? dynamic_cast<ComponentConstruction *>(func->args[0].value.get()) : nullptr;
+            if (!cc || !is_component_name(cc->component_name))
+            {
+                ErrorHandler::type_error("mount takes a component, built in place: mount(Counter()) or mount(Counter(start = 2))", func->line);
+                exit(1);
+            }
+            infer_expression_type(cc, scope);
+            return "Mounted";
+        }
         if (const FunctionDef *free_fn = resolve_free_function(func->name, scope, func->line))
         {
             return check_free_function_call(free_fn, func, scope);
@@ -2888,12 +2905,17 @@ static void check_free_function_names(const FunctionDef &fn, const std::set<std:
                 if (!base.empty() && std::islower(static_cast<unsigned char>(base[0])))
                     check_name(base, scope, line);
             }
-            else if (!scope.count(call->name) && !(call->name == "expect" && !fn.test_name.empty()))
+            else if (!scope.count(call->name) && !((call->name == "expect" || call->name == "mount") && !fn.test_name.empty()))
             {
                 const FunctionDef *target = resolve_free_function(call->name, no_scope, line);
                 if (!target && call->name == "expect")
                 {
                     ErrorHandler::type_error("expect only works inside a test block: test \"what it checks\" { expect(...); }", line);
+                    exit(1);
+                }
+                if (!target && call->name == "mount")
+                {
+                    ErrorHandler::type_error("mount only works inside a test block: test \"what it checks\" { Mounted m = mount(Counter()); }", line);
                     exit(1);
                 }
                 if (!target)

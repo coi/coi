@@ -1456,9 +1456,40 @@ both sides of a comparison as JSON:
   ✗ 1 of 12 failed in 0.8s
 ```
 
-Browser calls (DOM, storage, fetch, canvas) do nothing and return nothing in a test, so test the
-pure functions: parsing, merging, formatting, layout maths. `coi test` exits with 1 when a test
-fails, for a script or CI.
+`coi test` exits with 1 when a test fails, for a script or CI.
+
+### Testing a component
+
+`mount` puts a component on a page of the test's own, kept in memory with no browser. Elements
+are found by CSS selector, and clicks and typing reach the component's handlers as in a browser:
+
+```tsx
+module Counter;
+import "Counter.coi";
+
+test "save counts up" {
+    Mounted m = mount(Counter(start = 2));
+    m.click(".save");
+    expect(m.text(".count") == "3");
+    m.fill(".name", "Ada");
+    expect(m.text(".hello") == "Hi Ada");
+    expect(m.count("li") == 0);
+}
+```
+
+- `mount(Counter())` builds the component as `Counter(...)` does in code, props included, and
+  renders it. Each test starts on an empty page.
+- Actions: `click(sel)` (bubbles to the ancestors' handlers; a checkbox flips), `fill(sel, text)`
+  (sets the value, then `oninput`), `select(sel, value)` and `check(sel)` / `uncheck(sel)` (then
+  `onchange`), `key(sel, keyCode)` (`onkeydown`).
+- Reading: `text(sel)` (all the text inside), `attr(sel, name)`, `has(sel)`, `count(sel)`, and
+  `html()` for the whole page.
+- Selectors: tag, `#id`, `.class`, `[attr]`, `[attr=value]`, descendant, `>` and `,`. An action
+  or `text`/`attr` on a selector nothing matches fails the test there and prints the page.
+
+Other browser calls (storage, fetch, canvas, timers) do nothing and return nothing in a test.
+There is no layout either: sizes and positions read as 0. Keep what depends on those for a
+browser.
 
 ## Next Steps
 
