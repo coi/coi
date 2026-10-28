@@ -1,0 +1,8 @@
+// Test: a literal past int64 doesn't fit an int64
+component App {
+    init {
+        int64 offset = 0xcbf29ce484222325;
+    }
+    view { <p>x</p> }
+}
+app { root = App; }

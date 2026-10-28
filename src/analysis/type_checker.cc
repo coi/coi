@@ -371,6 +371,8 @@ static bool literal_fits(Expression *expr, const std::string &target)
     auto *lit = dynamic_cast<IntLiteral *>(expr);
     if (!lit)
         return false;
+    if (lit->big)
+        return t == "uint64" && !neg;
     v = neg ? -lit->value : lit->value;
     if (t == "float32" || t == "float64" || t == "int64")
         return true;
@@ -1116,6 +1118,8 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
 {
     if (auto *lit = dynamic_cast<IntLiteral *>(expr))
     {
+        if (lit->big)
+            return "uint64";
         if (lit->value >= INT32_MIN && lit->value <= INT32_MAX)
             return "int32";
         return lit->value >= 0 && lit->value <= UINT32_MAX ? "uint32" : "int64";

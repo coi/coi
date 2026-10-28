@@ -272,6 +272,7 @@ std::unique_ptr<Expression> Parser::parse_primary()
     if (current().type == TokenType::INT_LITERAL)
     {
         int64_t value = 0;
+        bool big = false;
         try
         {
             // base 0: decimal or 0x
@@ -279,14 +280,23 @@ std::unique_ptr<Expression> Parser::parse_primary()
         }
         catch (const std::out_of_range &)
         {
-            ErrorHandler::compiler_error("Integer literal '" + current().value + "' is too large", current().line);
+            // past int64 but within uint64 (a hash's constants): a uint64 literal
+            try
+            {
+                value = (int64_t)std::stoull(current().value, nullptr, 0);
+                big = true;
+            }
+            catch (const std::exception &)
+            {
+                ErrorHandler::compiler_error("Integer literal '" + current().value + "' is too large", current().line);
+            }
         }
         catch (const std::invalid_argument &)
         {
             ErrorHandler::compiler_error("Invalid integer literal '" + current().value + "'", current().line);
         }
         advance();
-        return std::make_unique<IntLiteral>(value);
+        return std::make_unique<IntLiteral>(value, big);
     }
 
     // Float literal

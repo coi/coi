@@ -130,6 +130,7 @@ uint8 byte = 255;          // 8-bit unsigned (0 to 255)
 uint16 port = 8080;        // 16-bit unsigned
 uint32 id = 4000000000;    // 32-bit unsigned
 uint64 huge = 10000000000; // 64-bit unsigned
+uint64 seed = 0xcbf29ce484222325; // past int64's range: a uint64 literal, fits nothing else
 
 // Hexadecimal literals (0x prefix)
 int GL_ARRAY_BUFFER = 0x8892;      // WebGL constant

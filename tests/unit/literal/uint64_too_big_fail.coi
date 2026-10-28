@@ -1,0 +1,8 @@
+// Test: a literal past uint64 fits nothing
+component App {
+    init {
+        uint64 over = 18446744073709551616;
+    }
+    view { <p>x</p> }
+}
+app { root = App; }

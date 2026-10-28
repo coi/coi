@@ -1,0 +1,14 @@
+// a literal past int64 is a uint64, which holds it: a 64-bit hash's constants
+def fnv(uint8[] bytes) : uint64 {
+    mut uint64 h = 0xcbf29ce484222325;
+    for b in bytes { h = (h ^ b) * 0x100000001b3; }
+    return h;
+}
+
+test "a uint64 literal past int64" {
+    uint64 top = 18446744073709551615;
+    expect(top == 0xffffffffffffffff);
+    expect(`${top}` == "18446744073709551615");
+    expect(fnv("".toBytes()) == 0xcbf29ce484222325);
+    expect(fnv("a".toBytes()) == 0xaf63dc4c8601ec8c);
+}

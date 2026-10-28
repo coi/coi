@@ -11,7 +11,8 @@ std::string event_call_args(const MethodDef& event_method, const std::string& ha
 
 struct IntLiteral : Expression {
     int64_t value;
-    explicit IntLiteral(int64_t v) : value(v){}
+    bool big = false;   // past INT64_MAX: value holds the uint64's bits, and it's a uint64
+    explicit IntLiteral(int64_t v, bool big = false) : value(v), big(big){}
     std::string to_webcc() override;
     bool is_static() override { return true; }
 };

@@ -1,0 +1,9 @@
+// Test: a literal past int64 fits a uint64
+component App {
+    init {
+        uint64 offset = 0xcbf29ce484222325;
+        uint64 top = 18446744073709551615;
+    }
+    view { <p>x</p> }
+}
+app { root = App; }

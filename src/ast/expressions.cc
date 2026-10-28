@@ -148,6 +148,7 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
 }
 
 std::string IntLiteral::to_webcc() {
+    if (big) return std::to_string((uint64_t)value) + "ULL";
     if (value >= INT32_MIN && value <= INT32_MAX) return std::to_string(value);
     return std::to_string(value) + "LL";
 }
@@ -1300,7 +1301,7 @@ std::vector<Expression*> MethodCall::get_children() {
 // field: an array's or a string's method, the same fallback to_webcc takes). "" when unknown
 static std::string untyped_result(Expression* e) {
     if (dynamic_cast<StringLiteral*>(e)) return "string";
-    if (dynamic_cast<IntLiteral*>(e)) return "int32";
+    if (auto* lit = dynamic_cast<IntLiteral*>(e)) return lit->big ? "uint64" : "int32";
     if (dynamic_cast<FloatLiteral*>(e)) return "float64";
     if (dynamic_cast<BoolLiteral*>(e)) return "bool";
     if (auto* call = dynamic_cast<FunctionCall*>(e)) {
