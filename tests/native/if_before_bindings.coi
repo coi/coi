@@ -1,0 +1,48 @@
+// a branch going away is gone before the bindings in it are redone: its text reads the first
+// item of a list, which is never read once the list is empty
+module Pills;
+
+component Pills {
+    pub mut int[] fresh;
+    pub def set() : void { fresh = [1, 2]; }
+    def clear() : void { fresh = []; }
+    def first() : string { return `page ${fresh[0]}`; }
+    view {
+        <div>
+            <if !fresh.isEmpty()><button class="clear" onclick={clear}>{first()}</button></if>
+        </div>
+    }
+}
+
+component Host {
+    mut Pills pills = Pills();
+    mut bool on = true;
+    def fill() : void { pills.set(); }
+    def flip() : void { on = !on; }
+    view {
+        <div>
+            <button class="fill" onclick={fill}>fill</button>
+            <button class="flip" onclick={flip}>flip</button>
+            <if on><div class="wrap"><{pills} /></div></if>
+        </div>
+    }
+}
+
+test "hidden and shown again, the member's view is one and follows its state" {
+    Mounted m = mount(Host());
+    m.click(".fill");
+    m.click(".flip");
+    m.click(".flip");
+    expect(m.count(".clear") == 1);
+    m.click(".clear");
+    expect(!m.has(".clear"));
+}
+
+test "a list emptied takes away what showed while it had items" {
+    Mounted m = mount(Host());
+    m.click(".fill");
+    expect(m.has(".clear"));
+    m.click(".clear");
+    expect(!m.has(".clear"));
+}
+

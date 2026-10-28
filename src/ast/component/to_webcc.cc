@@ -1725,10 +1725,11 @@ std::string Component::to_webcc(CompilerSession &session)
     {
         const std::string &v = param->name;
         ss << "    void _refresh_" << v << "() { if (!_coi_alive) return;";
-        if (generated_updaters.count(v))
-            ss << " _update_" << v << "();";
+        // the <if>s first: a branch going away is gone before the bindings in it are redone
         for (int if_id : var_to_if_ids[v])
             ss << " _sync_if_" << if_id << "();";
+        if (generated_updaters.count(v))
+            ss << " _update_" << v << "();";
         for (int loop_id : var_to_loop_ids[v])
             ss << " _sync_loop_" << loop_id << "();";
         ss << "\n";
@@ -1745,6 +1746,21 @@ std::string Component::to_webcc(CompilerSession &session)
 
         std::string updates;
         bool is_init_method = (method.name == "init");
+        // the <if>s of everything the method changed first: a branch going away is gone before
+        // the bindings in it are redone, so a text that only makes sense while its branch shows
+        // (the first item of a list that's now empty) is never read
+        std::set<int> synced_ifs;
+        for (const auto &mod : modified_vars)
+        {
+            if (var_to_if_ids.count(mod) && !is_init_method)
+            {
+                for (int if_id : var_to_if_ids[mod])
+                {
+                    if (synced_ifs.insert(if_id).second)
+                        updates += "        _sync_if_" + std::to_string(if_id) + "();\n";
+                }
+            }
+        }
         for (const auto &mod : modified_vars)
         {
             if (generated_updaters.count(mod) && !is_init_method)
@@ -1756,13 +1772,6 @@ std::string Component::to_webcc(CompilerSession &session)
                 for (const auto &call : child_updates[mod])
                 {
                     updates += call;
-                }
-            }
-            if (var_to_if_ids.count(mod) && !is_init_method)
-            {
-                for (int if_id : var_to_if_ids[mod])
-                {
-                    updates += "        _sync_if_" + std::to_string(if_id) + "();\n";
                 }
             }
             if (var_to_loop_ids.count(mod) && !is_init_method)
@@ -1896,10 +1905,10 @@ std::string Component::to_webcc(CompilerSession &session)
         for (const auto &ref : member_refs)
         {
             ss << "        " << cpp_name(ref.member) << "." << make_callback_name(ref.param) << " = [this]() {";
-            if (generated_updaters.count(ref.var))
-                ss << " _update_" << ref.var << "();";
             for (int if_id : var_to_if_ids[ref.var])
                 ss << " _sync_if_" << if_id << "();";
+            if (generated_updaters.count(ref.var))
+                ss << " _update_" << ref.var << "();";
             if (!g_component_array_loops.count(ref.var) && !g_array_loops.count(ref.var))
                 for (int loop_id : var_to_loop_ids[ref.var])
                     ss << " _sync_loop_" << loop_id << "();";
