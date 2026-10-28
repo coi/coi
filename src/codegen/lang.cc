@@ -12,7 +12,9 @@
 
 namespace fs = std::filesystem;
 
-// CLDR's plural categories, in the order a plural's slots have them
+// CLDR's plural categories: every language sorts numbers into some of these (English one and
+// other, Polish one, few, many, other, Arabic all six), and Intl.PluralRules says which one a
+// number is in. A plural gets a slot for each, in this order, so any language's forms fit
 static const char *const kCategories[] = {"zero", "one", "two", "few", "many", "other"};
 static const int kCategoryCount = 6;
 
