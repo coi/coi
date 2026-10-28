@@ -614,21 +614,36 @@ std::unique_ptr<ViewIfStatement> Parser::parse_view_if()
     // Parse then children until we hit </if> or <else>
     // Support text nodes, expressions {}, and elements <>
     Token last_non_text_token = tokens[pos - 1];  // The '>' we just consumed
+    // a space written between two inline children on one line is content, as in an element:
+    // <if x> {a}</if>, <if x>{a} <b>..</b></if>
+    bool after_text = false;
+    auto keep_inline_gap = [&](std::vector<std::unique_ptr<ASTNode>> &children) {
+        if (after_text) return;
+        int len = last_non_text_token.value.length();
+        if (last_non_text_token.type == TokenType::STRING_LITERAL)
+            len += 2;
+        if (last_non_text_token.line == current().line && last_non_text_token.column + len != current().column)
+            children.push_back(std::make_unique<TextNode>(" "));
+    };
     while (current().type != TokenType::END_OF_FILE && !is_if_terminator(true))
     {
         if (current().type == TokenType::LT)
         {
             // Element: <if>, <for>, or regular HTML
+            keep_inline_gap(viewIf->then_children);
             viewIf->then_children.push_back(parse_view_node());
             last_non_text_token = tokens[pos - 1];
+            after_text = false;
         }
         else if (current().type == TokenType::LBRACE)
         {
             // Expression: {expr}
+            keep_inline_gap(viewIf->then_children);
             advance();
             viewIf->then_children.push_back(parse_expression());
             expect(TokenType::RBRACE, "Expected '}'");
             last_non_text_token = tokens[pos - 1];
+            after_text = false;
         }
         else
         {
@@ -673,6 +688,7 @@ std::unique_ptr<ViewIfStatement> Parser::parse_view_if()
                     }
                 }
                 viewIf->then_children.push_back(std::make_unique<TextNode>(text));
+                after_text = true;
             }
             last_non_text_token = prev_token;
         }
@@ -688,21 +704,26 @@ std::unique_ptr<ViewIfStatement> Parser::parse_view_if()
         // Parse else children until </else>
         // Support text nodes, expressions {}, and elements <>
         last_non_text_token = tokens[pos - 1];  // The '>' we just consumed
+        after_text = false;
         while (current().type != TokenType::END_OF_FILE && !is_else_terminator())
         {
             if (current().type == TokenType::LT)
             {
                 // Element: <if>, <for>, or regular HTML
+                keep_inline_gap(viewIf->else_children);
                 viewIf->else_children.push_back(parse_view_node());
                 last_non_text_token = tokens[pos - 1];
+                after_text = false;
             }
             else if (current().type == TokenType::LBRACE)
             {
                 // Expression: {expr}
+                keep_inline_gap(viewIf->else_children);
                 advance();
                 viewIf->else_children.push_back(parse_expression());
                 expect(TokenType::RBRACE, "Expected '}'");
                 last_non_text_token = tokens[pos - 1];
+                after_text = false;
             }
             else
             {
@@ -745,6 +766,7 @@ std::unique_ptr<ViewIfStatement> Parser::parse_view_if()
                         }
                     }
                     viewIf->else_children.push_back(std::make_unique<TextNode>(text));
+                    after_text = true;
                 }
                 last_non_text_token = prev_token;
             }

@@ -1,0 +1,21 @@
+// a space written between two inline children on one line is content inside <if> and <else>
+// too, as it is in an element: <if x> {a}</if> keeps the space before a
+component IfSpaces(bool on = true) {
+    def word() : string { return "b"; }
+    view {
+        <div>
+            <p class="lead">a<if on> {word()}</if>c</p>
+            <p class="tail">a<if on>{word()} <i>x</i></if>c</p>
+            <p class="other">a<if !on>no<else> {word()} <i>x</i></else></if>c</p>
+            <p class="tight">a<if on>{word()}<i>x</i></if>c</p>
+        </div>
+    }
+}
+
+test "spaces inside if and else" {
+    Mounted m = mount(IfSpaces());
+    expect(m.text(".lead") == "a bc");
+    expect(m.text(".tail") == "ab xc");
+    expect(m.text(".other") == "a b xc");
+    expect(m.text(".tight") == "abxc");
+}
