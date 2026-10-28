@@ -1,0 +1,24 @@
+// a module's component hears its parent's new prop values, also from a parent in that module
+module Shelf;
+
+pub component Label(string text) {
+    view { <p class="t">{text}</p> }
+}
+
+component Host {
+    mut string name = "a";
+    def rename() : void { name = "b"; }
+    view {
+        <div>
+            <button class="go" onclick={rename}>x</button>
+            <Label text={name} />
+        </div>
+    }
+}
+
+test "a changed prop reaches a module's component" {
+    Mounted m = mount(Host());
+    expect(m.text(".t") == "a");
+    m.click(".go");
+    expect(m.text(".t") == "b");
+}

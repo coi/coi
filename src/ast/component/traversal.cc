@@ -42,7 +42,9 @@ void Component::collect_child_updates(ASTNode *node, std::map<std::string, std::
         }
         else
         {
-            instance_name = comp->component_name + "_" + std::to_string(counters[comp->component_name]++);
+            // named as view.cc names it: a component of a module is Mod_Name_0
+            std::string qname = qualified_name(comp->module_prefix, comp->component_name);
+            instance_name = qname + "_" + std::to_string(counters[qname]++);
         }
 
         for (const auto &prop : comp->props)
