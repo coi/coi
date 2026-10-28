@@ -1154,7 +1154,7 @@ def onKey(..., Mods mods, ...) : void {
 | `PointerType` | enum | `Mouse`, `Pen`, `Touch` |
 | `ReadyState` | enum | `Connecting`, `Open`, `Closing`, `Closed` |
 | `LineCap`, `LineJoin` | enum | `Butt`, `Round`, `Square` / `Miter`, `Round`, `Bevel` |
-| `PointerFlags` | flags | `Capture`, `Coalesced`, `NoScroll`, `Predict` |
+| `PointerFlags` | flags | `Capture`, `Coalesced`, `NoScroll`, `Predict`, `Hold`, `NoMenu` |
 | `Buttons` | flags | `Primary`, `Secondary`, `Auxiliary`, `Back`, `Forward`, `Eraser` |
 | `Mods` | flags | `Shift`, `Ctrl`, `Alt`, `Meta` |
 | `ContextFlags` | flags | `LowLatency`, `Opaque` |

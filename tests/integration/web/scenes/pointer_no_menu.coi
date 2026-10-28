@@ -1,0 +1,18 @@
+// PointerFlags.NoMenu: a right click opens no context menu and still reaches onpointerdown,
+// with the right button (2) in buttons. Without the flag the menu is left alone
+component PointerNoMenu {
+    mut string pressed = "-";
+
+    def down(PointerEvent e) : void { pressed = `${e.buttons}`; }
+
+    view {
+        <div>
+            <div class="pad" style="width:200px;height:100px;background:#ddd"
+                 onpointerdown={down} pointerflags={PointerFlags.NoMenu}></div>
+            <div class="plain" style="width:200px;height:100px;background:#eee"></div>
+            <p class="pressed">{pressed}</p>
+        </div>
+    }
+}
+
+app { root = PointerNoMenu; }

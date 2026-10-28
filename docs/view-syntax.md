@@ -211,6 +211,7 @@ Written as a call, these handlers too take their own arguments first and the eve
 | `PointerFlags.NoScroll` | Touch and pen don't scroll the page or select text, and a tap doesn't take focus away |
 | `PointerFlags.Predict` | Also report predicted samples (`onpointerpredicted`), to draw ahead of the pen |
 | `PointerFlags.Hold` | A finger held still for 500 ms reports `onpointerheld`, then stops scrolling the page so it can drag; no callout, context menu or click after it |
+| `PointerFlags.NoMenu` | No context menu on the element: a right click, a pen's barrel button or a long press is only a press (`e.buttons & Buttons.Secondary` tells the first two) |
 
 A misspelled event attribute is a compile error that lists the real ones.
 
