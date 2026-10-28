@@ -1,0 +1,26 @@
+// [v; n] outside a declaration: a field, an assignment, an argument, a return
+module Fill;
+
+pub enum Side { Left, Right }
+pod Cell { int x; }
+pod G { uint8[] b; float[] f; bool[] d; string[] s; Side[] sides; Cell[] cells; int[3] fixed; }
+
+def sized(int n) : bool[] { return [true; n]; }
+def total(int[] xs) : int { mut int t = 0; for x in xs { t += x; } return t; }
+
+test "a repeat initializer anywhere an array goes" {
+    int n = 2;
+    G g = G{b = [7; 4], f = [0.5; n], d = [false; n * n], s = ["a"; 2], sides = [Side::Right; 3], cells = [Cell{x = 1}; 2], fixed = [9; 3]};
+    expect(g.b == [7, 7, 7, 7]);
+    expect(g.f == [0.5, 0.5]);
+    expect(g.d.size() == 4 && !g.d[3]);
+    expect(g.s == ["a", "a"]);
+    expect(g.sides.size() == 3 && g.sides[2] == Side::Right);
+    expect(g.cells[1].x == 1);
+    expect(g.fixed[2] == 9);
+    mut uint8[] x = [];
+    x = [3; 3];
+    expect(x == [3, 3, 3]);
+    expect(sized(5).size() == 5);
+    expect(total([2; 4]) == 8);
+}

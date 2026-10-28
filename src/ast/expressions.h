@@ -197,6 +197,7 @@ struct ArrayLiteral : Expression {
 struct ArrayRepeatLiteral : Expression {
     std::unique_ptr<Expression> value;  // The value to repeat
     std::unique_ptr<Expression> count;  // Count expression (must be compile-time constant integer)
+    std::string target;                 // outside a declaration: the array type of where it goes, when known
 
     ArrayRepeatLiteral() = default;
     std::string to_webcc() override;

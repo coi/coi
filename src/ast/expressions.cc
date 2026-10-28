@@ -1,4 +1,5 @@
 #include "expressions.h"
+#include <set>
 #include "../codegen/lang.h"
 #include "../codegen/codegen_utils.h"
 #include "codegen_state.h"
@@ -1047,10 +1048,31 @@ void ArrayLiteral::propagate_element_type(const std::string& type) {
     }
 }
 
+// a declaration builds its own (VarDeclaration::to_webcc); anywhere else the array is made on the
+// spot. A number, bool or string element takes the target's type, so [0; n] fills a uint8[]; any
+// other element is the value's own type
 std::string ArrayRepeatLiteral::to_webcc() {
-    // Generate initialization - webcc::array constructor will fill with the value
-    // The actual array type and initialization is handled by VarDeclaration::to_webcc
-    return value->to_webcc();
+    static const std::set<std::string> plain = {"bool", "string", "int", "int8", "int16", "int32", "int64", "uint8",
+                                                "uint16", "uint32", "uint64", "float", "float32", "float64"};
+    std::string elem = target, size;
+    if (elem.ends_with("[]"))
+        elem = elem.substr(0, elem.size() - 2);
+    else if (size_t b = elem.rfind('['); b != std::string::npos && elem.back() == ']')
+    {
+        size = elem.substr(b + 1, elem.size() - b - 2);
+        elem = elem.substr(0, b);
+    }
+    std::string type = plain.count(elem) ? convert_type(elem) : "decltype(_x)";
+    // Side::Left is the enum's inner value type in C++, the array holds the enum
+    if (auto *e = dynamic_cast<EnumAccess *>(value.get()); e && !plain.count(elem))
+    {
+        std::string v = e->to_webcc();
+        type = v.substr(0, v.rfind("::"));
+    }
+    std::string fill = size.empty()
+        ? "coi::vector<" + type + "> _v; _v.resize((size_t)(" + count->to_webcc() + ")); for (size_t _i = 0; _i < _v.size(); _i++) _v[_i] = _x;"
+        : "coi::array<" + type + ", " + size + "> _v; _v.fill(_x);";
+    return "[&]{ auto _x = " + value->to_webcc() + "; " + fill + " return _v; }()";
 }
 
 bool ArrayRepeatLiteral::is_static() {

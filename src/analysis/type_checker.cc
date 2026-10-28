@@ -39,6 +39,14 @@ bool is_compatible_type(const std::string &source, const std::string &target);
 std::string infer_expression_type(Expression *expr, const std::map<std::string, std::string> &scope);
 static bool literal_fits(Expression *expr, const std::string &target);
 
+// [v; n] outside a declaration takes the array type of the place it goes: a field, an argument,
+// a return, the left side of an assignment
+static void aim_repeat(Expression *expr, const std::string &target)
+{
+    if (auto *r = dynamic_cast<ArrayRepeatLiteral *>(expr))
+        r->target = target;
+}
+
 static std::string extract_base_type(const std::string &type)
 {
     std::string base = type;
@@ -168,6 +176,7 @@ static std::string validate_component_args(
         {
             std::string arg_type = infer_expression_type(arg.value.get(), scope);
             std::string expected_type = normalize_type(param->type);
+            aim_repeat(arg.value.get(), expected_type);
             if (arg_type != "unknown" && !is_compatible_type(arg_type, expected_type) && !literal_fits(arg.value.get(), expected_type))
             {
                 return context_desc + ": argument " + std::to_string(i + 1) + " ('" + arg_name + 
@@ -966,6 +975,7 @@ static std::string check_free_function_call(const FunctionDef *fn, FunctionCall 
         if (is_function_param || mentions_type_param(param.type, fn->type_params))
             continue;
         std::string expected = normalize_type(param.type);
+        aim_repeat(arg.value.get(), expected);
         if (actual != "unknown" && !literal_fits(arg.value.get(), expected) &&
             !is_compatible_type(strip_module_prefix(actual), strip_module_prefix(expected)))
         {
@@ -1104,6 +1114,7 @@ static void check_component_args(ComponentConstruction *cc, const Component &com
         {
             std::string t = normalize_type(infer_expression_type(a.value.get(), scope));
             std::string want = normalize_type(p.type);
+            aim_repeat(a.value.get(), want);
             if (t != "unknown" && !is_compatible_type(t, want) && !literal_fits(a.value.get(), want))
             {
                 ErrorHandler::type_error("Prop '" + p.name + "' of '" + comp.name + "' is '" + want + "' but got '" + t + "'", cc->line);
@@ -1458,6 +1469,7 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                 ErrorHandler::type_error("'" + name + "' has no field '" + a.name + "'", cc->line);
                 exit(1);
             }
+            aim_repeat(a.value.get(), normalize_type(field_type));
             if (t != "unknown" && !is_compatible_type(t, normalize_type(field_type)) && !literal_fits(a.value.get(), field_type))
             {
                 ErrorHandler::type_error("Field '" + a.name + "' of '" + name + "' is '" + normalize_type(field_type) +
@@ -2011,6 +2023,7 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                     while (pi < params.size() && (is_callback(params[pi]) || seen++ != value_index)) pi++;
                     std::string arg_type = infer_expression_type(arg.value.get(), scope);
                     std::string expected_type = normalize_type(params[pi].type); // Mods -> uint8
+                    aim_repeat(arg.value.get(), expected_type);
                     if (!is_compatible_type(arg_type, expected_type) && !literal_fits(arg.value.get(), expected_type))
                     {
                         ErrorHandler::type_error(
@@ -2542,6 +2555,7 @@ static void check_function_body(const FunctionDef &method, const Component *comp
             // Store the target type for code generation (needed for handle casts)
             assign->target_type = var_type;
 
+            aim_repeat(assign->value.get(), var_type);
             if (var_type != "unknown" && val_type != "unknown")
             {
                 if (!is_compatible_type(val_type, var_type) && !literal_fits(assign->value.get(), var_type))
@@ -2789,6 +2803,7 @@ static void check_function_body(const FunctionDef &method, const Component *comp
                 check_moved_use(emit_stmt->args[i].get(), emit_stmt->line);
                 std::string actual = infer_expression_type(emit_stmt->args[i].get(), current_scope);
                 std::string expected = normalize_type(signal->params[i].type);
+                aim_repeat(emit_stmt->args[i].get(), expected);
                 if (actual != "unknown" && !is_compatible_type(actual, expected) && !literal_fits(emit_stmt->args[i].get(), expected))
                 {
                     ErrorHandler::type_error(
@@ -2901,6 +2916,7 @@ static void check_function_body(const FunctionDef &method, const Component *comp
                     exit(1);
                 }
                 std::string actual_return = infer_expression_type(ret_stmt->value.get(), current_scope);
+                aim_repeat(ret_stmt->value.get(), expected_return);
                 if (actual_return != "unknown" && !is_compatible_type(actual_return, expected_return) && !literal_fits(ret_stmt->value.get(), expected_return))
                 {
                     ErrorHandler::type_error(
@@ -3981,6 +3997,7 @@ void validate_view_hierarchy(const std::vector<Component> &components,
                             {
                                 std::string passed_type = infer_expression_type(passed_prop.value.get(), scope);
                                 std::string expected_type = normalize_type(declared_param->type);
+                                aim_repeat(passed_prop.value.get(), expected_type);
                                 if (passed_type != "unknown" && !is_compatible_type(passed_type, expected_type) && !literal_fits(passed_prop.value.get(), expected_type))
                                 {
                                     throw std::runtime_error(
