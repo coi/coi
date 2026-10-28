@@ -181,21 +181,25 @@ void generate_pwa_files(const fs::path &out_dir, const AppConfig &config)
         std::cerr << "[Coi] Warning: an iPhone or iPad shows a screenshot of the page on the home screen, not '" << rel(touch) << "'; give app.touchIcon a 180x180 PNG" << std::endl;
 
     // --- precache list and build hash ---
-    std::vector<std::string> files;
+    std::vector<std::string> files, lazy;
     for (const auto &entry : fs::recursive_directory_iterator(out_dir))
     {
         if (!entry.is_regular_file()) continue;
         std::string r = fs::relative(entry.path(), out_dir).generic_string();
         if (r == "sw.js" || r[0] == '.' || r.find("/.") != std::string::npos) continue;
-        // lazy/ folders: not precached
-        if (r.rfind("lazy/", 0) == 0 || r.find("/lazy/") != std::string::npos) continue;
+        // lazy/ folders: not precached, but part of the build: one that changed is a new version,
+        // so the copy an app cached before is dropped with the old cache
+        if (r.rfind("lazy/", 0) == 0 || r.find("/lazy/") != std::string::npos) { lazy.push_back(r); continue; }
         files.push_back(r);
     }
     std::sort(files.begin(), files.end());
+    std::sort(lazy.begin(), lazy.end());
 
     uint64_t hash = 1469598103934665603ull; // FNV-1a
     auto mix = [&](const char *p, size_t n) { for (size_t i = 0; i < n; i++) { hash ^= (unsigned char)p[i]; hash *= 1099511628211ull; } };
-    for (const auto &f : files)
+    std::vector<std::string> hashed = files;
+    hashed.insert(hashed.end(), lazy.begin(), lazy.end());
+    for (const auto &f : hashed)
     {
         mix(f.data(), f.size() + 1);
         std::ifstream in(out_dir / f, std::ios::binary);
