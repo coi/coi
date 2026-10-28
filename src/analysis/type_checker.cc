@@ -3191,6 +3191,95 @@ static void check_free_function_names(const FunctionDef &fn, const std::set<std:
         check_stmt(stmt.get(), scope);
 }
 
+// every pod and enum by name, with their fields' types; validate_types does it too, the view
+// check runs before it and needs them to type an attribute like width={d.hole}
+void register_types(const std::vector<Component> &components,
+                    const std::vector<std::unique_ptr<EnumDef>> &global_enums,
+                    const std::vector<std::unique_ptr<DataDef>> &global_data)
+{
+    // Collect all enum type names (for enum <-> int conversion checking)
+    g_enum_types.clear();
+    g_data_type_fields.clear();
+    g_pod_modules.clear();
+    g_data_type_field_types.clear();
+    g_union_alts.clear();
+    
+    // Add global enums
+    for (const auto &e : global_enums)
+    {
+        g_enum_types.insert(e->name);
+        if (!e->module_name.empty())
+            g_enum_types.insert(e->module_name + "::" + e->name);
+    }
+    
+    // Add component enums
+    for (const auto &comp : components)
+    {
+        for (const auto &e : comp.enums)
+        {
+            g_enum_types.insert(e->name);
+            // Also add qualified name for shared enums
+            if (e->is_shared)
+            {
+                g_enum_types.insert(comp.name + "." + e->name);
+            }
+        }
+    }
+
+    // Add global data types and fields
+    for (const auto &d : global_data)
+    {
+        std::set<std::string> fields;
+        std::map<std::string, std::string> field_types;
+        for (const auto &f : d->fields)
+        {
+            fields.insert(f.name);
+            field_types[f.name] = f.type;
+        }
+                g_data_type_fields[d->name] = fields;
+        g_data_type_field_types[d->name] = field_types;
+        g_pod_modules[d->name].insert(d->module_name);
+        if (!d->module_name.empty())
+        {
+            g_data_type_fields[d->module_name + "_" + d->name] = fields;
+            g_data_type_field_types[d->module_name + "_" + d->name] = field_types;
+        }
+        if (d->is_union)
+        {
+            std::set<std::string> alts;
+            for (const auto &alt : d->alts)
+                alts.insert(alt.name);
+            g_union_alts[d->name] = alts;
+            if (!d->module_name.empty())
+                g_union_alts[d->module_name + "_" + d->name] = alts;
+        }
+    }
+
+    // Add component-local data types and fields
+    for (const auto &comp : components)
+    {
+        for (const auto &d : comp.data)
+        {
+            std::set<std::string> fields;
+            std::map<std::string, std::string> field_types;
+            for (const auto &f : d->fields)
+            {
+                fields.insert(f.name);
+                field_types[f.name] = f.type;
+            }
+            g_data_type_fields[d->name] = fields;
+            g_data_type_fields[comp.name + "_" + d->name] = fields;
+            g_data_type_field_types[d->name] = field_types;
+            g_data_type_field_types[comp.name + "_" + d->name] = field_types;
+            if (!comp.module_name.empty())
+            {
+                g_data_type_fields[comp.module_name + "_" + comp.name + "_" + d->name] = fields;
+                g_data_type_field_types[comp.module_name + "_" + comp.name + "_" + d->name] = field_types;
+            }
+        }
+    }
+}
+
 void validate_types(const std::vector<Component> &components,
                     const std::vector<std::unique_ptr<EnumDef>> &global_enums,
                     const std::vector<std::unique_ptr<DataDef>> &global_data,
@@ -3226,66 +3315,11 @@ void validate_types(const std::vector<Component> &components,
         }
     }
 
-    // Collect all enum type names (for enum <-> int conversion checking)
-        g_enum_types.clear();
-    g_data_type_fields.clear();
-    g_pod_modules.clear();
-    g_data_type_field_types.clear();
-    g_union_alts.clear();
-    
-    // Add global enums
-    for (const auto &e : global_enums)
-    {
-        g_enum_types.insert(e->name);
-        if (!e->module_name.empty())
-            g_enum_types.insert(e->module_name + "::" + e->name);
-    }
-    
-    // Add component enums
-    for (const auto &comp : components)
-    {
-        for (const auto &e : comp.enums)
-        {
-            g_enum_types.insert(e->name);
-            // Also add qualified name for shared enums
-            if (e->is_shared)
-            {
-                g_enum_types.insert(comp.name + "." + e->name);
-            }
-        }
-    }
-
     // Validate global data type fields - they cannot contain no-copy types
     validate_data_fields_no_copy(global_data);
 
-    // Add global data types and fields
-    for (const auto &d : global_data)
-    {
-        std::set<std::string> fields;
-        std::map<std::string, std::string> field_types;
-        for (const auto &f : d->fields)
-        {
-            fields.insert(f.name);
-            field_types[f.name] = f.type;
-        }
-                g_data_type_fields[d->name] = fields;
-        g_data_type_field_types[d->name] = field_types;
-        g_pod_modules[d->name].insert(d->module_name);
-        if (!d->module_name.empty())
-        {
-            g_data_type_fields[d->module_name + "_" + d->name] = fields;
-            g_data_type_field_types[d->module_name + "_" + d->name] = field_types;
-        }
-        if (d->is_union)
-        {
-            std::set<std::string> alts;
-            for (const auto &alt : d->alts)
-                alts.insert(alt.name);
-            g_union_alts[d->name] = alts;
-            if (!d->module_name.empty())
-                g_union_alts[d->module_name + "_" + d->name] = alts;
-        }
-    }
+    register_types(components, global_enums, global_data);
+
     // a union's alternatives are pods (not unions, not primitives), each once, each tag once
     for (const auto &d : global_data)
     {
@@ -3313,30 +3347,6 @@ void validate_types(const std::vector<Component> &components,
         }
     }
 
-
-    // Add component-local data types and fields
-    for (const auto &comp : components)
-    {
-        for (const auto &d : comp.data)
-        {
-            std::set<std::string> fields;
-            std::map<std::string, std::string> field_types;
-            for (const auto &f : d->fields)
-            {
-                fields.insert(f.name);
-                field_types[f.name] = f.type;
-            }
-            g_data_type_fields[d->name] = fields;
-            g_data_type_fields[comp.name + "_" + d->name] = fields;
-            g_data_type_field_types[d->name] = field_types;
-            g_data_type_field_types[comp.name + "_" + d->name] = field_types;
-            if (!comp.module_name.empty())
-            {
-                g_data_type_fields[comp.module_name + "_" + comp.name + "_" + d->name] = fields;
-                g_data_type_field_types[comp.module_name + "_" + comp.name + "_" + d->name] = field_types;
-            }
-        }
-    }
 
     // Now that every pod/enum type is registered, check that variant match
     // patterns bind to real types (method bodies and reactive view content).
@@ -4193,8 +4203,16 @@ void validate_view_hierarchy(const std::vector<Component> &components,
                     std::string attr_type = normalize_type(infer_expression_type(attr.value.get(), scope));
                     if (attr_type != "string" && attr_type != "unknown")
                     {
-                        throw std::runtime_error("HTML attribute '" + attr.name + "' requires string, got '" + 
-                            display_type_name(attr_type) + "'. Use \"{" + attr.value->to_webcc() + "}\" at line " + std::to_string(el->line));
+                        // only "${...}" makes a value text; {n}, 5 or a lone disabled stay what they are
+                        std::string fix;
+                        if (!attr.braced.empty())
+                            fix = "\"${" + attr.braced + "}\"";
+                        else if (dynamic_cast<BoolLiteral *>(attr.value.get()))
+                            fix = "\"true\"";
+                        else
+                            fix = "\"" + attr.value->to_webcc() + "\"";
+                        throw std::runtime_error("Attribute '" + attr.name + "' takes a string, got '" + display_type_name(attr_type) +
+                                                 "': write " + attr.name + "=" + fix + " at line " + std::to_string(attr.line ? attr.line : el->line));
                     }
                 }
             }

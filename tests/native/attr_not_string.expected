@@ -1,0 +1,1 @@
+Attribute 'width' takes a string, got 'int': write width="${d.hole}" at line 13

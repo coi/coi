@@ -13,6 +13,8 @@ struct TextNode : ASTNode {
 struct HTMLAttribute {
     std::string name;
     std::unique_ptr<Expression> value;
+    std::string braced;   // width={d.hole}: the expression as written, for errors; empty when quoted or bare
+    int line = 0;
 };
 
 struct EventHandler {

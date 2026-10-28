@@ -389,6 +389,7 @@ std::unique_ptr<ASTNode> Parser::parse_html_element()
             continue;
         }
 
+        int attr_line = current().line;
         std::string attrName = current().value;
         advance();
 
@@ -402,16 +403,20 @@ std::unique_ptr<ASTNode> Parser::parse_html_element()
         }
 
         std::unique_ptr<Expression> attrValue;
+        std::string braced;
         if (match(TokenType::ASSIGN))
         {
+            size_t from = pos;
             attrValue = parse_prop_or_attr_value();
+            if (tokens[from].type == TokenType::LBRACE)
+                braced = source_text(from + 1, pos - 1);
         }
         else
         {
             // Boolean attribute? Treat as "true"
             attrValue = std::make_unique<BoolLiteral>(true);
         }
-        el->attributes.push_back({attrName, std::move(attrValue)});
+        el->attributes.push_back({attrName, std::move(attrValue), braced, attr_line});
     }
 
     // Self-closing

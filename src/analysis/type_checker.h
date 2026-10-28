@@ -20,6 +20,11 @@ bool is_compatible_type(const std::string &source, const std::string &target);
 // Infer the type of an expression given a scope of variable->type mappings
 std::string infer_expression_type(Expression *expr, const std::map<std::string, std::string> &scope);
 
+// Register every pod and enum (with field types) so a view can be typed before validate_types
+void register_types(const std::vector<Component> &components,
+                    const std::vector<std::unique_ptr<EnumDef>> &global_enums,
+                    const std::vector<std::unique_ptr<DataDef>> &global_data);
+
 // Validate types across all components:
 // - Parameter and state variable initialization
 // - Method body statements

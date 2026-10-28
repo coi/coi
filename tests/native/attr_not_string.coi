@@ -1,0 +1,21 @@
+// a number in a bare {} attribute is no string: only "${...}" makes it one
+module Sizes;
+
+pod Dot {
+    int hole;
+}
+
+component Pic {
+    Dot d = Dot{hole = 4};
+    view {
+        <svg>
+            <image href="dot.png"
+                   width={d.hole} />
+        </svg>
+    }
+}
+
+test "a pod's int field in a bare attribute" {
+    Mounted m = mount(Pic());
+    expect(m.has("image"));
+}
