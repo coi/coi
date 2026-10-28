@@ -1596,7 +1596,7 @@ std::string Component::to_webcc(CompilerSession &session)
         // Remove view from member references (keeps component state, just removes DOM)
         for (const auto &member_name : region.else_member_refs)
         {
-            ss << "            " << member_name << "._remove_view();\n";
+            ss << "            " << cpp_name(member_name) << "._remove_view();\n";
         }
         for (int loop_id : region.else_loop_ids)
             emit_loop_unmount(loop_id);
@@ -1645,7 +1645,7 @@ std::string Component::to_webcc(CompilerSession &session)
         // Remove view from member references (keeps component state, just removes DOM)
         for (const auto &member_name : region.then_member_refs)
         {
-            ss << "            " << member_name << "._remove_view();\n";
+            ss << "            " << cpp_name(member_name) << "._remove_view();\n";
         }
         for (int loop_id : region.then_loop_ids)
             emit_loop_unmount(loop_id);

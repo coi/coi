@@ -1,0 +1,30 @@
+// a component kept in a field, shown with <{x} /> inside an <if>: hidden and shown again, it keeps its state
+module Panels;
+
+component Counter {
+    mut int n = 0;
+    def up() : void { n += 1; }
+    view { <button class="count" onclick={up}>{n}</button> }
+}
+
+component Panel {
+    mut Counter counter = Counter();
+    mut bool open = true;
+    def toggle() : void { open = !open; }
+    view {
+        <div>
+            <button class="toggle" onclick={toggle}>toggle</button>
+            <if open><div class="box"><{counter} /></div></if>
+        </div>
+    }
+}
+
+test "a member component inside an if goes and comes back with its state" {
+    Mounted m = mount(Panel());
+    m.click(".count");
+    expect(m.text(".count") == "1");
+    m.click(".toggle");
+    expect(!m.has(".count"));
+    m.click(".toggle");
+    expect(m.text(".count") == "1");
+}
