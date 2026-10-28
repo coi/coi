@@ -1,0 +1,26 @@
+// a component made in a loop, whose child holds a reference to one of its fields: the child
+// writes through to it, the component isn't built elsewhere and moved
+module Cards;
+
+component Counter(mut int& n) {
+    def up() : void { n += 1; }
+    view { <button class="up" onclick={up}>up</button> }
+}
+
+component Card {
+    mut int count = 0;
+    mut Counter counter = Counter(&count);
+    view { <div class="card"><{counter} /><b class="c">{count}</b></div> }
+}
+
+component Deck {
+    mut string[] keys = ["a"];
+    view { <div><for k in keys key={k}><Card /></for></div> }
+}
+
+test "a child's reference reaches the field of a component made in a loop" {
+    Mounted m = mount(Deck());
+    m.click(".up");
+    m.click(".up");
+    expect(m.text(".c") == "2");
+}

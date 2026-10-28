@@ -437,7 +437,9 @@ void ComponentInstantiation::generate_code(ViewCodegenContext& ctx)
     {
         std::string vector_name = "_loop_" + qname + "s";
         instance_name = cpp_name(vector_name) + "[" + cpp_name(vector_name) + ".size() - 1]";
-        ctx.ss << "        " << vector_name << ".push_back(" << qname << "());\n";
+        // made in its place: a component whose members point at its own fields (a child given
+        // &field) must not be built as a temporary and moved, or they point at the temporary
+        ctx.ss << "        " << vector_name << ".emplace_back();\n";
         // one alias per instance: two components in the same loop body share a scope
         std::string alias = "_inst_" + qname + "_" + std::to_string(id);
         ctx.ss << "        auto& " << alias << " = " << instance_name << ";\n";
