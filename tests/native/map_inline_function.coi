@@ -1,0 +1,8 @@
+// a map has no any() with an inline function: its keys are walked instead
+module Maps;
+
+test "a map searched like an array" {
+    mut string[string] names;
+    names["a"] = "Ana";
+    expect(names.any(k => names[k] == "Ana"));
+}

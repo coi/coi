@@ -1495,6 +1495,13 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
         LambdaExpr *lam = mc->args.size() == 1 ? dynamic_cast<LambdaExpr *>(mc->args[0].value.get()) : nullptr;
         if (lam && t.ends_with("[]"))
             return inline_function_type(lam, mc->method, t, false, scope, mc->line);
+        // a map has no element order to search with an inline function: its keys are walked
+        if (lam && !extract_map_types(t).first.empty())
+        {
+            ErrorHandler::type_error("A map has no '" + mc->method + "' that takes an inline function; go through its keys with 'for k in map'",
+                                     mc->line);
+            exit(1);
+        }
         for (auto &a : mc->args)
             infer_expression_type(a.value.get(), scope);
         if (t == "unknown")
@@ -1728,6 +1735,12 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
             LambdaExpr *lam = func->args.size() == 1 ? dynamic_cast<LambdaExpr *>(func->args[0].value.get()) : nullptr;
             if (lam && (is_dynamic_array || is_fixed_array))
                 return inline_function_type(lam, method_name, obj_type, is_fixed_array, scope, func->line);
+            if (lam && !extract_map_types(normalize_type(obj_type)).first.empty())
+            {
+                ErrorHandler::type_error("A map has no '" + method_name + "' that takes an inline function; go through its keys with 'for k in map'",
+                                         func->line);
+                exit(1);
+            }
             // the arguments are typed here too: xs.push(cs[k].getContext2d()) returns before the
             // schema walk below, and the inner call needs its receiver type for codegen
             if (is_dynamic_array || is_fixed_array || normalize_type(obj_type) == "string")

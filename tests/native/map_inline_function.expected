@@ -1,0 +1,1 @@
+A map has no 'any' that takes an inline function; go through its keys with 'for k in map' at line 7
