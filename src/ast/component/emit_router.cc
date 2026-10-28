@@ -67,6 +67,11 @@ void emit_component_router_methods(std::stringstream &ss, const Component &compo
                 ss << "_rp_" << i << "_" << slot.index;
                 continue;
             }
+            if (slot.fallback)
+            {
+                ss << slot.fallback->to_webcc();
+                continue;
+            }
 
             // Explicit argument - same handling as component construction.
             const auto &arg = route.args[slot.index];

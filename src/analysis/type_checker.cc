@@ -236,7 +236,13 @@ static std::string validate_route(
         }
         else
         {
-            // Supplied by an explicit argument, in declaration order.
+            // Supplied by an explicit argument, in declaration order; past the last one, a
+            // parameter with a default takes it, as in any other construction
+            if (explicit_idx >= static_cast<int>(route.args.size()) && param->default_value)
+            {
+                route.ctor_order.push_back({false, 0, param->default_value.get()});
+                continue;
+            }
             if (explicit_idx >= static_cast<int>(route.args.size()))
             {
                 return context + " does not supply a value for parameter '" + param->name +

@@ -20,6 +20,7 @@ struct RouteParam {
 struct RouteCtorSlot {
     bool is_path_param = false;  // true  -> value comes from a captured URL segment
     int index = 0;               // index into path_params (if path) or args (if explicit)
+    Expression *fallback = nullptr;  // neither: the parameter's own default value
 };
 
 // Route entry for router block

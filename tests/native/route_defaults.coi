@@ -1,0 +1,19 @@
+// a route may leave out a component's parameters that have a default, as any construction can
+module Pages;
+
+component Note(string at = "", bool embedded = false) {
+    view { <p class="at">{embedded ? "in" : "out"}:{at}</p> }
+}
+
+component Site {
+    router {
+        "/s/*" => Note;
+        "/x/*" => Note("x");
+    }
+    view { <div><route /></div> }
+}
+
+test "the defaults fill what a route leaves out" {
+    Mounted m = mount(Note());
+    expect(m.text(".at") == "out:");
+}
