@@ -1,0 +1,2 @@
+// every language's text has the tags en.json gives it
+test "mismatch" { expect(Lang.t("agree") == "You agree to the Terms."); }

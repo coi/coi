@@ -217,6 +217,12 @@ struct ViewRawElement : ASTNode {
     void collect_dependencies(std::set<std::string>& deps) override;
 };
 
+// what a view's <lang key="..."> is made into: its nodes, put in its parent's place by the
+// parser, so nothing after the parser ever sees one
+struct ViewFragment : ASTNode {
+    std::vector<std::unique_ptr<ASTNode>> children;
+};
+
 // Route placeholder for router block - <route /> in view
 struct RoutePlaceholder : ASTNode {
     int line = 0;

@@ -1,6 +1,8 @@
 #include <unordered_set>
 #include "parser.h"
 #include "defs/def_parser.h"
+#include "frontend/lexer.h"
+#include "codegen/lang.h"
 #include "cli/error.h"
 #include <stdexcept>
 #include <cctype>
@@ -21,6 +23,18 @@ static bool is_html_element(const std::string &tag)
         "defs", "symbol", "mask", "pattern", "image", "marker", "filter", "stop", "linearGradient",
         "radialGradient", "clipPath", "foreignObject"};
     return names.count(tag) > 0;
+}
+
+// a child as the parser found it: a text with tags is its nodes, one by one
+static void add_view_child(std::vector<std::unique_ptr<ASTNode>> &to, std::unique_ptr<ASTNode> node)
+{
+    if (auto *frag = dynamic_cast<ViewFragment *>(node.get()))
+    {
+        for (auto &c : frag->children)
+            to.push_back(std::move(c));
+        return;
+    }
+    to.push_back(std::move(node));
 }
 
 // Parse a prop/attribute value: string, number (with optional unary -), or {expression}
@@ -463,7 +477,7 @@ std::unique_ptr<ASTNode> Parser::parse_html_element()
             else
             {
                 // Regular child element
-                el->children.push_back(parse_html_element());
+                add_view_child(el->children, parse_html_element());
             }
             last_non_text_token = tokens[pos - 1];  // Update after parsing element
             after_text = false;
@@ -472,9 +486,7 @@ std::unique_ptr<ASTNode> Parser::parse_html_element()
         {
             // Expression
             keep_inline_gap();
-            advance();
-            el->children.push_back(parse_expression());
-            expect(TokenType::RBRACE, "Expected '}'");
+            add_view_child(el->children, parse_view_braced());
             last_non_text_token = tokens[pos - 1];  // The '}' we just consumed
             after_text = false;
         }
@@ -551,6 +563,179 @@ std::unique_ptr<ASTNode> Parser::parse_html_element()
     expect(TokenType::GT, "Expected '>'");
 
     return el;
+}
+
+// ---- {Lang.t(...)} of a text with tags ----
+
+std::unique_ptr<Expression> Parser::parse_tokens_expression(std::vector<Token> toks)
+{
+    int line = toks.empty() ? 0 : toks.front().line;
+    toks.push_back({TokenType::END_OF_FILE, "", line, 0});
+    Parser sub(toks);
+    sub.component_member_types = component_member_types;
+    sub.component_array_types = component_array_types;
+    auto expr = sub.parse_expression();
+    if (sub.current().type != TokenType::END_OF_FILE)
+        ErrorHandler::compiler_error("Unexpected '" + sub.current().value + "' in Lang.t's args", line);
+    return expr;
+}
+
+// {Lang.t("login.agree", terms = <a href="/terms" />)} as a child in a view: a text with tags in
+// lang/en.json, its tags given elements by name (an HTML element's name needs none). Made here
+// into what it would be written as by hand, the runs of text as {Lang.t("login.agree#0", args)}
+// and each tag's element with its words first in it; when the languages put the tags in more
+// than one order, an <if> on key#order picks the one, the elements read again for each. Any
+// other {...} is the expression it always was
+std::unique_ptr<ASTNode> Parser::parse_view_braced()
+{
+    int start_line = current().line;
+    expect(TokenType::LBRACE, "Expected '{'");
+    size_t start = pos;
+    if (current().type == TokenType::IDENTIFIER && current().value == "Lang" && peek().type == TokenType::DOT &&
+        peek(2).value == "t" && peek(3).type == TokenType::LPAREN && peek(4).type == TokenType::STRING_LITERAL)
+    {
+        std::string key = peek(4).value;
+        pos += 5;
+        std::vector<Token> args;
+        bool counted = false;
+        std::map<std::string, size_t> given;   // where each tag's element starts in the tokens
+        while (match(TokenType::COMMA))
+        {
+            if (is_name_token(current().type) && peek().type == TokenType::ASSIGN && peek(2).type == TokenType::LT)
+            {
+                std::string name = current().value;
+                int line = current().line;
+                pos += 2;
+                if (given.count(name))
+                    ErrorHandler::compiler_error("Lang.t gives <" + name + "> twice", line);
+                given[name] = pos;
+                auto node = parse_view_node();
+                if (!dynamic_cast<HTMLElement *>(node.get()) && !dynamic_cast<ComponentInstantiation *>(node.get()))
+                    ErrorHandler::compiler_error("A tag's element in Lang.t is one element or component: " + name + " = <a href=\"...\" />", line);
+                continue;
+            }
+            size_t from = pos;
+            auto arg = parse_expression();
+            counted = counted || !dynamic_cast<ArrayLiteral *>(arg.get());
+            args.assign(tokens.begin() + from, tokens.begin() + pos);
+        }
+        bool whole = current().type == TokenType::RPAREN && peek().type == TokenType::RBRACE;
+        if (whole && (LangTable::instance().markup.count(key) || !given.empty()))
+        {
+            if (counted)
+                ErrorHandler::compiler_error("'" + key + "' has tags in lang/en.json, which a plural can't: it takes args, [a, b]", start_line);
+            pos += 2;
+            size_t after = pos;
+            auto frag = expand_lang(key, args, given, start_line);
+            pos = after;
+            return frag;
+        }
+        if (!given.empty())
+            ErrorHandler::compiler_error("Lang.t with elements is all of its {...}: {Lang.t(\"" + key + "\", name = <a ... />)}", start_line);
+        pos = start;
+    }
+    auto expr = parse_expression();
+    // a text with tags somewhere inside a bigger {...} would show without its elements
+    for (size_t i = start; i + 4 < pos; i++)
+        if (tokens[i].type == TokenType::IDENTIFIER && tokens[i].value == "Lang" && tokens[i + 1].type == TokenType::DOT &&
+            tokens[i + 2].value == "t" && tokens[i + 3].type == TokenType::LPAREN && tokens[i + 4].type == TokenType::STRING_LITERAL &&
+            LangTable::instance().markup.count(tokens[i + 4].value))
+            ErrorHandler::compiler_error("'" + tokens[i + 4].value + "' has tags in lang/en.json, which only show when Lang.t is all of its {...}: <if> around it instead", start_line);
+    expect(TokenType::RBRACE, "Expected '}'");
+    return expr;
+}
+
+std::unique_ptr<ASTNode> Parser::expand_lang(const std::string &key, const std::vector<Token> &args,
+                                             const std::map<std::string, size_t> &given, int start_line)
+{
+    const LangTable &t = LangTable::instance();
+    if (!t.present)
+        ErrorHandler::compiler_error("Lang needs lang/en.json next to src/: one object of the app's texts", start_line);
+    auto mit = t.markup.find(key);
+    if (mit == t.markup.end())
+    {
+        if (t.find(key) < 0)
+            ErrorHandler::compiler_error("No text '" + key + "' in lang/en.json", start_line);
+        ErrorHandler::compiler_error("'" + key + "' has no tags in lang/en.json: show it with {Lang.t(\"" + key + "\")}", start_line);
+    }
+    const LangMarkup &m = mit->second;
+    for (const auto &[name, at] : given)
+        if (!m.paired.count(name))
+            ErrorHandler::compiler_error("'" + key + "' has no <" + name + "> in lang/en.json", start_line);
+    for (const auto &name : m.names)
+        if (!given.count(name) && !is_html_element(name))
+            ErrorHandler::compiler_error("'" + key + "' has <" + name + "> in lang/en.json: say what it is, {Lang.t(\"" + key + "\", " + name + " = <a href=\"...\" />)}", start_line);
+
+    // Lang.t("key#piece", args), as if written in the view
+    auto text = [&](const std::string &piece) -> std::unique_ptr<ASTNode> {
+        auto toks = Lexer("Lang.t(\"" + key + "#" + piece + "\"" + (args.empty() ? ")" : ",")).tokenize();
+        toks.pop_back();
+        for (auto &tk : toks) tk.line = start_line;
+        toks.insert(toks.end(), args.begin(), args.end());
+        if (!args.empty()) toks.push_back({TokenType::RPAREN, ")", start_line, 0});
+        return parse_tokens_expression(toks);
+    };
+    auto element = [&](const std::string &name) -> std::unique_ptr<ASTNode> {
+        std::unique_ptr<ASTNode> node;
+        if (auto g = given.find(name); g != given.end())
+        {
+            pos = g->second;
+            node = parse_view_node();
+        }
+        else
+        {
+            auto el = std::make_unique<HTMLElement>();
+            el->line = start_line;
+            el->tag = name;
+            node = std::move(el);
+        }
+        if (m.paired.at(name))
+        {
+            auto *el = dynamic_cast<HTMLElement *>(node.get());
+            if (!el)
+                ErrorHandler::compiler_error("<" + name + "> has words in it in lang/en.json, which a component can't show: give it an element", start_line);
+            el->children.insert(el->children.begin(), text(name));
+        }
+        return node;
+    };
+    auto in_order = [&](const std::vector<std::string> &order, std::vector<std::unique_ptr<ASTNode>> &out) {
+        for (size_t i = 0; i <= order.size(); i++)
+        {
+            if (m.gap_used[i])
+                out.push_back(text(std::to_string(i)));
+            if (i < order.size())
+                out.push_back(element(order[i]));
+        }
+    };
+
+    auto frag = std::make_unique<ViewFragment>();
+    frag->line = start_line;
+    if (m.orders.size() == 1)
+        in_order(m.orders[0], frag->children);
+    else
+    {
+        // <if key#order == "0"> ... <else><if key#order == "1"> ... </if></else></if>
+        std::vector<std::unique_ptr<ASTNode>> *into = &frag->children;
+        for (size_t o = 0; o < m.orders.size(); o++)
+        {
+            if (o + 1 == m.orders.size())
+            {
+                in_order(m.orders[o], *into);
+                break;
+            }
+            auto branch = std::make_unique<ViewIfStatement>();
+            branch->line = start_line;
+            auto toks = Lexer("Lang.t(\"" + key + "#order\") == \"" + std::to_string(o) + "\"").tokenize();
+            toks.pop_back();
+            for (auto &tk : toks) tk.line = start_line;
+            branch->condition = parse_tokens_expression(toks);
+            in_order(m.orders[o], branch->then_children);
+            auto *next = &branch->else_children;
+            into->push_back(std::move(branch));
+            into = next;
+        }
+    }
+    return frag;
 }
 
 std::unique_ptr<ASTNode> Parser::parse_view_node()
@@ -636,7 +821,7 @@ std::unique_ptr<ViewIfStatement> Parser::parse_view_if()
         {
             // Element: <if>, <for>, or regular HTML
             keep_inline_gap(viewIf->then_children);
-            viewIf->then_children.push_back(parse_view_node());
+            add_view_child(viewIf->then_children, parse_view_node());
             last_non_text_token = tokens[pos - 1];
             after_text = false;
         }
@@ -644,9 +829,7 @@ std::unique_ptr<ViewIfStatement> Parser::parse_view_if()
         {
             // Expression: {expr}
             keep_inline_gap(viewIf->then_children);
-            advance();
-            viewIf->then_children.push_back(parse_expression());
-            expect(TokenType::RBRACE, "Expected '}'");
+            add_view_child(viewIf->then_children, parse_view_braced());
             last_non_text_token = tokens[pos - 1];
             after_text = false;
         }
@@ -716,7 +899,7 @@ std::unique_ptr<ViewIfStatement> Parser::parse_view_if()
             {
                 // Element: <if>, <for>, or regular HTML
                 keep_inline_gap(viewIf->else_children);
-                viewIf->else_children.push_back(parse_view_node());
+                add_view_child(viewIf->else_children, parse_view_node());
                 last_non_text_token = tokens[pos - 1];
                 after_text = false;
             }
@@ -724,9 +907,7 @@ std::unique_ptr<ViewIfStatement> Parser::parse_view_if()
             {
                 // Expression: {expr}
                 keep_inline_gap(viewIf->else_children);
-                advance();
-                viewIf->else_children.push_back(parse_expression());
-                expect(TokenType::RBRACE, "Expected '}'");
+                add_view_child(viewIf->else_children, parse_view_braced());
                 last_non_text_token = tokens[pos - 1];
                 after_text = false;
             }
@@ -830,7 +1011,7 @@ std::unique_ptr<ASTNode> Parser::parse_view_for()
             {
                 break;
             }
-            viewFor->children.push_back(parse_view_node());
+            add_view_child(viewFor->children, parse_view_node());
         }
 
         // </for>
@@ -882,7 +1063,7 @@ std::unique_ptr<ASTNode> Parser::parse_view_for()
             {
                 break;
             }
-            viewForEach->children.push_back(parse_view_node());
+            add_view_child(viewForEach->children, parse_view_node());
         }
 
         // Remove the temporary loop variable from component_member_types

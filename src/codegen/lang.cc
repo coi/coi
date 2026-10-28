@@ -5,6 +5,7 @@
 #include "json_codegen.h"
 
 #include <algorithm>
+#include <cctype>
 #include <fstream>
 #include <iostream>
 #include <regex>
@@ -74,6 +75,94 @@ static bool is_category(const std::string &s)
     return false;
 }
 
+// ---- tags in a text ----
+
+// a text cut at its tags: the runs between them, the words inside each, the order they come in
+struct Cut
+{
+    std::vector<std::string> gaps;   // one more than there are tags
+    std::vector<std::string> order;
+    std::map<std::string, std::string> inner;
+    std::map<std::string, bool> paired;
+    std::string plain;               // the text without its tags
+};
+
+// <name>, </name> or <name/> at i; anything else with a '<' in it (a < b) is just text
+static bool read_tag(const std::string &s, size_t i, std::string &name, bool &self, bool &close, size_t &end)
+{
+    size_t j = i + 1;
+    close = j < s.size() && s[j] == '/';
+    if (close) j++;
+    size_t from = j;
+    while (j < s.size() && (std::isalpha((unsigned char)s[j]) || (j > from && std::isdigit((unsigned char)s[j]))))
+        j++;
+    if (j == from) return false;
+    name = s.substr(from, j - from);
+    self = !close && j + 1 < s.size() && s[j] == '/' && s[j + 1] == '>';
+    if (self) { end = j + 2; return true; }
+    if (j < s.size() && s[j] == '>') { end = j + 1; return true; }
+    return false;
+}
+
+static Cut cut_tags(const std::string &text, const std::string &file, const std::string &key)
+{
+    Cut c;
+    std::string run;
+    size_t i = 0;
+    while (i < text.size())
+    {
+        std::string name;
+        bool self = false, close = false;
+        size_t end = 0;
+        if (text[i] != '<' || !read_tag(text, i, name, self, close, end))
+        {
+            run += text[i];
+            c.plain += text[i++];
+            continue;
+        }
+        if (close)
+            ErrorHandler::compiler_error(file + ": '" + key + "' closes </" + name + "> without opening it");
+        if (c.paired.count(name))
+            ErrorHandler::compiler_error(file + ": '" + key + "' has <" + name + "> twice");
+        c.gaps.push_back(run);
+        run.clear();
+        c.order.push_back(name);
+        c.paired[name] = !self;
+        i = end;
+        if (self) continue;
+        std::string closing = "</" + name + ">";
+        size_t stop = text.find(closing, end);
+        if (stop == std::string::npos)
+            ErrorHandler::compiler_error(file + ": '" + key + "' opens <" + name + "> and never closes it");
+        std::string inner = text.substr(end, stop - end);
+        for (size_t j = 0; j < inner.size(); j++)
+        {
+            std::string n2;
+            bool s2, c2;
+            size_t e2;
+            if (inner[j] == '<' && read_tag(inner, j, n2, s2, c2, e2))
+                ErrorHandler::compiler_error(file + ": '" + key + "' has <" + n2 + "> inside <" + name + ">: tags don't nest");
+        }
+        c.inner[name] = inner;
+        c.plain += inner;
+        i = stop + closing.size();
+    }
+    c.gaps.push_back(run);
+    return c;
+}
+
+// "<terms>…</terms>, <logo/>": a text's tags, for errors
+static std::string describe_tags(const LangMarkup &m)
+{
+    std::string out;
+    for (const auto &n : m.names)
+    {
+        if (!out.empty()) out += ", ";
+        out += m.paired.at(n) ? "<" + n + ">…</" + n + ">" : "<" + n + "/>";
+    }
+    return out;
+}
+
 void LangTable::load(const fs::path &project_root)
 {
     *this = LangTable{};
@@ -89,6 +178,11 @@ void LangTable::load(const fs::path &project_root)
             ErrorHandler::compiler_error("lang/en.json has '" + k + "' twice");
         by_key[k] = v;
     }
+    auto add = [&](const std::string &k, const std::string &v) {
+        index[k] = (int)keys.size();
+        keys.push_back(k);
+        en.push_back(v);
+    };
     // a plural (key.other there) gets a slot for every category, side by side, so a language
     // with more forms than English has somewhere to put them; English's missing ones are its other
     std::map<std::string, bool> placed;
@@ -98,24 +192,42 @@ void LangTable::load(const fs::path &project_root)
         std::string base = dot == std::string::npos ? "" : k.substr(0, dot);
         if (!base.empty() && is_category(k.substr(dot + 1)) && by_key.count(base + ".other"))
         {
+            if (!cut_tags(v, "lang/en.json", k).order.empty())
+                ErrorHandler::compiler_error("lang/en.json: '" + k + "' is a plural's form, which can't have tags");
             if (placed[base]) continue;
             placed[base] = true;
             for (int c = 0; c < kCategoryCount; c++)
             {
                 std::string slot = base + "." + kCategories[c];
-                index[slot] = (int)keys.size();
-                keys.push_back(slot);
                 auto it = by_key.find(slot);
-                en.push_back(it != by_key.end() ? it->second : by_key[base + ".other"]);
+                add(slot, it != by_key.end() ? it->second : by_key[base + ".other"]);
             }
             continue;
         }
-        index[k] = (int)keys.size();
-        keys.push_back(k);
-        en.push_back(v);
+        Cut cut = cut_tags(v, "lang/en.json", k);
+        if (cut.order.empty())
+        {
+            add(k, v);
+            continue;
+        }
+        // the text itself reads without its tags; the pieces a view puts together follow it
+        add(k, cut.plain);
+        LangMarkup m;
+        m.names = cut.order;
+        m.paired = cut.paired;
+        m.orders.push_back(cut.order);
+        for (size_t i = 0; i < cut.gaps.size(); i++)
+        {
+            add(k + "#" + std::to_string(i), cut.gaps[i]);
+            m.gap_used.push_back(!cut.gaps[i].empty());
+        }
+        for (const auto &n : cut.order)
+            if (cut.paired[n]) add(k + "#" + n, cut.inner[n]);
+        add(k + "#order", "0");
+        markup[k] = m;
     }
     codes.push_back("en");
-    std::vector<std::string> others;
+    std::vector<std::string> found;
     static const std::regex code_re("[a-z]{2,3}(-[A-Za-z0-9]{2,8})*");
     for (const auto &entry : fs::directory_iterator(dir))
     {
@@ -124,10 +236,62 @@ void LangTable::load(const fs::path &project_root)
         if (code == "en") continue;
         if (!std::regex_match(code, code_re))
             ErrorHandler::compiler_error("lang/" + entry.path().filename().string() + ": the name has to be a language code, like de.json or pt-BR.json");
-        others.push_back(code);
+        found.push_back(code);
     }
-    std::sort(others.begin(), others.end());
-    codes.insert(codes.end(), others.begin(), others.end());
+    std::sort(found.begin(), found.end());
+    codes.insert(codes.end(), found.begin(), found.end());
+
+    for (const std::string &code : found)
+    {
+        std::string file = "lang/" + code + ".json";
+        std::map<std::string, std::string> mine;
+        for (const auto &[k, v] : read_texts(dir / (code + ".json")))
+        {
+            if (find(k) < 0)
+                std::cerr << "Warning: " << file << " has '" << k << "', which lang/en.json doesn't" << std::endl;
+            mine[k] = v;
+        }
+        // in en.json's order; a plural form the language doesn't have is its other, and a text
+        // it doesn't have at all is English's
+        std::vector<std::string> list = en;
+        for (size_t i = 0; i < keys.size(); i++)
+        {
+            const std::string &k = keys[i];
+            auto it = mine.find(k);
+            std::string v = it != mine.end() ? it->second : "";
+            size_t dot = k.rfind('.');
+            if (v.empty() && dot != std::string::npos && is_category(k.substr(dot + 1)) && plural(k.substr(0, dot)) >= 0)
+            {
+                auto other = mine.find(k.substr(0, dot) + ".other");
+                if (other != mine.end()) v = other->second;
+            }
+            if (!v.empty()) list[i] = v;
+        }
+        // a text with tags: the same tags as English's, in whatever order the language needs
+        for (auto &[k, m] : markup)
+        {
+            auto it = mine.find(k);
+            if (it == mine.end() || it->second.empty()) continue;
+            Cut cut = cut_tags(it->second, file, k);
+            bool same = cut.order.size() == m.names.size();
+            for (const auto &n : cut.order)
+                same = same && m.paired.count(n) && m.paired[n] == cut.paired[n];
+            if (!same)
+                ErrorHandler::compiler_error(file + ": '" + k + "' has to have the tags lang/en.json gives it: " + describe_tags(m));
+            size_t o = std::find(m.orders.begin(), m.orders.end(), cut.order) - m.orders.begin();
+            if (o == m.orders.size()) m.orders.push_back(cut.order);
+            list[index[k]] = cut.plain;
+            for (size_t i = 0; i < cut.gaps.size(); i++)
+            {
+                list[index[k + "#" + std::to_string(i)]] = cut.gaps[i];
+                if (!cut.gaps[i].empty()) m.gap_used[i] = true;
+            }
+            for (const auto &n : cut.order)
+                if (cut.paired[n]) list[index[k + "#" + n]] = cut.inner[n];
+            list[index[k + "#order"]] = std::to_string(o);
+        }
+        others[code] = std::move(list);
+    }
 }
 
 int LangTable::find(const std::string &key) const
@@ -143,38 +307,19 @@ int LangTable::plural(const std::string &key) const
     return other - (kCategoryCount - 1);
 }
 
-void write_lang_files(const fs::path &project_root, const fs::path &out_dir)
+void write_lang_files(const fs::path &out_dir)
 {
     const LangTable &t = LangTable::instance();
     fs::path dir = out_dir / "lazy" / "lang";
     std::error_code ec;
     fs::remove_all(dir, ec);
-    if (t.codes.size() < 2) return;
+    if (t.others.empty()) return;
     fs::create_directories(dir);
-    for (size_t i = 1; i < t.codes.size(); i++)
+    for (const auto &[code, texts] : t.others)
     {
-        const std::string &code = t.codes[i];
-        std::map<std::string, std::string> texts;
-        for (const auto &[k, v] : read_texts(project_root / "lang" / (code + ".json")))
-        {
-            if (t.find(k) < 0)
-                std::cerr << "Warning: lang/" << code << ".json has '" << k << "', which lang/en.json doesn't" << std::endl;
-            texts[k] = v;
-        }
-        // in en.json's order; a plural form the language doesn't have is its other
         std::vector<Json> list;
-        for (const std::string &k : t.keys)
-        {
-            auto it = texts.find(k);
-            std::string v = it != texts.end() ? it->second : "";
-            size_t dot = k.rfind('.');
-            if (v.empty() && dot != std::string::npos && is_category(k.substr(dot + 1)) && t.plural(k.substr(0, dot)) >= 0)
-            {
-                auto other = texts.find(k.substr(0, dot) + ".other");
-                if (other != texts.end()) v = other->second;
-            }
+        for (const std::string &v : texts)
             list.push_back(Json(v));
-        }
         std::ofstream(dir / (code + ".json")) << dump(Json::array(list));
     }
 }
@@ -312,7 +457,7 @@ static bool __coi_lang_event(const webcc::Event& e) {
     out << R"(;
         coi::string* tab = __coi_lang_table();
         if (r.ok && (int)r.value.size() == __coi_lang_n) {
-            for (int i = 0; i < __coi_lang_n; i++) if (r.value[i].length()) tab[i] = r.value[i];
+            for (int i = 0; i < __coi_lang_n; i++) tab[i] = r.value[i];
         } else __coi_lang_code = "en";
         __coi_lang_waiting = false;
         __coi_mount();

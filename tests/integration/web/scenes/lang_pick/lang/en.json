@@ -1,1 +1,6 @@
-{ "title": "Settings", "notebooks": { "one": "# notebook", "other": "# notebooks" } }
+{
+  "title": "Settings",
+  "notebooks": { "one": "# notebook", "other": "# notebooks" },
+  "agree": "You agree to the <terms>Terms</terms> and the <privacy>Privacy Policy</privacy>.",
+  "who": "Signed in as <b>{0}</b>"
+}

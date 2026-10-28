@@ -331,8 +331,21 @@ toast = Lang.t("toast.moved", [title]);
 
 - **Checked.** A key `lang/en.json` doesn't have is a compile error, so a typo never reaches the page.
 - **Arguments and plurals.** `{0}`, `{1}`, ... take `args` in order. A key with `one` and `other` under it is a plural: it takes the count after the key, `Lang.t("notebooks", n)`, and the form for `n` is picked by the language's own rule (`Intl.PluralRules`): `one` and `other` for English, and `zero`, `two`, `few`, `many` where a language has them; `#` is `n`. A plural without a count, or a count for a text that isn't one, doesn't build.
+- **Links and bold words inside a sentence.** A sentence with an element in the middle stays one text, its elements marked as tags, so each language can put them where its word order needs them. `<name>words</name>` is a tag with words in it, `<name/>` one without:
+
+  ```json
+  "agree": "By continuing you agree to our <terms>Terms</terms> and <privacy>Privacy Policy</privacy>.",
+  "signedIn": "Signed in as <b>{0}</b>"
+  ```
+
+  ```coi
+  <p>{Lang.t("agree", terms = <a href="/terms" />, privacy = <a href="/privacy" />)}</p>
+  <p>{Lang.t("signedIn", [name])}</p>
+  ```
+
+  The view says what each tag is, by name, after the args; a tag named like an HTML element (`<b>`, `<em>`, `<code>`) is that element unless the view gives another. The tag's words go first in its element, before anything the element holds itself, and `{0}`, `{1}`, ... fill them too. What reaches the page is the text and the elements, as if written out by hand: no HTML is parsed at run time, so an argument is always text. Every language has to have the tags `en.json` gives the text, in any order; one that drops or renames a tag, or a view that doesn't say what a tag is, doesn't build. A text with tags shows its elements only when `Lang.t` is all of its `{...}` (put an `<if>` around it rather than a `?:`); in code, and in an attribute, it reads without its tags. A plural can't have tags.
 - **English is built in.** It works offline and in prerendered pages, and needs no download.
-- **Other languages** are files beside it, named by their code: `lang/de.json`, `lang/pt-BR.json`, with the same keys. The build writes each to `lazy/lang/`; a key it leaves out stays English, and one `en.json` doesn't have is pointed out. Before the app mounts, the visitor's language file is fetched: the choice `Lang.use` kept, else the first of the browser's languages there is a file for (`de-AT` takes `de`). It's kept offline after the first time, like any `lazy` file, and the app never shows English first.
+- **Other languages** are files beside it, named by their code: `lang/de.json`, `lang/pt-BR.json`, with the same keys. The build writes each to `lazy/lang/`, every text in `en.json`'s order; a key it leaves out stays English, and one `en.json` doesn't have is pointed out. Before the app mounts, the visitor's language file is fetched: the choice `Lang.use` kept, else the first of the browser's languages there is a file for (`de-AT` takes `de`). It's kept offline after the first time, like any `lazy` file, and the app never shows English first.
 - **Choosing.** `Lang.available()` is `["en", "de", ...]`, `Lang.code()` the one in use, `Lang.use("de")` keeps the choice and starts the app again in it.
 
 Prerendered pages are English for now.

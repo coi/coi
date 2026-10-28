@@ -1,0 +1,49 @@
+// a text with tags: the view says what each tag is, the words around and inside come from lang/
+module Tags;
+
+component Fine {
+    mut string name = "Ada";
+    def rename() : void { name = "Grace"; }
+    view {
+        <div>
+            <p class="agree">{Lang.t("agree",
+                terms = <a href="/terms" />,
+                privacy = <a href="/privacy" target="_blank" />)}</p>
+            <p class="who">{Lang.t("signedIn", [name])}</p>
+            <h2 class="welcome">{Lang.t("welcome", plus = <span class="ink">Plus<i></i></span>)}</h2>
+            <p class="open">{Lang.t("open", ["pondnote.ink"], host = <b class="host"><i></i></b>)}</p>
+            <if name != ""><p class="inif">{Lang.t("signedIn", [name])}</p></if>
+            <button class="rename" onclick={rename}>r</button>
+        </div>
+    }
+}
+
+test "the words around the tags and in them, the view's elements in their place" {
+    Mounted m = mount(Fine());
+    expect(m.text(".agree") == "By continuing you agree to our Terms and Privacy Policy.");
+    expect(m.text(".agree a:first-child") == "Terms");
+    expect(m.attr(".agree a:last-child", "target") == "_blank");
+    expect(m.text(".agree a:last-child") == "Privacy Policy");
+}
+
+test "a tag that's an HTML element needs no line in the view; args fill the text and follow the state" {
+    Mounted m = mount(Fine());
+    expect(m.text(".who b") == "Ada");
+    m.click(".rename");
+    expect(m.text(".who") == "Signed in as Grace");
+}
+
+test "<name/> is the view's element as written; the words go before what the element holds" {
+    Mounted m = mount(Fine());
+    expect(m.text(".welcome") == "Welcome to Plus");
+    expect(m.count(".welcome .ink i") == 1);
+    expect(m.text(".open .host") == "pondnote.ink/join");
+    expect(m.count(".open .host i") == 1);
+    expect(m.text(".open") == "Open pondnote.ink/join and type the code");
+}
+
+test "in an <if> too; and in code, a text with tags reads without them" {
+    Mounted m = mount(Fine());
+    expect(m.text(".inif b") == "Ada");
+    expect(Lang.t("signedIn", ["Ada"]) == "Signed in as Ada");
+}

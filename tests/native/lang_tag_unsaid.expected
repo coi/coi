@@ -1,0 +1,1 @@
+'agree' has <terms> in lang/en.json: say what it is, {Lang.t("agree", terms = <a href="..." />)}

@@ -1,0 +1,6 @@
+// a tag that isn't an HTML element needs the view to say what it is
+component Fine {
+    view { <p>{Lang.t("agree")}</p> }
+}
+
+test "unsaid" { Mounted m = mount(Fine()); }

@@ -1,1 +1,6 @@
-{ "title": "Einstellungen", "notebooks": { "one": "# Notizbuch", "other": "# Notizbücher" } }
+{
+  "title": "Einstellungen",
+  "notebooks": { "one": "# Notizbuch", "other": "# Notizbücher" },
+  "agree": "<privacy>Datenschutz</privacy> und <terms>Bedingungen</terms> stimmst du zu.",
+  "who": "Angemeldet als <b>{0}</b>"
+}

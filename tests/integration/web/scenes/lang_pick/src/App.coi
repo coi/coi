@@ -1,5 +1,5 @@
 // the visitor's language: the browser's when there's a file for it, English otherwise, and a
-// choice kept by Lang.use over both
+// choice kept by Lang.use over both; a text with tags in the order its language puts them
 component LangPick {
     def german() : void { Lang.use("de"); }
     view {
@@ -7,6 +7,8 @@ component LangPick {
             <h1 class="title">{Lang.t("title")}</h1>
             <p class="count">{Lang.t("notebooks", 3)}</p>
             <p class="code">{Lang.code()}</p>
+            <p class="agree">{Lang.t("agree", terms = <a class="terms" href="#t" />, privacy = <a class="privacy" href="#p" />)}</p>
+            <p class="who">{Lang.t("who", ["Ada"])}</p>
             <button class="de" onclick={german}>Deutsch</button>
         </div>
     }

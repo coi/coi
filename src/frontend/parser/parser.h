@@ -88,6 +88,11 @@ class Parser{
         std::string parse_style_block();
         std::unique_ptr<ASTNode> parse_html_element();
         std::unique_ptr<ASTNode> parse_view_node();  // Parse HTML element or view if/else/for
+        std::unique_ptr<ASTNode> parse_view_braced();  // {...} in a view: an expression, or a text with tags made into its nodes
+        std::unique_ptr<ASTNode> expand_lang(const std::string &key, const std::vector<Token> &args,
+                                             const std::map<std::string, size_t> &given, int start_line);
+        // an expression from tokens of its own (made up, or copied from elsewhere in the file)
+        std::unique_ptr<Expression> parse_tokens_expression(std::vector<Token> toks);
         std::unique_ptr<ViewIfStatement> parse_view_if();  // Parse if/else in view
         std::unique_ptr<ASTNode> parse_view_for();  // Parse for loop in view
         std::unique_ptr<RouterDef> parse_router();  // Parse router block

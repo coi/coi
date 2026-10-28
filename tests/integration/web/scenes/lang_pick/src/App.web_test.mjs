@@ -20,11 +20,17 @@ export async function run({ page, expect }) {
   const de = await open("de-DE");
   await expect.textContains(de.p.locator(".title"), "Einstellungen", "a German browser gets German");
   await expect.textContains(de.p.locator(".count"), "3 Notizbücher", "and its plurals");
+  // German puts the links the other way round, and starts with one
+  await expect.textContains(de.p.locator(".agree"), "Datenschutz und Bedingungen stimmst du zu.", "its words around its tags");
+  const order = await de.p.$$eval(".agree a", (as) => as.map((a) => a.className + ":" + a.textContent));
+  if (order.join() !== "privacy:Datenschutz,terms:Bedingungen") throw new Error(`German order: ${order}`);
+  await expect.textContains(de.p.locator(".who b"), "Ada", "the args in a tag");
   if (de.seen.includes("Settings")) throw new Error(`English showed first: ${de.seen}`);
 
   const fr = await open("fr-FR");
   await expect.textContains(fr.p.locator(".title"), "Settings", "no French file: English");
   await expect.textContains(fr.p.locator(".code"), "en", "and it says so");
+  await expect.textContains(fr.p.locator(".agree"), "You agree to the Terms and the Privacy Policy.", "English's order");
 
   // the choice: kept, and the app starts again in it
   await fr.p.click(".de");

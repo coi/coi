@@ -409,6 +409,17 @@ int main(int argc, char **argv)
         project_root = fs::current_path();
     }
 
+    // lang/ before any file is parsed: a view's {Lang.t(...)} of a text with tags is made from them
+    try
+    {
+        LangTable::instance().load(project_root);
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << e.what() << std::endl;
+        return 1;
+    }
+
     std::vector<Component> all_components;
     std::vector<std::unique_ptr<DataDef>> all_global_data;
     std::vector<std::unique_ptr<EnumDef>> all_global_enums;
@@ -708,7 +719,6 @@ int main(int argc, char **argv)
             }
             std::set<std::string> required_headers = get_required_headers(all_components, all_global_functions);
             FeatureFlags features = detect_features(all_components, required_headers, all_global_functions);
-            LangTable::instance().load(project_root);
             features.json = features.json || LangTable::instance().present;
             std::ostringstream discard;
             generate_cpp_code(discard, all_components, all_global_data, all_global_enums, all_global_functions,
@@ -846,7 +856,6 @@ int main(int argc, char **argv)
         std::set<std::string> required_headers = get_required_headers(all_components, all_global_functions);
         FeatureFlags features = detect_features(all_components, required_headers, all_global_functions);
         // lang/: English built in, the others written out once the program builds
-        LangTable::instance().load(project_root);
         features.json = features.json || LangTable::instance().present;
 
         // Generate C++ code
@@ -988,7 +997,7 @@ int main(int argc, char **argv)
                 std::cerr << "Error: webcc compilation failed." << std::endl;
                 return 1;
             }
-            write_lang_files(project_root, final_output_dir);
+            write_lang_files(final_output_dir);
             remove_prerendered_pages(abs_output_dir);
             if (final_app_config.prerender && !prerender_pages(final_app_config, all_components, abs_output_cc, abs_output_dir, cache_dir))
                 return 1;
