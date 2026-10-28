@@ -1,4 +1,5 @@
 #include "expressions.h"
+#include "../codegen/lang.h"
 #include "../codegen/codegen_utils.h"
 #include "codegen_state.h"
 #include "formatter.h"
@@ -99,6 +100,44 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
     if (intrinsic_name == "is_prerender" && args.empty()) {
         return "(webcc::system::is_prerender() != 0)";
     }
+
+    // Lang (codegen/lang.cc): the key is looked up in lang/en.json here, so one that isn't
+    // there is a compile error and the program only carries the slot's number
+    if (intrinsic_name == "lang_t") {
+        const LangTable& t = LangTable::instance();
+        int line = args.empty() ? -1 : args[0].value->line;
+        if (!t.present)
+            ErrorHandler::compiler_error("Lang needs lang/en.json next to src/: one object of the app's texts", line);
+        auto* lit = args.empty() ? nullptr : dynamic_cast<StringLiteral*>(args[0].value.get());
+        if (!lit || lit->is_template)
+            ErrorHandler::compiler_error("Lang takes the key as written, Lang.t(\"settings.title\"), so it can be checked", line);
+        const std::string& key = lit->value;
+        // a plural (key.other in en.json) takes a count after the key, any other text its args
+        int base = t.plural(key);
+        bool counted = args.size() >= 2 && !dynamic_cast<ArrayLiteral*>(args[1].value.get());
+        if (base < 0) {
+            int i = t.find(key);
+            if (i < 0)
+                ErrorHandler::compiler_error("No text '" + key + "' in lang/en.json", line);
+            if (counted || args.size() > 2)
+                ErrorHandler::compiler_error("'" + key + "' isn't a plural in lang/en.json (" + key + ".one, " + key + ".other): it takes no count", line);
+            if (args.size() == 2)
+                return "__coi_lang_t(" + std::to_string(i) + ", " + typed_literal(args[1].value.get()) + ")";
+            return "__coi_lang_t(" + std::to_string(i) + ")";
+        }
+        if (!counted)
+            ErrorHandler::compiler_error("'" + key + "' is a plural in lang/en.json: Lang.t(\"" + key + "\", n) with the count", line);
+        std::string code = "__coi_lang_plural(" + std::to_string(base) + ", (int64_t)(" + args[1].value->to_webcc() + ")";
+        if (args.size() >= 3)
+            code += ", " + typed_literal(args[2].value.get());
+        return code + ")";
+    }
+    if (intrinsic_name == "lang_code" && args.empty())
+        return "__coi_lang_code";
+    if (intrinsic_name == "lang_available" && args.empty())
+        return "__coi_lang_available()";
+    if (intrinsic_name == "lang_use" && args.size() == 1)
+        return "__coi_lang_use(" + args[0].value->to_webcc() + ")";
     
     if (intrinsic_name == "json_stringify" && args.size() == 1)
         return "__coi_json_stringify(" + typed_literal(args[0].value.get()) + ")";
@@ -488,7 +527,9 @@ std::string FunctionCall::to_webcc() {
     if (!type_or_obj.empty()) {
         // Check for static type call (e.g., System.random, Input.isKeyDown)
         if (std::isupper(type_or_obj[0])) {
-            if (auto* method_def = DefSchema::instance().lookup_method(type_or_obj, method)) {
+            // an overload by argument count (Lang.t(key), Lang.t(key, n)) first, then the name alone
+            const MethodDef* by_count = DefSchema::instance().lookup_method(type_or_obj, method, args.size());
+            if (auto* method_def = by_count ? by_count : DefSchema::instance().lookup_method(type_or_obj, method)) {
                 // For intrinsics, allow fewer args (they handle optional params internally)
                 // For others, require exact match
                 bool arg_count_ok = (method_def->mapping_type == MappingType::Intrinsic)

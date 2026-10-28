@@ -8,12 +8,15 @@ from .base import TestRunnerBase, GREEN, RED, NC
 class NativeRunner(TestRunnerBase):
     """tests/native/*.coi are run with `coi test`. A file must build and pass every test block in
     it. A file with a `name.expected` beside it must instead print each of its lines (a compile
-    error, or a failed check with both sides): that is how the runner's own output is checked."""
+    error, or a failed check with both sides): that is how the runner's own output is checked.
+    A folder with a src/ in it is a project of its own (what's beside src/, like lang/, counts),
+    run with `coi test` inside it; name.expected beside the folder works the same."""
 
     def run(self, tests_dir):
         self.ensure_build()
         native_dir = Path(tests_dir).resolve() / "native"
         files = sorted(p for p in native_dir.glob("*.coi") if p.is_file())   # .coi/ is the cache
+        files += sorted(p for p in native_dir.iterdir() if p.is_dir() and (p / "src").is_dir())
         if not files:
             print("No native tests found.")
             return
@@ -21,8 +24,8 @@ class NativeRunner(TestRunnerBase):
         print("Running native tests...")
         failures = []
         for i, f in enumerate(files):
-            result = subprocess.run([str(self.compiler_bin), "test", str(f)], cwd=native_dir,
-                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+            cmd, cwd = ([str(self.compiler_bin), "test"], f) if f.is_dir() else ([str(self.compiler_bin), "test", str(f)], native_dir)
+            result = subprocess.run(cmd, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
             out = re.sub(r"\x1b\[[0-9;]*m", "", result.stdout)
             expected = f.with_suffix(".expected")
             if expected.exists():

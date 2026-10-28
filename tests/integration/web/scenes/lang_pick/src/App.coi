@@ -1,0 +1,15 @@
+// the visitor's language: the browser's when there's a file for it, English otherwise, and a
+// choice kept by Lang.use over both
+component LangPick {
+    def german() : void { Lang.use("de"); }
+    view {
+        <div>
+            <h1 class="title">{Lang.t("title")}</h1>
+            <p class="count">{Lang.t("notebooks", 3)}</p>
+            <p class="code">{Lang.code()}</p>
+            <button class="de" onclick={german}>Deutsch</button>
+        </div>
+    }
+}
+
+app { root = LangPick; }

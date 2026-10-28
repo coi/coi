@@ -1,0 +1,4 @@
+// a plural needs its count: there's no text for "notebooks" without one
+test "no count" {
+    expect(Lang.t("notebooks") == "");
+}

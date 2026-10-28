@@ -17,6 +17,7 @@
 #include "codegen/codegen.h"
 #include "codegen/css_generator.h"
 #include "codegen/pwa_generator.h"
+#include "codegen/lang.h"
 #include <iostream>
 #include <chrono>
 #include <cstdlib>
@@ -706,6 +707,8 @@ int main(int argc, char **argv)
             }
             std::set<std::string> required_headers = get_required_headers(all_components, all_global_functions);
             FeatureFlags features = detect_features(all_components, required_headers, all_global_functions);
+            LangTable::instance().load(project_root);
+            features.json = features.json || LangTable::instance().present;
             std::ostringstream discard;
             generate_cpp_code(discard, all_components, all_global_data, all_global_enums, all_global_functions,
                               final_app_config, required_headers, features, true);
@@ -841,6 +844,9 @@ int main(int argc, char **argv)
 
         std::set<std::string> required_headers = get_required_headers(all_components, all_global_functions);
         FeatureFlags features = detect_features(all_components, required_headers, all_global_functions);
+        // lang/: English built in, the others written out once the program builds
+        LangTable::instance().load(project_root);
+        features.json = features.json || LangTable::instance().present;
 
         // Generate C++ code
         generate_cpp_code(out, all_components, all_global_data, all_global_enums, all_global_functions,
@@ -981,6 +987,7 @@ int main(int argc, char **argv)
                 std::cerr << "Error: webcc compilation failed." << std::endl;
                 return 1;
             }
+            write_lang_files(project_root, final_output_dir);
             remove_prerendered_pages(abs_output_dir);
             if (final_app_config.prerender && !prerender_pages(final_app_config, all_components, abs_output_cc, abs_output_dir, cache_dir))
                 return 1;

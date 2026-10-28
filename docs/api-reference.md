@@ -894,6 +894,20 @@ match (Json.parse(User, payload)) {
 }
 ```
 
+## Lang
+
+Text in more than one language, from `lang/en.json` and the other files beside it (see [More than one language](getting-started.md#more-than-one-language)).
+
+| Function | Returns |
+|---|---|
+| `Lang.t(string key)`, `Lang.t(string key, string[] args)` | the text for the key in the language in use, `{0}`, `{1}`, ... filled from `args`; the key must be in `lang/en.json` |
+| `Lang.t(string key, int n)`, `Lang.t(string key, int n, string[] args)` | for a plural (`key.one`, `key.other`, ...): the form for `n`, `#` as `n` |
+| `Lang.code()` | the language in use: `"en"`, `"de"`, `"pt-BR"` |
+| `Lang.available()` | `"en"` and every other language there's a file for |
+| `Lang.use(string code)` | keeps the choice and starts the app again in it |
+
+The key is written out, `Lang.t("settings.title")`, so the compiler can check it.
+
 ## WebSocket
 
 Real-time bidirectional communication with WebSocket servers. An owned `WebSocket` member is closed when its component is destroyed.
@@ -1178,6 +1192,7 @@ These names are taken: an enum of your own can't be called `ReadyState`. An unkn
 | `FetchRequest` | HTTP GET/POST requests                         |
 | `WebSocket`  | WebSocket connections                            |
 | `Json`       | Type-safe JSON parsing and serialization         |
+| `Lang`       | The app's texts in more than one language (`lang/`) |
 
 ## Next Steps
 

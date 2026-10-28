@@ -311,6 +311,32 @@ With `pwa = true`, `coi build` also writes `manifest.webmanifest` and `sw.js` ne
 
 Service workers need HTTPS (or `localhost`). Keep data the user creates in IndexedDB, not in the build: the cache is replaced on every update.
 
+### More than one language
+
+Put the app's texts in `lang/en.json`, next to `src/`, one object of them; groups are only for reading (`"settings": {"title": "Settings"}` is the key `settings.title`):
+
+```json
+{
+  "settings": { "title": "Settings" },
+  "toast": { "moved": "Moved {0} to the trash" },
+  "notebooks": { "one": "# notebook", "other": "# notebooks" }
+}
+```
+
+```coi
+<h2>{Lang.t("settings.title")}</h2>
+<small>{Lang.t("notebooks", count)}</small>
+toast = Lang.t("toast.moved", [title]);
+```
+
+- **Checked.** A key `lang/en.json` doesn't have is a compile error, so a typo never reaches the page.
+- **Arguments and plurals.** `{0}`, `{1}`, ... take `args` in order. A key with `one` and `other` under it is a plural: it takes the count after the key, `Lang.t("notebooks", n)`, and the form for `n` is picked by the language's own rule (`Intl.PluralRules`): `one` and `other` for English, and `zero`, `two`, `few`, `many` where a language has them; `#` is `n`. A plural without a count, or a count for a text that isn't one, doesn't build.
+- **English is built in.** It works offline and in prerendered pages, and needs no download.
+- **Other languages** are files beside it, named by their code: `lang/de.json`, `lang/pt-BR.json`, with the same keys. The build writes each to `lazy/lang/`; a key it leaves out stays English, and one `en.json` doesn't have is pointed out. Before the app mounts, the visitor's language file is fetched: the choice `Lang.use` kept, else the first of the browser's languages there is a file for (`de-AT` takes `de`). It's kept offline after the first time, like any `lazy` file, and the app never shows English first.
+- **Choosing.** `Lang.available()` is `["en", "de", ...]`, `Lang.code()` the one in use, `Lang.use("de")` keeps the choice and starts the app again in it.
+
+Prerendered pages are English for now.
+
 ### Your own title bar
 
 With `titlebar = overlay`, an installed app on desktop Chrome or Edge has no separate title bar: the page starts at the top of the window and the window buttons float over its top corner, like most desktop apps. The user can switch back to the normal bar from the window menu; other browsers and phones keep it.
@@ -344,6 +370,7 @@ For larger projects, organize your code into multiple files:
 
 ```
 my-app/
+├── lang/           # en.json and the other languages (optional)
 ├── src/
 │   ├── App.coi
 │   ├── components/

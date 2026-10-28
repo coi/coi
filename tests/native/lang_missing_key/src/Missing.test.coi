@@ -1,0 +1,4 @@
+// a key lang/en.json doesn't have doesn't build
+test "missing" {
+    expect(Lang.t("titel") == "Settings");
+}

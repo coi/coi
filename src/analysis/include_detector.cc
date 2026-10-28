@@ -243,8 +243,8 @@ std::set<std::string> get_required_headers(const std::vector<Component> &compone
         auto it = type_to_header.find(type);
         if (it != type_to_header.end())
         {
-            // Skip 'json' header - it's embedded inline when features.json is true
-            if (it->second != "json")
+            // Skip 'json' and 'lang': they're written into the program (features.json, codegen/lang.cc)
+            if (it->second != "json" && it->second != "lang")
             {
                 headers.insert(it->second);
             }

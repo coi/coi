@@ -1,0 +1,22 @@
+// lang/en.json is built in: a test reads the app's English texts (the host has no other language)
+test "texts by key, groups as dotted keys, arguments in order" {
+    expect(Lang.t("title") == "Settings");
+    expect(Lang.t("toast.moved", ["Physics", "the trash"]) == "Moved Physics to the trash");
+    expect(Lang.t("toast.moved") == "Moved {0} to {1}");
+}
+
+test "plurals: the form for n by the count after the key, # is n, then the arguments" {
+    expect(Lang.t("notebooks", 1) == "1 notebook");
+    expect(Lang.t("notebooks", 0) == "0 notebooks");
+    expect(Lang.t("notebooks", 12) == "12 notebooks");
+    expect(Lang.t("files", 1, ["Math"]) == "1 files in Math");
+}
+
+test "the languages: English in use, every lang/ file there" {
+    expect(Lang.code() == "en");
+    expect(Lang.available() == ["en", "de"]);
+    Lang.use("de");
+    expect(Lang.code() == "de");
+    Lang.use("xx");
+    expect(Lang.code() == "de");
+}

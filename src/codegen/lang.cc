@@ -1,0 +1,329 @@
+#include "lang.h"
+#include "../cli/error.h"
+#include "../cli/json.h"
+#include "codegen_utils.h"
+#include "json_codegen.h"
+
+#include <algorithm>
+#include <fstream>
+#include <iostream>
+#include <regex>
+#include <sstream>
+
+namespace fs = std::filesystem;
+
+// CLDR's plural categories, in the order a plural's slots have them
+static const char *const kCategories[] = {"zero", "one", "two", "few", "many", "other"};
+static const int kCategoryCount = 6;
+
+LangTable &LangTable::instance()
+{
+    static LangTable t;
+    return t;
+}
+
+static std::string read_file(const fs::path &p)
+{
+    std::ifstream in(p, std::ios::binary);
+    std::stringstream ss;
+    ss << in.rdbuf();
+    return ss.str();
+}
+
+// "settings": {"title": "Settings"} is "settings.title": groups are only for reading
+static void flatten(const Json &j, const std::string &prefix, const std::string &file,
+                    std::vector<std::pair<std::string, std::string>> &out)
+{
+    for (const auto &[k, v] : j.obj)
+    {
+        std::string key = prefix.empty() ? k : prefix + "." + k;
+        if (v.kind == Json::Str)
+            out.push_back({key, v.s});
+        else if (v.kind == Json::Obj)
+            flatten(v, key, file, out);
+        else
+            ErrorHandler::compiler_error(file + ": '" + key + "' is neither text nor a group of texts");
+    }
+}
+
+static std::vector<std::pair<std::string, std::string>> read_texts(const fs::path &p)
+{
+    std::string file = "lang/" + p.filename().string();
+    Json j;
+    try
+    {
+        j = parse_json(read_file(p));
+    }
+    catch (const std::exception &e)
+    {
+        ErrorHandler::compiler_error(file + " isn't valid JSON: " + e.what());
+    }
+    if (j.kind != Json::Obj)
+        ErrorHandler::compiler_error(file + " has to be one object of texts");
+    std::vector<std::pair<std::string, std::string>> out;
+    flatten(j, "", file, out);
+    return out;
+}
+
+static bool is_category(const std::string &s)
+{
+    for (int i = 0; i < kCategoryCount; i++)
+        if (s == kCategories[i]) return true;
+    return false;
+}
+
+void LangTable::load(const fs::path &project_root)
+{
+    *this = LangTable{};
+    fs::path dir = project_root / "lang";
+    if (!fs::exists(dir / "en.json"))
+        return;
+    present = true;
+    auto texts = read_texts(dir / "en.json");
+    std::map<std::string, std::string> by_key;
+    for (const auto &[k, v] : texts)
+    {
+        if (by_key.count(k))
+            ErrorHandler::compiler_error("lang/en.json has '" + k + "' twice");
+        by_key[k] = v;
+    }
+    // a plural (key.other there) gets a slot for every category, side by side, so a language
+    // with more forms than English has somewhere to put them; English's missing ones are its other
+    std::map<std::string, bool> placed;
+    for (const auto &[k, v] : texts)
+    {
+        size_t dot = k.rfind('.');
+        std::string base = dot == std::string::npos ? "" : k.substr(0, dot);
+        if (!base.empty() && is_category(k.substr(dot + 1)) && by_key.count(base + ".other"))
+        {
+            if (placed[base]) continue;
+            placed[base] = true;
+            for (int c = 0; c < kCategoryCount; c++)
+            {
+                std::string slot = base + "." + kCategories[c];
+                index[slot] = (int)keys.size();
+                keys.push_back(slot);
+                auto it = by_key.find(slot);
+                en.push_back(it != by_key.end() ? it->second : by_key[base + ".other"]);
+            }
+            continue;
+        }
+        index[k] = (int)keys.size();
+        keys.push_back(k);
+        en.push_back(v);
+    }
+    codes.push_back("en");
+    std::vector<std::string> others;
+    static const std::regex code_re("[a-z]{2,3}(-[A-Za-z0-9]{2,8})*");
+    for (const auto &entry : fs::directory_iterator(dir))
+    {
+        if (!entry.is_regular_file() || entry.path().extension() != ".json") continue;
+        std::string code = entry.path().stem().string();
+        if (code == "en") continue;
+        if (!std::regex_match(code, code_re))
+            ErrorHandler::compiler_error("lang/" + entry.path().filename().string() + ": the name has to be a language code, like de.json or pt-BR.json");
+        others.push_back(code);
+    }
+    std::sort(others.begin(), others.end());
+    codes.insert(codes.end(), others.begin(), others.end());
+}
+
+int LangTable::find(const std::string &key) const
+{
+    auto it = index.find(key);
+    return it == index.end() ? -1 : it->second;
+}
+
+int LangTable::plural(const std::string &key) const
+{
+    int other = find(key + ".other");
+    if (other < 0) return -1;
+    return other - (kCategoryCount - 1);
+}
+
+void write_lang_files(const fs::path &project_root, const fs::path &out_dir)
+{
+    const LangTable &t = LangTable::instance();
+    fs::path dir = out_dir / "lazy" / "lang";
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+    if (t.codes.size() < 2) return;
+    fs::create_directories(dir);
+    for (size_t i = 1; i < t.codes.size(); i++)
+    {
+        const std::string &code = t.codes[i];
+        std::map<std::string, std::string> texts;
+        for (const auto &[k, v] : read_texts(project_root / "lang" / (code + ".json")))
+        {
+            if (t.find(k) < 0)
+                std::cerr << "Warning: lang/" << code << ".json has '" << k << "', which lang/en.json doesn't" << std::endl;
+            texts[k] = v;
+        }
+        // in en.json's order; a plural form the language doesn't have is its other
+        std::vector<Json> list;
+        for (const std::string &k : t.keys)
+        {
+            auto it = texts.find(k);
+            std::string v = it != texts.end() ? it->second : "";
+            size_t dot = k.rfind('.');
+            if (v.empty() && dot != std::string::npos && is_category(k.substr(dot + 1)) && t.plural(k.substr(0, dot)) >= 0)
+            {
+                auto other = texts.find(k.substr(0, dot) + ".other");
+                if (other != texts.end()) v = other->second;
+            }
+            list.push_back(Json(v));
+        }
+        std::ofstream(dir / (code + ".json")) << dump(Json::array(list));
+    }
+}
+
+void emit_lang_runtime(std::ostream &out, const std::string &base, bool test_program)
+{
+    const LangTable &t = LangTable::instance();
+    size_t n = t.keys.size();
+    out << "// lang/: en.json built in, the visitor's language over it before the app mounts\n";
+    out << "static const char* const __coi_lang_en[] = {";
+    for (size_t i = 0; i < n; i++)
+        out << (i ? ", " : "") << cpp_string_literal(t.en[i]);
+    if (n == 0) out << "\"\"";
+    out << "};\n";
+    out << "static const char* const __coi_lang_codes[] = {";
+    for (size_t i = 0; i < t.codes.size(); i++)
+        out << (i ? ", " : "") << cpp_string_literal(t.codes[i]);
+    out << "};\n";
+    out << "static const int __coi_lang_n = " << n << ";\n";
+    out << "static const int __coi_lang_code_count = " << t.codes.size() << ";\n";
+    out << R"(static coi::string* __coi_lang_tab = nullptr;
+static coi::string __coi_lang_code = "en";
+static coi::string* __coi_lang_table() {
+    if (!__coi_lang_tab) {
+        __coi_lang_tab = new coi::string[__coi_lang_n > 0 ? __coi_lang_n : 1];
+        for (int i = 0; i < __coi_lang_n; i++) __coi_lang_tab[i] = coi::string(__coi_lang_en[i]);
+    }
+    return __coi_lang_tab;
+}
+// {0}, {1}, ... in a text: the arguments, in order
+static coi::string __coi_lang_fill(const coi::string& s, const coi::vector<coi::string>& args) {
+    if (args.empty()) return s;
+    webcc::hybrid_formatter<256> f;
+    const char* d = s.c_str();
+    uint32_t len = s.length(), start = 0;
+    for (uint32_t i = 0; i < len; i++) {
+        if (d[i] != '{') continue;
+        uint32_t j = i + 1, k = 0;
+        while (j < len && d[j] >= '0' && d[j] <= '9') k = k * 10 + (d[j++] - '0');
+        if (j == i + 1 || j >= len || d[j] != '}' || k >= args.size()) continue;
+        f << webcc::string_view(d + start, i - start) << webcc::string_view(args[k].c_str(), args[k].length());
+        start = j + 1;
+        i = j;
+    }
+    f << webcc::string_view(d + start, len - start);
+    return coi::string(f.c_str());
+}
+static coi::string __coi_lang_t(int i, const coi::vector<coi::string>& args = {}) {
+    return __coi_lang_fill(__coi_lang_table()[i], args);
+}
+// the form for n: the language's plural rule picks one of the six slots from base; # is n
+static coi::string __coi_lang_plural(int base, int64_t n, const coi::vector<coi::string>& args = {}) {
+    coi::string c = webcc::system::plural_category(__coi_lang_code, (double)n);
+    int k = c == "zero" ? 0 : c == "one" ? 1 : c == "two" ? 2 : c == "few" ? 3 : c == "many" ? 4 : c == "other" ? 5 : (n == 1 ? 1 : 5);
+    const coi::string& s = __coi_lang_table()[base + k];
+    webcc::hybrid_formatter<32> num;
+    num << n;
+    webcc::hybrid_formatter<256> f;
+    const char* d = s.c_str();
+    uint32_t start = 0;
+    for (uint32_t i = 0; i < s.length(); i++) {
+        if (d[i] != '#') continue;
+        f << webcc::string_view(d + start, i - start) << num.c_str();
+        start = i + 1;
+    }
+    f << webcc::string_view(d + start, s.length() - start);
+    return __coi_lang_fill(coi::string(f.c_str()), args);
+}
+static coi::vector<coi::string> __coi_lang_available() {
+    coi::vector<coi::string> out;
+    for (int i = 0; i < __coi_lang_code_count; i++) out.push_back(coi::string(__coi_lang_codes[i]));
+    return out;
+}
+static bool __coi_lang_known(const coi::string& code) {
+    for (int i = 0; i < __coi_lang_code_count; i++) if (code == __coi_lang_codes[i]) return true;
+    return false;
+}
+)";
+    if (test_program)
+    {
+        // a test runs in English; Lang.use changes the language it reports, nothing more
+        out << "static void __coi_lang_use(const coi::string& code) { if (__coi_lang_known(code)) __coi_lang_code = code; }\n";
+        return;
+    }
+    out << R"(// a choice is kept and the app starts again in it
+static void __coi_lang_use(const coi::string& code) {
+    if (!__coi_lang_known(code)) return;
+    webcc::storage::set_item("lang", code);
+    webcc::system::reload();
+}
+// the language this visit wants: a choice kept by Lang.use, else the first of the browser's
+// languages there's a file for ("de-AT" takes de when there's no de-AT)
+static coi::string __coi_lang_pick() {
+    coi::string kept = webcc::storage::get_item("lang");
+    if (__coi_lang_known(kept)) return kept;
+    coi::string all = webcc::system::get_languages();
+    const char* d = all.c_str();
+    uint32_t len = all.length(), start = 0;
+    for (uint32_t i = 0; i <= len; i++) {
+        if (i < len && d[i] != ',') continue;
+        coi::string want(d + start, i - start);
+        start = i + 1;
+        if (__coi_lang_known(want)) return want;
+        const char* w = want.c_str();
+        uint32_t dash = 0;
+        while (dash < want.length() && w[dash] != '-') dash++;
+        coi::string primary(w, dash);
+        if (__coi_lang_known(primary)) return primary;
+    }
+    return "en";
+}
+static webcc::FetchRequest __coi_lang_fetch;
+static bool __coi_lang_waiting = false;
+static void __coi_mount();
+// true while the language's file is on its way: the app mounts when it's here
+static bool __coi_lang_start() {
+    if (__coi_lang_code_count < 2) return false;
+    coi::string code = __coi_lang_pick();
+    if (code == "en") return false;
+    __coi_lang_code = code;
+    __coi_lang_waiting = true;
+)";
+    out << "    __coi_lang_fetch = webcc::fetch::get(coi::string::concat(" << cpp_string_literal(base + "lazy/lang/") << ", code, \".json\"));\n";
+    out << R"(    return true;
+}
+// the language's texts over English's, then the app; without them (offline before it was ever
+// fetched) the app comes in English
+static bool __coi_lang_event(const webcc::Event& e) {
+    if (!__coi_lang_waiting) return false;
+    if (auto s = e.as<webcc::fetch::SuccessEvent>()) {
+        if (!(s->id == __coi_lang_fetch)) return false;
+        coi::string text(s->data);
+        auto r = )";
+    out << generate_json_parse("string[]", "text");
+    out << R"(;
+        coi::string* tab = __coi_lang_table();
+        if (r.ok && (int)r.value.size() == __coi_lang_n) {
+            for (int i = 0; i < __coi_lang_n; i++) if (r.value[i].length()) tab[i] = r.value[i];
+        } else __coi_lang_code = "en";
+        __coi_lang_waiting = false;
+        __coi_mount();
+        return true;
+    }
+    if (auto er = e.as<webcc::fetch::ErrorEvent>()) {
+        if (!(er->id == __coi_lang_fetch)) return false;
+        __coi_lang_code = "en";
+        __coi_lang_waiting = false;
+        __coi_mount();
+        return true;
+    }
+    return false;
+}
+)";
+}

@@ -1,0 +1,6 @@
+{
+  "title": "Settings",
+  "toast": { "moved": "Moved {0} to {1}" },
+  "notebooks": { "one": "# notebook", "other": "# notebooks" },
+  "files": { "other": "# files in {0}" }
+}

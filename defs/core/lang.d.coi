@@ -1,0 +1,32 @@
+// Text in more than one language. lang/en.json next to src/ is one object of the app's texts,
+// groups allowed ({"settings": {"title": "Settings"}} is "settings.title"), built into the app.
+// Every other lang/<code>.json (de.json, pt-BR.json) is fetched before the app starts when it's
+// the visitor's language: the one Lang.use kept, else the first of the browser's there's a file
+// for. What a language leaves out is English. A key en.json doesn't have is a compile error.
+
+type Lang {
+    // the text; {0}, {1}, ... in it are args, in order
+    @intrinsic("lang_t")
+    shared def t(string key): string
+    @intrinsic("lang_t")
+    shared def t(string key, string[] args): string
+
+    // a plural (key.one, key.other in en.json, and zero, two, few, many where a language has
+    // them): the form for n, by the language's own rule; # in it is n
+    @intrinsic("lang_t")
+    shared def t(string key, int n): string
+    @intrinsic("lang_t")
+    shared def t(string key, int n, string[] args): string
+
+    // the language in use, "en" or a file's name ("de", "pt-BR")
+    @intrinsic("lang_code")
+    shared def code(): string
+
+    // "en" and every other language there's a file for
+    @intrinsic("lang_available")
+    shared def available(): string[]
+
+    // keeps the choice and starts the app again in it
+    @intrinsic("lang_use")
+    shared def use(string code): void
+}

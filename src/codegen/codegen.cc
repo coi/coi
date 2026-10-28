@@ -1,5 +1,6 @@
 #include <functional>
 #include "codegen.h"
+#include "lang.h"
 #include <filesystem>
 namespace fs = std::filesystem;
 #include "codegen_utils.h"
@@ -40,11 +41,13 @@ static void emit_event_dispatch(std::ostream &out, const FeatureFlags &features)
 }
 
 // every event of a frame to its handlers
-static void emit_dispatch_events(std::ostream &out, const FeatureFlags &features)
+static void emit_dispatch_events(std::ostream &out, const FeatureFlags &features, bool lang_start = false)
 {
     out << "void dispatch_events(const webcc::Event* events, uint32_t event_count) {\n";
     out << "    for (uint32_t i = 0; i < event_count; i++) {\n";
     out << "        const auto& e = events[i];\n";
+    if (lang_start)   // the visitor's language arriving before the app is there (lang.cc)
+        out << "        if (__coi_lang_event(e)) continue;\n";
     out << "        if (false) {\n"; // Dummy to allow all handlers to use "} else if"
     emit_feature_event_handlers(out, features);
     emit_event_dispatch(out, features);
@@ -261,6 +264,10 @@ void generate_cpp_code(
     }
     if (test_program)   // built for the host: the C library is there, and the page to mount on
         out << "#include <cstdio>\n#include <cstdlib>\n#include \"webcc/dom.h\"\n#include \"webcc/host.h\"\n";
+    bool lang = LangTable::instance().present;
+    bool lang_start = lang && !test_program && LangTable::instance().codes.size() > 1;
+    if (lang)
+        out << "#include \"webcc/system.h\"\n#include \"webcc/storage.h\"\n#include \"webcc/fetch.h\"\n#include \"webcc/core/format.h\"\n";
     out << "#include \"webcc/core/function.h\"\n";
     out << "#include \"webcc/core/allocator.h\"\n";
     out << "#include \"webcc/core/new.h\"\n";
@@ -582,6 +589,8 @@ template<typename V, typename F> inline V coi_filter(const V& v, F pred) {
     {
         emit_json_runtime(out);
     }
+    if (lang)
+        emit_lang_runtime(out, final_app_config.base, test_program);
     out << "\n";
 
     {
@@ -1083,7 +1092,7 @@ template<typename V, typename F> inline V coi_filter(const V& v, F pred) {
         out << "coi::string g_app_get_route() { return \"\"; }\n";
     }
 
-    emit_dispatch_events(out, features);
+    emit_dispatch_events(out, features, lang_start);
 
     out << "void update_wrapper(double time) {\n";
     out << "    static double last_time = 0;\n";
@@ -1119,7 +1128,8 @@ template<typename V, typename F> inline V coi_filter(const V& v, F pred) {
     out << "    coi_reap();\n";
     out << "}\n\n";
 
-    out << "int main() {\n";
+    // the app's start; with a language to fetch first, main leaves it to the fetch's answer
+    out << "static void __coi_mount() {\n";
     out << "    // We allocate the app on the heap because the stack is destroyed when main() returns.\n";
     out << "    // The app needs to persist for the event loop (update_wrapper).\n";
     out << "    // We use coi::malloc so backend allocation is abstracted per target.\n";
@@ -1144,6 +1154,17 @@ template<typename V, typename F> inline V coi_filter(const V& v, F pred) {
         out << "    webcc::dom::hydrate(app->_get_root_element());\n";
         out << "    webcc::flush();\n";
     }
+    out << "}\n\n";
+    out << "int main() {\n";
+    if (lang_start)
+    {
+        out << "    if (__coi_lang_start()) {\n";
+        out << "        webcc::system::set_update(update_wrapper);\n";
+        out << "        webcc::flush();\n";
+        out << "        return 0;\n";
+        out << "    }\n";
+    }
+    out << "    __coi_mount();\n";
     out << "    return 0;\n";
     out << "}\n";
 }
