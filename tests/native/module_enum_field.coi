@@ -1,0 +1,14 @@
+// a pod's field may be of its module's enum
+module Shapes;
+
+pub enum Corner { Sharp, Round }
+pub pod Box { int size; Corner corner; }
+
+def rounded(Box b) : bool { return b.corner == Corner::Round; }
+
+test "a module enum as a pod field, set by name or left at its first value" {
+    Box b = Box{size = 3, corner = Corner::Round};
+    expect(rounded(b));
+    expect(Box{size = 1}.corner == Corner::Sharp);
+    expect(b != Box{size = 3});
+}

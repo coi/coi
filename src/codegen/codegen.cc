@@ -597,6 +597,9 @@ template<typename V, typename F> inline V coi_filter(const V& v, F pred) {
         std::set<std::string> pods;
         for (const auto &data_def : all_global_data)
             pods.insert(qualified_name(data_def->module_name, data_def->name));
+        // a field may be of a module's enum too (Geo_Side)
+        for (const auto &enum_def : all_global_enums)
+            pods.insert(qualified_name(enum_def->module_name, enum_def->name));
                 for (const auto &data_def : all_global_data)
         {
             for (auto &field : data_def->fields)
