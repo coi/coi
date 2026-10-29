@@ -199,7 +199,16 @@ def get_mtimes(project_dir):
                 mtimes[str(f)] = f.stat().st_mtime
             except OSError:
                 pass
-    
+
+    # Watch the texts in lang/: en.json is built in, and a new language is a new file
+    lang_dir = project_path / 'lang'
+    if lang_dir.exists():
+        for f in lang_dir.glob('*.json'):
+            try:
+                mtimes[str(f)] = f.stat().st_mtime
+            except OSError:
+                pass
+
     return mtimes
 
 
