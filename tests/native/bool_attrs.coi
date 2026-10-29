@@ -1,0 +1,29 @@
+// disabled, checked and the like are on by being there at all, so disabled="false" written as an
+// attribute still disabled the button. They're set as the property: "false" (or nothing) is off
+component BoolAttrs {
+    mut bool busy = false;
+    mut bool on = true;
+    def go() : void { busy = true; on = false; }
+    view {
+        <div>
+            <button class="send" onclick={go} disabled={busy ? "true" : "false"}>Send</button>
+            <button class="never" disabled="false">Never off</button>
+            <button class="always" disabled="true">Always off</button>
+            <input class="box" type="checkbox" checked={on ? "true" : "false"} />
+            <input class="name" readonly={busy ? "true" : "false"} />
+        </div>
+    }
+}
+
+test "on-or-off attributes take false for off" {
+    Mounted m = mount(BoolAttrs());
+    expect(!m.has(".send[disabled]"));
+    expect(!m.has(".never[disabled]"));
+    expect(m.has(".always[disabled]"));
+    expect(m.has(".box[checked]"));
+    expect(!m.has(".name[readonly]"));
+    m.click(".send");
+    expect(m.has(".send[disabled]"));
+    expect(!m.has(".box[checked]"));
+    expect(m.has(".name[readonly]"));
+}

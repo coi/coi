@@ -32,6 +32,14 @@ component Greeting {
 }
 ```
 
+An attribute that is on just by being there, like `disabled`, `checked`, `selected`, `hidden`,
+`readonly`, `required` or `open`, takes `"false"` (or `""`) for off, so it can follow a value:
+
+```tsx
+<button onclick={send} disabled={busy ? "true" : "false"}>Send</button>
+<input type="checkbox" checked={done ? "true" : "false"} />
+```
+
 ## Raw HTML
 
 For rendering HTML strings (e.g., from a CMS or markdown parser), use the `<raw>` element:

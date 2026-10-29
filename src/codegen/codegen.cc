@@ -283,6 +283,8 @@ void generate_cpp_code(
     out << "using string_view = webcc::string_view;\n";
     out << "template<typename T> using vector = webcc::vector<T>;\n";
     out << "}\n";
+    // disabled, hidden and the like: "false" or nothing is off, anything else on (view.h, bool_attr_property)
+    out << "inline coi::string coi_bool_attr(const coi::string& v) { return v == \"false\" ? coi::string() : v; }\n";
     // a component kept in an array: its handlers and its children's callbacks hold `this`, so it
     // lives at one address for life, and one taken out while an event is being handled stays in
     // memory until the frame is over, so the handler that took it out can finish (a route

@@ -17,6 +17,20 @@ struct HTMLAttribute {
     int line = 0;
 };
 
+// an attribute that is on by being there at all (disabled="false" still disables), and the DOM
+// property that turns it on and off; nullptr for the others. These are set as the property, with
+// "false" (or nothing) for off, so disabled={busy ? "true" : "false"} means what it says
+inline const char *bool_attr_property(const std::string &name)
+{
+    static const std::map<std::string, const char *> props = {
+        {"checked", "checked"}, {"selected", "selected"}, {"disabled", "disabled"}, {"hidden", "hidden"}, {"readonly", "readOnly"}, {"required", "required"},
+        {"multiple", "multiple"}, {"autofocus", "autofocus"}, {"open", "open"}, {"inert", "inert"},
+        {"novalidate", "noValidate"}, {"autoplay", "autoplay"}, {"controls", "controls"}, {"loop", "loop"},
+        {"muted", "muted"}, {"playsinline", "playsInline"}, {"reversed", "reversed"}};
+    auto it = props.find(name);
+    return it == props.end() ? nullptr : it->second;
+}
+
 struct EventHandler {
     int element_id;
     std::string event_type;      // "click", "input", "change", "keydown"

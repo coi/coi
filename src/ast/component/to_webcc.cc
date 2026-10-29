@@ -959,9 +959,11 @@ std::string Component::to_webcc(CompilerSession &session)
         if (binding.type == "attr") {
             // Use set_property for properties that need to be set on the DOM object, not as attributes
             // - value: for input/textarea/select current value (attribute only sets default)
-            // - checked: for checkbox/radio current checked state
-            // - selected: for option current selected state
-            if (binding.name == "value" || binding.name == "checked" || binding.name == "selected") {
+            // - checked, selected, disabled and the other on-or-off ones (view.h, bool_attr_property)
+            if (const char *prop = bool_attr_property(binding.name)) {
+                // checked, disabled and the like: the property, "false" for off (view.h)
+                update_line = "webcc::dom::set_property(" + el_var + ", \"" + prop + "\", coi_bool_attr(" + binding.value_code + "));";
+            } else if (binding.name == "value") {
                 dom_call = "webcc::dom::set_property(" + el_var + ", \"" + binding.name + "\", ";
             } else {
                 dom_call = "webcc::dom::set_attribute(" + el_var + ", \"" + binding.name + "\", ";
@@ -979,8 +981,8 @@ std::string Component::to_webcc(CompilerSession &session)
             dom_call = "webcc::dom::set_inner_text(" + el_var + ", ";
         }
 
-        bool optimized = false;
-        if (binding.expr)
+        bool optimized = !update_line.empty();
+        if (!optimized && binding.expr)
         {
             if (auto strLit = dynamic_cast<StringLiteral *>(binding.expr))
             {

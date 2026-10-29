@@ -330,6 +330,7 @@ static bool is_listener_attr(const std::string &name)
 static bool skeleton_attr(const HTMLElement &el, const HTMLAttribute &attr)
 {
     if (is_listener_attr(attr.name)) return false;
+    if (bool_attr_property(attr.name)) return false;   // set as a property, "false" for off
     if (el.tag == "select" && attr.name == "value") return false;
     return plain_string(attr.value.get()) != nullptr;
 }
@@ -847,6 +848,8 @@ void HTMLElement::generate_code(ViewCodegenContext& ctx)
             // a select's value only takes once its options exist, and only as a property
             if (tag == "select" && attr.name == "value")
                 select_value = val;
+            else if (const char *prop = bool_attr_property(attr.name))
+                ctx.ss << "        webcc::dom::set_property(" << var << ", \"" << prop << "\", coi_bool_attr(" << val << "));\n";
             else
                 ctx.ss << "        webcc::dom::set_attribute(" << var << ", \"" << attr.name << "\", " << val << ");\n";
 
