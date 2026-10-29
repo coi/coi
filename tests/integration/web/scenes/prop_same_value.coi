@@ -1,0 +1,33 @@
+// a prop that comes out the same doesn't re-render the child: one child changing a pod it holds by
+// reference makes the parent work out every prop read from that pod again, and a sibling whose
+// prop didn't change keeps its rows as they are
+pod Note { string id; int[] strokes; }
+
+component Pad(mut Note& note) {
+    def add() : void { note.strokes.push(note.strokes.size()); }
+    view { <div><button class="add" onclick={add}>add</button><span class="n">{note.strokes.size()}</span></div> }
+}
+
+component Side(string active, string[] ids) {
+    view {
+        <ul class="side">
+            <for id in ids key={id}><li class={id == active ? "on" : "off"} data-id={id}>{id}</li></for>
+        </ul>
+    }
+}
+
+component Host {
+    mut Note note = Note{id = "a", strokes = []};
+    mut string[] ids = ["a", "b", "c"];
+    mut Pad pad = Pad(&note);
+    def other() : void { note = Note{id = "b", strokes = []}; }
+    view {
+        <div>
+            <button class="other" onclick={other}>other</button>
+            <{pad} />
+            <Side active={note.id} ids={ids} />
+        </div>
+    }
+}
+
+app { root = Host; }

@@ -66,3 +66,4 @@ json_string_literal|tests/integration/web/scenes/json_string_literal.coi|web
 input_bound_args|tests/integration/web/scenes/input_bound_args.coi|web
 
 base_fragment_link|tests/integration/web/scenes/base_fragment_link.coi|web
+prop_same_value|tests/integration/web/scenes/prop_same_value.coi|web

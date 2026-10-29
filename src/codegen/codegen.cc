@@ -776,6 +776,14 @@ template<typename V, typename F> inline V coi_filter(const V& v, F pred) {
     out << "}\n";
     // a keyed loop row's key, comparable across syncs whatever its type
     out << "template<typename T> coi::string coi_loop_key(const T& v) { webcc::hybrid_formatter<128> f; f << v; return coi::string(f.c_str()); }\n";
+    // a prop the parent worked out again: kept, and true when it differs from what the child has.
+    // The same value changes nothing the child shows, so the child isn't redone; a type without ==
+    // always counts as changed
+    out << "template<typename T, typename U> bool coi_set_prop(T& slot, U&& v) {\n";
+    out << "    if constexpr (requires { slot == v; }) { if (slot == v) return false; }\n";
+    out << "    slot = static_cast<U&&>(v);\n";
+    out << "    return true;\n";
+    out << "}\n";
     out << "int g_view_depth = 0;\n";
 
     // Emit feature-specific globals (dispatchers, callbacks, etc.)

@@ -53,9 +53,12 @@ void Component::collect_child_updates(ASTNode *node, std::map<std::string, std::
                 continue;
             std::set<std::string> deps;
             prop.value->collect_dependencies(deps);
-            // a reference already points at the parent's value; a value prop is copied again
-            std::string assign = prop.is_reference ? "" : instance_name + "." + cpp_name(prop.name) + " = " + prop.value->to_webcc() + "; ";
-            std::string call = "        " + assign + instance_name + "._refresh_" + prop.name + "();\n";
+            // a reference already points at the parent's value: the child is told. A value prop is
+            // copied again, and the child is redone only when it came out different (coi_set_prop)
+            std::string refresh = instance_name + "._refresh_" + prop.name + "();";
+            std::string call = prop.is_reference
+                ? "        " + refresh + "\n"
+                : "        if (coi_set_prop(" + instance_name + "." + cpp_name(prop.name) + ", " + prop.value->to_webcc() + ")) " + refresh + "\n";
             for (const auto &dep : deps)
             {
                 updates[dep].push_back(call);

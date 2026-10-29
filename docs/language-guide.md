@@ -797,6 +797,10 @@ component UserProfile {
 }
 ```
 
+A child component only hears about it when what it's given comes out different. In
+`<Badge name={user.name} />`, changing `user.email` leaves `Badge` alone, because `name` is still
+equal (`==`) to what it had.
+
 ## Enums
 
 Enums define a set of named constants. They can be declared inside components, as shared (accessible from other components), or globally.
