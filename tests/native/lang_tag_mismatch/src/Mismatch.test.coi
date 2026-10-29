@@ -1,2 +1,6 @@
-// every language's text has the tags en.json gives it
-test "mismatch" { expect(Lang.t("agree") == "You agree to the Terms."); }
+// every language's text has the tags en.json gives it, once a view uses them
+component Fine {
+    view { <p>{Lang.t("agree", terms = <a href="/terms" />)}</p> }
+}
+
+test "mismatch" { Mounted m = mount(Fine()); }

@@ -42,8 +42,8 @@ test "<name/> is the view's element as written; the words go before what the ele
     expect(m.text(".open") == "Open pondnote.ink/join and type the code");
 }
 
-test "in an <if> too; and in code, a text with tags reads without them" {
+test "in an <if> too; in code a text reads as written, tags and all" {
     Mounted m = mount(Fine());
     expect(m.text(".inif b") == "Ada");
-    expect(Lang.t("signedIn", ["Ada"]) == "Signed in as Ada");
+    expect(Lang.t("signedIn", ["Ada"]) == "Signed in as <b>Ada</b>");
 }

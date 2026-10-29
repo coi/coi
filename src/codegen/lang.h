@@ -7,10 +7,11 @@
 // plural's form for n (key.one, key.other, ...), Lang.use(code) keeps a choice and reloads.
 //
 // A text may hold tags, "agree to the <terms>Terms</terms>" or "<logo/>", which a view fills
-// with elements: {Lang.t("agree", terms = <a href="/terms" />)}. Each language's text is cut at
-// its tags here, at build time, into hidden texts of their own: key#0, key#1, ... the runs
-// between the tags, key#name the words inside one, key#order which of the orders the tags come
-// in (en.json's is "0").
+// with elements: {Lang.t("agree", terms = <a href="/terms" />)}. When a view does, each
+// language's text is cut at its tags here, at build time, into hidden texts of their own: key#0,
+// key#1, ... the runs between the tags, key#name the words inside one, key#order which of the
+// orders the tags come in (en.json's is "0"). Anywhere else a text reads as written, so one
+// that is HTML (shown with <raw>) is left alone.
 
 #include <filesystem>
 #include <map>
@@ -34,7 +35,7 @@ struct LangTable
     std::vector<std::string> en;     // the English text of each
     std::map<std::string, int> index;
     std::vector<std::string> codes;  // "en" first, then every other lang/<code>.json, sorted
-    std::map<std::string, LangMarkup> markup;  // the texts with tags, by key
+    std::map<std::string, LangMarkup> markup;  // the texts a view has cut at their tags, by key
     // every other language's texts, in keys' order (English where it has none)
     std::map<std::string, std::vector<std::string>> others;
 
@@ -45,6 +46,11 @@ struct LangTable
     // the slot of a plural's first category (zero, one, two, few, many, other follow it); -1
     // when en.json has no key.other
     int plural(const std::string &key) const;
+    // the text's tags, its pieces added to the table (once): nullptr when it has none
+    const LangMarkup *cut(const std::string &key);
+
+private:
+    void add(const std::string &key, const std::string &text);
 };
 
 // the table and Lang's functions, in the generated program (base: the app's deploy base)

@@ -84,7 +84,6 @@ struct Cut
     std::vector<std::string> order;
     std::map<std::string, std::string> inner;
     std::map<std::string, bool> paired;
-    std::string plain;               // the text without its tags
 };
 
 // <name>, </name> or <name/> at i; anything else with a '<' in it (a < b) is just text
@@ -116,8 +115,7 @@ static Cut cut_tags(const std::string &text, const std::string &file, const std:
         size_t end = 0;
         if (text[i] != '<' || !read_tag(text, i, name, self, close, end))
         {
-            run += text[i];
-            c.plain += text[i++];
+            run += text[i++];
             continue;
         }
         if (close)
@@ -144,7 +142,6 @@ static Cut cut_tags(const std::string &text, const std::string &file, const std:
                 ErrorHandler::compiler_error(file + ": '" + key + "' has <" + n2 + "> inside <" + name + ">: tags don't nest");
         }
         c.inner[name] = inner;
-        c.plain += inner;
         i = stop + closing.size();
     }
     c.gaps.push_back(run);
@@ -178,11 +175,6 @@ void LangTable::load(const fs::path &project_root)
             ErrorHandler::compiler_error("lang/en.json has '" + k + "' twice");
         by_key[k] = v;
     }
-    auto add = [&](const std::string &k, const std::string &v) {
-        index[k] = (int)keys.size();
-        keys.push_back(k);
-        en.push_back(v);
-    };
     // a plural (key.other there) gets a slot for every category, side by side, so a language
     // with more forms than English has somewhere to put them; English's missing ones are its other
     std::map<std::string, bool> placed;
@@ -192,8 +184,6 @@ void LangTable::load(const fs::path &project_root)
         std::string base = dot == std::string::npos ? "" : k.substr(0, dot);
         if (!base.empty() && is_category(k.substr(dot + 1)) && by_key.count(base + ".other"))
         {
-            if (!cut_tags(v, "lang/en.json", k).order.empty())
-                ErrorHandler::compiler_error("lang/en.json: '" + k + "' is a plural's form, which can't have tags");
             if (placed[base]) continue;
             placed[base] = true;
             for (int c = 0; c < kCategoryCount; c++)
@@ -204,27 +194,7 @@ void LangTable::load(const fs::path &project_root)
             }
             continue;
         }
-        Cut cut = cut_tags(v, "lang/en.json", k);
-        if (cut.order.empty())
-        {
-            add(k, v);
-            continue;
-        }
-        // the text itself reads without its tags; the pieces a view puts together follow it
-        add(k, cut.plain);
-        LangMarkup m;
-        m.names = cut.order;
-        m.paired = cut.paired;
-        m.orders.push_back(cut.order);
-        for (size_t i = 0; i < cut.gaps.size(); i++)
-        {
-            add(k + "#" + std::to_string(i), cut.gaps[i]);
-            m.gap_used.push_back(!cut.gaps[i].empty());
-        }
-        for (const auto &n : cut.order)
-            if (cut.paired[n]) add(k + "#" + n, cut.inner[n]);
-        add(k + "#order", "0");
-        markup[k] = m;
+        add(k, v);
     }
     codes.push_back("en");
     std::vector<std::string> found;
@@ -243,12 +213,11 @@ void LangTable::load(const fs::path &project_root)
 
     for (const std::string &code : found)
     {
-        std::string file = "lang/" + code + ".json";
         std::map<std::string, std::string> mine;
         for (const auto &[k, v] : read_texts(dir / (code + ".json")))
         {
             if (find(k) < 0)
-                std::cerr << "Warning: " << file << " has '" << k << "', which lang/en.json doesn't" << std::endl;
+                std::cerr << "Warning: lang/" << code << ".json has '" << k << "', which lang/en.json doesn't" << std::endl;
             mine[k] = v;
         }
         // in en.json's order; a plural form the language doesn't have is its other, and a text
@@ -267,31 +236,68 @@ void LangTable::load(const fs::path &project_root)
             }
             if (!v.empty()) list[i] = v;
         }
-        // a text with tags: the same tags as English's, in whatever order the language needs
-        for (auto &[k, m] : markup)
-        {
-            auto it = mine.find(k);
-            if (it == mine.end() || it->second.empty()) continue;
-            Cut cut = cut_tags(it->second, file, k);
-            bool same = cut.order.size() == m.names.size();
-            for (const auto &n : cut.order)
-                same = same && m.paired.count(n) && m.paired[n] == cut.paired[n];
-            if (!same)
-                ErrorHandler::compiler_error(file + ": '" + k + "' has to have the tags lang/en.json gives it: " + describe_tags(m));
-            size_t o = std::find(m.orders.begin(), m.orders.end(), cut.order) - m.orders.begin();
-            if (o == m.orders.size()) m.orders.push_back(cut.order);
-            list[index[k]] = cut.plain;
-            for (size_t i = 0; i < cut.gaps.size(); i++)
-            {
-                list[index[k + "#" + std::to_string(i)]] = cut.gaps[i];
-                if (!cut.gaps[i].empty()) m.gap_used[i] = true;
-            }
-            for (const auto &n : cut.order)
-                if (cut.paired[n]) list[index[k + "#" + n]] = cut.inner[n];
-            list[index[k + "#order"]] = std::to_string(o);
-        }
         others[code] = std::move(list);
     }
+}
+
+void LangTable::add(const std::string &key, const std::string &text)
+{
+    index[key] = (int)keys.size();
+    keys.push_back(key);
+    en.push_back(text);
+    for (auto &[code, list] : others)
+        list.push_back(text);
+}
+
+const LangMarkup *LangTable::cut(const std::string &key)
+{
+    auto have = markup.find(key);
+    if (have != markup.end()) return &have->second;
+    int i = find(key);
+    if (i < 0) return nullptr;
+    Cut cut = cut_tags(en[i], "lang/en.json", key);
+    if (cut.order.empty()) return nullptr;
+    // the pieces every language's text falls into, after the texts themselves
+    LangMarkup m;
+    m.names = cut.order;
+    m.paired = cut.paired;
+    m.orders.push_back(cut.order);
+    std::vector<std::pair<std::string, Cut>> cuts;   // by language, English first
+    cuts.push_back({"en", cut});
+    for (const auto &[code, list] : others)
+    {
+        std::string file = "lang/" + code + ".json";
+        Cut c = cut_tags(list[i], file, key);
+        bool same = c.order.size() == m.names.size();
+        for (const auto &n : c.order)
+            same = same && m.paired.count(n) && m.paired[n] == c.paired[n];
+        if (!same)
+            ErrorHandler::compiler_error(file + ": '" + key + "' has to have the tags lang/en.json gives it: " + describe_tags(m));
+        if (std::find(m.orders.begin(), m.orders.end(), c.order) == m.orders.end())
+            m.orders.push_back(c.order);
+        cuts.push_back({code, c});
+    }
+    auto piece = [&](const std::string &name, auto value) {
+        std::string slot = key + "#" + name;
+        add(slot, value(cuts[0].second));
+        for (size_t c = 1; c < cuts.size(); c++)
+            others[cuts[c].first][index[slot]] = value(cuts[c].second);
+    };
+    for (size_t g = 0; g <= cut.order.size(); g++)
+    {
+        bool used = false;
+        for (const auto &[code, c] : cuts)
+            used = used || !c.gaps[g].empty();
+        m.gap_used.push_back(used);
+        piece(std::to_string(g), [g](const Cut &c) { return c.gaps[g]; });
+    }
+    for (const auto &n : cut.order)
+        if (cut.paired[n])
+            piece(n, [&n](const Cut &c) { return c.inner.at(n); });
+    piece("order", [&m](const Cut &c) {
+        return std::to_string(std::find(m.orders.begin(), m.orders.end(), c.order) - m.orders.begin());
+    });
+    return &(markup[key] = m);
 }
 
 int LangTable::find(const std::string &key) const

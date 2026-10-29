@@ -585,7 +585,7 @@ std::unique_ptr<Expression> Parser::parse_tokens_expression(std::vector<Token> t
 // into what it would be written as by hand, the runs of text as {Lang.t("login.agree#0", args)}
 // and each tag's element with its words first in it; when the languages put the tags in more
 // than one order, an <if> on key#order picks the one, the elements read again for each. Any
-// other {...} is the expression it always was
+// other {...} is the expression it always was, and a text reads as written there, tags and all
 std::unique_ptr<ASTNode> Parser::parse_view_braced()
 {
     int start_line = current().line;
@@ -620,7 +620,7 @@ std::unique_ptr<ASTNode> Parser::parse_view_braced()
             args.assign(tokens.begin() + from, tokens.begin() + pos);
         }
         bool whole = current().type == TokenType::RPAREN && peek().type == TokenType::RBRACE;
-        if (whole && (LangTable::instance().markup.count(key) || !given.empty()))
+        if (whole && (LangTable::instance().cut(key) || !given.empty()))
         {
             if (counted)
                 ErrorHandler::compiler_error("'" + key + "' has tags in lang/en.json, which a plural can't: it takes args, [a, b]", start_line);
@@ -635,12 +635,6 @@ std::unique_ptr<ASTNode> Parser::parse_view_braced()
         pos = start;
     }
     auto expr = parse_expression();
-    // a text with tags somewhere inside a bigger {...} would show without its elements
-    for (size_t i = start; i + 4 < pos; i++)
-        if (tokens[i].type == TokenType::IDENTIFIER && tokens[i].value == "Lang" && tokens[i + 1].type == TokenType::DOT &&
-            tokens[i + 2].value == "t" && tokens[i + 3].type == TokenType::LPAREN && tokens[i + 4].type == TokenType::STRING_LITERAL &&
-            LangTable::instance().markup.count(tokens[i + 4].value))
-            ErrorHandler::compiler_error("'" + tokens[i + 4].value + "' has tags in lang/en.json, which only show when Lang.t is all of its {...}: <if> around it instead", start_line);
     expect(TokenType::RBRACE, "Expected '}'");
     return expr;
 }

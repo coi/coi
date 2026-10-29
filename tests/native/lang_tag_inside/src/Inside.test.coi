@@ -1,7 +1,0 @@
-// a text with tags inside a bigger {...} would lose its elements, so it doesn't build
-component Who {
-    mut bool on = true;
-    view { <p>{on ? Lang.t("who", ["Ada"]) : ""}</p> }
-}
-
-test "inside" { Mounted m = mount(Who()); }
