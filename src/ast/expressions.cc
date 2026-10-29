@@ -139,6 +139,8 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
         return "__coi_lang_available()";
     if (intrinsic_name == "lang_use" && args.size() == 1)
         return "__coi_lang_use(" + args[0].value->to_webcc() + ")";
+    if (intrinsic_name == "lang_chosen" && args.empty())
+        return "__coi_lang_chosen()";
     
     if (intrinsic_name == "json_stringify" && args.size() == 1)
         return "__coi_json_stringify(" + typed_literal(args[0].value.get()) + ")";

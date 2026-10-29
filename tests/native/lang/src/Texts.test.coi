@@ -19,4 +19,8 @@ test "the languages: English in use, every lang/ file there" {
     expect(Lang.code() == "de");
     Lang.use("xx");
     expect(Lang.code() == "de");
+    expect(Lang.chosen() == "de");
+    Lang.use("");
+    expect(Lang.chosen() == "");
+    expect(Lang.code() == "en");
 }

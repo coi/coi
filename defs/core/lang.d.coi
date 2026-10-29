@@ -26,7 +26,11 @@ type Lang {
     @intrinsic("lang_available")
     shared def available(): string[]
 
-    // keeps the choice and starts the app again in it
+    // keeps the choice and starts the app again in it; "" forgets it, back to the browser's
     @intrinsic("lang_use")
     shared def use(string code): void
+
+    // the choice Lang.use kept, "" when the browser's language is followed
+    @intrinsic("lang_chosen")
+    shared def chosen(): string
 }

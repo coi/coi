@@ -407,14 +407,21 @@ static bool __coi_lang_known(const coi::string& code) {
     if (test_program)
     {
         // a test runs in English; Lang.use changes the language it reports, nothing more
-        out << "static void __coi_lang_use(const coi::string& code) { if (__coi_lang_known(code)) __coi_lang_code = code; }\n";
+        out << "static coi::string __coi_lang_kept = \"\";\n";
+        out << "static coi::string __coi_lang_chosen() { return __coi_lang_kept; }\n";
+        out << "static void __coi_lang_use(const coi::string& code) { if (code.empty()) { __coi_lang_kept = \"\"; __coi_lang_code = \"en\"; } else if (__coi_lang_known(code)) __coi_lang_kept = __coi_lang_code = code; }\n";
         return;
     }
-    out << R"(// a choice is kept and the app starts again in it
+    out << R"(// a choice is kept and the app starts again in it; "" forgets it
 static void __coi_lang_use(const coi::string& code) {
-    if (!__coi_lang_known(code)) return;
-    webcc::storage::set_item("lang", code);
+    if (code.empty()) webcc::storage::remove_item("lang");
+    else if (__coi_lang_known(code)) webcc::storage::set_item("lang", code);
+    else return;
     webcc::system::reload();
+}
+static coi::string __coi_lang_chosen() {
+    coi::string kept = webcc::storage::get_item("lang");
+    return __coi_lang_known(kept) ? kept : coi::string("");
 }
 // the language this visit wants: a choice kept by Lang.use, else the first of the browser's
 // languages there's a file for ("de-AT" takes de when there's no de-AT)

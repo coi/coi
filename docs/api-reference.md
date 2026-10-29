@@ -904,7 +904,8 @@ Text in more than one language, from `lang/en.json` and the other files beside i
 | `Lang.t(string key, int n)`, `Lang.t(string key, int n, string[] args)` | for a plural (`key.one`, `key.other`, ...): the form for `n`, `#` as `n` |
 | `Lang.code()` | the language in use: `"en"`, `"de"`, `"pt-BR"` |
 | `Lang.available()` | `"en"` and every other language there's a file for |
-| `Lang.use(string code)` | keeps the choice and starts the app again in it |
+| `Lang.use(string code)` | keeps the choice and starts the app again in it; `""` forgets it, back to the browser's |
+| `Lang.chosen()` | the choice kept, `""` when the browser's language is followed |
 
 The key is written out, `Lang.t("settings.title")`, so the compiler can check it. In a view, a text with tags (`"agree to the <terms>Terms</terms>"`) takes an element for each by name: `{Lang.t("agree", terms = <a href="/terms" />)}` (see [Links and bold words inside a sentence](getting-started.md#more-than-one-language)).
 
