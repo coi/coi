@@ -1,0 +1,17 @@
+// Test: a call to a method the component doesn't have is an error here, not in the generated C++
+component App {
+    mut int n = 0;
+
+    def bump() : void { n++; }
+    def go() : void { bumpp(); }
+
+    init { go(); }
+
+    view {
+        <div>{n}</div>
+    }
+}
+
+app {
+    root = App;
+}

@@ -2346,6 +2346,13 @@ static void check_function_body(const FunctionDef &method, const Component *comp
                         break;
                     }
                 }
+                // a bare name that is no method, param, state or free function: say so here, not from the C++ compiler
+                if (!target_method && !call->name.empty() && std::islower(static_cast<unsigned char>(call->name[0])) &&
+                    call->name.find('.') == std::string::npos && call->name.find("::") == std::string::npos &&
+                    !method_scope.count(call->name) && !resolve_free_function(call->name, method_scope, line)) {
+                    ErrorHandler::type_error("Unknown function '" + call->name + "' in component '" + comp->name + "'", line);
+                    exit(1);
+                }
             } else {
                 target_method = resolve_free_function(call->name, method_scope, line);
             }
