@@ -1,0 +1,8 @@
+// sortBy wants a number or a string to sort by, not true or false
+component App {
+    mut int[] nums = [3, 1, 2];
+    mount { nums.sortBy(x => x > 1); }
+    view { <div>{nums.size()}</div> }
+}
+
+app { root = App; }

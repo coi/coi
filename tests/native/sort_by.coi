@@ -1,0 +1,51 @@
+// an array sorted by a key from each element, both ways; equal keys keep their order
+module Sorting;
+
+pod Row { string name; int64 owed; float score; }
+
+def rows() : Row[] {
+    return [Row{name = "mia", owed = 30, score = 2.5}, Row{name = "Ben", owed = 10, score = 9.0},
+            Row{name = "ana", owed = 30, score = 1.0}, Row{name = "lou", owed = 0, score = 4.0}];
+}
+def names(Row[] rs) : string {
+    mut string out = "";
+    for r in rs { out += (out.isEmpty() ? "" : ",") + r.name; }
+    return out;
+}
+
+test "sortBy a number, smallest first" {
+    mut Row[] rs = rows();
+    rs.sortBy(r => r.owed);
+    expect(names(rs) == "lou,Ben,mia,ana");
+}
+
+test "sortByDescending keeps the order of equal keys" {
+    mut Row[] rs = rows();
+    rs.sortByDescending(r => r.owed);
+    expect(names(rs) == "mia,ana,Ben,lou");
+}
+
+test "sortBy a string the inline function works out" {
+    mut Row[] rs = rows();
+    rs.sortBy(r => r.name.toLower());
+    expect(names(rs) == "ana,Ben,lou,mia");
+}
+
+test "sortBy a float, and on short arrays" {
+    mut Row[] rs = rows();
+    rs.sortByDescending(r => r.score);
+    expect(names(rs) == "Ben,lou,mia,ana");
+    mut Row[] none = [];
+    none.sortBy(r => r.owed);
+    expect(none.isEmpty());
+    mut int[] one = [4];
+    one.sortBy(x => 0 - x);
+    expect(one[0] == 4);
+}
+
+test "a key from outside the element" {
+    mut int[] nums = [3, 1, 2];
+    int pivot = 2;
+    nums.sortBy(x => x == pivot ? 0 : x);
+    expect(nums == [2, 1, 3]);
+}

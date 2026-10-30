@@ -391,6 +391,33 @@ template<typename V, typename F> inline V coi_filter(const V& v, F pred) {
     for (int32_t i = 0; i < (int32_t)v.size(); i++) if (pred(v[i])) out.push_back(v[i]);
     return out;
 }
+// each key worked out once, the positions merge sorted by them (equal keys keep their order),
+// then the elements moved over in that order
+template<typename V, typename F> inline void coi_sort_by(V& v, F key, bool desc) {
+    int32_t n = (int32_t)v.size();
+    if (n < 2) return;
+    webcc::vector<decltype(key(v[0]))> keys;
+    webcc::vector<int32_t> at, next;
+    keys.reserve(n); at.reserve(n); next.reserve(n);
+    for (int32_t i = 0; i < n; i++) { keys.push_back(key(v[i])); at.push_back(i); next.push_back(0); }
+    for (int32_t w = 1; w < n; w *= 2) {
+        for (int32_t lo = 0; lo < n; lo += 2 * w) {
+            int32_t mid = lo + w < n ? lo + w : n, hi = lo + 2 * w < n ? lo + 2 * w : n;
+            int32_t i = lo, j = mid, k = lo;
+            while (i < mid && j < hi) {
+                bool right = desc ? keys[at[i]] < keys[at[j]] : keys[at[j]] < keys[at[i]];
+                next[k++] = right ? at[j++] : at[i++];
+            }
+            while (i < mid) next[k++] = at[i++];
+            while (j < hi) next[k++] = at[j++];
+        }
+        webcc::vector<int32_t> t = webcc::move(at); at = webcc::move(next); next = webcc::move(t);
+    }
+    V out;
+    out.reserve(n);
+    for (int32_t i = 0; i < n; i++) out.push_back(webcc::move(v[at[i]]));
+    v = webcc::move(out);
+}
 )";
     out << "inline coi::vector<uint8_t> coi_bytes(webcc::bytes_view v) {\n";
     out << "    coi::vector<uint8_t> out; out.reserve(v.length());\n";

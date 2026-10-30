@@ -68,6 +68,14 @@ type array<T> {
 
     @inline("coi_all(${this}, ${0})")
     def all(def pred(T): bool): bool
+
+    // sorted by a key from each element (c => c.owed), smallest or largest first; elements
+    // with the same key keep their order
+    @inline("coi_sort_by(${this}, ${0}, false)")
+    def sortBy(def key(T): int): void
+
+    @inline("coi_sort_by(${this}, ${0}, true)")
+    def sortByDescending(def key(T): int): void
 }
 
 // Fixed-size array (T[N]) - maps to webcc::array<T, N>

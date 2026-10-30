@@ -205,6 +205,7 @@ nums.pop();                  // Remove last element
 nums.clear();                // Remove all elements
 nums.remove(0);              // Remove element at index
 nums.sort();                 // Sort in ascending order
+nums.sortBy(x => 0 - x);     // by a key from each element (see below); sortByDescending too
 nums.append([5, 6]);         // Add every element of another array
 
 // Search
@@ -233,6 +234,14 @@ blocks.remove(b => b.id == 7);                   // every one that says true (re
 TextBlock[] wide = blocks.filter(b => b.w > 400.0);
 int n = blocks.count(b => b.font == "mono");
 bool allDone = todos.all(t => t.done);
+```
+
+Sorting by a field takes one that gives each element its key, a number or a string, instead of true or false. Each key is worked out once, and elements with the same key keep their order, so sorting by one thing after another sorts by both:
+
+```tsx
+mut Row[] rows = list;
+rows.sortBy(r => r.name.toLower());   // a to z
+rows.sortByDescending(r => r.owed);   // largest first; equal amounts stay a to z
 ```
 
 The element's type comes from the array, so there is nothing to annotate. An inline function goes nowhere else: not into a variable, not to another function, not to a callback. For that, write a method and pass `&name`. Its body is one expression; for more, a method as well.

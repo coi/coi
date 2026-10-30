@@ -999,26 +999,39 @@ static std::string check_free_function_call(const FunctionDef *fn, FunctionCall 
 
 // an inline function given to an array's indexOf, contains, remove, filter, count, any or all:
 // it runs on each element, so its parameter is an element and its body must say true or false.
+// sortBy and sortByDescending take one that gives each element its key: a number or a string.
 // Returns the call's type
 static std::string inline_function_type(LambdaExpr *lam, const std::string &method, const std::string &array_type, bool fixed,
                                         const std::map<std::string, std::string> &scope, int line)
 {
-    static const std::set<std::string> dynamic_only = {"remove", "filter"};
-    static const std::set<std::string> takes = {"indexOf", "contains", "remove", "filter", "count", "any", "all"};
+    static const std::set<std::string> dynamic_only = {"remove", "filter", "sortBy", "sortByDescending"};
+    static const std::set<std::string> takes = {"indexOf", "contains", "remove", "filter", "count", "any", "all", "sortBy", "sortByDescending"};
     if (!takes.count(method) || (fixed && dynamic_only.count(method)))
     {
         ErrorHandler::type_error("'" + method + "' on " + (fixed ? "a fixed-size array" : "an array") +
                                      " doesn't take an inline function (" +
-                                     (fixed ? "indexOf, contains, count, any and all do)" : "indexOf, contains, remove, filter, count, any and all do)"),
+                                     (fixed ? "indexOf, contains, count, any and all do)" : "indexOf, contains, remove, filter, count, any, all, sortBy and sortByDescending do)"),
                                  line);
         exit(1);
     }
+    bool sorting = method == "sortBy" || method == "sortByDescending";
     std::string elem = fixed ? array_type.substr(0, array_type.rfind('[')) : array_type.substr(0, array_type.size() - 2);
     lam->placed = true;
     lam->param_type = elem;
     auto inner = scope;
     inner[lam->param] = elem;
     std::string said = normalize_type(infer_expression_type(lam->body.get(), inner));
+    if (sorting)
+    {
+        static const std::set<std::string> keys = {"int", "int32", "int64", "uint8", "uint16", "uint32", "uint64", "float", "float32", "float64", "string", "unknown"};
+        if (!keys.count(said))
+        {
+            ErrorHandler::type_error("The inline function given to '" + method + "' must give each element a number or a string to sort by; this one gives a '" +
+                                         display_type_name(said) + "'", lam->line);
+            exit(1);
+        }
+        return "void";
+    }
     if (said != "bool" && said != "unknown")
     {
         ErrorHandler::type_error("The inline function given to '" + method + "' must say true or false for each element; this one is a '" +
