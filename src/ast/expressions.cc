@@ -926,7 +926,24 @@ std::string MemberAccess::to_webcc() {
     return object->to_webcc() + "." + cpp_name(member);
 }
 
+// a call through a member of a member, a.b.size() or a.b[i].c.isEmpty(): it reads a.b. The
+// parser keeps the whole receiver in the call's name; a.b() alone is a's method b
+bool dotted_member_read(const std::string& name, MemberDependency& out) {
+    auto ident = [&](size_t from) {
+        size_t k = from;
+        while (k < name.size() && (std::isalnum(static_cast<unsigned char>(name[k])) || name[k] == '_')) k++;
+        return k;
+    };
+    size_t a = ident(0);
+    if (a == 0 || a >= name.size() || name[a] != '.') return false;
+    size_t b = ident(a + 1);
+    if (b == a + 1 || b >= name.size() || (name[b] != '.' && name[b] != '[')) return false;
+    out = {name.substr(0, a), name.substr(a + 1, b - a - 1)};
+    return true;
+}
+
 void FunctionCall::collect_member_dependencies(std::set<MemberDependency>& member_deps) {
+    if (MemberDependency d; dotted_member_read(name, d)) member_deps.insert(d);
     if (auto it = g_method_member_reads.find(name); it != g_method_member_reads.end())
         member_deps.insert(it->second.begin(), it->second.end());
     if (auto it = g_child_method_reads.find(name); it != g_child_method_reads.end())

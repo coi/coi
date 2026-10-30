@@ -1,0 +1,47 @@
+// a parent's view reading a member's list through a call on it, inner.ids.size(), updates when
+// the list changes, by assignment or in place, as inner.n does, also from the parent's own
+// method and as a child's prop
+module ChildListReads;
+
+component Inner {
+    pub mut int[] ids;
+    pub def add() : void { ids.push(7); }
+    pub def assign() : void { ids = [1, 2]; }
+    view { <div><button class="add" onclick={add}>add</button><button class="assign" onclick={assign}>assign</button></div> }
+}
+
+component Count(int n) {
+    view { <p class="prop">{n}</p> }
+}
+
+component Outer {
+    mut Inner inner = Inner();
+    def count() : int { return inner.ids.size(); }
+    view {
+        <div>
+            <{inner} />
+            <p class="direct">{inner.ids.size()}</p>
+            <p class="method">{count()}</p>
+            <Count n={count()} />
+            <if !inner.ids.isEmpty()><p class="first">{inner.ids[0]}</p></if>
+        </div>
+    }
+}
+
+test "pushed into" {
+    Mounted m = mount(Outer());
+    m.click(".add");
+    expect(m.text(".direct") == "1");
+    expect(m.text(".method") == "1");
+    expect(m.text(".prop") == "1");
+    expect(m.text(".first") == "7");
+}
+
+test "assigned" {
+    Mounted m = mount(Outer());
+    m.click(".assign");
+    expect(m.text(".direct") == "2");
+    expect(m.text(".method") == "2");
+    expect(m.text(".prop") == "2");
+    expect(m.text(".first") == "1");
+}

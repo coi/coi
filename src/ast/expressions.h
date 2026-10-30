@@ -106,6 +106,8 @@ struct FunctionCall : Expression {
     void collect_member_dependencies(std::set<MemberDependency>& member_deps) override;
 };
 
+bool dotted_member_read(const std::string& name, MemberDependency& out);
+
 // "abc".at(0), (a + b).toString()
 struct MethodCall : Expression {
     std::unique_ptr<Expression> receiver;

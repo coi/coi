@@ -408,9 +408,11 @@ std::string Component::to_webcc(CompilerSession &session)
         if (auto ma = dynamic_cast<MemberAccess *>(n))
             if (auto id = dynamic_cast<Identifier *>(ma->object.get()))
                 if (member_names.count(id->name)) out.insert({id->name, ma->member});
-        if (auto fc = dynamic_cast<FunctionCall *>(n))
+        if (auto fc = dynamic_cast<FunctionCall *>(n)) {
             if (auto it = g_child_method_reads.find(fc->name); it != g_child_method_reads.end())
                 out.insert(it->second.begin(), it->second.end());
+            if (MemberDependency d; dotted_member_read(fc->name, d) && member_names.count(d.object)) out.insert(d);
+        }
         for (auto *c : n->get_child_nodes()) walk_members(c, out);
     };
     for (const auto &m : methods)
