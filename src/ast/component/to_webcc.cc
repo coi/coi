@@ -854,6 +854,7 @@ std::string Component::to_webcc(CompilerSession &session)
     // Child component members
     emit_component_members(ss, component_members);
     ss << "    bool _coi_alive = false; // view() mounted and _destroy() not yet run\n";
+    ss << "    bool _coi_gone = false;  // _destroy() ran, and no view() since\n";
     ss << "    int32_t _coi_page_key = 0; // where its page-wide listeners are filed; an array that moves it keeps it\n";
     ss << "    webcc::handle _page_key() { if (!_coi_page_key) _coi_page_key = --g_coi_page_keys; return webcc::handle(_coi_page_key); }\n";
     if (!seeded_state.empty())
@@ -1981,6 +1982,7 @@ std::string Component::to_webcc(CompilerSession &session)
     ss << "    void _view(webcc::handle parent = webcc::dom::get_body(), webcc::handle _before = webcc::handle()) {\n";
     ss << "        g_view_depth++;\n";
     ss << "        _coi_alive = true;\n";
+    ss << "        _coi_gone = false;\n";
     if (!seeded_state.empty())
     {
         // once: a loop may view the same instance again, and that mustn't reset its state

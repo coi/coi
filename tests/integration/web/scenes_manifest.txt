@@ -67,3 +67,4 @@ input_bound_args|tests/integration/web/scenes/input_bound_args.coi|web
 
 base_fragment_link|tests/integration/web/scenes/base_fragment_link.coi|web
 prop_same_value|tests/integration/web/scenes/prop_same_value.coi|web
+hidden_member_gone|tests/integration/web/scenes/hidden_member_gone.coi|web

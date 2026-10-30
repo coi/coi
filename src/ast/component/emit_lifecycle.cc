@@ -69,12 +69,17 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
     ss << "    void _destroy(bool _skip_dom = false) {\n";
     // Idempotent: parents destroy every child they hold, whether or not that
     // child was mounted (or was already torn down by an if-region toggle).
-    ss << "        if (!_coi_alive) return;\n";
+    // One never mounted (a member kept for its methods, never shown) still
+    // goes: its callbacks, timers and sockets would call into freed memory.
+    // Only the DOM part needs a view
+    ss << "        if (_coi_gone) return;\n";
+    ss << "        _coi_gone = true;\n";
+    ss << "        bool _mounted = _coi_alive;\n";
     ss << "        _coi_alive = false;\n";
     // the unmount block first: handlers, timers and sockets are still there for it
     for (const auto &m : component.methods)
         if (m.name == "unmount")
-            ss << "        _user_unmount();\n";
+            ss << "        if (_mounted) _user_unmount();\n";
     // every handler / fetch callback this component registered
     ss << "        coi_forget_owner(this);\n";
     ss << "        if (_coi_page_key) coi_forget_handle(webcc::handle(_coi_page_key));\n";
@@ -169,6 +174,7 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
         }
     }
 
+    ss << "        if (_mounted) {\n";
     // If we have if/else at root level, generate conditional destroy
     if (root_if_id >= 0 && !if_regions.empty())
     {
@@ -251,6 +257,7 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
             ss << "        if (!_skip_dom) webcc::dom::remove_element(_el[0]);\n";
         }
     }
+    ss << "        }\n";
     // Cleanup route components
     if (component.router)
     {

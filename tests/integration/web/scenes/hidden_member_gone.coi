@@ -1,0 +1,42 @@
+// a component kept in a field for its methods and never shown goes with its owner: a storage
+// request or a timer it started doesn't call back into it once the owner is gone
+component Keeper(def onOpened : void, def onLate : void) {
+    mut Database db;
+    mut Timeout timer;
+    pub def start() : void {
+        db = Idb.open("hidden-member-gone", &opened);
+        timer = System.setTimeout(150, &late);
+    }
+    def opened(uint8 ok) : void { System.log("keeper opened"); onOpened(); }
+    def late() : void { System.log("keeper late"); onLate(); }
+}
+
+component Home {
+    mut int opens = 0;
+    mut int lates = 0;
+    mut Keeper keeper = Keeper(&heardOpen, &heardLate);
+    def heardOpen() : void { opens++; }
+    def heardLate() : void { lates++; }
+    def begin() : void { keeper.start(); }
+    // started, then gone in the same update: nothing it started has answered yet
+    def leave() : void { keeper.start(); System.navigate("/gone"); }
+    view {
+        <div class="home">
+            <button class="begin" onclick={begin}>begin</button>
+            <button class="leave" onclick={leave}>leave</button>
+            <p class="opens">{opens}</p>
+            <p class="lates">{lates}</p>
+        </div>
+    }
+}
+
+component Gone { view { <p class="gone">gone</p> } }
+
+component Site {
+    router {
+        "/" => Home;
+        "/gone" => Gone;
+    }
+    view { <div class="site"><route /></div> }
+}
+app { root = Site; }
