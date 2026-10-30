@@ -197,7 +197,7 @@ component Sketch {
 | Attribute | Handler takes | Notes |
 |-----------|---------------|-------|
 | `onpointer` | `PointerEvent` | Every pointer event; `e.phase` says which |
-| `onpointerdown`, `onpointermove`, `onpointerup`, `onpointercancel`, `onpointerpredicted`, `onpointerheld` | `PointerEvent` | One phase each. Cancel means the browser took over (e.g. a touch became a scroll): not a finished stroke |
+| `onpointerdown`, `onpointermove`, `onpointerup`, `onpointercancel`, `onpointerpredicted`, `onpointerheld`, `onpointerleave` | `PointerEvent` | One phase each. Cancel means the browser took over (e.g. a touch became a scroll): not a finished stroke. Leave: the pointer went off the element (a mouse moved away, a pen lifted out of range, a finger after it lifted), the moment to drop a hover |
 | `onwheel` | `WheelEvent` | The page doesn't scroll or zoom while over the element. A trackpad pinch has `Mods.Ctrl` set. `wheelflags={WheelFlags.ZoomOnly}` keeps normal scrolling and only takes ctrl/meta wheel and pinches |
 | `onresize` | `ResizeEvent` | Once when the element appears, then on every size or pixel-ratio change |
 | `onscroll` | `ScrollEvent` | The element's `left` and `top` scroll offsets, at most once per frame; scrolling itself is never delayed |

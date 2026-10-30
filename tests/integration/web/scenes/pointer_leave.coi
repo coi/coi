@@ -1,0 +1,21 @@
+// a hover shown while the pointer is over an element, dropped when it leaves it: moving onto
+// a child isn't leaving, moving off the element is
+component PointerLeave {
+    mut string at = "-";
+    mut int left = 0;
+
+    def move(PointerEvent e) : void { at = `${e.x.toInt()} ${e.y.toInt()}`; }
+    def leave(PointerEvent e) : void { at = "-"; left++; }
+
+    view {
+        <div>
+            <div class="pad" style="width:200px;height:100px;background:#ddd" onpointermove={move} onpointerleave={leave}>
+                <div class="inner" style="width:60px;height:40px;margin:20px;background:#bbb"></div>
+            </div>
+            <p class="at">{at}</p>
+            <p class="left">{left}</p>
+        </div>
+    }
+}
+
+app { root = PointerLeave; }
