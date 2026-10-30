@@ -438,6 +438,7 @@ std::string Component::to_webcc(CompilerSession &session)
 
     // Populate global context for reference params
     g_ref_props.clear();
+    g_inline_ref_writes.clear();
     for (auto &param : params)
     {
         if (param->is_reference)
@@ -1741,6 +1742,26 @@ std::string Component::to_webcc(CompilerSession &session)
         for (const auto &call : child_updates[v])
             ss << call;
         ss << "    }\n";
+    }
+
+    // a child made in the view wrote through the reference it was handed: redo what shows the
+    // value here, refresh the other children sharing it, and pass the change up when the value
+    // is itself a reference from above
+    for (const auto &v : g_inline_ref_writes)
+    {
+        ss << "    void _ref_written_" << v << "() { if (!_coi_alive) return;";
+        for (int if_id : var_to_if_ids[v])
+            ss << " _sync_if_" << if_id << "();";
+        if (generated_updaters.count(v))
+            ss << " _update_" << v << "();";
+        if (!g_component_array_loops.count(v) && !g_array_loops.count(v))
+            for (int loop_id : var_to_loop_ids[v])
+                ss << " _sync_loop_" << loop_id << "();";
+        for (const auto &call : child_updates[v])
+            ss << " " << call.substr(8, call.size() - 10) << ";";
+        if (g_ref_props.count(v) && !pub_mut_vars.count(v))
+            ss << " if(" << make_callback_name(v) << ") " << make_callback_name(v) << "();";
+        ss << " }\n";
     }
 
     // Helper lambda for method generation

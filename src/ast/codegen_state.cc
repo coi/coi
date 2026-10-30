@@ -1,6 +1,7 @@
 #include "codegen_state.h"
 
 std::set<std::string> g_ref_props;
+std::set<std::string> g_inline_ref_writes;
 std::string g_test_file;
 std::map<std::string, UsedEvent> g_used_events;
 

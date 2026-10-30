@@ -1,6 +1,8 @@
+#include <algorithm>
 #include <cctype>
 #include <set>
 #include "view.h"
+#include "codegen_state.h"
 #include "expressions.h"
 #include "../defs/def_parser.h"
 #include "../cli/error.h"
@@ -490,22 +492,15 @@ void ComponentInstantiation::generate_code(ViewCodegenContext& ctx)
                 std::set<std::string> prop_deps;
                 prop.value->collect_dependencies(prop_deps);
 
+                // what shows the value may come later in the view than the child: the
+                // component works that out at the end (_ref_written_<dep>)
                 std::string update_calls;
                 for (const auto &dep : prop_deps)
                 {
-                    bool has_dependent_binding = false;
-                    for (const auto &binding : ctx.bindings)
-                    {
-                        if (binding.dependencies.count(dep))
-                        {
-                            has_dependent_binding = true;
-                            break;
-                        }
-                    }
-                    if (has_dependent_binding)
-                    {
-                        update_calls += "_update_" + dep + "(); ";
-                    }
+                    if (dep.empty() || !std::all_of(dep.begin(), dep.end(), [](char c) { return std::isalnum((unsigned char)c) || c == '_'; }))
+                        continue;
+                    g_inline_ref_writes.insert(dep);
+                    update_calls += "_ref_written_" + dep + "(); ";
                 }
 
                 if (!update_calls.empty())

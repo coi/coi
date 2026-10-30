@@ -11,6 +11,11 @@
 
 extern std::set<std::string> g_ref_props;
 
+// state a child made in the view was handed by reference (<Counter &n={count} />): the
+// component defines _ref_written_<name>, which the child's change callback calls, once the
+// whole view is known (bindings after the child count too)
+extern std::set<std::string> g_inline_ref_writes;
+
 // the file of the test being generated, as its failures should name it; "" outside a test
 extern std::string g_test_file;
 

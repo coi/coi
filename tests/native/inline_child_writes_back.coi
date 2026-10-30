@@ -1,0 +1,43 @@
+// a child made in the view and handed a reference writes through it, and the owner shows the
+// change: a binding after the child, one in an <if>, and the owner's owner through its own
+// reference
+module InlineChildWritesBack;
+
+component Counter(mut int& n) {
+    def up() : void { n += 1; }
+    view { <button class="up" onclick={up}>up</button> }
+}
+
+component Card(mut int& total) {
+    mut int count = 0;
+    view {
+        <div>
+            <Counter &n={count} />
+            <b class="c">{count}</b>
+            <if count > 1><i class="many">many</i></if>
+            <span class="total"><Counter &n={total} /></span>
+        </div>
+    }
+}
+
+component Table {
+    mut int all = 0;
+    view { <div><Card &total={all} /><p class="all">{all}</p></div> }
+}
+
+test "the owner shows what its inline child wrote" {
+    Mounted m = mount(Table());
+    m.click(".up");
+    expect(m.text(".c") == "1");
+    expect(!m.has(".many"));
+    m.click(".up");
+    expect(m.text(".c") == "2");
+    expect(m.has(".many"));
+}
+
+test "a reference handed on reaches the owner's owner" {
+    Mounted m = mount(Table());
+    m.click(".total .up");
+    expect(m.text(".all") == "1");
+    expect(m.text(".c") == "0");
+}
