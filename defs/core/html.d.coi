@@ -7,7 +7,8 @@ type Html {
     shared def escape(string text): string
 
     // tags dropped; a <br> or the end of a block element (p, div, li, h1-h6, tr, blockquote, pre)
-    // becomes a newline; amp, lt, gt, quot, apos, #39 and nbsp are decoded, other entities stay
+    // becomes a newline, the end of a table cell (td, th) a tab between cells as innerText has it;
+    // amp, lt, gt, quot, apos, #39 and nbsp are decoded, other entities stay
     @inline("coi::html::to_text(${0})")
     shared def toText(string html): string
 }

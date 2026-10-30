@@ -1,0 +1,8 @@
+// Html.toText keeps a table's cells apart: a tab between them, a newline after each row
+module HtmlTextCells;
+
+test "cells end in a tab, rows in a newline" {
+    expect(Html.toText("<table><tbody><tr><td>a</td><td>b</td></tr><tr><th>c</th><td><b>d</b></td></tr></tbody></table>") == "a\tb\nc\td\n");
+    expect(Html.toText("<p>x</p><p>y</p>") == "x\ny\n");
+    expect(Html.toText("<td class=\"n\">1</td><td>2</td>") == "1\t2\t");
+}

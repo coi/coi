@@ -509,7 +509,8 @@ el.setInnerHtml(Html.escape(title));           // the text shows as typed
 
 string text = Html.toText("<p>Hi <b>there</b></p><p>x &amp; y</p>");
 // "Hi there\nx & y": tags go, a <br> or the end of a block element (p, div, li,
-// h1-h6, tr, blockquote, pre) is a line break, the common entities are decoded
+// h1-h6, tr, blockquote, pre) is a line break, a table cell's end (td, th) a tab
+// between cells, the common entities are decoded
 ```
 
 ## Url

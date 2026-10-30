@@ -460,11 +460,19 @@ template<typename V, typename F> inline void coi_sort_by(V& v, F key, bool desc)
     out << "        if (tag.length() >= n && tag.substr(0, n).to_lower() == string(e) && (tag.length() == n || tag.data()[n] == ' ')) return true; }\n";
     out << "    return false;\n";
     out << "}\n";
+    // a table cell ends in a tab, as innerText has it; the row's end takes the last one back
+    out << "inline bool html_cell_end(const string& tag) {\n";
+    out << "    string t = tag.length() >= 3 ? tag.substr(0, 3).to_lower() : string();\n";
+    out << "    return (t == string(\"/td\") || t == string(\"/th\")) && (tag.length() == 3 || tag.data()[3] == ' ');\n";
+    out << "}\n";
     out << "inline string to_text(const string& h) {\n";
     out << "    string out; uint32_t i = 0, n = h.length(); const char* d = h.data();\n";
     out << "    while (i < n) { char c = d[i];\n";
     out << "        if (c == '<') { int end = h.index_of(\">\", i); if (end < 0) break;\n";
-    out << "            if (html_block_end(h.substr(i + 1, end - i - 1))) out += \"\\n\"; i = end + 1; continue; }\n";
+    out << "            string tag = h.substr(i + 1, end - i - 1);\n";
+    out << "            if (html_block_end(tag)) { if (out.length() > 0 && out.data()[out.length() - 1] == '\\t') out = out.substr(0, out.length() - 1); out += \"\\n\"; }\n";
+    out << "            else if (html_cell_end(tag)) out += \"\\t\";\n";
+    out << "            i = end + 1; continue; }\n";
     out << "        if (c == '&') { int end = h.index_of(\";\", i);\n";
     out << "            if (end > (int)i && end - (int)i < 8) { string e = h.substr(i + 1, end - i - 1);\n";
     out << "                if (e == \"amp\") out += \"&\"; else if (e == \"lt\") out += \"<\"; else if (e == \"gt\") out += \">\";\n";
