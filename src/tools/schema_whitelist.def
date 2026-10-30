@@ -43,6 +43,7 @@ get_selection_text
 get_caret_offset
 insert_at_text_offset
 closest
+query_selector
 element_at
 contains
 # a handler returning true: the browser does nothing more with the click or press (a link isn't followed)
