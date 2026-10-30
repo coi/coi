@@ -1,0 +1,34 @@
+// a variable named like a function of the module doesn't hide the function: twice(n) is the
+// call and twice the number. A callback in a variable of that name is still what's called
+module LocalNamedLikeFunction;
+
+def twice(int n) : int { return n * 2; }
+
+pub def f(int n) : int {
+    int twice = 5;
+    return twice(n) + twice;
+}
+
+pub def g(float twice) : int { return twice(4) + twice.toInt(); }
+
+component Twice(def twice(int) : int) {
+    mut int got = 0;
+    def run() : void { got = twice(10); }
+    view { <button class="run" onclick={run}>{got}</button> }
+}
+
+component Host {
+    def thrice(int n) : int { return n * 3; }
+    view { <Twice &twice={thrice} /> }
+}
+
+test "a local or a parameter named like a function" {
+    expect(f(3) == 11);
+    expect(g(1.5) == 9);
+}
+
+test "a callback named like a function is the callback" {
+    Mounted m = mount(Host());
+    m.click(".run");
+    expect(m.text(".run") == "30");
+}

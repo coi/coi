@@ -167,7 +167,10 @@ std::string FreeFunctionRegistry::resolve_call(const std::string& name) const {
         return cpp_name(qualified_name(module, fn));
     }
     if (!std::islower(static_cast<unsigned char>(name[0]))) return "";
-    if (ctx.has_method(name) || !ctx.get_symbol_type(name).empty()) return "";
+    // a method of that name, or a callback in a variable (def ...), is the call; any other
+    // variable named like the function only shares its name (int twice = 5; twice(n))
+    std::string symbol = ctx.get_symbol_type(name);
+    if (ctx.has_method(name) || symbol.rfind("def", 0) == 0 || symbol.rfind("webcc::function", 0) == 0) return "";
     if (!find(ctx.module_name, name)) return "";
     return cpp_name(qualified_name(ctx.module_name, name));
 }
