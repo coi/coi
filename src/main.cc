@@ -926,8 +926,9 @@ int main(int argc, char **argv)
                 // Resolve assets/routes against the deploy base (see `base` in app{}).
                 head << "    <base href=\"" << base << "\">\n";
                 // a link to a part of the page (href="#there") stays on the page it's on: against the
-                // base it would resolve to the base's page instead, a new load without the query
-                head << "    <script>addEventListener('click',e=>{const a=e.target.closest&&e.target.closest('a[href^=\"#\"]');if(!a||e.defaultPrevented||e.button||e.ctrlKey||e.metaKey||e.shiftKey||e.altKey||a.target==='_blank')return;e.preventDefault();location.hash=a.getAttribute('href');});</script>\n";
+                // base it would resolve to the base's page instead, a new load without the query.
+                // Setting the hash it already has does nothing, so a second click scrolls there itself
+                head << "    <script>addEventListener('click',e=>{const a=e.target.closest&&e.target.closest('a[href^=\"#\"]');if(!a||e.defaultPrevented||e.button||e.ctrlKey||e.metaKey||e.shiftKey||e.altKey||a.target==='_blank')return;e.preventDefault();const h=a.getAttribute('href');if(location.hash!==h){location.hash=h;return;}const t=document.getElementById(decodeURIComponent(h.slice(1)));if(t)t.scrollIntoView();});</script>\n";
                 head << "    <meta charset=\"utf-8\">\n";
                 head << "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, viewport-fit=cover\">\n";
                 head << "    <title>" << title << "</title>\n";
