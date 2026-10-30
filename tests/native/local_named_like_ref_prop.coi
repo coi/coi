@@ -1,0 +1,53 @@
+// a method's own variable named like one of the component's reference props is that variable:
+// a local, a loop variable, a match binding or a parameter, while other methods still reach
+// the prop through the reference
+module LocalNamedLikeRefProp;
+
+pub pod Box { string name; }
+
+component Panel(mut string& text, mut int& count) {
+    mut string got = "";
+    def read() : void {
+        string text = `{"name":"local"}`;
+        match (Json.parse(Box, text)) {
+            Success(Box b, BoxMeta meta) => { got = b.name; };
+            Error(string message) => { got = "error"; };
+        };
+    }
+    def loop() : void {
+        mut int sum = 0;
+        for count in 0:3 { sum += count; }
+        got = `${sum}`;
+    }
+    def param(string text) : void { got = text; }
+    def prop() : void { got = text; count = count + 1; }
+    def asked() : void { param("given"); }
+    view {
+        <div>
+            <button class="read" onclick={read}>read</button>
+            <button class="loop" onclick={loop}>loop</button>
+            <button class="param" onclick={asked}>param</button>
+            <button class="prop" onclick={prop}>prop</button>
+            <p class="got">{got}</p>
+        </div>
+    }
+}
+
+component PanelHost {
+    mut string words = "from the host";
+    mut int n = 0;
+    view { <div><Panel &text={words} &count={n} /><p class="n">{n}</p></div> }
+}
+
+test "a local, a loop variable or a parameter named like a reference prop is that variable" {
+    Mounted m = mount(PanelHost());
+    m.click(".read");
+    expect(m.text(".got") == "local");
+    m.click(".loop");
+    expect(m.text(".got") == "3");
+    m.click(".param");
+    expect(m.text(".got") == "given");
+    m.click(".prop");
+    expect(m.text(".got") == "from the host");
+    expect(m.text(".n") == "1");
+}

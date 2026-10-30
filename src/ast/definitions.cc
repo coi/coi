@@ -33,8 +33,31 @@ static std::string function_signature(const FunctionDef& fn, const std::string& 
     return result;
 }
 
+// the names a method declares itself: its params, locals, loop variables, match bindings and
+// lambda params. A component's reference prop of the same name is that variable inside the
+// method, not *prop
+static void declared_names(ASTNode* node, std::set<std::string>& out) {
+    if (!node) return;
+    if (auto* v = dynamic_cast<VarDeclaration*>(node)) out.insert(v->name);
+    else if (auto* f = dynamic_cast<ForRangeStatement*>(node)) out.insert(f->var_name);
+    else if (auto* f = dynamic_cast<ForEachStatement*>(node)) out.insert(f->var_name);
+    else if (auto* l = dynamic_cast<LambdaExpr*>(node)) out.insert(l->param);
+    else if (auto* m = dynamic_cast<MatchExpr*>(node)) {
+        for (auto& arm : m->arms) {
+            for (auto& b : arm.pattern.variant_bindings) out.insert(b.name);
+            for (auto& f : arm.pattern.fields) if (!f.value) out.insert(f.name);
+        }
+    }
+    for (ASTNode* child : node->get_child_nodes()) declared_names(child, out);
+}
+
 std::string FunctionDef::to_webcc(const std::string& injected_code) {
     ComponentTypeContext::instance().begin_method_scope();
+    std::set<std::string> own;
+    for (auto& p : params) own.insert(p.name);
+    for (auto& stmt : body) declared_names(stmt.get(), own);
+    std::set<std::string> hidden;
+    for (auto& n : own) if (g_ref_props.erase(n)) hidden.insert(n);
 
     std::string result = function_signature(*this, cpp_name(name)) + " {\n";
     // the updates run when the method leaves, early returns included
@@ -46,6 +69,7 @@ std::string FunctionDef::to_webcc(const std::string& injected_code) {
     }
     result += "}\n";
 
+    for (auto& n : hidden) g_ref_props.insert(n);
     ComponentTypeContext::instance().end_method_scope();
     return result;
 }
