@@ -1,0 +1,25 @@
+// a press in a test: pointer down, then up, reaching the element's and its ancestors' pointer
+// handlers, and no click
+component Menu {
+    mut bool open = true;
+    mut string heard = "";
+
+    def down() : void { open = false; heard += "down "; }
+    def up() : void { heard += "up "; }
+    def outer() : void { heard += "outer "; }
+    def clicked() : void { heard += "click "; }
+
+    view {
+        <div class="menu" onpointerdown={outer}>
+            <if open><div class="veil" onpointerdown={down} onpointerup={up} onclick={clicked}></div></if>
+            <p class="heard">{heard}</p>
+        </div>
+    }
+}
+
+test "a press closes what closes on pointer down, bubbling, without a click" {
+    Mounted m = mount(Menu());
+    m.press(".veil");
+    expect(!m.has(".veil"));
+    expect(m.text(".heard") == "down outer up ");
+}

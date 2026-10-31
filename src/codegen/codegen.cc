@@ -168,6 +168,10 @@ struct Mounted {
         webcc::DOMElement el = find("click", selector);
         if (el.is_valid()) { webcc::host::click(el); coi_test_update(); }
     }
+    void press(const coi::string& selector) const {
+        webcc::DOMElement el = find("press", selector);
+        if (el.is_valid()) { webcc::host::press(el); coi_test_update(); }
+    }
     void fill(const coi::string& selector, const coi::string& text) const {
         webcc::DOMElement el = find("fill", selector);
         if (el.is_valid()) { webcc::host::input(el, text); coi_test_update(); }

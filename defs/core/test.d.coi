@@ -7,6 +7,10 @@ type Mounted {
     @inline("${this}.click(${0})")
     def click(string selector): void
 
+    // a press with the mouse: pointer down, then up (onpointerdown, onpointerup), no click
+    @inline("${this}.press(${0})")
+    def press(string selector): void
+
     // types the text into an input or textarea: its value, then oninput
     @inline("${this}.fill(${0}, ${1})")
     def fill(string selector, string text): void

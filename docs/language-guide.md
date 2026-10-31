@@ -1538,7 +1538,8 @@ test "save counts up" {
   renders it. Each test starts on an empty page. Props go by name, any left out keep their
   defaults (a callback left out does nothing), and a reference prop takes the test's own variable:
   `mut Note[] notes = []; mount(List(title = "Week", &notes = notes))`.
-- Actions: `click(sel)` (bubbles to the ancestors' handlers; a checkbox flips), `fill(sel, text)`
+- Actions: `click(sel)` (bubbles to the ancestors' handlers; a checkbox flips), `press(sel)` (a
+  mouse press: `onpointerdown`, then `onpointerup`, no click), `fill(sel, text)`
   (sets the value, then `oninput`), `select(sel, value)` and `check(sel)` / `uncheck(sel)` (then
   `onchange`), `key(sel, keyCode)` (`onkeydown`).
 - Reading: `text(sel)` (all the text inside), `attr(sel, name)`, `has(sel)`, `count(sel)`, and
