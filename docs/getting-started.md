@@ -122,6 +122,11 @@ This compiles `src/App.coi` and outputs to `dist/`:
 
 Assets from the `assets/` folder are automatically copied to `dist/assets/`.
 
+Files in `public/` are copied to the root of `dist/` as they are: a page written by hand
+(`public/checkout/index.html` is served at `/checkout`), `robots.txt`, a file a host needs. The
+service worker caches them like any other built file, so a page there opens offline too. A file
+with the name of one the build writes (`index.html`, `app.js`) is replaced by the build's.
+
 ### `coi dev`
 
 Build and start a local development server with hot reloading:
@@ -132,7 +137,7 @@ coi dev
 
 This builds the project and starts a server at `http://localhost:8000` (or the next free port; `COI_PORT=8001 coi dev` starts from another one, handy when two projects run side by side). The server automatically watches for changes to:
 - `.coi` files in `src/`
-- Files in `assets/` (images, fonts, etc.)
+- Files in `assets/` (images, fonts, etc.) and `public/`
 - `.css` files in `styles/`
 
 When you save any watched file, the project rebuilds automatically and your browser refreshes with the latest changes.

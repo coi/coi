@@ -632,6 +632,20 @@ int build_project(bool keep_cc, bool cc_only, bool silent_banner)
         }
     }
 
+    // public/ goes to the root of dist/ as it is: pages written by hand (public/checkout/index.html
+    // is served at /checkout), robots.txt and the like. The build's own files are written after it
+    fs::path public_dir = project_dir / "public";
+    if (fs::exists(public_dir) && fs::is_directory(public_dir))
+    {
+        for (const auto &file : fs::recursive_directory_iterator(public_dir))
+        {
+            if (!file.is_regular_file()) continue;
+            fs::path dest = dist_dir / fs::relative(file.path(), public_dir);
+            fs::create_directories(dest.parent_path());
+            fs::copy_file(file.path(), dest, fs::copy_options::overwrite_existing);
+        }
+    }
+
     // Get executable directory to find coi binary path
     fs::path exe_dir = get_executable_dir();
     fs::path coi_bin = exe_dir / "coi";

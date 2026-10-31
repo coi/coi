@@ -77,6 +77,7 @@ coi build                # build to dist/
 ```
 my-app/
   assets/images/        # copied verbatim to dist/assets/ (reference as "assets/...")
+  public/               # optional: copied verbatim to the root of dist/ (public/x/index.html is served at /x)
   src/
     App.coi             # root; contains the app {} block
     layout/  (NavBar.coi, Footer.coi)

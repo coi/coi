@@ -181,10 +181,9 @@ def get_mtimes(project_dir):
             except OSError:
                 pass
     
-    # Watch assets/
-    assets_dir = project_path / 'assets'
-    if assets_dir.exists():
-        for f in assets_dir.rglob('*'):
+    # Watch assets/ and public/
+    for folder in ('assets', 'public'):
+        for f in (project_path / folder).rglob('*'):
             if f.is_file():
                 try:
                     mtimes[str(f)] = f.stat().st_mtime
