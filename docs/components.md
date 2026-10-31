@@ -586,7 +586,7 @@ A route without parameters keeps its component whenever the same route matches a
 - Dynamic segments (`"/users/:id"`) capture part of the URL into the component's same-named `string`/`int`/`bool` parameter
 - Use `else => Component;` as a catch-all for unmatched routes (404 page)
 - The `<route />` element renders the component matching the current URL
-- `System.navigate(path)` changes the URL and updates the view
+- `System.navigate(path)` changes the URL and updates the view. The path may carry a query or a hash (`"/shop?plan=year"`): the route is matched on the path alone, and the URL keeps the rest for the page to read (`System.getSearch()`, `System.getHash()`)
 - The router reads the initial URL on page load, so direct links work (e.g., `/dashboard`)
 - Browser back/forward buttons work automatically via the History API
 

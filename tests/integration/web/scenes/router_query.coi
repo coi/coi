@@ -1,0 +1,21 @@
+// navigate("/shop?plan=year"): the "/shop" route, matched on the path alone, while the browser's
+// URL keeps the query for the page to read; a "#hash" is left out of the match the same way
+component Front {
+    def shop() : void { System.navigate("/shop?plan=year"); }
+    def top() : void { System.navigate("/shop#top"); }
+    view { <div class="front"><button class="shop" onclick={shop}>shop</button><button class="top" onclick={top}>top</button></div> }
+}
+
+component Shop {
+    def home() : void { System.navigate("/"); }
+    view { <div class="shop"><p class="search">{System.getSearch()}</p><button class="home" onclick={home}>home</button></div> }
+}
+
+component Site {
+    router {
+        "/" => Front;
+        "/shop" => Shop;
+    }
+    view { <div class="site"><route /></div> }
+}
+app { root = Site; }

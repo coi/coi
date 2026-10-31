@@ -573,9 +573,12 @@ template<typename V, typename F> inline void coi_sort_by(V& v, F key, bool desc)
     if (any_router)
     {
         out << "namespace __coi_route {\n";
-        out << "// \"/app/\" is \"/app\": a folder's page is served with the slash\n";
+        out << "// the route in a path: without the ?query and the #hash (navigate(\"/shop?plan=year\") is the\n";
+        out << "// \"/shop\" route, the browser's URL keeps the query), and \"/app/\" is \"/app\": a folder's page is\n";
+        out << "// served with the slash\n";
         out << "inline coi::string path(const coi::string& p) {\n";
-        out << "    uint32_t n = p.length();\n";
+        out << "    uint32_t n = 0;\n";
+        out << "    while (n < p.length() && p.data()[n] != '?' && p.data()[n] != '#') n++;\n";
         out << "    while (n > 1 && p.data()[n - 1] == '/') n--;\n";
         out << "    return n == p.length() ? p : coi::string(p.data(), n);\n";
         out << "}\n";
