@@ -42,6 +42,11 @@ get_selection_text
 # the caret as a text offset, and html put at such an offset
 get_caret_offset
 insert_at_text_offset
+# the caret's line: what was typed on it so far, and where it is (for a popup at the caret)
+get_text_before_caret
+get_caret_left
+get_caret_top
+get_caret_bottom
 closest
 query_selector
 element_at
