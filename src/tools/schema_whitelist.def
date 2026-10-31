@@ -159,6 +159,9 @@ set_item
 get_item
 remove_item
 clear
+# sessionStorage: this tab only
+session_set_item
+session_get_item
 # the answer arrives as PERSISTED; subscribing asks
 persist +listen(PERSISTED)
 

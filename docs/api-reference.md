@@ -244,6 +244,8 @@ Local storage for persisting data.
 | `Storage.getItem(string key)` | Read a value by key (returns `""` if the key is missing) |
 | `Storage.removeItem(string key)` | Remove item by key |
 | `Storage.clear()` | Clear all stored items |
+| `Storage.sessionSetItem(string key, string value)` | Store a value for this tab only: it lasts through reloads and navigations and goes when the tab closes |
+| `Storage.sessionGetItem(string key)` | Read a value stored for this tab (returns `""` if the key is missing) |
 
 > **Note:** `getItem` returns an empty string (`""`) for a missing key, so use `.isEmpty()` to detect "not set".
 
