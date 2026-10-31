@@ -74,20 +74,14 @@ std::string FunctionDef::to_webcc(const std::string& injected_code) {
     return result;
 }
 
-// the C++ signature of a function whose body is JavaScript: the Coi one plus who owns its callbacks
-// (the calling component, or nullptr from a top-level function), so they go when the component does
-static std::string js_signature(const FunctionDef& fn) {
-    std::string sig = function_signature(fn, cpp_name(qualified_name(fn.module_name, fn.name)));
-    sig.insert(sig.size() - 1, std::string(fn.params.empty() ? "" : ", ") + "const void* _coi_owner");
-    return sig;
-}
-
 static bool js_callback(const FunctionDef::Param& p) { return p.type.rfind("webcc::function<", 0) == 0; }
 
 // a function whose body is JavaScript (= js { ... }): carried into the page by WEBCC_JS (a wasm
 // import whose name is the source, dispatched by the import table). Numbers and strings go in as they are, under their
 // Coi names; a callback goes in as a channel number, and the body gets a function of the callback's
 // name that posts on it (push_event_js_MESSAGE), which the event dispatch turns back into the call.
+// The channel belongs to whoever the callback is bound to (function::owner(): the component whose
+// method it is, through however many functions it was handed), and goes when that one goes.
 // An error thrown in the body is logged and ends the body, not the frame. Natively (coi test,
 // prerendering) there is no page: it does nothing and returns zero
 static std::string js_definition(const FunctionDef& fn) {
@@ -113,17 +107,16 @@ static std::string js_definition(const FunctionDef& fn) {
     s += "WEBCC_JS(" + cret + ", " + imp + ", (" + cparams + "), {" + prelude + "try {\n" + fn.js_body +
          "\n} catch (e) { console.error(" + cpp_string_literal(fn.name + ":") + ", e); } });\n";
     s += "#endif\n";
-    s += js_signature(fn) + " {\n";
+    s += function_signature(fn, cpp_name(qualified_name(fn.module_name, fn.name))) + " {\n";
     s += "#if defined(__wasm__)\n";
     for (const auto& p : fn.params) if (js_callback(p)) {
         std::string n = cpp_name(p.name);
         s += "    int32_t _ch_" + n + " = coi_js_channel();\n";
-        s += "    coi_events<webcc::js::MessageEvent>.set(webcc::handle(_ch_" + n + "), [" + n + "](const webcc::js::MessageEvent& _e) { " + n + "(coi::string(_e.data)); }, _coi_owner);\n";
+        s += "    coi_events<webcc::js::MessageEvent>.set(webcc::handle(_ch_" + n + "), [" + n + "](const webcc::js::MessageEvent& _e) { " + n + "(coi::string(_e.data)); }, " + n + ".owner());\n";
     }
     s += std::string(fn.return_type == "void" ? "    " : fn.return_type == "bool" ? "    return 0 != " : "    return ") + imp + "(" + call + ");\n";
     s += "#else\n";
     for (const auto& p : fn.params) s += "    (void)" + cpp_name(p.name) + ";\n";
-    s += "    (void)_coi_owner;\n";
     if (fn.return_type != "void") s += std::string("    return ") + (fn.return_type == "bool" ? "false" : "0") + ";\n";
     s += "#endif\n}\n";
     if (channels) g_used_events["js::MESSAGE"] = {"js", "MESSAGE", "channel", "webcc::js::MessageEvent", "", false};
@@ -132,7 +125,7 @@ static std::string js_definition(const FunctionDef& fn) {
 
 std::string FunctionDef::free_declaration() {
     ComponentTypeContext::instance().begin_method_scope();
-    std::string result = (is_js ? js_signature(*this) : function_signature(*this, cpp_name(qualified_name(module_name, name)))) + ";\n";
+    std::string result = function_signature(*this, cpp_name(qualified_name(module_name, name))) + ";\n";
     ComponentTypeContext::instance().end_method_scope();
     return result;
 }
@@ -181,7 +174,6 @@ void register_free_functions(const std::vector<std::unique_ptr<FunctionDef>>& fu
     for (const auto& fn : functions) {
         FreeFunctionInfo info;
         info.is_public = fn->is_public;
-        info.is_js = fn->is_js;
         for (const auto& param : fn->params) {
             info.mut_ref_params.push_back(param.is_mutable && param.is_reference);
         }

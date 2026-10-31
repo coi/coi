@@ -132,7 +132,7 @@ std::string Assignment::to_webcc()
         {
             // Get the method name from the reference operand
             std::string method_name = ref_expr->operand->to_webcc();
-            rhs = generate_member_function_lambda(target_type, method_name);
+            rhs = "coi::bound(this, " + generate_member_function_lambda(target_type, method_name) + ")";
         }
         else
         {

@@ -425,7 +425,8 @@ function; params are `int`, `float`, `bool`, `string` or a callback `def f(strin
 visible in the JS by name; returns `void`, `int`, `float` or `bool` with `return` inside the
 block (a string, or anything that arrives later, comes back through a callback; use JSON for
 more). A callback can be called any number of times, now or later; the handler runs on the next
-frame like an event. A thrown error is logged and ends the body, not the frame. Not in a
+frame like an event; a callback that is a component's method stops with the component, however it was handed over.
+A thrown error is logged and ends the body, not the frame. Not in a
 component's methods for now. Natively (`coi test`, prerendering) it does nothing, returns
 0/false, never calls back. `pub def` exports it, so a package can wrap a JS library.
 ```coi

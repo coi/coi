@@ -403,12 +403,12 @@ void ComponentInstantiation::generate_code(ViewCodegenContext& ctx)
                 // Callback with params: generate lambda that forwards args
                 std::string lambda_params = build_lambda_params_from_types(prop.callback_param_types);
                 std::string forward_args = build_forward_args(prop.callback_param_types.size());
-                ctx.ss << "        " << instance_name << "." << cpp_name(prop.name) << " = [this](" << lambda_params << ") { return this->" << val << "(" << forward_args << "); };\n";
+                ctx.ss << "        " << instance_name << "." << cpp_name(prop.name) << " = coi::bound(this, [this](" << lambda_params << ") { return this->" << val << "(" << forward_args << "); });\n";
             }
             else if (ctx.method_names.count(prop.value->raw_name()) || prop.is_callback)
             {
                 // No-param callback or method reference
-                ctx.ss << "        " << instance_name << "." << cpp_name(prop.name) << " = [this]() { this->" << val << "(); };\n";
+                ctx.ss << "        " << instance_name << "." << cpp_name(prop.name) << " = coi::bound(this, [this]() { this->" << val << "(); });\n";
             }
             else if (prop.is_reference)
             {

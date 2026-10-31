@@ -764,7 +764,7 @@ std::string FunctionCall::to_webcc() {
                                 if (j > 0) arg_code += ", ";
                                 arg_code += "_arg" + std::to_string(j);
                             }
-                            arg_code += "); }";
+                            arg_code = "coi::bound(this, " + arg_code + "); })";
                             wrapped = true;
                         }
                     }
@@ -846,7 +846,7 @@ std::string FunctionCall::to_webcc() {
                         if (j > 0) arg_code += ", ";
                         arg_code += "_arg" + std::to_string(j);
                     }
-                    arg_code += "); }";
+                    arg_code = "coi::bound(this, " + arg_code + "); })";
                 }
             }
         }
@@ -855,9 +855,6 @@ std::string FunctionCall::to_webcc() {
         }
         result += arg_code;
     }
-    // a JavaScript body's callbacks belong to the calling component, and stop with it
-    if (const FreeFunctionInfo* info = free_fn.empty() ? nullptr : FreeFunctionRegistry::instance().resolve_info(name); info && info->is_js)
-        result += std::string(args.empty() ? "" : ", ") + (ComponentTypeContext::instance().component_name.empty() ? "nullptr" : "this");
     result += ")";
     return result;
 }
@@ -1003,6 +1000,7 @@ std::string ReferenceExpression::to_webcc() {
                 result += "_arg" + std::to_string(i);
             }
             result += "); }";
+            result = "coi::bound(this, " + result + ")";
             return result;
         }
         std::string free_fn = FreeFunctionRegistry::instance().resolve_call(method_name);
@@ -1184,7 +1182,7 @@ std::string ComponentConstruction::to_webcc() {
                 params += (k ? ", " : "") + convert_type(types[k]) + " _a" + std::to_string(k);
                 fwd += (k ? ", _a" : "_a") + std::to_string(k);
             }
-            return "[this](" + params + ") { return this->" + cpp_name(id->name) + "(" + fwd + "); }";
+            return "coi::bound(this, [this](" + params + ") { return this->" + cpp_name(id->name) + "(" + fwd + "); })";
         }
         if (args[i].is_reference) return "&(" + value + ")";
         if (args[i].is_move) return "coi::move(" + value + ")";

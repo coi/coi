@@ -1,0 +1,25 @@
+// Test: a callback handed through a module function to a JavaScript body keeps its owner
+
+module Timing;
+
+def later(int ms, def onDone(string) : void) : void = js {
+    setTimeout(() => onDone("done"), ms);
+}
+
+pub def soon(def onDone(string) : void) : void {
+    later(10, onDone);
+}
+
+component App {
+    mut string got = "";
+
+    def heard(string s) : void { got = s; }
+
+    mount { Timing::soon(&heard); }
+
+    view { <div>{got}</div> }
+}
+
+app {
+    root = App;
+}

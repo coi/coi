@@ -1247,7 +1247,7 @@ component App {
 ```
 
 - The whole body is JavaScript; a semicolon after the closing brace is fine, not needed. Parameters are `int`, `float`, `bool`, `string`, or a callback `def f(string) : void`. The return type is `void`, `int`, `float` or `bool`, returned with `return` inside the block; a string comes back through a callback, and so does anything that arrives later (an event, a promise's result). Pass JSON for anything bigger and parse it on either side.
-- A call runs the body at once and returns its value. A callback may be called any number of times; each call reaches the handler on the next frame, like an event, and the view updates. Called from a component, the callbacks stop when the component is destroyed.
+- A call runs the body at once and returns its value. A callback may be called any number of times; each call reaches the handler on the next frame, like an event, and the view updates. A callback that is a component's method stops when that component is destroyed, through however many functions it was handed (a message that comes later is dropped); one that is a top-level function lives as long as the page.
 - An error thrown in the body is logged on the console and ends that body (a value-returning one returns `0`); the rest of the frame goes on.
 - Top-level and module functions only, for now (not a component's methods). `pub def` makes one available to other modules, so a package can wrap a JavaScript library behind a Coi module: `Paddle::open(...)`, `Map::show(...)`.
 - Natively (in `coi test`, and while a page is prerendered) there is no page: the function does nothing, returns `0` or `false`, and never calls back.

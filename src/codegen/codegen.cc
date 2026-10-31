@@ -430,6 +430,10 @@ template<typename V, typename F> inline void coi_sort_by(V& v, F key, bool desc)
     out << "template<typename T, size_t N> using array = webcc::array<T, N>;\n";
     out << "template<typename K, typename V> using map = webcc::unordered_map<K, V>;\n";
     out << "template<typename Signature> using function = webcc::function<Signature>;\n";
+    // a method bound to its component: a callable that says whose it is (function::owner()), so a
+    // table keeping it (a JavaScript body's callback) drops it when the component goes
+    out << "template<typename L> struct bound_t { const void* who; L call; template<typename... A> decltype(auto) operator()(A&&... a) const { return call(static_cast<A&&>(a)...); } const void* owner() const { return who; } };\n";
+    out << "template<typename L> bound_t<L> bound(const void* who, L call) { return bound_t<L>{who, static_cast<L&&>(call)}; }\n";
     out << "using webcc::move;\n";
     // view updates after a method, on every return
     out << "template<typename F> struct OnExit { F f; ~OnExit() { f(); } };\n";

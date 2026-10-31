@@ -1,0 +1,50 @@
+// a callback that is a component's method, handed through a module function to a JavaScript body,
+// stops with the component: the message that comes after the component is gone is dropped, the
+// one for a component still there arrives, and the page goes on
+
+def later(int ms, def onDone(string) : void) : void = js {
+    setTimeout(() => onDone("late"), ms);
+}
+
+def mark() : void = js { window.lateCalled = true; }
+
+def askLater(int ms, def onDone(string) : void) : void {
+    later(ms, onDone);   // a function value is passed as it is, no &
+}
+
+component Child {
+    mut string got = "";
+    def heard(string s) : void { got = s; mark(); }
+    mount { askLater(300, &heard); }
+    view { <p class="child">{got}</p> }
+}
+
+component App {
+    mut bool showChild = true;
+    mut string kept = "";
+    mut int beats = 0;
+    mut Timeout drop;
+    mut Timeout beat;
+
+    def heard(string s) : void { kept = s; }
+    def gone() : void { showChild = false; }
+    def beatOn() : void { beats++; beat = System.setTimeout(100.0, &beatOn); }
+
+    mount {
+        askLater(300, &heard);
+        drop = System.setTimeout(50.0, &gone);
+        beat = System.setTimeout(100.0, &beatOn);
+    }
+
+    view {
+        <div>
+            <if showChild>
+                <Child />
+            </if>
+            <p class="kept">{kept}</p>
+            <p class="beats">{beats}</p>
+        </div>
+    }
+}
+
+app { root = App; }
