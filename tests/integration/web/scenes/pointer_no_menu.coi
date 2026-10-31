@@ -1,5 +1,6 @@
 // PointerFlags.NoMenu: a right click opens no context menu and still reaches onpointerdown,
-// with the right button (2) in buttons. Without the flag the menu is left alone
+// with the right button (2) in buttons. Without the flag the menu is left alone, and so is
+// the menu of text that can be edited inside the element
 component PointerNoMenu {
     mut string pressed = "-";
 
@@ -8,7 +9,10 @@ component PointerNoMenu {
     view {
         <div>
             <div class="pad" style="width:200px;height:100px;background:#ddd"
-                 onpointerdown={down} pointerflags={PointerFlags.NoMenu}></div>
+                 onpointerdown={down} pointerflags={PointerFlags.NoMenu}>
+                <input class="field" value="words" />
+                <div class="note" contenteditable="true">typed</div>
+            </div>
             <div class="plain" style="width:200px;height:100px;background:#eee"></div>
             <p class="pressed">{pressed}</p>
         </div>
