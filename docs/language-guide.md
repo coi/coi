@@ -607,6 +607,8 @@ pod BadData {
 
 ### Initialization
 
+A pod starts with every field at zero, `false` or empty: `mut User user;` is a user with an empty name and age 0, as a local, a component's state or a field of another pod, `mut` or not.
+
 Use aggregate initialization syntax with curly braces. Both positional and named field syntax are supported:
 
 ```tsx

@@ -1,0 +1,28 @@
+// a pod declared without a value is blank: every field zero, false or empty, mut or not, and
+// one inside another pod the same
+module PodZero;
+
+pod Inner { float x; int n; bool b; string s; int[] list; }
+pod Outer { Inner inner; string name; }
+
+def fresh() : Inner { mut Inner p; return p; }
+def freshConst() : Inner { Inner p; return p; }
+def nested() : Outer { Outer o; return o; }
+
+component Holder {
+    mut Inner kept;
+    view { <p class="n">{kept.n}</p> }
+}
+
+test "a declared pod starts at zero" {
+    expect(fresh().x == 0.0);
+    expect(fresh().n == 0);
+    expect(!fresh().b);
+    expect(fresh().s.isEmpty());
+    expect(fresh().list.size() == 0);
+    expect(freshConst().x == 0.0);
+    expect(nested().inner.n == 0);
+    expect(nested().name.isEmpty());
+    Mounted m = mount(Holder());
+    expect(m.text(".n") == "0");
+}

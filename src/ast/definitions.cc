@@ -197,7 +197,7 @@ static std::string emit_union(const DataDef &u) {
     std::string me = qualified_name(u.module_name, u.name);
     ss << "struct " << me << " {\n";
     for (const auto& field : u.fields)
-        ss << "    " << convert_type(field.type) << " " << cpp_name(field.name) << ";\n";
+        ss << "    " << convert_type(field.type) << " " << cpp_name(field.name) << "{};\n";
     ss << "    int32_t _which = -1;\n";
     for (size_t i = 0; i < u.alts.size(); ++i)
         ss << "    " << convert_type(u.alts[i].type) << " _" << i << "{};\n";
@@ -232,8 +232,10 @@ std::string DataDef::to_webcc() {
     }
     
     ss << "struct " << qualified_name(module_name, name) << " {\n";
+    // every field starts at zero, false or empty ({}), so a pod declared without a value is
+    // blank wherever it lives, and a const one can be declared at all
     for(const auto& field : fields){
-        ss << "    " << convert_type(field.type) << " " << cpp_name(field.name) << ";\n";
+        ss << "    " << convert_type(field.type) << " " << cpp_name(field.name) << "{};\n";
     }
     // == compares field by field; only compiled where a program compares two of them
     ss << "    bool operator==(const " << qualified_name(module_name, name) << "&) const = default;\n";

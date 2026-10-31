@@ -977,9 +977,9 @@ template<typename V, typename F> inline void coi_sort_by(V& v, F key, bool desc)
         {
             std::string local = qualified_name(comp.module_name, comp.name) + "_" + data_def->name;
             out << "struct " << local << " {\n";
-            for (const auto &field : data_def->fields)
+            for (const auto &field : data_def->fields)   // blank to start with, as a global pod (definitions.cc)
             {
-                out << "    " << convert_type(field.type) << " " << cpp_name(field.name) << ";\n";
+                out << "    " << convert_type(field.type) << " " << cpp_name(field.name) << "{};\n";
             }
             out << "    bool operator==(const " << local << "&) const = default;\n";
             out << "};\n";
