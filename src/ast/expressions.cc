@@ -457,6 +457,22 @@ static std::string generate_event_registration(const MethodDef& event_method, co
     return "coi_events<" + full + ">.set(" + handle_expr + ", [this](const " + full + "& _e) { (void)_e; " + call + "; }, this)";
 }
 
+// a handle's @cleanup command called by hand (timer.clearTimeout()) ends it: no event comes for it
+// any more, so its callbacks go now, as when its last event arrives. Left in, every cancelled
+// timer would keep a slot in the table until its component goes
+static std::string forget_if_ended(const std::string& call, const std::string& handle_type,
+                                   const std::string& mapping, const std::string& handle_expr) {
+    const TypeDef* td = DefSchema::instance().lookup_type(handle_type);
+    if (!td || td->cleanup.empty() || td->cleanup != mapping) return call;
+    std::string out = "(" + call;
+    for (const auto& m : td->methods) {
+        if (m.mapping_type != MappingType::Event) continue;
+        SchemaEventSpec spec = SchemaEventSpec::parse(m.mapping_value);
+        out += ", coi_events<webcc::" + spec.struct_name() + ">.remove(" + handle_expr + ")";
+    }
+    return out + ")";
+}
+
 // callbacks on a call that returns a handle
 static std::string wrap_with_callbacks(const std::string& call, const MethodDef& method, const SplitArgs& split, const std::string& call_name) {
     if (split.callbacks.empty()) return call;
@@ -603,6 +619,7 @@ std::string FunctionCall::to_webcc() {
     const MethodDef* map_method = nullptr;
     std::string map_ns = "";
     std::string map_func = "";
+    std::string map_obj_type = "";   // the receiver's handle type, on an instance call
 
     if (dot_pos != std::string::npos && dot_pos > 0 && dot_pos < name.length() - 1) {
         std::string obj = name.substr(0, dot_pos);
@@ -649,6 +666,7 @@ std::string FunctionCall::to_webcc() {
                         } else if (map_method->mapping_type == MappingType::Map) {
                             pass_obj = true;
                             obj_arg = resolved_receiver;
+                            map_obj_type = obj_type;
                         } else {
                             map_method = nullptr;
                         }
@@ -785,6 +803,7 @@ std::string FunctionCall::to_webcc() {
             code = "(int32_t)(" + code + ")";
         }
         code = from_webcc_value(code, map_method->return_type);
+        if (pass_obj) code = forget_if_ended(code, map_obj_type, map_method->mapping_value, obj_arg);
 
         return code;
     }
@@ -1441,7 +1460,7 @@ std::string MethodCall::to_webcc() {
             std::string a = args[i].value->to_webcc();
             call += ", " + (i < m->params.size() ? to_webcc_arg(a, m->params[i].type) : a);
         }
-        return from_webcc_value(call + ")", m->return_type);
+        return forget_if_ended(from_webcc_value(call + ")", m->return_type), def_type, m->mapping_value, recv);
     }
     // a pod's generated <Pod>Meta struct counts as a def type: its has() and has_<field>() are the compiler's
     bool meta_type = type.size() > 4 && type.compare(type.size() - 4, 4, "Meta") == 0;

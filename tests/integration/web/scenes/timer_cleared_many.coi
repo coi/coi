@@ -1,0 +1,22 @@
+// timers cleared by hand don't hold on to their callbacks: after many set and cleared, as a
+// debounce does on every keystroke, a new one still fires
+component TimerClearedMany {
+    mut string fired = "-";
+    mut Timeout debounce;
+    mut Timeout last;
+
+    mount {
+        for i in 0:600 {
+            debounce = System.setTimeout(60000.0, &neverHere);
+            debounce.clearTimeout();
+        }
+        last = System.setTimeout(30.0, &here);
+    }
+
+    def here() : void { fired = "fired"; }
+    def neverHere() : void {}
+
+    view { <p class="fired">{fired}</p> }
+}
+
+app { root = TimerClearedMany; }
