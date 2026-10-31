@@ -1,0 +1,21 @@
+// Test: a JavaScript body in a module function, public, called with the module prefix from a component
+
+module Page;
+
+pub def width() : int = js { return window.innerWidth; }
+
+component App {
+    mut int w = 0;
+
+    mount {
+        w = Page::width();
+    }
+
+    view {
+        <div>{w}</div>
+    }
+}
+
+app {
+    root = App;
+}

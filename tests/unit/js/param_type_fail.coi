@@ -1,0 +1,13 @@
+// Test: JavaScript body - a pod can't cross to JavaScript
+
+pod Point { int x; int y; }
+
+def show(Point p) : void = js { console.log(p); }
+
+component App {
+    view { <div>x</div> }
+}
+
+app {
+    root = App;
+}

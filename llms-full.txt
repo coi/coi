@@ -419,6 +419,27 @@ Rules:
 - Inside a component, the component's own method wins over a top-level function with the
   same name.
 
+**A function whose body is JavaScript.** A top-level function's body can be assigned as a
+`js { ... }` block, for browser APIs and libraries the platform doesn't cover. Called like any
+function; params are `int`, `float`, `bool`, `string` or a callback `def f(string) : void`,
+visible in the JS by name; returns `void`, `int`, `float` or `bool` with `return` inside the
+block (a string, or anything that arrives later, comes back through a callback; use JSON for
+more). A callback can be called any number of times, now or later; the handler runs on the next
+frame like an event. A thrown error is logged and ends the body, not the frame. Not in a
+component's methods for now. Natively (`coi test`, prerendering) it does nothing, returns
+0/false, never calls back. `pub def` exports it, so a package can wrap a JS library.
+```coi
+def width() : int = js { return window.innerWidth; }
+def watch(def onChange(string) : void) : void = js {
+    addEventListener("online", () => onChange("on"));   // param names are the JS names
+}
+component App {
+    mut string net = "on";
+    def changed(string s) : void { net = s; }
+    mount { watch(&onChange = changed); }
+}
+```
+
 **Function references / callbacks.** Function-typed variables hold callables:
 ```coi
 component EventManager {

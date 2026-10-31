@@ -1,0 +1,24 @@
+// Test: a function whose body is JavaScript; numbers and strings in, a number out
+
+def jsAdd(int a, int b) : int = js { return a + b; }
+
+def setTitle(string t, bool shout) : void = js {
+    document.title = shout ? t.toUpperCase() : t;
+};
+
+component App {
+    mut int sum = 0;
+
+    mount {
+        sum = jsAdd(2, 3);
+        setTitle("hello", false);
+    }
+
+    view {
+        <div>{sum}</div>
+    }
+}
+
+app {
+    root = App;
+}

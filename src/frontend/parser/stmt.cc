@@ -33,6 +33,8 @@ std::unique_ptr<Statement> Parser::parse_statement()
 
 std::unique_ptr<Statement> Parser::parse_statement_body()
 {
+    if (current().type == TokenType::JS_BODY)
+        ErrorHandler::compiler_error("js { } is a whole function's body: def name(...) : void = js { ... }", current().line);
     // Block
     if (current().type == TokenType::LBRACE)
     {

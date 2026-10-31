@@ -22,6 +22,7 @@ class Lexer {
         Token read_template_string();
         void read_template_expr(std::string& out);
         Token read_identifier();
+        Token read_js_body();
     public:
         Lexer(const std::string& src);
         std::vector<Token> tokenize();

@@ -250,6 +250,45 @@ Token Lexer::read_identifier(){
     return Token{TokenType::IDENTIFIER, id, start_line, start_column};
 }
 
+// = js { ... }: the text between the braces as written, for the page to run. Strings, template
+// literals and comments are passed over so a brace inside them doesn't count
+Token Lexer::read_js_body(){
+    int start_line = line, start_column = column;
+    advance();   // '{'
+    std::string body;
+    int depth = 0;
+    while (current() != '\0') {
+        char c = current();
+        if (c == '}' && depth == 0) break;
+        if (c == '{') depth++;
+        else if (c == '}') depth--;
+        if (c == '\'' || c == '"' || c == '`') {
+            body += c; advance();
+            while (current() != '\0' && current() != c) {
+                if (current() == '\\') { body += current(); advance(); }
+                if (current() == '\0') break;
+                body += current(); advance();
+            }
+            if (current() == c) { body += c; advance(); }
+            continue;
+        }
+        if (c == '/' && peek() == '/') {
+            while (current() != '\n' && current() != '\0') { body += current(); advance(); }
+            continue;
+        }
+        if (c == '/' && peek() == '*') {
+            body += current(); advance(); body += current(); advance();
+            while (current() != '\0' && !(current() == '*' && peek() == '/')) { body += current(); advance(); }
+            if (current() == '*') { body += current(); advance(); body += current(); advance(); }
+            continue;
+        }
+        body += c; advance();
+    }
+    if (current() != '}') ErrorHandler::compiler_error("The JavaScript body that starts here has no closing '}'", start_line);
+    advance();   // '}'
+    return Token{TokenType::JS_BODY, body, start_line, start_column};
+}
+
 std::vector<Token> Lexer::tokenize(){
     std::vector<Token> tokens;
     // Pre-allocate based on source size estimate (roughly 1 token per 5 chars)
@@ -287,7 +326,18 @@ std::vector<Token> Lexer::tokenize(){
 
         // Identifiers and keywords
         if(std::isalpha(current()) || current() == '_'){
-            tokens.push_back(read_identifier());
+            Token id = read_identifier();
+            // js { ... }: JavaScript, one token holding its text (a function's body, = js { ... })
+            if (id.type == TokenType::IDENTIFIER && id.value == "js") {
+                size_t at = pos;
+                while (at < source.size() && std::isspace(static_cast<unsigned char>(source[at]))) at++;
+                if (at < source.size() && source[at] == '{') {
+                    skip_whitespace();
+                    tokens.push_back(read_js_body());
+                    continue;
+                }
+            }
+            tokens.push_back(id);
             continue;
         }
 

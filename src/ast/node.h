@@ -222,6 +222,7 @@ struct ComponentTypeContext {
 // Top-level functions known to codegen: module -> function name -> info
 struct FreeFunctionInfo {
     bool is_public = false;
+    bool is_js = false;                // body is JavaScript: the call also passes who owns its callbacks
     std::vector<bool> mut_ref_params;  // per param: mut T&
 };
 
@@ -242,6 +243,8 @@ struct FreeFunctionRegistry {
 
     // C++ name for a top-level call, "" if not one
     std::string resolve_call(const std::string& name) const;
+    // the function a top-level call names, nullptr if not one
+    const FreeFunctionInfo* resolve_info(const std::string& name) const;
 };
 
 // Type conversion utility

@@ -1,0 +1,14 @@
+// Test: JavaScript body - js { } is the whole body, not a statement among others
+
+def twice(int n) : int {
+    int m = n;
+    js { return m * 2; }
+}
+
+component App {
+    view { <div>x</div> }
+}
+
+app {
+    root = App;
+}

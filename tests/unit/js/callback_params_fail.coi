@@ -1,0 +1,11 @@
+// Test: JavaScript body - a callback takes one string, nothing else
+
+def ask(def onAnswer(int) : void) : void = js { onAnswer(1); }
+
+component App {
+    view { <div>x</div> }
+}
+
+app {
+    root = App;
+}

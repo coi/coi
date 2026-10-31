@@ -23,6 +23,8 @@ enum class TokenType {
     // Delimiters
     LPAREN, RPAREN, LBRACE, RBRACE, LBRACKET, RBRACKET,
     SEMICOLON, COMMA, DOT, COLON, DOUBLE_COLON, ARROW, AMPERSAND,
+    // = js { ... }: a function's JavaScript body, as written
+    JS_BODY,
     // Special
     END_OF_FILE, UNKNOWN
 };

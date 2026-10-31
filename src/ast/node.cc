@@ -151,6 +151,17 @@ std::string convert_type(const std::string& type) {
     return type;
 }
 
+const FreeFunctionInfo* FreeFunctionRegistry::resolve_info(const std::string& name) const {
+    if (functions.empty() || name.empty() || name.find('.') != std::string::npos) return nullptr;
+    const auto& ctx = ComponentTypeContext::instance();
+    size_t dcolon = name.find("::");
+    if (dcolon != std::string::npos) return find(name.substr(0, dcolon), name.substr(dcolon + 2));
+    if (!std::islower(static_cast<unsigned char>(name[0]))) return nullptr;
+    std::string symbol = ctx.get_symbol_type(name);
+    if (ctx.has_method(name) || symbol.rfind("def", 0) == 0 || symbol.rfind("webcc::function", 0) == 0) return nullptr;
+    return find(ctx.module_name, name);
+}
+
 std::string FreeFunctionRegistry::resolve_call(const std::string& name) const {
     if (functions.empty() || name.empty() || name.find('.') != std::string::npos) return "";
     const auto& ctx = ComponentTypeContext::instance();

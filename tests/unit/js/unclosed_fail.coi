@@ -1,0 +1,11 @@
+// Test: JavaScript body - one that never closes
+
+def broken() : void = js { if (true) { console.log("x");
+
+component App {
+    view { <div>x</div> }
+}
+
+app {
+    root = App;
+}

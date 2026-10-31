@@ -227,12 +227,13 @@ std::set<std::string> get_required_headers(const std::vector<Component> &compone
     {
         collect_used_types(comp, used_types);
     }
+    std::set<std::string> headers;
     for (const auto &func : functions)
     {
         collect_used_types(*func, used_types);
+        if (func->is_js) headers.insert("js");   // webcc::js::MessageEvent, a callback's way back
     }
 
-    std::set<std::string> headers;
     // Always include dom, system, and input (needed for basic DOM operations, main loop, and key state)
     headers.insert("dom");
     headers.insert("system");

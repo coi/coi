@@ -1,0 +1,11 @@
+// Test: JavaScript body - a string doesn't come back directly (it comes through a callback)
+
+def title() : string = js { return document.title; }
+
+component App {
+    view { <div>x</div> }
+}
+
+app {
+    root = App;
+}

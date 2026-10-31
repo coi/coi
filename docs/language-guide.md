@@ -1213,6 +1213,44 @@ component App {
 
 A top-level function only sees its parameters and its own locals. It has no component state, no `emit`, and no lifecycle; referencing any other name is a compile error. To work on component data, pass it in (by `&` reference if the function should modify it).
 
+### A Function Whose Body Is JavaScript (`= js { }`)
+
+A top-level function can be given JavaScript as its body, for a browser API or a library the platform doesn't cover (a payment form, an analytics script, a map). The signature is Coi, the body is assigned as a `js { }` block, and it is called like any other top-level function; the parameters are visible inside by name:
+
+```tsx
+def width() : int = js { return window.innerWidth; }
+
+def setTitle(string title, bool shout) : void = js {
+    document.title = shout ? title.toUpperCase() : title;
+}
+
+// a callback is a function the JavaScript can call, now or later, with a string
+def watchOnline(def onChange(string) : void) : void = js {
+    addEventListener("online", () => onChange("on"));
+    addEventListener("offline", () => onChange("off"));
+}
+
+component App {
+    mut string net = "on";
+
+    def changed(string state) : void { net = state; }
+
+    mount {
+        setTitle("Notes", false);
+        watchOnline(&onChange = changed);
+    }
+
+    view { <p>{net}</p> }
+}
+```
+
+- The whole body is JavaScript; a semicolon after the closing brace is fine, not needed. Parameters are `int`, `float`, `bool`, `string`, or a callback `def f(string) : void`. The return type is `void`, `int`, `float` or `bool`, returned with `return` inside the block; a string comes back through a callback, and so does anything that arrives later (an event, a promise's result). Pass JSON for anything bigger and parse it on either side.
+- A call runs the body at once and returns its value. A callback may be called any number of times; each call reaches the handler on the next frame, like an event, and the view updates. Called from a component, the callbacks stop when the component is destroyed.
+- An error thrown in the body is logged on the console and ends that body (a value-returning one returns `0`); the rest of the frame goes on.
+- Top-level and module functions only, for now (not a component's methods). `pub def` makes one available to other modules, so a package can wrap a JavaScript library behind a Coi module: `Paddle::open(...)`, `Map::show(...)`.
+- Natively (in `coi test`, and while a page is prerendered) there is no page: the function does nothing, returns `0` or `false`, and never calls back.
+- The body is JavaScript as the browser runs it. Keep strings and comments well-formed (an unmatched `'` or `"` even in a comment doesn't build), and no `#` at the start of a line.
+
 **Visibility** follows the module rules, like pods and components: a top-level function is module-internal by default, and `pub def` makes it available to other modules. From another module, import the file and call it with the module prefix:
 
 ```tsx

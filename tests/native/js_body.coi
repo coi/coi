@@ -1,0 +1,23 @@
+// a function whose body is JavaScript has no page to run on natively: it does nothing, returns
+// zero, and never calls back
+module JsBody;
+
+def jsAdd(int a, int b) : int = js { return a + b; }
+
+def yes() : bool = js { return true; }
+
+def ask(string q, def onAnswer(string) : void) : void = js { onAnswer(q + "!"); }
+
+component Asker {
+    mut string answer = "none";
+    def heard(string a) : void { answer = a; }
+    mount { ask("hi", &onAnswer = heard); }
+    view { <p class="answer">{answer}</p> }
+}
+
+test "a JavaScript body is a no-op without a page" {
+    expect(jsAdd(2, 3) == 0);
+    expect(yes() == false);
+    Mounted m = mount(Asker());
+    expect(m.text(".answer") == "none");
+}

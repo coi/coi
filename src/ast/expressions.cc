@@ -855,6 +855,9 @@ std::string FunctionCall::to_webcc() {
         }
         result += arg_code;
     }
+    // a JavaScript body's callbacks belong to the calling component, and stop with it
+    if (const FreeFunctionInfo* info = free_fn.empty() ? nullptr : FreeFunctionRegistry::instance().resolve_info(name); info && info->is_js)
+        result += std::string(args.empty() ? "" : ", ") + (ComponentTypeContext::instance().component_name.empty() ? "nullptr" : "this");
     result += ")";
     return result;
 }

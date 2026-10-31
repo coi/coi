@@ -1,0 +1,11 @@
+// Test: JavaScript body - not in a component's method, for now
+
+component App {
+    def width() : int = js { return window.innerWidth; }
+
+    view { <div>x</div> }
+}
+
+app {
+    root = App;
+}

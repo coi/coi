@@ -31,7 +31,9 @@ static void emit_event_dispatch(std::ostream &out, const FeatureFlags &features)
             out << "            }\n";
             continue;
         }
-        out << "                coi_events<" << ev.struct_name << ">.dispatch(evt->" << ev.key << ", *evt);\n";
+        // a plain number as the key (a JavaScript body's channel) is the handle it was registered under
+        std::string by = ev.handle_type.empty() ? "webcc::handle(evt->" + ev.key + ")" : "evt->" + ev.key;
+        out << "                coi_events<" << ev.struct_name << ">.dispatch(" << by << ", *evt);\n";
         if (ev.last)
             for (const auto &[key2, other] : g_used_events)
                 if (other.handle_type == ev.handle_type)
@@ -782,6 +784,10 @@ template<typename V, typename F> inline void coi_sort_by(V& v, F key, bool desc)
     out << "inline void coi_note_span(webcc::handle root, int32_t lo) {\n";
     out << "    g_coi_spans.push_back(CoiSpan{(int32_t)root, lo, webcc::deferred_handle_counter()});\n";
     out << "}\n";
+    // channels for JavaScript bodies' callbacks: numbers of their own, far from any element handle,
+    // since coi_forget_handle goes by number
+    out << "inline int32_t g_coi_js_channels = 0x40000000;\n";
+    out << "inline int32_t coi_js_channel() { return g_coi_js_channels++; }\n";
     // keys for page listeners: negative, stable across moves
     out << "inline int32_t g_coi_page_keys = 0;\n";
     out << "inline void coi_forget_handle(webcc::handle h) {\n";

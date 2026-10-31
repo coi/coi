@@ -1199,6 +1199,8 @@ Component Parser::parse_component()
         {
             int line = current().line;
             FunctionDef func = parse_function_def(is_public);
+            if (func.is_js)
+                ErrorHandler::compiler_error("'" + func.name + "': a JavaScript body is for a top-level function, not a method, for now", func.line);
             // the lifecycle blocks are methods by these names in the generated code
             if (func.name == "tick" || func.name == "init" || func.name == "mount" || func.name == "unmount")
                 ErrorHandler::compiler_error("A method can't be called '" + func.name + "': that's the " + func.name +
@@ -1527,6 +1529,25 @@ std::string Parser::source_text(size_t from, size_t to)
     return out;
 }
 
+// a function whose body is JavaScript: what crosses is numbers, strings, and a callback that
+// takes a string back
+static void check_js_signature(const FunctionDef& func)
+{
+    for (const auto& p : func.params)
+    {
+        bool ok = p.type == "int" || p.type == "float" || p.type == "bool" || p.type == "string" ||
+                  p.type == "webcc::function<void(coi::string)>";
+        if (!ok || p.is_reference || p.is_mutable)
+            ErrorHandler::compiler_error("'" + func.name + "': parameter '" + p.name +
+                "' can't cross to JavaScript; a function whose body is JavaScript takes int, float, bool, string, or a callback def f(string) : void", func.line);
+    }
+    if (func.return_type != "void" && func.return_type != "int" && func.return_type != "float" && func.return_type != "bool")
+        ErrorHandler::compiler_error("'" + func.name + "' returns '" + func.return_type +
+            "'; a function whose body is JavaScript returns void, int, float or bool (a string comes back through a callback)", func.line);
+    if (!func.type_params.empty())
+        ErrorHandler::compiler_error("'" + func.name + "' can't be generic with a JavaScript body", func.line);
+}
+
 FunctionDef Parser::parse_function_def(bool is_public)
 {
     advance();
@@ -1758,6 +1779,17 @@ FunctionDef Parser::parse_function_def(bool is_public)
     {
         advance();
         func.return_type += parse_type_bracket_suffix();
+    }
+    // def f(...) : ret = js { ... }: a function whose body is JavaScript (definitions.cc, js_definition)
+    if (current().type == TokenType::ASSIGN && peek().type == TokenType::JS_BODY)
+    {
+        advance();
+        func.is_js = true;
+        func.js_body = current().value;
+        advance();
+        if (current().type == TokenType::SEMICOLON) advance();
+        check_js_signature(func);
+        return func;
     }
     expect(TokenType::LBRACE, "Expected '{'");
 
