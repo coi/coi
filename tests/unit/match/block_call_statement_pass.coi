@@ -1,0 +1,27 @@
+// Test: a match used as a statement may end an arm block with a call that returns a value;
+// only yield makes a block arm a value
+pod Reply { int n; }
+
+component MatchBlockCall {
+    mut int seen = 0;
+
+    def keep(int n) : bool {
+        seen = n;
+        return n > 0;
+    }
+
+    mount {
+        match (Json.parse(Reply, "{\"n\":1}")) {
+            Success(Reply r, ReplyMeta m) => { seen = 2; keep(r.n); };
+            Error(string e) => {};
+        };
+    }
+
+    view {
+        <div>{seen}</div>
+    }
+}
+
+app {
+    root = MatchBlockCall;
+}

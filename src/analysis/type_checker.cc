@@ -39,6 +39,14 @@ bool is_compatible_type(const std::string &source, const std::string &target);
 std::string infer_expression_type(Expression *expr, const std::map<std::string, std::string> &scope);
 static bool literal_fits(Expression *expr, const std::string &target);
 
+// a match whose block arms don't yield is no value: say how it gets one
+static std::string yield_hint(Expression *init, const std::string &got)
+{
+    if (got == "void" && dynamic_cast<MatchExpr *>(init))
+        return ". A match gives a value through 'yield <expr>;' in its block arms";
+    return "";
+}
+
 // [v; n] outside a declaration takes the array type of the place it goes: a field, an argument,
 // a return, the left side of an assignment
 static void aim_repeat(Expression *expr, const std::string &target)
@@ -1443,15 +1451,11 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
         return result_type;
     }
 
-    // Block expression type inference
-    // Prefer explicit yield (parsed as ReturnStatement), then fallback to final expression statement.
+    // Block expression type inference: only a yield (parsed as ReturnStatement) gives a block a
+    // value. A last expression statement is just a statement, as in the generated code: a call
+    // that returns something there doesn't make the block a value
     if (auto block = dynamic_cast<BlockExpr *>(expr))
     {
-        if (block->statements.empty())
-        {
-            return "void";
-        }
-
         for (auto it = block->statements.rbegin(); it != block->statements.rend(); ++it)
         {
             if (auto* ret_stmt = dynamic_cast<ReturnStatement *>((*it).get()))
@@ -1463,14 +1467,7 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                 return "void";
             }
         }
-
-        auto* last_expr_stmt = dynamic_cast<ExpressionStatement *>(block->statements.back().get());
-        if (!last_expr_stmt || !last_expr_stmt->expression)
-        {
-            return "void";
-        }
-
-        return infer_expression_type(last_expr_stmt->expression.get(), scope);
+        return "void";
     }
 
     if (auto *cc = dynamic_cast<ComponentConstruction *>(expr))
@@ -2506,7 +2503,7 @@ static void check_function_body(const FunctionDef &method, const Component *comp
                 if (init != "unknown" && !is_compatible_type(init, type) && !literal_fits(decl->initializer.get(), type))
                 {
                     ErrorHandler::type_error(
-                        "Variable '" + decl->name + "' expects '" + type + "' but got '" + init + "'",
+                        "Variable '" + decl->name + "' expects '" + type + "' but got '" + init + "'" + yield_hint(decl->initializer.get(), init),
                         decl->line);
                     exit(1);
                 }
@@ -3549,7 +3546,7 @@ void validate_types(const std::vector<Component> &components,
                 if (init != "unknown" && !is_compatible_type(init, type) && !literal_fits(var->initializer.get(), type))
                 {
                     ErrorHandler::type_error(
-                        "Variable '" + var->name + "' expects '" + type + "' but initialized with '" + init + "'");
+                        "Variable '" + var->name + "' expects '" + type + "' but initialized with '" + init + "'" + yield_hint(var->initializer.get(), init));
                     exit(1);
                 }
             }

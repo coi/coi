@@ -1,0 +1,20 @@
+// Test: a match used as a value needs yield in its block arms; a last expression isn't a value
+component MatchBlockNoYield {
+    mut int n = 1;
+
+    def label() : string {
+        string s = match (n) {
+            1 => { "one"; };
+            else => { "other"; };
+        };
+        return s;
+    }
+
+    view {
+        <div>{label()}</div>
+    }
+}
+
+app {
+    root = MatchBlockNoYield;
+}
