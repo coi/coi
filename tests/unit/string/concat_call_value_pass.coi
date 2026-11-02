@@ -1,0 +1,24 @@
+// Test: a browser call with a joined string as its argument works where its value is used
+// (returned, kept in a variable) as well as on its own
+component ConcatCallValue {
+    mut string v = "";
+
+    def kept(string name) : string { return Storage.getItem("kept-" + name); }
+    def twice(string name) : string {
+        string a = Storage.getItem("a-" + name);
+        return a + kept(name);
+    }
+
+    mount {
+        Storage.setItem("kept-" + "x", "1");
+        v = twice("x");
+    }
+
+    view {
+        <div>{v}</div>
+    }
+}
+
+app {
+    root = ConcatCallValue;
+}

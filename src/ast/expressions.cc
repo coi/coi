@@ -748,7 +748,7 @@ std::string FunctionCall::to_webcc() {
             }
             call_suffix += ")";
 
-            return generate_formatter_block(parts, call_prefix, call_suffix);
+            return generate_formatter_call(parts, call_prefix, call_suffix);
         }
 
         std::string code = "webcc::" + map_ns + "::" + map_func + "(";

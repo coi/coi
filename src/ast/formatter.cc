@@ -47,6 +47,17 @@ std::string generate_formatter_expr(const std::vector<Expression*>& parts) {
     return code;
 }
 
+// the same as an expression: the call's result is the value, so it works as a statement, a
+// return value or an initializer alike (a void call returns void)
+std::string generate_formatter_call(const std::vector<Expression*>& parts,
+                                    const std::string& callback_prefix,
+                                    const std::string& callback_suffix) {
+    std::string code = "([&]() { webcc::hybrid_formatter<" + std::to_string(FORMATTER_BUFFER_SIZE) + "> _fmt; ";
+    code += generate_formatter_appends(parts);
+    code += "return " + callback_prefix + "_fmt.c_str()" + callback_suffix + "; }())";
+    return code;
+}
+
 std::string generate_formatter_block(const std::vector<std::string>& parts,
                                      const std::string& callback_prefix,
                                      const std::string& callback_suffix) {

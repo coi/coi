@@ -25,6 +25,11 @@ std::string generate_formatter_appends(const std::vector<Expression*>& parts);
 // Generate formatter code that returns a coi::string (expression context)
 std::string generate_formatter_expr(const std::vector<Expression*>& parts);
 
+// a call with the concatenation as its argument, as an expression
+std::string generate_formatter_call(const std::vector<Expression*>& parts,
+                                    const std::string& callback_prefix,
+                                    const std::string& callback_suffix = "");
+
 // Generate formatter code as a statement block that calls a function with c_str()
 std::string generate_formatter_block(const std::vector<std::string>& parts,
                                      const std::string& callback_prefix,
