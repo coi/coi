@@ -1,0 +1,30 @@
+// an element made in code goes into one from the view and stays there through re-renders of it;
+// detach takes it out again
+component App {
+    mut DOMElement holder;
+    mut Canvas[] made;
+    mut bool wide = false;
+    mut int renders = 0;
+    def add() : void {
+        mut Canvas c = Canvas.createCanvas(`made-${made.size()}`, 20.0, 10.0);
+        c.setStyle("display", "block");
+        holder.appendChild(c);
+        made.push(c);
+    }
+    def toggle() : void { wide = !wide; renders++; }
+    def take() : void {
+        if (made.isEmpty()) return;
+        made[0].detach();
+        made = made.slice(1, made.size());
+    }
+    view {
+        <div>
+            <button class="add" onclick={add}>add</button>
+            <button class="toggle" onclick={toggle}>toggle</button>
+            <button class="take" onclick={take}>take</button>
+            <div &={holder} class={wide ? "holder wide" : "holder"} style={`width:${wide ? 200 : 100}px`}></div>
+            <p class="renders">{renders}</p>
+        </div>
+    }
+}
+app { root = App; }

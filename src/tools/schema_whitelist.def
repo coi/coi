@@ -59,6 +59,10 @@ add_class
 remove_class
 get_attribute
 set_attribute
+# an element made in code (Canvas.createCanvas) put into one from the view, or taken out again:
+# the view leaves the children of an element it gave none alone
+append_child
+detach
 
 [canvas]
 create_canvas
