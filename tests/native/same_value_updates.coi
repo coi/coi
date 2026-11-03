@@ -1,0 +1,36 @@
+// a number, bool or string given the value it has changes nothing, and the next real change
+// still shows, in the same method or a later one
+module SameValueUpdates;
+
+component Panel {
+    mut int n = 3;
+    mut bool open = false;
+    mut string label = "a";
+    def same() : void { n = 3; open = false; label = "a"; }
+    def change() : void { n = 3; n = 4; label = "a"; label = "b"; open = true; }
+    def back() : void { n = 3; open = false; }
+    view {
+        <div>
+            <p class="n">{n}</p>
+            <p class="label">{label}</p>
+            <if open><p class="open">open</p></if>
+            <button class="same" onclick={same}>same</button>
+            <button class="change" onclick={change}>change</button>
+            <button class="back" onclick={back}>back</button>
+        </div>
+    }
+}
+
+test "the same value changes nothing, a new one shows" {
+    Mounted m = mount(Panel());
+    m.click(".same");
+    expect(m.text(".n") == "3");
+    expect(!m.has(".open"));
+    m.click(".change");
+    expect(m.text(".n") == "4");
+    expect(m.text(".label") == "b");
+    expect(m.has(".open"));
+    m.click(".back");
+    expect(m.text(".n") == "3");
+    expect(!m.has(".open"));
+}

@@ -846,14 +846,37 @@ void collect_mods_recursive(ASTNode *node, std::set<std::string> &mods)
     }
 }
 
+static bool plain_value(const std::string &type)
+{
+    static const std::set<std::string> plain = {"int", "int8", "int16", "int32", "int64", "uint8", "uint16", "uint32", "uint64",
+                                                "float", "float32", "float64", "bool", "string"};
+    return plain.count(type) > 0;
+}
+
 // a statement as code, marked dirty first when it may change a field the method's hook refreshes.
 // A compound statement answers for its own condition or range only, its body's statements mark
-// themselves; a foreach as a whole, as changing its items counts as changing what it walks
+// themselves; a foreach as a whole, as changing its items counts as changing what it walks.
+// A plain value (a number, a bool, a string) given to such a field marks it only if it differs
+// from what was there: resetting state that is reset already redraws nothing
 std::string tracked(Statement *s)
 {
     std::string code = s->to_webcc();
     if (g_dirty_fields.empty())
         return code;
+    if (auto *a = dynamic_cast<Assignment *>(s);
+        a && g_dirty_fields.count(a->name) && !g_ref_props.count(a->name) && plain_value(a->target_type))
+    {
+        std::set<std::string> by_value;
+        collect_mods_recursive(a->value.get(), by_value);
+        bool more = false;
+        for (const auto &m : by_value)
+            if (g_dirty_fields.count(m)) { more = true; break; }
+        if (!more)
+        {
+            std::string f = cpp_name(a->name);
+            return "{ auto _coi_was = " + f + "; " + code + " if (!(" + f + " == _coi_was)) _coi_dirty = true; }";
+        }
+    }
     std::set<std::string> mods;
     if (auto i = dynamic_cast<IfStatement *>(s))
         collect_mods_recursive(i->condition.get(), mods);
