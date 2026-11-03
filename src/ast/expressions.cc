@@ -1387,7 +1387,7 @@ void LambdaExpr::collect_member_dependencies(std::set<MemberDependency>& member_
 std::string BlockExpr::to_webcc() {
     std::string code = "([&]() {\n";
     for (const auto& stmt : statements) {
-        code += "            " + stmt->to_webcc() + "\n";
+        code += "            " + tracked(stmt.get()) + "\n";
     }
     code += "        }())";
     return code;

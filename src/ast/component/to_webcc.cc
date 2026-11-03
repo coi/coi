@@ -1771,6 +1771,7 @@ std::string Component::to_webcc(CompilerSession &session)
         method.collect_modifications(modified_vars);
 
         std::string updates;
+        std::set<std::string> refreshed; // the fields the updates below are for
         bool is_init_method = (method.name == "init");
         // the <if>s of everything the method changed first: a branch going away is gone before
         // the bindings in it are redone, so a text that only makes sense while its branch shows
@@ -1780,6 +1781,7 @@ std::string Component::to_webcc(CompilerSession &session)
         {
             if (var_to_if_ids.count(mod) && !is_init_method)
             {
+                refreshed.insert(mod);
                 for (int if_id : var_to_if_ids[mod])
                 {
                     if (synced_ifs.insert(if_id).second)
@@ -1791,10 +1793,12 @@ std::string Component::to_webcc(CompilerSession &session)
         {
             if (generated_updaters.count(mod) && !is_init_method)
             {
+                refreshed.insert(mod);
                 updates += "        _update_" + mod + "();\n";
             }
             if (child_updates.count(mod) && !is_init_method)
             {
+                refreshed.insert(mod);
                 for (const auto &call : child_updates[mod])
                 {
                     updates += call;
@@ -1807,6 +1811,7 @@ std::string Component::to_webcc(CompilerSession &session)
                 if (g_component_array_loops.find(mod) == g_component_array_loops.end() &&
                     g_array_loops.find(mod) == g_array_loops.end())
                 {
+                    refreshed.insert(mod);
                     for (int loop_id : var_to_loop_ids[mod])
                     {
                         updates += "        _sync_loop_" + std::to_string(loop_id) + "();\n";
@@ -1819,6 +1824,7 @@ std::string Component::to_webcc(CompilerSession &session)
         {
             if (g_ref_props.count(mod))
             {
+                refreshed.insert(mod);
                 std::string callback_name = make_callback_name(mod);
                 updates += "        if(" + callback_name + ") " + callback_name + "();\n";
             }
@@ -1841,7 +1847,9 @@ std::string Component::to_webcc(CompilerSession &session)
         {
             method.name = "_user_unmount";
         }
+        g_dirty_fields = updates.empty() ? std::set<std::string>{} : refreshed;
         ss << "    " << method.to_webcc(updates);
+        g_dirty_fields.clear();
         if (original_name == "tick" || original_name == "init" || original_name == "mount" || original_name == "unmount")
         {
             method.name = original_name;

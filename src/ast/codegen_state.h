@@ -11,6 +11,12 @@
 
 extern std::set<std::string> g_ref_props;
 
+// a method with an update hook (FunctionDef::to_webcc): the fields the hook refreshes. A statement
+// that may change one of them sets _coi_dirty first (tracked()), so the hook runs when the method
+// changed something, not on every return, early ones included
+extern std::set<std::string> g_dirty_fields;
+std::string tracked(Statement *s);
+
 // state a child made in the view was handed by reference (<Counter &n={count} />): the
 // component defines _ref_written_<name>, which the child's change callback calls, once the
 // whole view is known (bindings after the child count too)

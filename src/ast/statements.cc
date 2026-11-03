@@ -588,7 +588,7 @@ std::string BlockStatement::to_webcc()
 {
     std::string code = "{\n";
     for (auto &stmt : statements)
-        code += stmt->to_webcc();
+        code += tracked(stmt.get());
     code += "}\n";
     return code;
 }
@@ -603,11 +603,11 @@ std::string IfStatement::to_webcc()
 {
     std::string cond = strip_outer_parens(condition->to_webcc());
     std::string code = "if(" + cond + ") ";
-    code += then_branch->to_webcc();
+    code += tracked(then_branch.get());
     if (else_branch)
     {
         code += " else ";
-        code += else_branch->to_webcc();
+        code += tracked(else_branch.get());
     }
     return code;
 }
@@ -622,7 +622,7 @@ void IfStatement::collect_dependencies(std::set<std::string> &deps)
 
 std::string WhileStatement::to_webcc()
 {
-    return "while(" + strip_outer_parens(condition->to_webcc()) + ") " + body->to_webcc();
+    return "while(" + strip_outer_parens(condition->to_webcc()) + ") " + tracked(body.get());
 }
 
 void WhileStatement::collect_dependencies(std::set<std::string> &deps)
@@ -636,7 +636,7 @@ std::string ForRangeStatement::to_webcc()
     std::string code = "for(int " + cpp_name(var_name) + " = " + start->to_webcc() + "; ";
     code += "(" + cpp_name(var_name) + " < " + end->to_webcc() + "); ";
     code += cpp_name(var_name) + "++) ";
-    code += body->to_webcc();
+    code += tracked(body.get());
     return code;
 }
 
@@ -654,7 +654,7 @@ std::string ForEachStatement::to_webcc()
     if (auto *lit = dynamic_cast<ArrayLiteral *>(iterable.get()); lit && !lit->element_type.empty())
         over = convert_type(lit->element_type + "[]") + over;
     std::string code = "for(auto& " + cpp_name(var_name) + " : " + over + ") ";
-    code += body->to_webcc();
+    code += tracked(body.get());
     return code;
 }
 
@@ -844,4 +844,35 @@ void collect_mods_recursive(ASTNode *node, std::set<std::string> &mods)
             }
         }
     }
+}
+
+// a statement as code, marked dirty first when it may change a field the method's hook refreshes.
+// A compound statement answers for its own condition or range only, its body's statements mark
+// themselves; a foreach as a whole, as changing its items counts as changing what it walks
+std::string tracked(Statement *s)
+{
+    std::string code = s->to_webcc();
+    if (g_dirty_fields.empty())
+        return code;
+    std::set<std::string> mods;
+    if (auto i = dynamic_cast<IfStatement *>(s))
+        collect_mods_recursive(i->condition.get(), mods);
+    else if (auto w = dynamic_cast<WhileStatement *>(s))
+        collect_mods_recursive(w->condition.get(), mods);
+    else if (auto f = dynamic_cast<ForRangeStatement *>(s))
+    {
+        collect_mods_recursive(f->start.get(), mods);
+        collect_mods_recursive(f->end.get(), mods);
+    }
+    else if (!dynamic_cast<BlockStatement *>(s))
+        collect_mods_recursive(s, mods);
+    bool hit = false;
+    for (const auto &m : mods)
+        if (g_dirty_fields.count(m)) { hit = true; break; }
+    if (!hit)
+        return code;
+    // a declaration keeps its scope; anything else may be an if's only statement
+    if (dynamic_cast<VarDeclaration *>(s))
+        return "_coi_dirty = true; " + code;
+    return "{ _coi_dirty = true; " + code + " }";
 }

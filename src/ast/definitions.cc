@@ -60,12 +60,18 @@ std::string FunctionDef::to_webcc(const std::string& injected_code) {
     for (auto& n : own) if (g_ref_props.erase(n)) hidden.insert(n);
 
     std::string result = function_signature(*this, cpp_name(name)) + " {\n";
-    // the updates run when the method leaves, early returns included
+    // the updates run when the method leaves, early returns included, if it changed what they
+    // refresh (g_dirty_fields: its statements that may change one say so in _coi_dirty)
     if(!injected_code.empty()) {
-        result += "    auto _coi_after = coi::on_exit([&]() {\n" + injected_code + "    });\n";
+        if (!g_dirty_fields.empty()) {
+            result += "    bool _coi_dirty = false;\n";
+            result += "    auto _coi_after = coi::on_exit([&]() {\n        if (!_coi_dirty) return;\n" + injected_code + "    });\n";
+        } else {
+            result += "    auto _coi_after = coi::on_exit([&]() {\n" + injected_code + "    });\n";
+        }
     }
     for(auto& stmt : body){
-        result += "    " + stmt->to_webcc() + "\n";
+        result += "    " + tracked(stmt.get()) + "\n";
     }
     result += "}\n";
 

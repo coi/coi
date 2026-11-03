@@ -1,0 +1,139 @@
+// a method's updates run only when it changed what they refresh: an early return before any change
+// leaves the view as it was, and a change from anywhere in the method still shows, in a branch, a
+// loop, a foreach's item, a match arm, or a declaration that hands a list to a function changing it
+module DirtyUpdates;
+
+pod Task { string name; bool done; }
+
+// the last of a list, taken off it
+def takeLast(mut int[]& list) : int {
+    int v = list[list.size() - 1];
+    list.pop();
+    return v;
+}
+
+component Board {
+    mut int n = 0;
+    mut string word = "";
+    mut int[] ids = [1, 2, 3];
+    mut Task[] tasks = [Task{name = "a", done = false}, Task{name = "b", done = false}];
+
+    def nothing(bool go) : void {
+        if (!go) return;
+        n = 100;
+    }
+    def nested(int k) : void {
+        if (k > 0) {
+            if (k > 5) n = k * 2;
+            else n = k;
+        } else {
+            word = "low";
+        }
+    }
+    def looped() : void {
+        mut int i = 0;
+        while (i < 3) { i++; }
+        for j in 0:2 { if (j == 1) n = n + 10; }
+    }
+    def doneAll() : void {
+        for t in tasks { t.done = true; }
+    }
+    def popped() : void {
+        int last = takeLast(&ids);
+        word = `${last}`;
+    }
+    def parsed(string json) : void {
+        match (Json.parse(Task, json)) {
+            Success(Task t, TaskMeta m) => { tasks.push(t); };
+            Error(string e) => { word = "bad"; };
+        };
+    }
+    def early(int k) : void {
+        if (k == 0) return;
+        ids.push(k);
+        if (k > 1) return;
+        n = n + 1;
+    }
+
+    view {
+        <div>
+            <p class="n">{n}</p>
+            <p class="word">{word}</p>
+            <p class="ids">{ids.size()}</p>
+            <p class="done">{tasks.count(t => t.done)} of {tasks.size()}</p>
+            <for i in 0:ids.size()><b class="id">{ids[i]}</b></for>
+            <button class="none" onclick={nothing(false)}>none</button>
+            <button class="some" onclick={nothing(true)}>some</button>
+            <button class="hi" onclick={nested(7)}>hi</button>
+            <button class="mid" onclick={nested(3)}>mid</button>
+            <button class="lo" onclick={nested(0)}>lo</button>
+            <button class="loop" onclick={looped}>loop</button>
+            <button class="all" onclick={doneAll}>all</button>
+            <button class="pop" onclick={popped}>pop</button>
+            <button class="ok" onclick={parsed(`{"name":"c","done":true}`)}>ok</button>
+            <button class="bad" onclick={parsed("nope")}>bad</button>
+            <button class="e0" onclick={early(0)}>e0</button>
+            <button class="e1" onclick={early(1)}>e1</button>
+            <button class="e2" onclick={early(2)}>e2</button>
+        </div>
+    }
+}
+
+test "an early return before any change leaves the view, a change after it shows" {
+    Mounted m = mount(Board());
+    m.click(".none");
+    expect(m.text(".n") == "0");
+    m.click(".some");
+    expect(m.text(".n") == "100");
+}
+
+test "a change in a nested branch shows, the else branch's too" {
+    Mounted m = mount(Board());
+    m.click(".hi");
+    expect(m.text(".n") == "14");
+    m.click(".mid");
+    expect(m.text(".n") == "3");
+    m.click(".lo");
+    expect(m.text(".word") == "low");
+}
+
+test "a change inside loops shows" {
+    Mounted m = mount(Board());
+    m.click(".loop");
+    expect(m.text(".n") == "10");
+}
+
+test "a foreach changing its items counts as changing the list" {
+    Mounted m = mount(Board());
+    m.click(".all");
+    expect(m.text(".done") == "2 of 2");
+}
+
+test "a declaration that hands a list to a function changing it updates the list's views" {
+    Mounted m = mount(Board());
+    m.click(".pop");
+    expect(m.text(".word") == "3");
+    expect(m.text(".ids") == "2");
+    expect(m.count(".id") == 2);
+}
+
+test "a change in a match arm shows" {
+    Mounted m = mount(Board());
+    m.click(".ok");
+    expect(m.text(".done") == "1 of 3");
+    m.click(".bad");
+    expect(m.text(".word") == "bad");
+}
+
+test "a change before a later early return still shows" {
+    Mounted m = mount(Board());
+    m.click(".e0");
+    expect(m.text(".ids") == "3");
+    m.click(".e2");
+    expect(m.text(".ids") == "4");
+    expect(m.count(".id") == 4);
+    expect(m.text(".n") == "0");
+    m.click(".e1");
+    expect(m.text(".ids") == "5");
+    expect(m.text(".n") == "1");
+}
