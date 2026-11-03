@@ -1049,7 +1049,9 @@ void HTMLElement::collect_dependencies(std::set<std::string> &deps)
 {
     for (auto &attr : attributes)
     {
-        if (attr.value)
+        // an event handler isn't shown: it runs when the event comes, reading what it needs then
+        // (its arguments too), so what it reads doesn't redraw the element or the loop it's in
+        if (attr.value && attr.name.rfind("on", 0) != 0)
             attr.value->collect_dependencies(deps);
     }
     for (auto &child : children)

@@ -1,0 +1,29 @@
+// an event handler's reads aren't what its element shows: a field only a handler reads can change
+// without redrawing the list it's in, and the handler, run when the event comes, sees it as it is then
+module HandlerReads;
+
+component Rows {
+    mut int[] items = [1, 2, 3];
+    mut int factor = 10;       // read only by the handler
+    mut int last = 0;
+    def pick(int i) : void { last = items[i] * factor; }
+    def bump() : void { factor = factor + 5; }
+    view {
+        <div>
+            <for i in 0:items.size()><button class="row" onclick={pick(i)}>{items[i]}</button></for>
+            <button class="bump" onclick={bump}>bump</button>
+            <p class="last">{last}</p>
+        </div>
+    }
+}
+
+test "a handler reads its fields when it runs" {
+    Mounted m = mount(Rows());
+    m.click(".row:nth-child(2)");
+    expect(m.text(".last") == "20");
+    m.click(".bump");
+    m.click(".row:nth-child(2)");
+    expect(m.text(".last") == "30");
+    m.click(".row:nth-child(3)");
+    expect(m.text(".last") == "45");
+}
