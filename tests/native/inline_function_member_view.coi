@@ -1,0 +1,26 @@
+// an inline function in a view reading its item's members (t => t.done) depends on the list, not
+// on a member of something named t, and follows the list as it changes
+module InlineFunctionMemberView;
+
+pod Task { string name; bool done; }
+
+component Tasks {
+    mut Task[] tasks = [Task{name = "a", done = false}, Task{name = "b", done = true}];
+    def finish() : void { tasks[0].done = true; }
+    view {
+        <div>
+            <p class="done">{tasks.count(t => t.done)}</p>
+            <p class="any">{tasks.any(t => t.name == "a" && t.done) ? "yes" : "no"}</p>
+            <button onclick={finish}>finish</button>
+        </div>
+    }
+}
+
+test "reads its items' members and follows the list" {
+    Mounted m = mount(Tasks());
+    expect(m.text(".done") == "1");
+    expect(m.text(".any") == "no");
+    m.click("button");
+    expect(m.text(".done") == "2");
+    expect(m.text(".any") == "yes");
+}

@@ -1376,6 +1376,14 @@ void LambdaExpr::collect_dependencies(std::set<std::string>& deps) {
     deps.insert(inner.begin(), inner.end());
 }
 
+// t => t.done reads the item's done, not a member of something named t
+void LambdaExpr::collect_member_dependencies(std::set<MemberDependency>& member_deps) {
+    std::set<MemberDependency> inner;
+    body->collect_member_dependencies(inner);
+    for (const auto& d : inner)
+        if (d.object != param) member_deps.insert(d);
+}
+
 std::string BlockExpr::to_webcc() {
     std::string code = "([&]() {\n";
     for (const auto& stmt : statements) {

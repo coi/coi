@@ -331,6 +331,7 @@ struct LambdaExpr : Expression {
 
     std::string to_webcc() override;
     void collect_dependencies(std::set<std::string>& deps) override;
+    void collect_member_dependencies(std::set<MemberDependency>& member_deps) override;
     bool is_static() override { return false; }
     std::vector<Expression*> get_children() override { return {body.get()}; }
 };
