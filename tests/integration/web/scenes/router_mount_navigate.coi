@@ -1,0 +1,25 @@
+// a route whose mount navigates on (a page that only passes visitors along): the next route
+// shows in the same pass, though the app has no tick and nothing else happens after the click
+component Front {
+    def enter() : void { System.navigate("/gate"); }
+    view { <div class="front"><button class="enter" onclick={enter}>enter</button></div> }
+}
+
+component Gate {
+    mount { System.navigate("/inside"); }
+    view { <div class="gate">gate</div> }
+}
+
+component Inside {
+    view { <div class="inside">inside</div> }
+}
+
+component Site {
+    router {
+        "/" => Front;
+        "/gate" => Gate;
+        "/inside" => Inside;
+    }
+    view { <div class="site"><route /></div> }
+}
+app { root = Site; }

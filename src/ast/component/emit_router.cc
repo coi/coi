@@ -35,10 +35,14 @@ void emit_component_router_methods(std::stringstream &ss, const Component &compo
     // _apply_route() - performs a pending route swap. Called from
     // update_wrapper after all events/ticks have been dispatched, so no
     // route component method is on the stack when components are destroyed.
+    // The new route's mount may move on again (a login page sending a signed-in visitor on):
+    // that goes in the same pass, or an app without a tick would wait for the next event.
+    // A few hops at most, so two pages sending each other back and forth can't hang the page
     ss << "    void _apply_route() {\n";
-    ss << "        if (!_route_dirty) return;\n";
-    ss << "        _route_dirty = false;\n";
-    ss << "        _sync_route();\n";
+    ss << "        for (int hop = 0; hop < 8 && _route_dirty; ++hop) {\n";
+    ss << "            _route_dirty = false;\n";
+    ss << "            _sync_route();\n";
+    ss << "        }\n";
     ss << "    }\n";
 
     // _sync_route() method - creates the matching component, after destroying the one shown.
