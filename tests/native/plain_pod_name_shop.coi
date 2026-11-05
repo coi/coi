@@ -1,0 +1,17 @@
+// a module with a public pod named like one in a file outside any module (plain_pod_name.coi)
+module Shop;
+
+pub pod Held { string token; bool acknowledged; }
+
+pub def firstToken(string json) : string {
+    mut string t = "";
+    match (Json.parse(Held, json)) {
+        Success(Held h, HeldMeta m) => { t = h.token; };
+        Error(string e) => {};
+    };
+    return t;
+}
+
+test "the module's own pod" {
+    expect(firstToken(`{"token":"z","acknowledged":true}`) == "z");
+}

@@ -3262,7 +3262,13 @@ void register_types(const std::vector<Component> &components,
         }
     }
 
-    // Add global data types and fields
+    // Add global data types and fields. The bare name is the pod outside every module when there
+    // is one: code outside the modules means that one, and a module's pod of the same name is
+    // still its module's own (Module_Name, pod_key)
+    std::set<std::string> plain;
+    for (const auto &d : global_data)
+        if (d->module_name.empty())
+            plain.insert(d->name);
     for (const auto &d : global_data)
     {
         std::set<std::string> fields;
@@ -3272,8 +3278,12 @@ void register_types(const std::vector<Component> &components,
             fields.insert(f.name);
             field_types[f.name] = f.type;
         }
-                g_data_type_fields[d->name] = fields;
-        g_data_type_field_types[d->name] = field_types;
+        bool bare = d->module_name.empty() || !plain.count(d->name);
+        if (bare)
+        {
+            g_data_type_fields[d->name] = fields;
+            g_data_type_field_types[d->name] = field_types;
+        }
         g_pod_modules[d->name].insert(d->module_name);
         if (!d->module_name.empty())
         {
@@ -3285,7 +3295,8 @@ void register_types(const std::vector<Component> &components,
             std::set<std::string> alts;
             for (const auto &alt : d->alts)
                 alts.insert(alt.name);
-            g_union_alts[d->name] = alts;
+            if (bare)
+                g_union_alts[d->name] = alts;
             if (!d->module_name.empty())
                 g_union_alts[d->module_name + "_" + d->name] = alts;
         }
@@ -4452,31 +4463,34 @@ void validate_type_imports(const std::vector<Component> &components,
 {
     if (file_imports.empty()) return;  // No import tracking, skip validation
     
-    // Build maps from type name to source file
-    std::map<std::string, std::string> data_source_files;  // type name -> source file
-    std::map<std::string, std::string> enum_source_files;  // enum name -> source file
+    // Build maps from type name to the files that define one by that name: two modules, or a
+    // module and a file outside any, may each have their own
+    std::map<std::string, std::vector<std::string>> data_source_files;  // type name -> source files
+    std::map<std::string, std::vector<std::string>> enum_source_files;  // enum name -> source files
     
     for (const auto &d : global_data)
     {
-        data_source_files[d->name] = d->source_file;
+        data_source_files[d->name].push_back(d->source_file);
     }
     for (const auto &e : global_enums)
     {
-        enum_source_files[e->name] = e->source_file;
+        enum_source_files[e->name].push_back(e->source_file);
     }
     
-    // Helper to check if a type is accessible from a given source file
+    // Helper to check if a type is accessible from a given source file: one of the types by that
+    // name is in the file or in one it imports
     auto is_type_accessible = [&](const std::string& type_name, const std::string& user_file,
-                                  const std::string& type_source_file) -> bool {
-        // Same file - always accessible
-        if (user_file == type_source_file) return true;
-        // platform enums have no source file
-        if (type_source_file.empty()) return true;
-        
-        // Directly imported
+                                  const std::vector<std::string>& type_source_files) -> bool {
         auto it = file_imports.find(user_file);
-        if (it != file_imports.end() && it->second.count(type_source_file) > 0) return true;
-        
+        for (const auto &type_source_file : type_source_files)
+        {
+            // Same file - always accessible
+            if (user_file == type_source_file) return true;
+            // platform enums have no source file
+            if (type_source_file.empty()) return true;
+            // Directly imported
+            if (it != file_imports.end() && it->second.count(type_source_file) > 0) return true;
+        }
         return false;
     };
     

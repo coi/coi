@@ -1,0 +1,21 @@
+// a file outside any module has its own pod, named like a public one in a module it imports: the
+// bare name is its own, the module's is Shop::Held
+import "plain_pod_name_shop.coi";
+
+pod Held { string who; int at; }
+
+component Holder {
+    mut Held[int] held;
+    mount { held[1] = Held{who = "a", at = 2}; }
+    view { <p>{held[1].who}{held[1].at}</p> }
+}
+
+test "the file's own pod, while an imported module has a public one of that name" {
+    Held h = Held{who = "a", at = 2};
+    expect(h.who == "a" && h.at == 2);
+    Shop::Held s = Shop::Held{token = "x", acknowledged = true};
+    expect(s.token == "x" && s.acknowledged);
+    expect(Shop::firstToken(`{"token":"y","acknowledged":false}`) == "y");
+    Mounted m = mount(Holder());
+    expect(m.text("p") == "a2");
+}
