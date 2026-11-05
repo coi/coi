@@ -1,0 +1,25 @@
+// redirect("/app"): the route changes like navigate, but the history entry is replaced, so back
+// from /app goes to the page before /gate, never to /gate again
+component Front {
+    def enter() : void { System.navigate("/gate"); }
+    view { <div class="front"><button class="enter" onclick={enter}>enter</button></div> }
+}
+
+component Gate {
+    mount { System.redirect("/app"); }
+    view { <div class="gate">gate</div> }
+}
+
+component Inside {
+    view { <div class="inside">inside</div> }
+}
+
+component Site {
+    router {
+        "/" => Front;
+        "/gate" => Gate;
+        "/app" => Inside;
+    }
+    view { <div class="site"><route /></div> }
+}
+app { root = Site; }

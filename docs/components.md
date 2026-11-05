@@ -554,6 +554,16 @@ component NavBar {
 }
 ```
 
+`System.redirect(path)` goes there too, but in place of the current history entry, so back skips the page that sent the visitor on. Use it for a page that only passes people along, like a login screen sending someone who is already signed in to where they were going:
+
+```tsx
+component Login {
+    mount {
+        if (Account::signedIn()) System.redirect("/app");   // back from /app won't land here again
+    }
+}
+```
+
 ### One component for many URLs
 
 Usually every screen is its own route component, and the router mounts and unmounts them. Sometimes one component must stay mounted while the URL changes under it, because it holds what the screens share: an editor with its open document and undo history, an app with a storage connection and a sidebar. A trailing `/*` gives such a component every path under a prefix, and it picks the screen from the path itself:
@@ -587,6 +597,7 @@ A route without parameters keeps its component whenever the same route matches a
 - Use `else => Component;` as a catch-all for unmatched routes (404 page)
 - The `<route />` element renders the component matching the current URL
 - `System.navigate(path)` changes the URL and updates the view. The path may carry a query or a hash (`"/shop?plan=year"`): the route is matched on the path alone, and the URL keeps the rest for the page to read (`System.getSearch()`, `System.getHash()`)
+- `System.redirect(path)` does the same in place of the current history entry: back skips the page it left
 - The router reads the initial URL on page load, so direct links work (e.g., `/dashboard`)
 - Browser back/forward buttons work automatically via the History API
 
@@ -598,6 +609,7 @@ A route without parameters keeps its component whenever the same route matches a
 | Default route | `else => NotFound;` | Catch-all for unmatched paths |
 | Render route | `<route />` | Placeholder for current route's component |
 | Navigate | `System.navigate("/path")` | Programmatically change route |
+| Redirect | `System.redirect("/path")` | Change route in place of the current history entry |
 | With props | `"/" => Page(&callback);` | Pass props to route component |
 | Dynamic param | `"/users/:id" => User;` | Capture a URL segment into `User`'s same-named param |
 | Rest | `"/app/*" => App;` | `/app` and everything under it, one component that stays mounted; `System.onPopstate(&h)` tells it about back/forward |

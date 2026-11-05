@@ -229,6 +229,8 @@ request_frame
 @intrinsic("is_prerender") shared def isPrerender(): bool
 // Router navigation (compiler intrinsics)
 @intrinsic("navigate") shared def navigate(string route): void
+// as navigate, but in place of the current history entry: back skips the page that sent you on
+@intrinsic("redirect") shared def redirect(string route): void
 @intrinsic("get_route") shared def getRoute(): string
 
 [webgl]

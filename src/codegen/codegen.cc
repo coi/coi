@@ -222,6 +222,7 @@ static void coi_test_unmount() {
 static void emit_test_main(std::ostream &out, const std::vector<std::unique_ptr<FunctionDef>> &functions, const FeatureFlags &features)
 {
     out << "void g_app_navigate(const coi::string& route) {}\n";
+    out << "void g_app_redirect(const coi::string& route) {}\n";
     out << "coi::string g_app_get_route() { return \"\"; }\n\n";
     emit_dispatch_events(out, features);
     out << "int main() {\n";
@@ -1060,6 +1061,7 @@ template<typename V, typename F> inline void coi_sort_by(V& v, F key, bool desc)
 
     // Forward declare global navigation functions (defined after components)
     out << "void g_app_navigate(const coi::string& route);\n";
+    out << "void g_app_redirect(const coi::string& route);\n";
     out << "coi::string g_app_get_route();\n\n";
 
     // Top-level functions are generated with no component active
@@ -1148,12 +1150,14 @@ template<typename V, typename F> inline void coi_sort_by(V& v, F key, bool desc)
     {
         // at build time a page is the page at its path: a redirect in a mount (to a login, say) waits for the browser
         out << "void g_app_navigate(const coi::string& route) { if (app && !webcc::system::is_prerender()) app->navigate(route); }\n";
+        out << "void g_app_redirect(const coi::string& route) { if (app && !webcc::system::is_prerender()) app->redirect(route); }\n";
         out << "coi::string g_app_get_route() { return app ? app->_current_route : \"\"; }\n";
     }
     else
     {
         // Stub functions if no router - prevents linker errors
         out << "void g_app_navigate(const coi::string& route) {}\n";
+        out << "void g_app_redirect(const coi::string& route) {}\n";
         out << "coi::string g_app_get_route() { return \"\"; }\n";
     }
 

@@ -24,6 +24,16 @@ void emit_component_router_methods(std::stringstream &ss, const Component &compo
     ss << "        _route_dirty = true;\n";
     ss << "    }\n";
 
+    // redirect() - as navigate(), but the URL takes the current history entry's place instead of
+    // adding one: back skips the page that moved on (a login screen sending a signed-in visitor on)
+    ss << "    void redirect(const coi::string& route) {\n";
+    ss << "        webcc::system::replace_state(route);\n";
+    ss << "        if (_current_route == __coi_route::path(route)) return;\n";
+    ss << "        _current_route = __coi_route::path(route);\n";
+    ss << "        webcc::dom::scroll_to_top();\n";
+    ss << "        _route_dirty = true;\n";
+    ss << "    }\n";
+
     // _handle_popstate() method - called when browser back/forward buttons are clicked
     ss << "    void _handle_popstate(const coi::string& path) {\n";
     ss << "        if (_current_route == __coi_route::path(path)) return;\n";

@@ -92,6 +92,9 @@ static std::string generate_intrinsic(const std::string& intrinsic_name,
     if (intrinsic_name == "navigate" && args.size() == 1) {
         return "g_app_navigate(" + args[0].value->to_webcc() + ")";
     }
+    if (intrinsic_name == "redirect" && args.size() == 1) {
+        return "g_app_redirect(" + args[0].value->to_webcc() + ")";
+    }
     if (intrinsic_name == "get_route" && args.empty()) {
         return "g_app_get_route()";
     }
