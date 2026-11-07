@@ -2,6 +2,7 @@
 
 #include "../cli/log.h"
 #include "def_parser.h"
+#include <algorithm>
 #include <cctype>
 #include "../cli/error.h"
 #include <cstdint>
@@ -549,14 +550,19 @@ std::optional<TypeDef> DefParser::parse_type()
     {
         advance(); // skip '<'
         advance(); // skip first type parameter
+        int params = 1;
         // Handle multiple type parameters separated by commas
         while (current_.type == Token::Comma)
         {
             advance(); // skip ','
             advance(); // skip next type parameter
+            params++;
         }
         if (current_.type == Token::Greater)
             advance();
+        // T[N] has methods of its own (fill, no push), kept apart from T[]'s, see array_def
+        if (type_def.name == "array" && params == 2)
+            type_def.name = "fixed_array";
     }
 
     // Check for 'extends'
@@ -1320,6 +1326,19 @@ std::string DefSchema::webcc_cast_type(const std::string &type_name) const
     if (!it->second.enum_cpp.empty())
         return it->second.enum_cpp;
     return it->second.flags_cpp;
+}
+
+std::string DefSchema::array_def(const std::string &type)
+{
+    if (type.empty() || type.back() != ']')
+        return "";
+    size_t open = type.rfind('[');
+    if (open == std::string::npos)
+        return "";
+    std::string size = type.substr(open + 1, type.size() - open - 2);
+    if (size.empty())
+        return "array";
+    return std::all_of(size.begin(), size.end(), ::isdigit) ? "fixed_array" : "array";
 }
 
 std::string DefSchema::resolve_alias(const std::string &type_name) const

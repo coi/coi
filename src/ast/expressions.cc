@@ -494,7 +494,7 @@ static std::string wrap_with_callbacks(const std::string& call, const MethodDef&
 // field path): the compiler's own if some def type has it, the user's otherwise
 static bool def_method_named(const std::string& method) {
     const auto& defs = DefSchema::instance();
-    return defs.lookup_method("string", method) || defs.lookup_method("array", method) || defs.lookup_method("Meta", method) ||
+    return defs.lookup_method("string", method) || defs.lookup_method("array", method) || defs.lookup_method("fixed_array", method) || defs.lookup_method("Meta", method) ||
            defs.lookup_func(DefSchema::to_snake_case(method));
 }
 
@@ -607,7 +607,12 @@ std::string FunctionCall::to_webcc() {
                 }
 
             // Check array methods (an inline function argument picks the ...Where form)
-            if (auto* method_def = DefSchema::instance().lookup_method("array", predicate_method(method, args), args.size())) {
+            // receiver type unknown: T[]'s methods, then T[N]'s (fill)
+            std::string arr = DefSchema::array_def(receiver_type);
+            const auto* method_def = DefSchema::instance().lookup_method(arr.empty() ? "array" : arr, predicate_method(method, args), args.size());
+            if (!method_def && arr.empty())
+                method_def = DefSchema::instance().lookup_method("fixed_array", method, args.size());
+            if (method_def) {
                 if (method_def->mapping_type == MappingType::Inline) {
                     return expand_inline_template(method_def->mapping_value, resolved_receiver, args);
                 }
@@ -1424,7 +1429,7 @@ static std::string untyped_result(Expression* e) {
         // xs.size() with xs a field of the component: the field's type owns the method
         std::string field = call->receiver_type.empty() ? ComponentTypeContext::instance().get_symbol_type(owner) : call->receiver_type;
         if (!field.empty() && field != "unknown")
-            owner = field.back() == ']' ? "array" : DefSchema::instance().resolve_alias(field);
+            owner = field.back() == ']' ? DefSchema::array_def(field) : DefSchema::instance().resolve_alias(field);
         const auto* m = DefSchema::instance().lookup_method(owner, method, call->args.size());
         if (!m) m = DefSchema::instance().lookup_method(owner, method);
         if (!m) return "";
@@ -1435,10 +1440,11 @@ static std::string untyped_result(Expression* e) {
         std::string t = mc->receiver_type == "unknown" ? "" : mc->receiver_type;
         if (t.empty()) t = untyped_result(mc->receiver.get());
         const auto* m = DefSchema::instance().lookup_method("", "", 0);
-        if (!t.empty()) m = DefSchema::instance().lookup_method(t.back() == ']' ? "array" : DefSchema::instance().resolve_alias(t), mc->method, mc->args.size());
+        if (!t.empty()) m = DefSchema::instance().lookup_method(t.back() == ']' ? DefSchema::array_def(t) : DefSchema::instance().resolve_alias(t), mc->method, mc->args.size());
         else {
             m = DefSchema::instance().lookup_method("string", mc->method, mc->args.size());
             if (!m) m = DefSchema::instance().lookup_method("array", mc->method, mc->args.size());
+            if (!m) m = DefSchema::instance().lookup_method("fixed_array", mc->method, mc->args.size());
         }
         if (!m) return "";
         // an array's element type in its return (T, T[]) isn't known here
@@ -1452,16 +1458,17 @@ std::string MethodCall::to_webcc() {
     std::string type = receiver_type == "unknown" ? "" : receiver_type;
     // System.getDateNow().toInt64() or xs.size().toInt64() in a view: the checker didn't type it, the defs say
     if (type.empty()) type = untyped_result(receiver.get());
-    std::string def_type = !type.empty() && type.back() == ']' ? "array" : DefSchema::instance().resolve_alias(type);
+    std::string def_type = !type.empty() && type.back() == ']' ? DefSchema::array_def(type) : DefSchema::instance().resolve_alias(type);
     std::string recv = typed_literal(receiver.get());
     if (dynamic_cast<StringLiteral*>(receiver.get()) && receiver->is_static())
         recv = "coi::string(" + recv + ")";
     bool inline_fn = has_inline_function(args);
     std::string want = predicate_method(method, args);
-    const auto* m = DefSchema::instance().lookup_method(inline_fn ? "array" : def_type, want, args.size());
+    const auto* m = DefSchema::instance().lookup_method(inline_fn && def_type.empty() ? "array" : def_type, want, args.size());
     if (!m && (type.empty() || type == "unknown")) {
         if (!inline_fn) m = DefSchema::instance().lookup_method("string", method, args.size());
         if (!m) m = DefSchema::instance().lookup_method("array", want, args.size());
+        if (!m) m = DefSchema::instance().lookup_method("fixed_array", want, args.size());
     }
     if (m && m->mapping_type == MappingType::Inline)
         return expand_inline_template(m->mapping_value, "(" + recv + ")", args);

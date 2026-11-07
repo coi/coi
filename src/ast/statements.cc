@@ -410,7 +410,7 @@ std::string ExpressionStatement::to_webcc()
                 std::string field_name = obj_expr.substr(second_dot + 1);     // e.g., "label"
                 
                 // Check if this is a mutating method (returns void)
-                std::vector<std::string> types_to_check = {"string", "array", "int", "float", "bool"};
+                std::vector<std::string> types_to_check = {"string", "array", "fixed_array", "int", "float", "bool"};
                 bool is_mutating = false;
                 for (const auto& type : types_to_check)
                 {
@@ -788,7 +788,7 @@ void collect_mods_recursive(ASTNode *node, std::set<std::string> &mods)
             std::string obj_expr = call->name.substr(0, dot_pos);
 
             bool is_mutating = false;
-            std::vector<std::string> types_to_check = {"string", "array", "int", "float", "bool"};
+            std::vector<std::string> types_to_check = {"string", "array", "fixed_array", "int", "float", "bool"};
             for (const auto& type : types_to_check)
             {
                 auto* method_def = DefSchema::instance().lookup_method(type, method);

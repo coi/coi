@@ -1,0 +1,12 @@
+// Test: fill on a fixed-size array, also one that's a field read from a method
+component App {
+    mut int[4] xs = [1, 2, 3, 4];
+    mut float[2] ys = [0.5, 1.5];
+    init {
+        xs.fill(0);
+        ys.fill(2.0);
+    }
+    def reset() : void { xs.fill(9); }
+    view { <button onclick={reset}>{xs[0]} {ys.size()}</button> }
+}
+app { root = App; }

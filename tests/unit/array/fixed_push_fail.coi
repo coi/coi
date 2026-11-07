@@ -1,0 +1,7 @@
+// Test: a fixed-size array can't grow
+component App {
+    mut int[3] xs = [1, 2, 3];
+    init { xs.push(4); }
+    view { <p>{xs.size()}</p> }
+}
+app { root = App; }

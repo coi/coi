@@ -1,0 +1,7 @@
+// Test: fill belongs to fixed-size arrays; a dynamic one would only fail in C++
+component App {
+    mut int[] xs = [1, 2, 3];
+    init { xs.fill(0); }
+    view { <p>{xs.size()}</p> }
+}
+app { root = App; }

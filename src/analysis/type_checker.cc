@@ -1522,8 +1522,9 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
             infer_expression_type(a.value.get(), scope);
         if (t == "unknown")
             return "unknown";
-        std::string def_t = !t.empty() && t.back() == ']' ? "array" : t;
-        if (def_t != "array" && !DefSchema::instance().lookup_type(def_t))
+        std::string arr = DefSchema::array_def(t);
+        std::string def_t = arr.empty() ? t : arr;
+        if (arr.empty() && !DefSchema::instance().lookup_type(def_t))
             return "unknown";  // component or pod receiver, C++ resolves it
         const auto *m = DefSchema::instance().lookup_method(def_t, mc->method, mc->args.size());
         if (!m || m->is_shared)
@@ -1532,7 +1533,7 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                                      std::to_string(mc->args.size()) + " argument(s)", mc->line);
             exit(1);
         }
-        if (def_t == "array")
+        if (!arr.empty())
             return array_method_type(m->return_type, t);
         return m->return_type.empty() ? "void" : normalize_type(m->return_type);
     }
@@ -1738,11 +1739,11 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
                 std::string list;
                 for (const auto &n : names)
                     list += (list.empty() ? "" : ", ") + n;
-                std::string what = kind == "array" ? "An array" : "A string";
+                std::string what = kind == "array" ? "An array" : kind == "fixed_array" ? "A fixed-size array" : "A string";
                 if (!names.count(method_name))
                     ErrorHandler::type_error(what + " has no method '" + method_name + "' (available: " + list + ")", func->line);
                 else
-                    ErrorHandler::type_error("'" + method_name + "' on " + (kind == "array" ? "an array" : "a string") +
+                    ErrorHandler::type_error("'" + method_name + "' on " + (kind == "array" ? "an array" : kind == "fixed_array" ? "a fixed-size array" : "a string") +
                                              " doesn't take " + std::to_string(func->args.size()) + " argument(s)", func->line);
                 exit(1);
             };
@@ -1766,9 +1767,10 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
             // Use DefSchema for array method lookups
             if (is_dynamic_array || is_fixed_array)
             {
-                if (auto* method_def = DefSchema::instance().lookup_method("array", method_name, func->args.size()))
+                std::string kind = is_fixed_array ? "fixed_array" : "array";
+                if (auto* method_def = DefSchema::instance().lookup_method(kind, method_name, func->args.size()))
                     return array_method_type(method_def->return_type, obj_type);
-                builtin_method_error("array");
+                builtin_method_error(kind);
             }
             
             // Use DefSchema for string method lookups

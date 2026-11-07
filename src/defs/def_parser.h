@@ -224,6 +224,9 @@ public:
     // Returns the canonical type name, or the input if not an alias
     std::string resolve_alias(const std::string &type_name) const;
 
+    // the def type holding an array's methods: "array" for T[], "fixed_array" for T[N], "" otherwise
+    static std::string array_def(const std::string &type);
+
     // Get namespace for a type (extracted from @map annotations)
     // e.g., "Canvas" -> "canvas", "DOMElement" -> "dom"
     std::string get_namespace_for_type(const std::string &type_name) const;

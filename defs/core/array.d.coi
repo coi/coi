@@ -79,6 +79,7 @@ type array<T> {
 }
 
 // Fixed-size array (T[N]) - maps to webcc::array<T, N>
+// Its own type (fixed_array to the compiler): T[] has no fill, T[N] no push
 @builtin
 type array<T, N> {
     @inline("(int)${this}.size()")
