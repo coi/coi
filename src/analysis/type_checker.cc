@@ -4307,6 +4307,12 @@ void validate_view_hierarchy(const std::vector<Component> &components,
             else if (iterable_type.ends_with("[]"))
             {
                 loop_scope[viewForEach->var_name] = iterable_type.substr(0, iterable_type.size() - 2);
+                // the loop indexes it, which a bare brace list can't take
+                if (auto *lit = dynamic_cast<ArrayLiteral *>(viewForEach->iterable.get()))
+                {
+                    if (lit->element_type.empty()) lit->element_type = loop_scope[viewForEach->var_name];
+                    lit->named = true;
+                }
             }
             else
             {

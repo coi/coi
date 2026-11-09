@@ -1248,7 +1248,7 @@ std::string Component::to_webcc(CompilerSession &session)
                 std::string elements_vec = "_loop_" + id + "_elements";
                 std::string keys_vec = "_loop_" + id + "_keys";
                 std::string anchor_var = "_loop_" + id + "_anchor";
-                bool temp = region.iterable_expr.find('(') != std::string::npos;
+                bool temp = region.iterable_expr.find_first_of("({") != std::string::npos;
                 std::string item_ref = std::string(temp ? "auto " : "auto& ") + cpp_name(region.var_name) + " = _items[_idx];\n";
 
                 ss << "        auto&& _items = " << region.iterable_expr << ";\n";
@@ -1436,8 +1436,8 @@ std::string Component::to_webcc(CompilerSession &session)
         ss << "        if (_idx < (int)" << elements_vec << ".size()) {\n";
         ss << "            _ref = (_idx + 1 < (int)" << elements_vec << ".size()) ? " << elements_vec << "[_idx + 1] : " << anchor_var << ";\n";
         ss << "        }\n";
-        // a call like colors() is a temporary: take the item by value
-        bool temp = region.iterable_expr.find('(') != std::string::npos;
+        // a call like colors() or a literal is a temporary: take the item by value
+        bool temp = region.iterable_expr.find_first_of("({") != std::string::npos;
         ss << "        " << (temp ? "auto " : "auto& ") << cpp_name(region.var_name) << " = " << region.iterable_expr << "[_idx];\n";
 
         std::string item_code = transform_to_insert_before(region.item_creation_code, parent_var, "_ref");

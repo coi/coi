@@ -1,0 +1,20 @@
+// a view loop over an array written in place
+module Picks;
+
+component Picker {
+    mut int picked = -1;
+    def pick(int i) : void { picked = i; }
+    view {
+        <div>
+            <for i in [0, 1, 2] key={i}><button class={`b${i}`} onclick={pick(i)}>{i}</button></for>
+            <p class="picked">{picked}</p>
+        </div>
+    }
+}
+
+test "a loop over a literal array builds its rows and hands each its item" {
+    Mounted m = mount(Picker());
+    expect(m.count("button") == 3);
+    m.click(".b2");
+    expect(m.text(".picked") == "2");
+}
