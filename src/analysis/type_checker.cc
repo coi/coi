@@ -1314,6 +1314,15 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
             }
         }
 
+        // a component's pub field or parameter: what it was declared as
+        if (const Component *comp = find_component(obj_type))
+        {
+            for (const auto &v : comp->state)
+                if (v->is_public && v->name == member->member) return normalize_type(v->type);
+            for (const auto &p : comp->params)
+                if (p->is_public && !p->is_callback && p->name == member->member) return normalize_type(p->type);
+        }
+
         // Check if it's a schema type with known fields/properties
         // For now, return unknown - could be extended to check schema for field types
         return "unknown";

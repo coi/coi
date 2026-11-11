@@ -1,0 +1,24 @@
+// an array written in place as one side of ?:, also when the other side is reached through
+// components the checker can't type
+module Ternary;
+
+component Inner {
+    pub mut int current = 7;
+    pub mut int[] all = [1, 2, 3];
+    view { <div></div> }
+}
+
+component Outer {
+    mut Inner inner = Inner();
+    pub mut bool one = true;
+    pub def ids() : int[] { return one ? [inner.current] : inner.all; }
+    view { <div><{inner} /><p class="n">{ids().size()}</p></div> }
+}
+
+def names(bool none, string[] some) : string[] { return none ? some : ["a", "b"]; }
+
+test "an array literal can be either branch of ?:" {
+    expect(names(false, []) == ["a", "b"]);
+    Mounted m = mount(Outer());
+    expect(m.text(".n") == "1");
+}
