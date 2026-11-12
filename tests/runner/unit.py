@@ -8,6 +8,19 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from .base import TestRunnerBase, GREEN, RED, NC
 
+def build_jobs():
+    """One build per core ran 24 clang++ at ~0.8 GB each and OOM-killed the desktop, so the
+    count is also capped by free memory. COI_TEST_JOBS overrides it."""
+    if os.environ.get("COI_TEST_JOBS"):
+        return max(1, int(os.environ["COI_TEST_JOBS"]))
+    cpus = os.cpu_count() or 4
+    try:
+        with open("/proc/meminfo") as f:
+            avail_kb = next(int(l.split()[1]) for l in f if l.startswith("MemAvailable:"))
+    except (OSError, StopIteration):
+        return min(cpus, 4)
+    return max(1, min(cpus, int((avail_kb / 1048576 - 4) / 1.5)))
+
 class UnitRunner(TestRunnerBase):
     def build_pass_tests(self, tests, tests_dir):
         """Build each _pass test all the way to WASM: generating C++ alone accepts programs
@@ -27,7 +40,7 @@ class UnitRunner(TestRunnerBase):
             return f"{test.relative_to(tests_dir)} (doesn't build: {first[:160]})"
 
         done = 0
-        with ThreadPoolExecutor(max_workers=os.cpu_count() or 4) as pool:
+        with ThreadPoolExecutor(max_workers=build_jobs()) as pool:
             for failure in pool.map(build, enumerate(tests)):
                 done += 1
                 self.draw_progress_bar(done, len(tests))
