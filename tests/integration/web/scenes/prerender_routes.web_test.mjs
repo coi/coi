@@ -7,6 +7,11 @@ export async function run({ page, expect }) {
   await expect.ok(html.includes(">offline</li>") && html.includes(">2026</p>"), "loop or method output not prerendered");
   const tool = await (await page.request.get(root + "tool/")).text();
   await expect.ok(tool.includes('<button class="count">0</button>'), "second route not prerendered");
+  // a page's own title and description, set as it mounted, are in its <head> and nowhere else
+  await expect.ok(tool.includes("<title>Tool &amp; more</title>"), "a page's own title not in its HTML");
+  await expect.ok(tool.includes('<meta name="description" content="Count &quot;things&quot; <fast>">'), "a page's own description not in its HTML");
+  await expect.ok(tool.split('name="description"').length === 2, "more than one description in a page");
+  await expect.ok(!html.includes("Tool &amp; more") && !html.includes('name="description"'), "one page's title or description in another page");
   // a "/docs/*" route: its prefix page, and the listed /docs/guide rendered with that path
   const docs = await (await page.request.get(root + "docs/")).text();
   await expect.ok(docs.includes('<p class="at">/docs</p>'), "the /docs/* route's prefix page not prerendered");

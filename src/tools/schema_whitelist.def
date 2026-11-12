@@ -204,6 +204,8 @@ log
 warn
 error
 set_title
+# the page's <meta name="description">; set while prerendering, it goes into that page's HTML
+set_description
 # the browser's UI color at runtime (app.theme sets the first one)
 set_theme_color
 reload

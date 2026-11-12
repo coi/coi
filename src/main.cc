@@ -33,6 +33,51 @@
 
 namespace fs = std::filesystem;
 
+static std::string html_escape(const std::string &s, bool attr)
+{
+    std::string out;
+    for (char c : s)
+    {
+        if (c == '&') out += "&amp;";
+        else if (c == '<' && !attr) out += "&lt;";
+        else if (c == '>' && !attr) out += "&gt;";
+        else if (c == '"' && attr) out += "&quot;";
+        else out += c;
+    }
+    return out;
+}
+
+// what a page set of its <head> while it rendered (System.setTitle, System.setDescription), from
+// webcc's <page>.head, put in place of the app's title and description in that page's copy
+static void apply_page_head(std::string &page, const fs::path &head_file)
+{
+    std::ifstream in(head_file);
+    std::string line;
+    while (std::getline(in, line))
+    {
+        size_t tab = line.find('\t');
+        if (tab == std::string::npos)
+            continue;
+        std::string key = line.substr(0, tab), value = line.substr(tab + 1);
+        size_t head_end = page.find("</head>");
+        if (key == "title")
+        {
+            size_t a = page.find("<title>"), b = page.find("</title>");
+            if (a != std::string::npos && b != std::string::npos && b < head_end)
+                page.replace(a, b + 8 - a, "<title>" + html_escape(value, false) + "</title>");
+        }
+        else if (key == "description")
+        {
+            std::string tag = "<meta name=\"description\" content=\"" + html_escape(value, true) + "\">";
+            size_t a = page.find("<meta name=\"description\"");
+            if (a != std::string::npos && a < head_end)
+                page.replace(a, page.find('>', a) + 1 - a, tag);
+            else if ((a = page.find("</title>")) != std::string::npos)
+                page.insert(a + 8, "\n    " + tag);
+        }
+    }
+}
+
 // app.prerender: the generated C++ is built for this machine by webcc and run once per static
 // route of the root's router ("/" without one); the HTML of each first render goes into its
 // own copy of index.html (route "/x" -> x/index.html); the loaded app hydrates it
@@ -100,6 +145,7 @@ static bool prerender_pages(const AppConfig &config, const std::vector<Component
         html.insert(tag_end, " data-hydrate");
         std::string page = index;
         page.replace(at, marker.size(), html);
+        apply_page_head(page, pre_dir / ("page" + std::to_string(i) + ".html.head"));
         // served for a path that isn't this page's route (a host falling back to the root page
         // for a deep link): the prerendered markup stays hidden until the app has taken over
         std::string guard = "<script>(function(){var r=\"" + paths[i] + "\",p=location.pathname.replace(/\\/+$/,\"\")||\"/\";"

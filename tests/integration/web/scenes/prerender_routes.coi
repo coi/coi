@@ -23,9 +23,14 @@ component Front {
     }
 }
 
+// sets its own title and description: they go into its page's <head>, and only its
 component Tool {
     mut int n = 0;
     def inc() : void { n++; }
+    mount {
+        System.setTitle("Tool & more");
+        System.setDescription("Count \"things\" <fast>");
+    }
     view { <button class="count" onclick={inc}>{n}</button> }
 }
 

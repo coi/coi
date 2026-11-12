@@ -274,6 +274,7 @@ app {
 
 - Every static route of the root's `router` is rendered (`"/"` without one): `"/"` into `index.html`, `"/about"` into `about/index.html`. Routes with parameters aren't.
 - Browser-only calls (storage, fetch, canvas) return nothing at build time; the app fills those parts in when it hydrates. `System.isPrerender()` is `true` then, and `System.navigate` does nothing: a page is the page at its path, so a mount that sends a signed-out visitor to `/login` renders its own screen at build and redirects in the browser.
+- A page's own title and description: call `System.setTitle` and `System.setDescription` as it mounts, and they go into that page's HTML in place of `app.title` and `app.description`, so each page reads as itself to a search engine. A page that sets neither keeps the app's.
 - `coi dev` doesn't prerender.
 - A `"/app/*"` route gets one page, `app/index.html`, which a host serves for every path under it (the generated service worker and `coi dev` do). `prerender = ["/app/note"];` renders more pages under such a route: the app runs with that pathname, so it can render that screen's frame (an empty note) for `/app/note/<id>` links. A page served for a path outside its own route hides its markup until the app has taken over.
 

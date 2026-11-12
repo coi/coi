@@ -348,6 +348,7 @@ Logging, page title, time, and URL navigation.
 | `System.warn(string msg)` | Log warning to console |
 | `System.error(string msg)` | Log error to console |
 | `System.setTitle(string title)` | Set page title |
+| `System.setDescription(string text)` | Set the page's `<meta name="description">`, what search engines show under the title |
 | `System.setThemeColor(string color)` | Set the browser's UI color (address bar, the installed app's title bar) |
 | `System.reload()` | Reload the page |
 | `System.openUrl(string url)` | Open URL in a new tab, with no way back to this page (noopener) |
