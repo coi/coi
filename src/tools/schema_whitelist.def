@@ -185,6 +185,12 @@ is_online
 # page lifecycle, PAGE_HIDE is the last chance to save
 init_lifecycle +listen(PAGE_HIDE, PAGE_SHOW, ONLINE)
 init_visibility_change +listen(VISIBILITY_CHANGE)
+# the whole page fullscreen: enterFullscreen in a click or key handler, canFullscreen 0 where there is none
+can_fullscreen
+is_fullscreen
+enter_fullscreen
+exit_fullscreen
+init_fullscreen_change +listen(FULLSCREEN_CHANGE)
 # back and forward, with the path arrived at; a "/app/*" route's component stays and hears it here
 init_popstate +listen(POPSTATE)
 # installing as an app: the state now and on each change (0 no prompt, 1 can prompt, 2 installed,

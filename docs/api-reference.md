@@ -1139,6 +1139,7 @@ Events of a handle you create in code (`img.onLoaded(&h)`) need that handle's li
 | `Compression.compress(bytes, "deflate", &onDone = h)`, `decompress` | deflate, deflate-raw or gzip; `h(Blob data, string error)` |
 | `ctx.getImageData(x, y, w, h)` | a canvas rectangle's RGBA bytes |
 | `System.getDevicePixelRatio()`, `System.isOnline()` | Screen and connection |
+| `System.canFullscreen()`, `System.isFullscreen()`, `System.enterFullscreen()`, `System.exitFullscreen()` | The whole page fullscreen: enter in a click or key handler; `canFullscreen()` is 0 where there is none (iPhone); `System.fullscreenChange` says when it changes |
 | `el.setStyle(name, value)`, `el.focus()`, `el.blur()`, `el.getProperty(name)` | Text boxes over a canvas |
 | `ws.sendBinary(bytes)`, `ws.closeWithCode(code, reason)`, `ws.getBufferedAmount()` | WebSocket extras |
 

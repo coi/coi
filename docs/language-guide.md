@@ -1450,6 +1450,7 @@ component Editor {
 | `System.visibilityChange` | `VisibilityChangeEvent` (`hidden`, `state`): the moment to save |
 | `System.pageHide`, `System.pageShow` | `uint8 persisted` |
 | `System.online` | `uint8 online` |
+| `System.fullscreenChange` | `uint8 on`: the page went fullscreen or left it, Esc included |
 | `System.popstate` | `string path`: back or forward, with the path arrived at |
 | `System.installState` | `uint8 state`: 0 no install prompt, 1 the browser offers one, 2 installed, 3 no prompt but Share, Add to Home Screen installs it (iPhone, iPad), 4 no prompt but File, Add to Dock does (Safari on a Mac) |
 | `System.pointerUp` | `PointerUpEvent` (`pointerId`, `pointerType`, `x`, `y`): a pointer let go anywhere on the page, cancel included |
