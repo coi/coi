@@ -1,0 +1,9 @@
+// a module with a public pod of numbers, for chained_casts.coi to reach into
+module Tally;
+
+pub pod Count { int saves; float share; }
+
+test "the module's own pod" {
+    Count c = Count{saves = 2};
+    expect(c.saves.toInt64() == 2);
+}

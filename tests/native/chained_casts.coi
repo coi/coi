@@ -1,5 +1,6 @@
 // a cast chained on what a shared def or a builtin method returns
 module Chained;
+import "chained_casts_tally.coi";
 
 def cents(string euros) : int64 { return Math.round(euros.toFloat() * 100.0).toInt64(); }
 def count(int[] xs) : int64 { return xs.size().toInt64(); }
@@ -13,11 +14,18 @@ test "a cast on an array's size" {
     expect(count([1, 2, 3]) == 3);
 }
 
-pod Tally { int saves; float share; }
-def wide(Tally t) : int64 { return t.saves.toInt64(); }
+pod Score { int saves; float share; }
+def wide(Score t) : int64 { return t.saves.toInt64(); }
+def wider(Tally::Count c) : string { return `${c.saves.toInt64() + 1}`; }
 
 test "a cast on a pod's number field" {
-    expect(wide(Tally{saves = 7}) == 7);
-    Tally t = Tally{saves = 3, share = 2.6};
+    expect(wide(Score{saves = 7}) == 7);
+    Score t = Score{saves = 3, share = 2.6};
     expect(t.share.toInt() == 2);
+}
+
+test "a cast on a number field of another module's pod" {
+    expect(wider(Tally::Count{saves = 7}) == "8");
+    Tally::Count c = Tally::Count{saves = 1, share = 4.5};
+    expect(c.share.toInt() == 4);
 }

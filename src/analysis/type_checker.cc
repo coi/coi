@@ -458,10 +458,12 @@ static std::string get_data_field_type(const std::string& raw, const std::string
         }
     }
 
-    size_t dot_pos = type_name.find('.');
-    if (dot_pos != std::string::npos) {
-        std::string module_qualified = type_name;
-        std::replace(module_qualified.begin(), module_qualified.end(), '.', '_');
+    // Module.Pod or Module::Pod: kept as Module_Pod
+    std::string module_qualified = type_name;
+    for (size_t p; (p = module_qualified.find("::")) != std::string::npos;)
+        module_qualified.replace(p, 2, "_");
+    std::replace(module_qualified.begin(), module_qualified.end(), '.', '_');
+    if (module_qualified != type_name) {
         auto mit = g_data_type_field_types.find(module_qualified);
         if (mit != g_data_type_field_types.end()) {
             auto fit = mit->second.find(field_name);
