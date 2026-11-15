@@ -1721,7 +1721,12 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
         if (!path_type.empty() && (path_type.ends_with("]") || path_type == "string"))
             func->receiver_type = path_type;
         else
+        {
+            // a.count.toInt64(): a number field's own methods need its type too
+            if (!path_type.empty() && !DefSchema::instance().is_handle(path_type) && DefSchema::instance().lookup_type(path_type))
+                func->receiver_type = path_type;
             path_type.clear();
+        }
         if (!obj_name.empty() && (scope.count(obj_name) || !path_type.empty()))
         {
             std::string obj_type = scope.count(obj_name) ? scope.at(obj_name) : path_type;

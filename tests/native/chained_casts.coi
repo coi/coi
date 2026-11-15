@@ -12,3 +12,12 @@ test "a cast on Math.round's result" {
 test "a cast on an array's size" {
     expect(count([1, 2, 3]) == 3);
 }
+
+pod Tally { int saves; float share; }
+def wide(Tally t) : int64 { return t.saves.toInt64(); }
+
+test "a cast on a pod's number field" {
+    expect(wide(Tally{saves = 7}) == 7);
+    Tally t = Tally{saves = 3, share = 2.6};
+    expect(t.share.toInt() == 2);
+}
