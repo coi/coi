@@ -1,0 +1,46 @@
+// a keyed loop over an array of components, sorted in place: every box stays, once, in the new
+// order, with its <if> parts as they were (shut ones stay shut, open ones open)
+component Box(pub int id) {
+    mut bool open = true;
+    pub def shut() : void { open = false; }
+    pub def reopen() : void { open = true; }
+    view {
+        <div class="box" data-id={`${id}`}>
+            <span class="label">{id}</span>
+            <if open><i class="mark">o</i></if>
+            <if open><b class="tag">t</b></if>
+        </div>
+    }
+}
+
+component ComponentArraySort {
+    mut Box[] boxes;
+    mut int[] order = [1, 2, 3, 4];
+
+    mount {
+        for i in order { boxes.push(Box(i)); }
+    }
+
+    // the first one goes last, the way a picked item comes out on top
+    def raise() : void {
+        int first = order[0];
+        order.remove(0);
+        order.push(first);
+        boxes.sortBy(b => order.indexOf(o => o == b.id));
+    }
+    def shutFirst() : void { boxes[0].shut(); }
+    def reopenAll() : void { for i in 0:boxes.size() { boxes[i].reopen(); } }
+
+    view {
+        <div>
+            <button class="raise" onclick={raise}>raise</button>
+            <button class="shut" onclick={shutFirst}>shut</button>
+            <button class="reopen" onclick={reopenAll}>reopen</button>
+            <div class="list">
+                <for b in boxes key={b.id}><{b} /></for>
+            </div>
+        </div>
+    }
+}
+
+app { root = ComponentArraySort; }

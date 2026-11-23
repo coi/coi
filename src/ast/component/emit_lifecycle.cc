@@ -389,6 +389,15 @@ void emit_component_lifecycle_methods(std::stringstream &ss,
     }
     ss << "    }\n";
 
+    // _move_view: the view's elements, as they are, moved in front of `before` (a sorted array of
+    // components puts its items in the new order with it). An if/else at the root brings its anchor
+    ss << "    void _move_view(webcc::handle parent, webcc::handle before) {\n";
+    ss << "        webcc::handle _r = _get_root_element();\n";
+    ss << "        if (_r.is_valid() && (int32_t)_r != 0) webcc::dom::move_before(parent, _r, before);   // 0: no element of its own\n";
+    if (root_if_id >= 0)
+        ss << "        if (_if_" << root_if_id << "_anchor.is_valid()) webcc::dom::move_before(parent, _if_" << root_if_id << "_anchor, before);\n";
+    ss << "    }\n";
+
     // _get_root_element method - returns the root DOM element for this component
     // Handles if/else at root level by checking _if_X_state
     ss << "    webcc::handle _get_root_element() {\n";

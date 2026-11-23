@@ -357,6 +357,12 @@ public:
     void erase(size_t i, bool skip_dom = false) { if (i >= slots.size()) return; T* p = slots[i]; slots.erase(i); let_go(p, skip_dom); }
     void remove(size_t i) { erase(i); }
     void clear(bool skip_dom = false) { webcc::vector<T*> gone(webcc::move(slots)); for (size_t i = 0; i < gone.size(); i++) let_go(gone[i], skip_dom); }
+    // the same components in a new order (at[i]: where the i-th one was): nothing is moved, copied or destroyed
+    void reorder(const webcc::vector<int32_t>& at) {
+        webcc::vector<T*> s; s.reserve(at.size());
+        for (size_t i = 0; i < at.size(); i++) s.push_back(slots[at[i]]);
+        slots = webcc::move(s);
+    }
 };
 }
 )";
@@ -399,7 +405,8 @@ template<typename V, typename F> inline V coi_filter(const V& v, F pred) {
     return out;
 }
 // each key worked out once, the positions merge sorted by them (equal keys keep their order),
-// then the elements moved over in that order
+// then the elements moved over in that order. Components only swap places: moving one into a
+// new array and clearing the old would destroy it, and its view with it
 template<typename V, typename F> inline void coi_sort_by(V& v, F key, bool desc) {
     int32_t n = (int32_t)v.size();
     if (n < 2) return;
@@ -420,10 +427,13 @@ template<typename V, typename F> inline void coi_sort_by(V& v, F key, bool desc)
         }
         webcc::vector<int32_t> t = webcc::move(at); at = webcc::move(next); next = webcc::move(t);
     }
-    V out;
-    out.reserve(n);
-    for (int32_t i = 0; i < n; i++) out.push_back(webcc::move(v[at[i]]));
-    v = webcc::move(out);
+    if constexpr (requires { v.reorder(at); }) v.reorder(at);
+    else {
+        V out;
+        out.reserve(n);
+        for (int32_t i = 0; i < n; i++) out.push_back(webcc::move(v[at[i]]));
+        v = webcc::move(out);
+    }
 }
 )";
     out << "inline coi::vector<uint8_t> coi_bytes(webcc::bytes_view v) {\n";

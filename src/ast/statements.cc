@@ -490,6 +490,17 @@ std::string ExpressionStatement::to_webcc()
                     result += "} }\n";
                     return result;
                 }
+                else if (method == "sortBy" || method == "sortByDescending")
+                {
+                    // arr.sortBy(...): the items swap places in the array, then their elements are
+                    // moved into that order in front of the loop's anchor, kept as they are
+                    std::string id = std::to_string(info.loop_id);
+                    result = expression->to_webcc() + ";\n";
+                    result += "if (_loop_" + id + "_parent.is_valid()) {\n";
+                    result += "    for (auto& _c : " + arr_cpp + ") _c._move_view(_loop_" + id + "_parent, _loop_" + id + "_anchor);\n";
+                    result += "}\n";
+                    return result;
+                }
                 else if (method == "clear" && call->args.empty())
                 {
                     // arr.clear(): the items are destroyed; when the loop is all the parent holds,
