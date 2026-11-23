@@ -223,12 +223,6 @@ static void emit_loop_region_members(std::stringstream &ss, const std::vector<Lo
             if (region.is_keyed)
                 ss << "    coi::vector<coi::string> _loop_" << id << "_keys;\n";
         }
-        else if (region.is_html_loop)
-        {
-            ss << "    coi::vector<webcc::handle> _loop_" << region.loop_id << "_elements;\n";
-            if (region.is_keyed)
-                ss << "    coi::vector<coi::string> _loop_" << region.loop_id << "_keys;\n";
-        }
         else if (region.is_keyed && !region.component_type.empty() && !region.is_member_ref_loop)
         {
             // keyed component rows: the keys of the last sync, to update props in place
@@ -560,7 +554,7 @@ std::string Component::to_webcc(CompilerSession &session)
         }
     }
 
-    // Populate global context for keyed HTML loops over non-component arrays
+    // keyed loops of elements, by array: push, pop, clear and a changed item work on their rows
     g_array_loops.clear();
     g_html_loop_var_infos.clear();
     for (const auto &region : loop_regions)
@@ -571,13 +565,8 @@ std::string Component::to_webcc(CompilerSession &session)
             info.loop_id = region.loop_id;
             info.parent_var = "_loop_" + std::to_string(region.loop_id) + "_parent";
             info.anchor_var = "_loop_" + std::to_string(region.loop_id) + "_anchor";
-            info.elements_vec_name = "_loop_" + std::to_string(region.loop_id) + "_elements";
             info.var_name = region.var_name;
-            info.item_creation_code = transform_to_insert_before(region.item_creation_code, info.parent_var, info.anchor_var);
-            info.root_element_var = region.root_element_var;
             info.key_expr = region.key_expr;
-            info.is_only_child = region.is_only_child;
-            info.rows = region.row != nullptr;
             g_array_loops[region.iterable_raw.empty() ? region.iterable_expr : region.iterable_raw].push_back(info);
 
             HtmlLoopVarInfo var_info;
@@ -1451,58 +1440,6 @@ std::string Component::to_webcc(CompilerSession &session)
             std::string count_var = "_loop_" + std::to_string(region.loop_id) + "_count";
             std::string parent_var = "_loop_" + std::to_string(region.loop_id) + "_parent";
 
-            if (region.is_html_loop)
-            {
-                // Keyed HTML element loop (e.g., <for msg in messages key={msg}><div>{msg}</div></for>).
-                // Every row is built fresh; a row whose key was there before is morphed into the
-                // live one, so its nodes (and their pointer capture, focus, hover) survive. Then
-                // rows are put in order, moving only those out of place
-                std::string id = std::to_string(region.loop_id);
-                std::string elements_vec = "_loop_" + id + "_elements";
-                std::string keys_vec = "_loop_" + id + "_keys";
-                std::string anchor_var = "_loop_" + id + "_anchor";
-                bool temp = region.iterable_expr.find_first_of("({") != std::string::npos;
-                std::string item_ref = std::string(temp ? "auto " : "auto& ") + cpp_name(region.var_name) + " = _items[_idx];\n";
-
-                ss << "        auto&& _items = " << region.iterable_expr << ";\n";
-                ss << "        int _new_count = (int)_items.size();\n";
-                ss << "        coi::vector<webcc::handle> _old = " << elements_vec << ";\n";
-                ss << "        bool _keyed = " << keys_vec << ".size() == _old.size();\n";
-                ss << "        coi::vector<int> _taken;\n";
-                ss << "        for (int _j = 0; _j < (int)_old.size(); _j++) _taken.push_back(0);\n";
-                ss << "        coi::vector<int> _take;\n";
-                ss << "        coi::vector<coi::string> _new_keys;\n";
-                ss << "        for (int _idx = 0; _idx < _new_count; _idx++) {\n";
-                ss << "            " << item_ref;
-                ss << "            coi::string _k = coi_loop_key(" << region.key_expr << ");\n";
-                ss << "            int _m = -1;\n";
-                ss << "            if (_keyed) {\n";
-                ss << "                if (_idx < (int)_old.size() && !_taken[_idx] && " << keys_vec << "[_idx] == _k) _m = _idx;\n";
-                ss << "                else for (int _j = 0; _j < (int)_old.size(); _j++) { if (!_taken[_j] && " << keys_vec << "[_j] == _k) { _m = _j; break; } }\n";
-                ss << "            }\n";
-                ss << "            if (_m >= 0) _taken[_m] = 1;\n";
-                ss << "            _take.push_back(_m);\n";
-                ss << "            _new_keys.push_back(_k);\n";
-                ss << "        }\n";
-                ss << "        for (int _j = 0; _j < (int)_old.size(); _j++) {\n";
-                ss << "            if (!_taken[_j]) { _forget_row(_old[_j]); webcc::dom::remove_element(_old[_j]); }\n";
-                ss << "        }\n";
-                ss << "        " << elements_vec << ".clear();\n";
-                ss << "        g_view_depth++;\n";
-                ss << "        for (int _idx = 0; _idx < _new_count; _idx++) {\n";
-                ss << "            " << item_ref;
-                ss << indent_code(transform_to_insert_before(region.item_creation_code, "_loop_" + id + "_parent", anchor_var), "        ");
-                ss << "            if (_take[_idx] >= 0) { _forget_row(_old[_take[_idx]]); webcc::dom::morph(_old[_take[_idx]], " << region.root_element_var << "); }\n";
-                ss << "            else webcc::dom::detach(" << region.root_element_var << ");\n";
-                ss << "            " << elements_vec << ".push_back(" << region.root_element_var << ");\n";
-                ss << "        }\n";
-                ss << "        for (int _idx = _new_count - 1; _idx >= 0; _idx--)\n";
-                ss << "            webcc::dom::place(" << parent_var << ", " << elements_vec << "[_idx], _idx + 1 < _new_count ? " << elements_vec << "[_idx + 1] : " << anchor_var << ");\n";
-                ss << "        " << keys_vec << " = _new_keys;\n";
-                ss << "        if (--g_view_depth == 0) webcc::flush();\n";
-                ss << "        " << count_var << " = _new_count;\n";
-            }
-            else
             {
                 // Keyed component loop
                 std::string vec_name = region.is_member_ref_loop ? region.iterable_expr : ("_loop_" + region.component_type + "s");
@@ -1565,8 +1502,7 @@ std::string Component::to_webcc(CompilerSession &session)
         {
             ss << "        int new_count = " << region.end_expr << " - " << region.start_expr << ";\n";
             ss << "        int old_count = _loop_" << region.loop_id << "_count;\n";
-            if (!(region.is_html_loop && region.component_type.empty()))
-                ss << "        if (new_count == old_count) return;\n";
+            ss << "        if (new_count == old_count) return;\n";
             ss << "        (void)old_count;\n";
 
             if (!region.component_type.empty())
@@ -1592,52 +1528,16 @@ std::string Component::to_webcc(CompilerSession &session)
                 }
                 ss << "        }\n";
             }
-            else if (region.is_html_loop)
-            {
-                // elements over a range: a sync runs when the range or anything the body reads
-                // changed, so the items are built fresh, like a keyed loop's, and the live ones
-                // take their look (morph): an input being typed in keeps its node, focus and caret,
-                // and only rows that are really new appear (and take autofocus). The loop variable
-                // runs from the start expression, not from zero
-                std::string vec_name = "_loop_" + std::to_string(region.loop_id) + "_elements";
-                std::string anchor_var = "_loop_" + std::to_string(region.loop_id) + "_anchor";
-
-                ss << "        coi::vector<webcc::handle> _live = " << vec_name << ";\n";
-                ss << "        " << vec_name << ".clear();\n";
-                ss << "        g_view_depth++;\n";
-                ss << "        for (int " << cpp_name(region.var_name) << " = " << region.start_expr << "; " << cpp_name(region.var_name) << " < " << region.end_expr << "; " << cpp_name(region.var_name) << "++) {\n";
-
-                std::string item_code = region.item_creation_code;
-                // the body appends to the loop's parent: insert before the anchor instead, or the
-                // rows end up after whatever follows the loop
-                std::string loop_parent = "_loop_" + std::to_string(region.loop_id) + "_parent";
-                item_code = transform_to_insert_before(item_code, loop_parent, anchor_var);
-                item_code = track_top_level_inserts(item_code, loop_parent, vec_name);
-                ss << indent_code(item_code, "    ");
-                ss << "        }\n";
-                // element by element: the live one keeps its place and becomes the fresh one,
-                // the fresh one goes; live ones past the end go too
-                ss << "        for (size_t _j = 0; _j < " << vec_name << ".size() && _j < _live.size(); _j++) {\n";
-                ss << "            _forget_row(_live[_j]);\n";
-                ss << "            webcc::dom::morph(_live[_j], " << vec_name << "[_j]);\n";
-                ss << "        }\n";
-                ss << "        for (size_t _j = " << vec_name << ".size(); _j < _live.size(); _j++) {\n";
-                ss << "            _forget_row(_live[_j]);\n";
-                ss << "            webcc::dom::remove_element(_live[_j]);\n";
-                ss << "        }\n";
-                ss << "        if (--g_view_depth == 0) webcc::flush();\n";
-            }
             ss << "        _loop_" << region.loop_id << "_count = new_count;\n";
         }
         ss << "    }\n";
     }
 
-    // Generate _sync_loop_X_item() methods for keyed HTML loops (single-item patch)
+    // the single-item patch of a keyed loop of elements (pages[i].title = ...)
     for (const auto &region : loop_regions)
     {
-        if (!(region.is_keyed && region.is_html_loop) || region.root_element_var.empty())
+        if (!(region.is_keyed && region.row))
             continue;
-        if (region.row)
         {
             // one item changed in place: its row is updated (or built again, if its shape
             // changed); a key that moved, or rows not in step with the array, take a whole sync
@@ -1656,39 +1556,7 @@ std::string Component::to_webcc(CompilerSession &session)
             ss << "        else _loop_" << id << "_remake(" << rows << "[_idx], " << cpp_name(region.var_name) << ", _loop_" << id << "_anchor);\n";
             ss << "        if (--g_view_depth == 0) webcc::flush();\n";
             ss << "    }\n";
-            continue;
         }
-
-        std::string elements_vec = "_loop_" + std::to_string(region.loop_id) + "_elements";
-        std::string parent_var = "_loop_" + std::to_string(region.loop_id) + "_parent";
-        std::string anchor_var = "_loop_" + std::to_string(region.loop_id) + "_anchor";
-
-        ss << "    void _sync_loop_" << region.loop_id << "_item(int _idx) {\n";
-        ss << "        if (!" << parent_var << ".is_valid()) return;\n";
-        ss << "        if (_idx < 0 || _idx >= (int)" << region.iterable_expr << ".size()) return;\n";
-        ss << "        webcc::handle _ref = " << anchor_var << ";\n";
-        ss << "        if (_idx < (int)" << elements_vec << ".size()) {\n";
-        ss << "            _ref = (_idx + 1 < (int)" << elements_vec << ".size()) ? " << elements_vec << "[_idx + 1] : " << anchor_var << ";\n";
-        ss << "        }\n";
-        // a call like colors() or a literal is a temporary: take the item by value
-        bool temp = region.iterable_expr.find_first_of("({") != std::string::npos;
-        ss << "        " << (temp ? "auto " : "auto& ") << cpp_name(region.var_name) << " = " << region.iterable_expr << "[_idx];\n";
-
-        std::string item_code = transform_to_insert_before(region.item_creation_code, parent_var, "_ref");
-        ss << indent_code(item_code, "        ");
-        // the live row takes the fresh one's look and handles
-        ss << "        if (_idx < (int)" << elements_vec << ".size()) {\n";
-        ss << "            _forget_row(" << elements_vec << "[_idx]);\n";
-        ss << "            webcc::dom::morph(" << elements_vec << "[_idx], " << region.root_element_var << ");\n";
-        ss << "            " << elements_vec << "[_idx] = " << region.root_element_var << ";\n";
-        ss << "        } else " << elements_vec << ".push_back(" << region.root_element_var << ");\n";
-        ss << "        {\n";
-        ss << "            auto& _keys = _loop_" << region.loop_id << "_keys;\n";
-        ss << "            coi::string _k = coi_loop_key(" << region.key_expr << ");\n";
-        ss << "            if (_idx < (int)_keys.size()) _keys[_idx] = _k;\n";
-        ss << "            else if (_idx == (int)_keys.size()) _keys.push_back(_k);\n";
-        ss << "        }\n";
-        ss << "    }\n";
     }
 
     // Map from variable to if IDs
@@ -1728,18 +1596,6 @@ std::string Component::to_webcc(CompilerSession &session)
                 std::string rows = "_loop_" + std::to_string(loop_id) + "_rows";
                 ss << "            for (auto& _r : " << rows << ") { _forget_row(_r.first); for (auto& _n : _r.nodes) webcc::dom::remove_element(_n); }\n";
                 ss << "            " << rows << ".clear();\n";
-                if (lr.is_keyed)
-                    ss << "            _loop_" << loop_id << "_keys.clear();\n";
-                ss << "            _loop_" << loop_id << "_count = 0;\n";
-            }
-            else if (lr.is_html_loop)
-            {
-                std::string vec_name = "_loop_" + std::to_string(loop_id) + "_elements";
-                ss << "            while ((int)" << vec_name << ".size() > 0) {\n";
-                ss << "                _forget_row(" << vec_name << "[" << vec_name << ".size() - 1]);\n";
-                ss << "                webcc::dom::remove_element(" << vec_name << "[" << vec_name << ".size() - 1]);\n";
-                ss << "                " << vec_name << ".pop_back();\n";
-                ss << "            }\n";
                 if (lr.is_keyed)
                     ss << "            _loop_" << loop_id << "_keys.clear();\n";
                 ss << "            _loop_" << loop_id << "_count = 0;\n";

@@ -541,7 +541,7 @@ std::string ExpressionStatement::to_webcc()
                 const auto &loops = html_loop_it->second;
                 std::string result;
 
-                if (method == "push" && call->args.size() == 1 && loops[0].rows)
+                if (method == "push" && call->args.size() == 1)
                 {
                     // one row more, at the end: a list filled a push at a time stays linear
                     std::string item_expr = call->args[0].value->to_webcc();
@@ -561,7 +561,7 @@ std::string ExpressionStatement::to_webcc()
                     result += "}\n";
                     return result;
                 }
-                else if (method == "pop" && call->args.empty() && loops[0].rows)
+                else if (method == "pop" && call->args.empty())
                 {
                     result = "if (!" + arr_cpp + ".empty()) {\n";
                     for (const auto &info : loops)
@@ -580,7 +580,7 @@ std::string ExpressionStatement::to_webcc()
                     result += "}\n";
                     return result;
                 }
-                else if (method == "clear" && call->args.empty() && loops[0].rows)
+                else if (method == "clear" && call->args.empty())
                 {
                     for (const auto &info : loops)
                     {
@@ -593,63 +593,11 @@ std::string ExpressionStatement::to_webcc()
                     result += arr_cpp + ".clear();\n";
                     return result;
                 }
-                else if (method == "push" && call->args.size() == 1)
-                {
-                    std::string item_expr = call->args[0].value->to_webcc();
-                    result = "{\n";
-                    result += arr_cpp + ".push_back(" + item_expr + ");\n";
-                    for (const auto &info : loops)
-                    {
-                        std::string count_var = "_loop_" + std::to_string(info.loop_id) + "_count";
-                        result += "if (" + info.parent_var + ".is_valid()) {\n";
-                        result += "    auto& " + cpp_name(info.var_name) + " = " + arr_cpp + "[" + arr_cpp + ".size() - 1];\n";
-                        result += info.item_creation_code;
-                        if (!info.root_element_var.empty())
-                        {
-                            result += "    " + info.elements_vec_name + ".push_back(" + info.root_element_var + ");\n";
-                            result += "    _loop_" + std::to_string(info.loop_id) + "_keys.push_back(coi_loop_key(" + info.key_expr + "));\n";
-                        }
-                        result += "    " + count_var + " = (int)" + arr_cpp + ".size();\n";
-                        result += "}\n";
-                    }
-                    result += "}\n";
-                    return result;
-                }
                 else if (method == "remove" && call->args.size() == 1)
                 {
                     result = arr_cpp + ".remove(" + call->args[0].value->to_webcc() + ");";
                     for (const auto &info : loops)
                         result += "\n_sync_loop_" + std::to_string(info.loop_id) + "();";
-                    return result;
-                }
-                else if (method == "pop" && call->args.empty())
-                {
-                    result = "if (!" + arr_cpp + ".empty()) {\n";
-                    for (const auto &info : loops)
-                    {
-                        result += "    if (!" + info.elements_vec_name + ".empty()) {\n";
-                        result += "        _forget_row(" + info.elements_vec_name + ".back());\n";
-                        result += "        webcc::dom::remove_element(" + info.elements_vec_name + ".back());\n";
-                        result += "        " + info.elements_vec_name + ".pop_back();\n";
-                        result += "    }\n";
-                        result += "    if (!_loop_" + std::to_string(info.loop_id) + "_keys.empty()) _loop_" + std::to_string(info.loop_id) + "_keys.pop_back();\n";
-                    }
-                    result += "    " + arr_cpp + ".pop_back();\n";
-                    for (const auto &info : loops)
-                        result += "    _loop_" + std::to_string(info.loop_id) + "_count = (int)" + arr_cpp + ".size();\n";
-                    result += "}\n";
-                    return result;
-                }
-                else if (method == "clear" && call->args.empty())
-                {
-                    for (const auto &info : loops)
-                    {
-                        result += "for (auto& _el : " + info.elements_vec_name + ") { _forget_row(_el); webcc::dom::remove_element(_el); }\n";
-                        result += info.elements_vec_name + ".clear();\n";
-                        result += "_loop_" + std::to_string(info.loop_id) + "_keys.clear();\n";
-                        result += "_loop_" + std::to_string(info.loop_id) + "_count = 0;\n";
-                    }
-                    result += arr_cpp + ".clear();\n";
                     return result;
                 }
             }
