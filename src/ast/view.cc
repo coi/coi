@@ -1,3 +1,4 @@
+#include <functional>
 #include <algorithm>
 #include <cctype>
 #include <set>
@@ -52,6 +53,15 @@ void ViewCodegenContext::row_handler(const std::string& el_var, const std::strin
     for (size_t p = again.find(from); p != std::string::npos; p = again.find(from, p + to.size()))
         again.replace(p, from.size(), to);
     row->handlers.push_back({again, row_if, row_then});
+}
+
+// a kept row's own list of a component type
+std::string row_comp_list(const std::string &qname)
+{
+    std::string field = qname;
+    for (char &c : field)
+        if (!isalnum((unsigned char)c)) c = '_';
+    return "_row.k_" + field;
 }
 
 // Helper to map Coi types to C++ types for lambda params
@@ -464,8 +474,12 @@ void ComponentInstantiation::generate_code(ViewCodegenContext& ctx)
 
     if (ctx.in_loop)
     {
-        std::string vector_name = "_loop_" + qname + "s";
-        instance_name = cpp_name(vector_name) + "[" + cpp_name(vector_name) + ".size() - 1]";
+        // a kept row owns its components: they go with it, nothing piles up in a list of the
+        // component's
+        std::string vector_name = ctx.row ? row_comp_list(qname) : "_loop_" + qname + "s";
+        if (ctx.row)
+            ctx.row->comp_types.insert(qname);
+        instance_name = (ctx.row ? vector_name : cpp_name(vector_name)) + "[" + (ctx.row ? vector_name : cpp_name(vector_name)) + ".size() - 1]";
         // made in its place: a component whose members point at its own fields (a child given
         // &field) must not be built as a temporary and moved, or they point at the temporary
         ctx.ss << "        " << vector_name << ".emplace_back();\n";
@@ -1517,11 +1531,67 @@ void ViewRawElement::collect_dependencies(std::set<std::string> &deps)
 }
 
 // ViewForRangeStatement
+// a loop inside a kept row: a list of the row's own (_row.sN), its rows kept the same way and
+// synced when the row updates. Not when it stands at the row's top (its rows would sit beside the
+// row's own nodes, out of reach of a rebuild of the row) or its body doesn't start with an
+// element (a keyed one: is one element): then the row is built again on every sync
+static bool row_sub_loop(ViewCodegenContext &ctx, bool keyed, const std::string &var_name,
+                         std::vector<std::unique_ptr<ASTNode>> &children, const std::function<void(RowPlan &)> &fill)
+{
+    if (ctx.parent == "_sp" || children.empty() || !dynamic_cast<HTMLElement *>(children[0].get()))
+        return false;
+    if (keyed && children.size() != 1)
+        return false;
+    int k = (int)ctx.row->subs.size();
+    auto sub = std::make_shared<RowPlan>();
+    sub->name = ctx.row->name + "_s" + std::to_string(k);
+    sub->var = var_name;
+    sub->keyed = keyed;
+    sub->rebind = keyed;
+    fill(*sub);
+
+    std::stringstream body;
+    HandleBlock body_handles;
+    int root_id = ctx.counter;
+    ViewCodegenContext bctx = ctx.for_loop(body, body_handles, "_sp", var_name);
+    bctx.row = sub.get();
+    for (auto &child : children)
+        generate_view_child(child.get(), bctx);
+    sub->root_var = "_el_" + std::to_string(root_id);
+    sub->make_code = "int32_t _span_lo = webcc::deferred_handle_counter();\n" + body_handles.wrap(body.str()) +
+                     "coi_note_span(" + sub->root_var + ", _span_lo);\n";
+    ctx.row->subs.push_back({sub, ctx.row_if, ctx.row_then});
+
+    // where the loop stands in the row: its anchor, then its rows (the loop variables around it
+    // go along: the inner rows' code may read them)
+    std::string anchor = "_sub_anchor_" + std::to_string(ctx.counter++);
+    std::string args;
+    for (size_t at = 0; at <= ctx.loop_var_name.size();)
+    {
+        size_t comma = ctx.loop_var_name.find(", ", at);
+        args += ", " + cpp_name(ctx.loop_var_name.substr(at, comma == std::string::npos ? std::string::npos : comma - at));
+        if (comma == std::string::npos) break;
+        at = comma + 2;
+    }
+    ctx.ss << "        webcc::handle " << anchor << " = webcc::handle(" << ctx.next_handle() << ");\n";
+    ctx.ss << "        webcc::dom::create_text_node_deferred(" << anchor << ", \"\");\n";
+    ctx.ss << "        webcc::dom::append_child(" << ctx.parent << ", " << anchor << ");\n";
+    ctx.ss << "        _row.s" << k << "_parent = " << ctx.parent << ";\n";
+    ctx.ss << "        _row.s" << k << "_anchor = " << anchor << ";\n";
+    ctx.ss << "        " << sub->name << "_sync(_row" << args << ");\n";
+    return true;
+}
+
 void ViewForRangeStatement::generate_code(ViewCodegenContext& ctx)
 {
 
     if (ctx.in_loop || !ctx.loop_regions || !ctx.loop_counter)
     {
+        if (ctx.row && row_sub_loop(ctx, false, var_name, children, [&](RowPlan &p) {
+                p.start_expr = start->to_webcc();
+                p.end_expr = end->to_webcc();
+            }))
+            return;
         if (ctx.row) ctx.row->rebuild = true;
         ctx.ss << "        for (int " << cpp_name(var_name) << " = " << start->to_webcc() << "; "
            << cpp_name(var_name) << " < " << end->to_webcc() << "; " << cpp_name(var_name) << "++) {\n";
@@ -1590,13 +1660,17 @@ void ViewForRangeStatement::generate_code(ViewCodegenContext& ctx)
     std::map<std::string, int> temp_comp_counters = ctx.component_counters;
     int root_element_id = temp_counter;
 
-    ViewCodegenContext item_ctx{item_ss, loop_parent_var, temp_counter, ctx.event_handlers, ctx.bindings,
+    ViewCodegenContext item_ctx{item_ss, region.is_html_loop ? "_sp" : loop_parent_var, temp_counter, ctx.event_handlers, ctx.bindings,
         temp_comp_counters, ctx.method_names, ctx.parent_component_name, true,
         nullptr, nullptr, nullptr, nullptr, var_name, &item_handles};
     // rows of elements are kept between syncs and updated where their values changed
     if (region.is_html_loop)
     {
         region.row = std::make_shared<RowPlan>();
+        region.row->name = "_loop_" + std::to_string(my_loop_id);
+        region.row->var = var_name;
+        region.row->start_expr = region.start_expr;
+        region.row->end_expr = region.end_expr;
         item_ctx.row = region.row.get();
     }
     for (auto &child : children)
@@ -1612,6 +1686,11 @@ void ViewForRangeStatement::generate_code(ViewCodegenContext& ctx)
         std::string lo = "_span_lo_" + std::to_string(my_loop_id);
         region.item_creation_code = "int32_t " + lo + " = webcc::deferred_handle_counter();\n" + region.item_creation_code +
             "coi_note_span(" + region.root_element_var + ", " + lo + ");\n";
+    }
+    if (region.row)
+    {
+        region.row->make_code = region.item_creation_code;
+        region.row->root_var = region.root_element_var;
     }
 
     // Generate item update code
@@ -1648,6 +1727,11 @@ void ViewForEachStatement::generate_code(ViewCodegenContext& ctx)
 
     if (ctx.in_loop || !key_expr || !ctx.loop_regions || !ctx.loop_counter)
     {
+        if (ctx.row && key_expr && row_sub_loop(ctx, true, var_name, children, [&](RowPlan &p) {
+                p.iterable_expr = iterable->to_webcc();
+                p.key_expr = key_expr->to_webcc();
+            }))
+            return;
         if (ctx.row) ctx.row->rebuild = true;
         ctx.ss << "        for (auto& " << cpp_name(var_name) << " : " << iterable->to_webcc() << ") {\n";
         std::stringstream body_ss;
@@ -1726,7 +1810,7 @@ void ViewForEachStatement::generate_code(ViewCodegenContext& ctx)
     std::map<std::string, int> temp_comp_counters = ctx.component_counters;
     int root_element_id = temp_counter;
 
-    ViewCodegenContext item_ctx{item_ss, loop_parent_var, temp_counter, ctx.event_handlers, ctx.bindings,
+    ViewCodegenContext item_ctx{item_ss, region.is_html_loop ? "_sp" : loop_parent_var, temp_counter, ctx.event_handlers, ctx.bindings,
         temp_comp_counters, ctx.method_names, ctx.parent_component_name, true,
         nullptr, nullptr, nullptr, nullptr, var_name, &item_handles};
     // rows of elements are kept between syncs, matched by key; a kept row's item may be another
@@ -1734,7 +1818,12 @@ void ViewForEachStatement::generate_code(ViewCodegenContext& ctx)
     if (region.is_html_loop)
     {
         region.row = std::make_shared<RowPlan>();
+        region.row->name = "_loop_" + std::to_string(my_loop_id);
+        region.row->var = var_name;
+        region.row->keyed = true;
         region.row->rebind = true;
+        region.row->iterable_expr = region.iterable_expr;
+        region.row->key_expr = region.key_expr;
         item_ctx.row = region.row.get();
     }
     for (auto &child : children)
@@ -1750,6 +1839,11 @@ void ViewForEachStatement::generate_code(ViewCodegenContext& ctx)
         std::string lo = "_span_lo_" + std::to_string(my_loop_id);
         region.item_creation_code = "int32_t " + lo + " = webcc::deferred_handle_counter();\n" + region.item_creation_code +
             "coi_note_span(" + region.root_element_var + ", " + lo + ");\n";
+    }
+    if (region.row)
+    {
+        region.row->make_code = region.item_creation_code;
+        region.row->root_var = region.root_element_var;
     }
 
     // Generate item update code

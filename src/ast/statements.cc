@@ -553,7 +553,7 @@ std::string ExpressionStatement::to_webcc()
                         result += "if (" + info.parent_var + ".is_valid()) {\n";
                         result += "    auto& " + cpp_name(info.var_name) + " = " + arr_cpp + "[" + arr_cpp + ".size() - 1];\n";
                         result += "    _loop_" + id + "_rows.emplace_back();\n";
-                        result += "    _loop_" + id + "_make(_loop_" + id + "_rows.back(), " + cpp_name(info.var_name) + ", " + info.anchor_var + ");\n";
+                        result += "    _loop_" + id + "_make(_loop_" + id + "_rows.back(), " + info.parent_var + ", " + cpp_name(info.var_name) + ", " + info.anchor_var + ");\n";
                         result += "    _loop_" + id + "_keys.push_back(coi_loop_key(" + info.key_expr + "));\n";
                         result += "    _loop_" + id + "_count = (int)" + arr_cpp + ".size();\n";
                         result += "}\n";
@@ -568,8 +568,7 @@ std::string ExpressionStatement::to_webcc()
                     {
                         std::string rows = "_loop_" + std::to_string(info.loop_id) + "_rows";
                         result += "    if (!" + rows + ".empty()) {\n";
-                        result += "        _forget_row(" + rows + ".back().first);\n";
-                        result += "        for (auto& _node : " + rows + ".back().nodes) webcc::dom::remove_element(_node);\n";
+                        result += "        _loop_" + std::to_string(info.loop_id) + "_drop(" + rows + ".back());\n";
                         result += "        " + rows + ".pop_back();\n";
                         result += "    }\n";
                         result += "    if (!_loop_" + std::to_string(info.loop_id) + "_keys.empty()) _loop_" + std::to_string(info.loop_id) + "_keys.pop_back();\n";
@@ -585,7 +584,7 @@ std::string ExpressionStatement::to_webcc()
                     for (const auto &info : loops)
                     {
                         std::string rows = "_loop_" + std::to_string(info.loop_id) + "_rows";
-                        result += "for (auto& _r : " + rows + ") { _forget_row(_r.first); for (auto& _node : _r.nodes) webcc::dom::remove_element(_node); }\n";
+                        result += "for (auto& _r : " + rows + ") _loop_" + std::to_string(info.loop_id) + "_drop(_r);\n";
                         result += rows + ".clear();\n";
                         result += "_loop_" + std::to_string(info.loop_id) + "_keys.clear();\n";
                         result += "_loop_" + std::to_string(info.loop_id) + "_count = 0;\n";

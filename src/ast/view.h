@@ -4,6 +4,7 @@
 #include "expressions.h"
 #include <map>
 #include <memory>
+#include <set>
 
 struct TextNode : ASTNode {
     std::string text;
@@ -63,30 +64,48 @@ struct ComponentProp {
     std::vector<std::string> callback_param_types;
 };
 
-// A row of a loop over a range, kept from one sync to the next: what its update has to find
-// again. The row's code is the component's own (it reads the component's members and calls its
-// methods as the rest of the view does); the row keeps its handles, the last value of each
-// binding and the state of each <if> inside it in a struct of its own (_row)
+// A row of a loop of elements, kept from one sync to the next: what its update has to find again.
+// The row's code is the component's own (it reads the component's members and calls its methods
+// as the rest of the view does); a struct of its own (_row) keeps its handles, the last value of
+// each binding, the side each <if> in it took, its components and the rows of a loop inside it
 struct RowPlan {
     // an <if> in the row, in the order the row's code meets them; parent -1 at the row's top
     struct If { std::string cond; int parent; bool in_then; };
     // a value shown in the row: slot is the element's handle in _row.h, kind how it is set
     // (attr, value, prop, text, textnode, html)
     struct Bind { int slot; std::string kind; std::string name; std::string value_code; int iff; bool in_then; };
-    // a component in the row: its instance in _row.cN, its props set again on an update
+    // a component in the row: its instance in _row.cN (made in the row's own list of its type),
+    // its props set again on an update
     struct Comp { int index; std::string type; std::string update_code; int iff; bool in_then; };
     // a handler registration in the row (its element as _row.h[n]), set again on an update
     struct Handler { std::string code; int iff; bool in_then; };
+    // a loop inside the row: its rows are the row's (_row.sN), synced when the row updates
+    struct Sub { std::shared_ptr<RowPlan> plan; int iff; bool in_then; };
+
+    std::string name;           // _loop_3, or _loop_3_s0 for a loop inside its rows
+    std::string var;            // the loop variable
+    bool keyed = false;         // a keyed loop's row stands for an item, a range row for an index
+    std::string start_expr, end_expr;       // a range
+    std::string iterable_expr, key_expr;    // a keyed loop
+    std::string make_code;      // the row's code; it appends to _sp, the loop's parent
+    std::string root_var;       // the row's first element, its handle span noted on it
+
     std::vector<If> ifs;
     std::vector<Bind> binds;
     std::vector<Comp> comps;
     std::vector<Handler> handlers;
+    std::vector<Sub> subs;
+    std::set<std::string> comp_types;
+    int slots = 0;
     // a keyed row: its item can change while the row is kept, so its handlers are set again
     bool rebind = false;
-    int slots = 0;
-    // a loop inside the row: its items aren't tracked, so the row is built again on every sync
+    // a loop inside the row that it can't keep (a loop without a key, or one whose body doesn't
+    // start with an element): the row is built again on every sync
     bool rebuild = false;
 };
+
+// a kept row's own list of a component type: "_row.k_<Type>"
+std::string row_comp_list(const std::string &qname);
 
 // Struct to track reactive loop regions 
 struct LoopRegion {

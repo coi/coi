@@ -1,0 +1,64 @@
+// a loop inside a kept row keeps its rows too: a change elsewhere writes nothing, a changed inner
+// item updates its row in place (and its component), inner rows come, go and move with their
+// keys, an inner handler has both loop variables as they are now, a range inside a row follows
+// its count, and a row that goes takes its inner rows with it
+pod Book { int id; string name; }
+pod Page { int id; int book; string title; }
+
+component Mark(string label) {
+    view { <b class="mark">{label}</b> }
+}
+
+component NestedRowsKept {
+    mut Book[] books = [Book{id = 1, name = "A"}, Book{id = 2, name = "B"}];
+    mut Page[] pages = [Page{id = 10, book = 1, title = "x"}, Page{id = 11, book = 1, title = "y"}, Page{id = 12, book = 2, title = "z"}];
+    mut int other = 0;
+    mut int stars = 1;
+    mut string opened = "";
+    mut int next = 13;
+
+    def bump() : void { other++; }
+    def retitle() : void { pages[0].title = "X"; }
+    def move() : void { pages[1].book = 2; }
+    def add() : void { pages.push(Page{id = next, book = 1, title = `p${next}`}); next++; }
+    def flip() : void {
+        mut Page[] r;
+        mut int i = pages.size() - 1;
+        while (i >= 0) { r.push(pages[i]); i--; }
+        pages = r;
+    }
+    def more() : void { stars++; }
+    def dropBook() : void { books.remove(0); }
+    def open(Book b, Page p) : void { opened = `${b.name}/${p.title}`; }
+
+    view {
+        <div>
+            <button class="bump" onclick={bump}>bump</button>
+            <button class="retitle" onclick={retitle}>retitle</button>
+            <button class="move" onclick={move}>move</button>
+            <button class="add" onclick={add}>add</button>
+            <button class="flip" onclick={flip}>flip</button>
+            <button class="more" onclick={more}>more</button>
+            <button class="dropbook" onclick={dropBook}>drop book</button>
+            <span class="other">{other}</span>
+            <span class="opened">{opened}</span>
+            <div class="list">
+                <for b in books key={b.id}>
+                    <div class="book" data-id={`${b.id}`}>
+                        <span class="name">{b.name}</span>
+                        <span class="stars"><for s in 0:stars><i class="star">*</i></for></span>
+                        <div class="pages">
+                            <for p in pages key={p.id}>
+                                <div class={p.book == b.id ? "page" : "page hidden"} data-id={`${p.id}`} onclick={open(b, p)}>
+                                    <Mark label={p.title} />
+                                </div>
+                            </for>
+                        </div>
+                    </div>
+                </for>
+            </div>
+        </div>
+    }
+}
+
+app { root = NestedRowsKept; }

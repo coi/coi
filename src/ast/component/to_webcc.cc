@@ -188,6 +188,232 @@ static void emit_loop_vector_members(std::stringstream &ss, const std::set<std::
     ss << "    }\n";
 }
 
+
+// ---- kept rows (RowPlan, view.h) ----
+
+// the struct of one row: its nodes at the top (to move and remove), the handle its span is noted
+// on, the index it was made for (a range row's handlers have it), what its update compares, its
+// components, and the rows of each loop inside it
+static void emit_row_struct(std::stringstream &ss, const RowPlan &plan)
+{
+    for (const auto &sub : plan.subs)
+        emit_row_struct(ss, *sub.plan);
+    ss << "    struct " << plan.name << "_row {\n";
+    ss << "        webcc::handle first;\n";
+    ss << "        coi::vector<webcc::handle> nodes;\n";
+    ss << "        int at = 0;\n";
+    ss << "        webcc::handle h[" << std::max(1, plan.slots) << "];\n";
+    ss << "        coi::string v[" << std::max<size_t>(1, plan.binds.size()) << "];\n";
+    ss << "        bool f[" << std::max<size_t>(1, plan.ifs.size()) << "] = {};\n";
+    for (const auto &c : plan.comps)
+        ss << "        " << c.type << "* c" << c.index << " = nullptr;\n";
+    for (const auto &t : plan.comp_types)
+        ss << "        coi::components<" << t << "> " << row_comp_list(t).substr(5) << ";\n";
+    for (size_t k = 0; k < plan.subs.size(); k++)
+    {
+        std::string sk = "s" + std::to_string(k);
+        ss << "        coi::vector<" << plan.subs[k].plan->name << "_row> " << sk << ";\n";
+        ss << "        coi::vector<coi::string> " << sk << "_keys;\n";
+        ss << "        webcc::handle " << sk << "_parent;\n";
+        ss << "        webcc::handle " << sk << "_anchor;\n";
+    }
+    ss << "    };\n";
+}
+
+// the loop variable as a parameter: a range row has its index, a keyed row its item
+static std::string row_param(const RowPlan &plan)
+{
+    return (plan.keyed ? "auto&& " : "int ") + cpp_name(plan.var);
+}
+
+// the sync of a list of rows: those whose key (or index) is still there are kept, updated where
+// their values changed or built again where their shape did, the others go, new ones are made;
+// a keyed list is then put in order, moving only rows out of place. oa: the loop variables
+// around, as arguments ("nb_, ")
+static void emit_rows_sync(std::stringstream &ss, const RowPlan &plan, const std::string &rows, const std::string &keys,
+                           const std::string &parent, const std::string &anchor, const std::string &oa)
+{
+    std::string p = plan.name;
+    std::string var = cpp_name(plan.var);
+    if (!plan.keyed)
+    {
+        ss << "        int _from = " << plan.start_expr << ";\n";
+        ss << "        int _n = " << plan.end_expr << " - _from;\n";
+        ss << "        if (_n < 0) _n = 0;\n";
+        ss << "        g_view_depth++;\n";
+        ss << "        while ((int)" << rows << ".size() > _n) { " << p << "_drop(" << rows << ".back()); " << rows << ".pop_back(); }\n";
+        ss << "        for (int _k = 0; _k < (int)" << rows << ".size(); _k++) {\n";
+        ss << "            if (" << p << "_same(" << rows << "[_k], " << oa << "_from + _k)) " << p << "_update(" << rows << "[_k], " << oa << "_from + _k);\n";
+        ss << "            else " << p << "_remake(" << rows << "[_k], " << parent << ", " << oa << "_from + _k, _k + 1 < (int)" << rows << ".size() ? " << rows << "[_k + 1].nodes[0] : " << anchor << ");\n";
+        ss << "        }\n";
+        ss << "        for (int _k = (int)" << rows << ".size(); _k < _n; _k++) {\n";
+        ss << "            " << rows << ".emplace_back();\n";
+        ss << "            " << p << "_make(" << rows << ".back(), " << parent << ", " << oa << "_from + _k, " << anchor << ");\n";
+        ss << "        }\n";
+        ss << "        if (--g_view_depth == 0) webcc::flush();\n";
+        return;
+    }
+    bool temp = plan.iterable_expr.find_first_of("({") != std::string::npos;
+    std::string item_ref = std::string(temp ? "auto " : "auto& ") + var + " = _items[_idx];\n";
+    ss << "        auto&& _items = " << plan.iterable_expr << ";\n";
+    ss << "        int _n = (int)_items.size();\n";
+    ss << "        coi::vector<" << p << "_row> _old = webcc::move(" << rows << ");\n";
+    ss << "        " << rows << " = coi::vector<" << p << "_row>();\n";
+    ss << "        bool _keyed = " << keys << ".size() == _old.size();\n";
+    ss << "        coi::vector<int> _taken;\n";
+    ss << "        for (int _j = 0; _j < (int)_old.size(); _j++) _taken.push_back(0);\n";
+    ss << "        coi::vector<int> _take;\n";
+    ss << "        coi::vector<coi::string> _new_keys;\n";
+    ss << "        for (int _idx = 0; _idx < _n; _idx++) {\n";
+    ss << "            " << item_ref;
+    ss << "            coi::string _k = coi_loop_key(" << plan.key_expr << ");\n";
+    ss << "            int _m = -1;\n";
+    ss << "            if (_keyed) {\n";
+    ss << "                if (_idx < (int)_old.size() && !_taken[_idx] && " << keys << "[_idx] == _k) _m = _idx;\n";
+    ss << "                else for (int _j = 0; _j < (int)_old.size(); _j++) { if (!_taken[_j] && " << keys << "[_j] == _k) { _m = _j; break; } }\n";
+    ss << "            }\n";
+    ss << "            if (_m >= 0) _taken[_m] = 1;\n";
+    ss << "            _take.push_back(_m);\n";
+    ss << "            _new_keys.push_back(_k);\n";
+    ss << "        }\n";
+    ss << "        g_view_depth++;\n";
+    ss << "        for (int _j = 0; _j < (int)_old.size(); _j++) if (!_taken[_j]) " << p << "_drop(_old[_j]);\n";
+    ss << "        " << rows << ".reserve(_n);\n";
+    ss << "        for (int _idx = 0; _idx < _n; _idx++) {\n";
+    ss << "            " << item_ref;
+    ss << "            if (_take[_idx] >= 0) {\n";
+    ss << "                " << rows << ".push_back(webcc::move(_old[_take[_idx]]));\n";
+    ss << "                auto& _r = " << rows << ".back();\n";
+    ss << "                if (" << p << "_same(_r, " << oa << var << ")) " << p << "_update(_r, " << oa << var << ");\n";
+    ss << "                else " << p << "_remake(_r, " << parent << ", " << oa << var << ", " << anchor << ");\n";
+    ss << "            } else {\n";
+    ss << "                " << rows << ".emplace_back();\n";
+    ss << "                " << p << "_make(" << rows << ".back(), " << parent << ", " << oa << var << ", " << anchor << ");\n";
+    ss << "            }\n";
+    ss << "        }\n";
+    ss << "        for (int _idx = _n - 1; _idx >= 0; _idx--)\n";
+    ss << "            webcc::dom::place(" << parent << ", " << rows << "[_idx].nodes[0], _idx + 1 < _n ? " << rows << "[_idx + 1].nodes[0] : " << anchor << ");\n";
+    ss << "        " << keys << " = _new_keys;\n";
+    ss << "        if (--g_view_depth == 0) webcc::flush();\n";
+}
+
+// a row's functions: made (before _at, in _sp), the same shape as when made, updated, forgotten
+// (its handlers and components, and those of the rows inside it), dropped (and its nodes), built
+// again in its place (made after it and morphed onto it node by node, so what is in it, focus, a
+// caret, pointer capture, stays), and the sync of each loop inside it. op/oa: the loop variables
+// around, as parameters ("auto&& nb_, ") and arguments ("nb_, ")
+static void emit_row_functions(std::stringstream &ss, const RowPlan &plan, const std::string &op, const std::string &oa)
+{
+    std::string p = plan.name;
+    std::string row_t = p + "_row";
+    std::string var = cpp_name(plan.var);
+    std::string own = op + row_param(plan);
+    std::function<std::string(int, bool)> active = [&](int k, bool then) -> std::string {
+        if (k < 0) return "true";
+        std::string me = then ? "_row.f[" + std::to_string(k) + "]" : "!_row.f[" + std::to_string(k) + "]";
+        return plan.ifs[k].parent < 0 ? me : "(" + active(plan.ifs[k].parent, plan.ifs[k].in_then) + " && " + me + ")";
+    };
+
+    std::string make = transform_to_insert_before(plan.make_code, "_sp", "_at");
+    make = track_top_level_inserts(make, "_sp", "_row.nodes");
+    ss << "    void " << p << "_make(" << row_t << "& _row, webcc::handle _sp, " << own << ", webcc::handle _at) {\n";
+    ss << indent_code(make, "    ");
+    ss << "        _row.first = " << plan.root_var << ";\n";
+    if (!plan.keyed)
+        ss << "        _row.at = " << var << ";\n";
+    ss << "    }\n";
+
+    ss << "    bool " << p << "_same(" << row_t << "& _row, " << own << ") {\n";
+    ss << "        (void)" << var << ";\n";
+    if (!plan.keyed)
+        ss << "        if (_row.at != " << var << ") return false;\n";
+    if (plan.rebuild)
+        ss << "        return false;\n";
+    for (size_t k = 0; k < plan.ifs.size(); k++)
+    {
+        const auto &f = plan.ifs[k];
+        ss << "        if (" << active(f.parent, f.in_then) << " && (bool)(" << f.cond << ") != _row.f[" << k << "]) return false;\n";
+    }
+    ss << "        return true;\n";
+    ss << "    }\n";
+
+    ss << "    void " << p << "_update(" << row_t << "& _row, " << own << ") {\n";
+    ss << "        (void)" << var << ";\n";
+    for (size_t b = 0; b < plan.binds.size(); b++)
+    {
+        const auto &bind = plan.binds[b];
+        std::string h = "_row.h[" + std::to_string(bind.slot) + "]";
+        std::string v = "_row.v[" + std::to_string(b) + "]";
+        std::string set;
+        if (bind.kind == "attr")
+            set = "webcc::dom::set_attribute(" + h + ", \"" + bind.name + "\", " + v + ");";
+        else if (bind.kind == "value")
+            set = "webcc::dom::set_property(" + h + ", \"value\", " + v + ");";
+        else if (bind.kind == "prop")
+            set = "webcc::dom::set_property(" + h + ", \"" + bind.name + "\", coi_bool_attr(" + bind.value_code + "));";
+        else if (bind.kind == "text")
+            set = "webcc::dom::set_inner_text(" + h + ", " + v + ");";
+        else if (bind.kind == "textnode")
+            set = "webcc::dom::set_node_value(" + h + ", " + v + ");";
+        else
+            set = "webcc::dom::set_inner_html(" + h + ", " + v + ");";
+        ss << "        if (" << active(bind.iff, bind.in_then) << ") {\n";
+        ss << "            coi::string _v;\n";
+        ss << "            " << generate_formatter_block(std::vector<std::string>{bind.value_code}, "_v = coi::string(") << "\n";
+        ss << "            if (!(_v == " << v << ")) { " << v << " = _v; " << set << " }\n";
+        ss << "        }\n";
+    }
+    for (const auto &c : plan.comps)
+    {
+        ss << "        if (_row.c" << c.index << " && " << active(c.iff, c.in_then) << ") {\n";
+        ss << "            auto& _inst = *_row.c" << c.index << ";\n";
+        ss << c.update_code;
+        ss << "        }\n";
+    }
+    for (const auto &h : plan.handlers)
+    {
+        ss << "        if (" << active(h.iff, h.in_then) << ") {\n";
+        ss << indent_code(h.code, "    ");
+        ss << "        }\n";
+    }
+    for (const auto &sub : plan.subs)
+        ss << "        if (" << active(sub.iff, sub.in_then) << ") " << sub.plan->name << "_sync(_row, " << oa << var << ");\n";
+    ss << "    }\n";
+
+    ss << "    void " << p << "_forget(" << row_t << "& _row) {\n";
+    for (size_t k = 0; k < plan.subs.size(); k++)
+        ss << "        for (auto& _r : _row.s" << k << ") " << plan.subs[k].plan->name << "_forget(_r);\n";
+    ss << "        _forget_row(_row.first);\n";
+    for (const auto &t : plan.comp_types)
+        ss << "        " << row_comp_list(t) << ".clear(true);\n";
+    ss << "    }\n";
+    ss << "    void " << p << "_drop(" << row_t << "& _row) {\n";
+    ss << "        " << p << "_forget(_row);\n";
+    ss << "        for (auto& _node : _row.nodes) webcc::dom::remove_element(_node);\n";
+    ss << "    }\n";
+
+    ss << "    void " << p << "_remake(" << row_t << "& _old, webcc::handle _sp, " << own << ", webcc::handle _at) {\n";
+    ss << "        " << row_t << " _fresh;\n";
+    ss << "        " << p << "_make(_fresh, _sp, " << oa << var << ", _at);\n";
+    ss << "        " << p << "_forget(_old);\n";
+    ss << "        for (size_t _j = 0; _j < _old.nodes.size(); _j++) {\n";
+    ss << "            if (_j < _fresh.nodes.size()) webcc::dom::morph(_old.nodes[_j], _fresh.nodes[_j]);\n";
+    ss << "            else webcc::dom::remove_element(_old.nodes[_j]);\n";
+    ss << "        }\n";
+    ss << "        _old = webcc::move(_fresh);\n";
+    ss << "    }\n";
+
+    for (size_t k = 0; k < plan.subs.size(); k++)
+    {
+        const RowPlan &sub = *plan.subs[k].plan;
+        std::string sk = "_up.s" + std::to_string(k);
+        emit_row_functions(ss, sub, own + ", ", oa + var + ", ");
+        ss << "    void " << sub.name << "_sync(" << row_t << "& _up, " << own << ") {\n";
+        emit_rows_sync(ss, sub, sk, sk + "_keys", sk + "_parent", sk + "_anchor", oa + var + ", ");
+        ss << "    }\n";
+    }
+}
+
 static void emit_loop_region_members(std::stringstream &ss, const std::vector<LoopRegion> &loop_regions)
 {
     for (const auto &region : loop_regions)
@@ -205,23 +431,10 @@ static void emit_loop_region_members(std::stringstream &ss, const std::vector<Lo
         }
         if (region.row)
         {
-            const RowPlan &plan = *region.row;
-            std::string id = std::to_string(region.loop_id);
-            // one row: its nodes at the top (to move and remove), the handle its span is noted on,
-            // the index it was made for (its handlers have it), and what its update compares
-            ss << "    struct _loop_" << id << "_row {\n";
-            ss << "        webcc::handle first;\n";
-            ss << "        coi::vector<webcc::handle> nodes;\n";
-            ss << "        int at = 0;\n";
-            ss << "        webcc::handle h[" << std::max(1, plan.slots) << "];\n";
-            ss << "        coi::string v[" << std::max<size_t>(1, plan.binds.size()) << "];\n";
-            ss << "        bool f[" << std::max<size_t>(1, plan.ifs.size()) << "] = {};\n";
-            for (const auto &c : plan.comps)
-                ss << "        " << c.type << "* c" << c.index << " = nullptr;\n";
-            ss << "    };\n";
-            ss << "    coi::vector<_loop_" << id << "_row> _loop_" << id << "_rows;\n";
+            emit_row_struct(ss, *region.row);
+            ss << "    coi::vector<" << region.row->name << "_row> " << region.row->name << "_rows;\n";
             if (region.is_keyed)
-                ss << "    coi::vector<coi::string> _loop_" << id << "_keys;\n";
+                ss << "    coi::vector<coi::string> " << region.row->name << "_keys;\n";
         }
         else if (region.is_keyed && !region.component_type.empty() && !region.is_member_ref_loop)
         {
@@ -1234,107 +1447,11 @@ std::string Component::to_webcc(CompilerSession &session)
         }
     }
 
-    // A loop over a range of elements keeps its rows: each row is made once and afterwards only
-    // what changed in it is set again. A row whose shape changed (an <if> in it turned, or it
-    // stands for another index now) is built again and morphed onto the old one
+    // loops of elements keep their rows: each row is made once, afterwards only what changed in it
+    // is set again, and a row whose shape changed is built again in its place
     for (const auto &region : loop_regions)
-    {
-        if (!region.row)
-            continue;
-        const RowPlan &plan = *region.row;
-        std::string id = std::to_string(region.loop_id);
-        std::string row_t = "_loop_" + id + "_row";
-        std::string parent_var = "_loop_" + id + "_parent";
-        std::string var = cpp_name(region.var_name);
-        // a range row has its index, a keyed row its item
-        std::string param = region.is_keyed ? "auto&& " + var : "int " + var;
-        // is the <if> k, and every <if> around it, on the side it was made with?
-        std::function<std::string(int, bool)> active = [&](int k, bool then) -> std::string {
-            if (k < 0) return "true";
-            std::string me = then ? "_row.f[" + std::to_string(k) + "]" : "!_row.f[" + std::to_string(k) + "]";
-            return plan.ifs[k].parent < 0 ? me : "(" + active(plan.ifs[k].parent, plan.ifs[k].in_then) + " && " + me + ")";
-        };
-
-        // made before _at (the next row's first node, or the anchor)
-        std::string make = transform_to_insert_before(region.item_creation_code, parent_var, "_at");
-        make = track_top_level_inserts(make, parent_var, "_row.nodes");
-        ss << "    void _loop_" << id << "_make(" << row_t << "& _row, " << param << ", webcc::handle _at) {\n";
-        ss << indent_code(make, "    ");
-        ss << "        _row.first = " << region.root_element_var << ";\n";
-        if (!region.is_keyed)
-            ss << "        _row.at = " << var << ";\n";
-        ss << "    }\n";
-
-        // the same shape: the same index, and every <if> on the same side as when made
-        ss << "    bool _loop_" << id << "_same(" << row_t << "& _row, " << param << ") {\n";
-        ss << "        (void)" << var << ";\n";
-        if (!region.is_keyed)
-            ss << "        if (_row.at != " << var << ") return false;\n";
-        if (plan.rebuild)
-            ss << "        return false;\n";
-        for (size_t k = 0; k < plan.ifs.size(); k++)
-        {
-            const auto &f = plan.ifs[k];
-            ss << "        if (" << active(f.parent, f.in_then) << " && (bool)(" << f.cond << ") != _row.f[" << k << "]) return false;\n";
-        }
-        ss << "        return true;\n";
-        ss << "    }\n";
-
-        // the values that came out different, and the props of the row's components
-        ss << "    void _loop_" << id << "_update(" << row_t << "& _row, " << param << ") {\n";
-        ss << "        (void)" << var << ";\n";
-        for (size_t b = 0; b < plan.binds.size(); b++)
-        {
-            const auto &bind = plan.binds[b];
-            std::string h = "_row.h[" + std::to_string(bind.slot) + "]";
-            std::string v = "_row.v[" + std::to_string(b) + "]";
-            std::string set;
-            if (bind.kind == "attr")
-                set = "webcc::dom::set_attribute(" + h + ", \"" + bind.name + "\", " + v + ");";
-            else if (bind.kind == "value")
-                set = "webcc::dom::set_property(" + h + ", \"value\", " + v + ");";
-            else if (bind.kind == "prop")
-                set = "webcc::dom::set_property(" + h + ", \"" + bind.name + "\", coi_bool_attr(" + bind.value_code + "));";
-            else if (bind.kind == "text")
-                set = "webcc::dom::set_inner_text(" + h + ", " + v + ");";
-            else if (bind.kind == "textnode")
-                set = "webcc::dom::set_node_value(" + h + ", " + v + ");";
-            else
-                set = "webcc::dom::set_inner_html(" + h + ", " + v + ");";
-            ss << "        if (" << active(bind.iff, bind.in_then) << ") {\n";
-            ss << "            coi::string _v;\n";
-            ss << "            " << generate_formatter_block(std::vector<std::string>{bind.value_code}, "_v = coi::string(") << "\n";
-            ss << "            if (!(_v == " << v << ")) { " << v << " = _v; " << set << " }\n";
-            ss << "        }\n";
-        }
-        for (const auto &c : plan.comps)
-        {
-            ss << "        if (_row.c" << c.index << " && " << active(c.iff, c.in_then) << ") {\n";
-            ss << "            auto& _inst = *_row.c" << c.index << ";\n";
-            ss << c.update_code;
-            ss << "        }\n";
-        }
-        for (const auto &h : plan.handlers)
-        {
-            ss << "        if (" << active(h.iff, h.in_then) << ") {\n";
-            ss << indent_code(h.code, "    ");
-            ss << "        }\n";
-        }
-        ss << "    }\n";
-
-        // built again in its place: made after the old row, then morphed onto it node by node,
-        // so what is in it (focus, a caret, pointer capture) stays
-        ss << "    void _loop_" << id << "_remake(" << row_t << "& _old, " << param << ", webcc::handle _at) {\n";
-        ss << "        " << row_t << " _fresh;\n";
-        ss << "        _loop_" << id << "_make(_fresh, " << var << ", _at);\n";
-        ss << "        _forget_row(_old.first);\n";
-        ss << "        for (size_t _j = 0; _j < _old.nodes.size(); _j++) {\n";
-        ss << "            if (_j < _fresh.nodes.size()) webcc::dom::morph(_old.nodes[_j], _fresh.nodes[_j]);\n";
-        ss << "            else webcc::dom::remove_element(_old.nodes[_j]);\n";
-        ss << "        }\n";
-        ss << "        _old = webcc::move(_fresh);\n";
-        ss << "    }\n";
-    }
+        if (region.row)
+            emit_row_functions(ss, *region.row, "", "");
 
     // Generate _sync_loop_X() methods
     for (const auto &region : loop_regions)
@@ -1345,92 +1462,11 @@ std::string Component::to_webcc(CompilerSession &session)
         // insert. The loop is rendered in full when its region is (re)mounted.
         ss << "        if (!_loop_" << region.loop_id << "_parent.is_valid()) return;\n";
 
-        if (region.row && region.is_keyed)
-        {
-            // rows are matched by key: a row whose key is still there is kept (updated, or built
-            // again where its shape changed), the others go, new keys get a row; then the rows
-            // are put in order, moving only those out of place
-            std::string id = std::to_string(region.loop_id);
-            std::string rows = "_loop_" + id + "_rows";
-            std::string keys = "_loop_" + id + "_keys";
-            std::string anchor = "_loop_" + id + "_anchor";
-            bool temp = region.iterable_expr.find_first_of("({") != std::string::npos;
-            std::string item_ref = std::string(temp ? "auto " : "auto& ") + cpp_name(region.var_name) + " = _items[_idx];\n";
-            ss << "        auto&& _items = " << region.iterable_expr << ";\n";
-            ss << "        int _n = (int)_items.size();\n";
-            ss << "        coi::vector<_loop_" << id << "_row> _old = webcc::move(" << rows << ");\n";
-            ss << "        " << rows << " = coi::vector<_loop_" << id << "_row>();\n";
-            ss << "        bool _keyed = " << keys << ".size() == _old.size();\n";
-            ss << "        coi::vector<int> _taken;\n";
-            ss << "        for (int _j = 0; _j < (int)_old.size(); _j++) _taken.push_back(0);\n";
-            ss << "        coi::vector<int> _take;\n";
-            ss << "        coi::vector<coi::string> _new_keys;\n";
-            ss << "        for (int _idx = 0; _idx < _n; _idx++) {\n";
-            ss << "            " << item_ref;
-            ss << "            coi::string _k = coi_loop_key(" << region.key_expr << ");\n";
-            ss << "            int _m = -1;\n";
-            ss << "            if (_keyed) {\n";
-            ss << "                if (_idx < (int)_old.size() && !_taken[_idx] && " << keys << "[_idx] == _k) _m = _idx;\n";
-            ss << "                else for (int _j = 0; _j < (int)_old.size(); _j++) { if (!_taken[_j] && " << keys << "[_j] == _k) { _m = _j; break; } }\n";
-            ss << "            }\n";
-            ss << "            if (_m >= 0) _taken[_m] = 1;\n";
-            ss << "            _take.push_back(_m);\n";
-            ss << "            _new_keys.push_back(_k);\n";
-            ss << "        }\n";
-            ss << "        g_view_depth++;\n";
-            ss << "        for (int _j = 0; _j < (int)_old.size(); _j++) {\n";
-            ss << "            if (_taken[_j]) continue;\n";
-            ss << "            _forget_row(_old[_j].first);\n";
-            ss << "            for (auto& _node : _old[_j].nodes) webcc::dom::remove_element(_node);\n";
-            ss << "        }\n";
-            ss << "        " << rows << ".reserve(_n);\n";
-            ss << "        for (int _idx = 0; _idx < _n; _idx++) {\n";
-            ss << "            " << item_ref;
-            ss << "            if (_take[_idx] >= 0) {\n";
-            ss << "                " << rows << ".push_back(webcc::move(_old[_take[_idx]]));\n";
-            ss << "                auto& _r = " << rows << ".back();\n";
-            ss << "                if (_loop_" << id << "_same(_r, " << cpp_name(region.var_name) << ")) _loop_" << id << "_update(_r, " << cpp_name(region.var_name) << ");\n";
-            ss << "                else _loop_" << id << "_remake(_r, " << cpp_name(region.var_name) << ", " << anchor << ");\n";
-            ss << "            } else {\n";
-            ss << "                " << rows << ".emplace_back();\n";
-            ss << "                _loop_" << id << "_make(" << rows << ".back(), " << cpp_name(region.var_name) << ", " << anchor << ");\n";
-            ss << "            }\n";
-            ss << "        }\n";
-            ss << "        for (int _idx = _n - 1; _idx >= 0; _idx--)\n";
-            ss << "            webcc::dom::place(_loop_" << id << "_parent, " << rows << "[_idx].nodes[0], _idx + 1 < _n ? " << rows << "[_idx + 1].nodes[0] : " << anchor << ");\n";
-            ss << "        " << keys << " = _new_keys;\n";
-            ss << "        if (--g_view_depth == 0) webcc::flush();\n";
-            ss << "        _loop_" << id << "_count = _n;\n";
-            ss << "    }\n";
-            continue;
-        }
-
         if (region.row)
         {
-            // rows past the new end go, the rest are updated (or built again where their shape
-            // changed), new ones come at the end. The loop variable runs from the start expression
-            std::string id = std::to_string(region.loop_id);
-            std::string rows = "_loop_" + id + "_rows";
-            ss << "        int _from = " << region.start_expr << ";\n";
-            ss << "        int _n = " << region.end_expr << " - _from;\n";
-            ss << "        if (_n < 0) _n = 0;\n";
-            ss << "        g_view_depth++;\n";
-            ss << "        while ((int)" << rows << ".size() > _n) {\n";
-            ss << "            auto& _r = " << rows << ".back();\n";
-            ss << "            _forget_row(_r.first);\n";
-            ss << "            for (auto& _node : _r.nodes) webcc::dom::remove_element(_node);\n";
-            ss << "            " << rows << ".pop_back();\n";
-            ss << "        }\n";
-            ss << "        for (int _k = 0; _k < (int)" << rows << ".size(); _k++) {\n";
-            ss << "            if (_loop_" << id << "_same(" << rows << "[_k], _from + _k)) _loop_" << id << "_update(" << rows << "[_k], _from + _k);\n";
-            ss << "            else _loop_" << id << "_remake(" << rows << "[_k], _from + _k, _k + 1 < (int)" << rows << ".size() ? " << rows << "[_k + 1].nodes[0] : _loop_" << id << "_anchor);\n";
-            ss << "        }\n";
-            ss << "        for (int _k = (int)" << rows << ".size(); _k < _n; _k++) {\n";
-            ss << "            " << rows << ".emplace_back();\n";
-            ss << "            _loop_" << id << "_make(" << rows << ".back(), _from + _k, _loop_" << id << "_anchor);\n";
-            ss << "        }\n";
-            ss << "        if (--g_view_depth == 0) webcc::flush();\n";
-            ss << "        _loop_" << id << "_count = _n;\n";
+            std::string p = region.row->name;
+            emit_rows_sync(ss, *region.row, p + "_rows", p + "_keys", p + "_parent", p + "_anchor", "");
+            ss << "        " << p << "_count = (int)" << p << "_rows.size();\n";
             ss << "    }\n";
             continue;
         }
@@ -1553,7 +1589,7 @@ std::string Component::to_webcc(CompilerSession &session)
             ss << "        if (!(" << keys << "[_idx] == coi_loop_key(" << region.key_expr << "))) { _sync_loop_" << id << "(); return; }\n";
             ss << "        g_view_depth++;\n";
             ss << "        if (_loop_" << id << "_same(" << rows << "[_idx], " << cpp_name(region.var_name) << ")) _loop_" << id << "_update(" << rows << "[_idx], " << cpp_name(region.var_name) << ");\n";
-            ss << "        else _loop_" << id << "_remake(" << rows << "[_idx], " << cpp_name(region.var_name) << ", _loop_" << id << "_anchor);\n";
+            ss << "        else _loop_" << id << "_remake(" << rows << "[_idx], _loop_" << id << "_parent, " << cpp_name(region.var_name) << ", _loop_" << id << "_anchor);\n";
             ss << "        if (--g_view_depth == 0) webcc::flush();\n";
             ss << "    }\n";
         }
@@ -1594,7 +1630,7 @@ std::string Component::to_webcc(CompilerSession &session)
             else if (lr.row)
             {
                 std::string rows = "_loop_" + std::to_string(loop_id) + "_rows";
-                ss << "            for (auto& _r : " << rows << ") { _forget_row(_r.first); for (auto& _n : _r.nodes) webcc::dom::remove_element(_n); }\n";
+                ss << "            for (auto& _r : " << rows << ") _loop_" << loop_id << "_drop(_r);\n";
                 ss << "            " << rows << ".clear();\n";
                 if (lr.is_keyed)
                     ss << "            _loop_" << loop_id << "_keys.clear();\n";
