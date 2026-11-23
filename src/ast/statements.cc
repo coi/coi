@@ -346,6 +346,22 @@ std::string MemberAssignment::to_webcc()
             result += "}";
         }
     }
+    // notes[i].title = ...: the <for> over notes shows it, in that item's row when the index is a
+    // plain name or number (said again here), else in a sync of the whole loop
+    else if (auto ix = dynamic_cast<IndexAccess *>(root))
+    {
+        auto *arr = dynamic_cast<Identifier *>(ix->array.get());
+        auto hl = arr ? g_array_loops.find(arr->name) : g_array_loops.end();
+        if (hl != g_array_loops.end())
+        {
+            bool plain = dynamic_cast<Identifier *>(ix->index.get()) || ix->index->is_static();
+            for (const auto &loop : hl->second)
+            {
+                std::string id = std::to_string(loop.loop_id);
+                result += plain ? "\n_sync_loop_" + id + "_item((int)(" + ix->index->to_webcc() + "));" : "\n_sync_loop_" + id + "();";
+            }
+        }
+    }
 
     return result;
 }
