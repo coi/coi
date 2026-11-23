@@ -3,6 +3,7 @@
 #include "node.h"
 #include "expressions.h"
 #include <map>
+#include <memory>
 
 struct TextNode : ASTNode {
     std::string text;
@@ -62,6 +63,31 @@ struct ComponentProp {
     std::vector<std::string> callback_param_types;
 };
 
+// A row of a loop over a range, kept from one sync to the next: what its update has to find
+// again. The row's code is the component's own (it reads the component's members and calls its
+// methods as the rest of the view does); the row keeps its handles, the last value of each
+// binding and the state of each <if> inside it in a struct of its own (_row)
+struct RowPlan {
+    // an <if> in the row, in the order the row's code meets them; parent -1 at the row's top
+    struct If { std::string cond; int parent; bool in_then; };
+    // a value shown in the row: slot is the element's handle in _row.h, kind how it is set
+    // (attr, value, prop, text, textnode, html)
+    struct Bind { int slot; std::string kind; std::string name; std::string value_code; int iff; bool in_then; };
+    // a component in the row: its instance in _row.cN, its props set again on an update
+    struct Comp { int index; std::string type; std::string update_code; int iff; bool in_then; };
+    // a handler registration in the row (its element as _row.h[n]), set again on an update
+    struct Handler { std::string code; int iff; bool in_then; };
+    std::vector<If> ifs;
+    std::vector<Bind> binds;
+    std::vector<Comp> comps;
+    std::vector<Handler> handlers;
+    // a keyed row: its item can change while the row is kept, so its handlers are set again
+    bool rebind = false;
+    int slots = 0;
+    // a loop inside the row: its items aren't tracked, so the row is built again on every sync
+    bool rebuild = false;
+};
+
 // Struct to track reactive loop regions 
 struct LoopRegion {
     int loop_id;
@@ -82,6 +108,7 @@ struct LoopRegion {
     std::string key_type;
     std::string iterable_expr;
     std::string iterable_raw;     // the Coi spelling: the loop registries are looked up by it
+    std::shared_ptr<RowPlan> row; // a loop over a range of elements: its rows are kept and updated
 };
 
 // Struct to track reactive if/else regions
@@ -142,13 +169,27 @@ struct ViewCodegenContext {
     Skeleton* tpl = nullptr;
     int tpl_parent = -1;
     int tpl_k = 0;
+    // in a kept row (RowPlan): what it records, and the <if> of the row it is in (-1: none)
+    RowPlan* row = nullptr;
+    int row_if = -1;
+    bool row_then = true;
 
     // Create a child context with a new parent element
     ViewCodegenContext with_parent(const std::string& new_parent) const {
-        return ViewCodegenContext{ss, new_parent, counter, event_handlers, bindings,
+        ViewCodegenContext c{ss, new_parent, counter, event_handlers, bindings,
             component_counters, method_names, parent_component_name, in_loop,
             loop_regions, loop_counter, if_regions, if_counter, loop_var_name, handles};
+        c.row = row;
+        c.row_if = row_if;
+        c.row_then = row_then;
+        return c;
     }
+
+    // records a value of the kept row this element shows; returns the binding's index
+    // (nothing outside a kept row: -1)
+    int row_bind(const std::string& el_var, const std::string& kind, const std::string& name, const std::string& value_code);
+    // a handler set on an element of a kept row: recorded to be set again with the current item
+    void row_handler(const std::string& el_var, const std::string& code);
 
     // loop body context, writes to its own snippet
     // a nested loop's handlers capture every enclosing loop variable: "p, nb"

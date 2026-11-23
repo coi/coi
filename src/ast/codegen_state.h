@@ -57,6 +57,7 @@ struct ArrayLoopInfo
     std::string root_element_var;
     std::string key_expr;
     bool is_only_child;
+    bool rows = false;   // kept rows (_loop_N_rows): push, pop and clear work on them
 };
 extern std::map<std::string, std::vector<ArrayLoopInfo>> g_array_loops;
 

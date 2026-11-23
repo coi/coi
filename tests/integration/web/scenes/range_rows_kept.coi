@@ -1,0 +1,48 @@
+// a loop over a range keeps its rows: a change elsewhere in the component writes nothing in them,
+// a value that changed is set in place (the element stays), an <if> in a row that turns builds
+// just that row again, the components in a row keep their instance, rows come and go at the end,
+// and a window that moves (from:to) gives its rows their new index
+component Tag(string label) {
+    view { <b class="tag">{label}</b> }
+}
+
+component RangeRowsKept {
+    mut int count = 3;
+    mut int from = 0;
+    mut int open = -1;
+    mut int other = 0;
+    mut string word = "a";
+    mut int clicked = -1;
+
+    def more() : void { count++; }
+    def fewer() : void { count--; }
+    def bump() : void { other++; }
+    def rename() : void { word = "b"; }
+    def toggle() : void { open = open == 1 ? -1 : 1; }
+    def shift() : void { from++; count++; }
+    def hit(int i) : void { clicked = i; }
+
+    view {
+        <div>
+            <button class="more" onclick={more}>more</button>
+            <button class="fewer" onclick={fewer}>fewer</button>
+            <button class="bump" onclick={bump}>bump</button>
+            <button class="rename" onclick={rename}>rename</button>
+            <button class="toggle" onclick={toggle}>toggle</button>
+            <button class="shift" onclick={shift}>shift</button>
+            <span class="other">{other}</span>
+            <span class="clicked">{clicked}</span>
+            <div class="list">
+                <for i in from:count>
+                    <div class={i == open ? "row open" : "row"} data-i={`${i}`} onclick={hit(i)}>
+                        <span class="word">{word}</span>
+                        <Tag label={`${word}${i}`} />
+                        <if i == open><i class="extra">extra {i}</i></if>
+                    </div>
+                </for>
+            </div>
+        </div>
+    }
+}
+
+app { root = RangeRowsKept; }

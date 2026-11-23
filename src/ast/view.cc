@@ -28,6 +28,32 @@ std::string HandleBlock::wrap(const std::string& code) const
     return "        int32_t " + name + " = webcc::reserve_deferred_handles(" + std::to_string(count) + ");\n" + code;
 }
 
+int ViewCodegenContext::row_bind(const std::string& el_var, const std::string& kind, const std::string& name, const std::string& value_code)
+{
+    if (!row) return -1;
+    int slot = row->slots++;
+    int b = (int)row->binds.size();
+    row->binds.push_back({slot, kind, name, value_code, row_if, row_then});
+    // the handle, and the value as the row shows it now: an update writes only what differs
+    ss << "        _row.h[" << slot << "] = " << el_var << ";\n";
+    ss << "        " << generate_formatter_block(std::vector<std::string>{value_code}, "_row.v[" + std::to_string(b) + "] = coi::string(") << "\n";
+    return b;
+}
+
+void ViewCodegenContext::row_handler(const std::string& el_var, const std::string& code)
+{
+    // only a row that stands for an item (a keyed loop): its handlers have the item in them,
+    // and a kept row's item may be another value now. A range row's index never changes
+    if (!row || !row->rebind) return;
+    int slot = row->slots++;
+    ss << "        _row.h[" << slot << "] = " << el_var << ";\n";
+    std::string again = code;
+    std::string from = "(" + el_var + ",", to = "(_row.h[" + std::to_string(slot) + "],";
+    for (size_t p = again.find(from); p != std::string::npos; p = again.find(from, p + to.size()))
+        again.replace(p, from.size(), to);
+    row->handlers.push_back({again, row_if, row_then});
+}
+
 // Helper to map Coi types to C++ types for lambda params
 static std::string coi_type_to_cpp(const std::string& type) {
     return convert_type(type);
@@ -447,6 +473,27 @@ void ComponentInstantiation::generate_code(ViewCodegenContext& ctx)
         std::string alias = "_inst_" + qname + "_" + std::to_string(id);
         ctx.ss << "        auto& " << alias << " = " << instance_name << ";\n";
         instance_name = alias;
+        if (ctx.row)
+        {
+            // a kept row keeps the instance and sets again only the props that came out different
+            int index = (int)ctx.row->comps.size();
+            std::string update;
+            for (auto &prop : props)
+            {
+                std::string val = prop.value->to_webcc();
+                std::string field = "_inst." + cpp_name(prop.name);
+                if (prop.is_callback && !prop.callback_param_types.empty())
+                    update += "            " + field + " = [this](" + build_lambda_params_from_types(prop.callback_param_types) + ") { return this->" + val + "(" + build_forward_args(prop.callback_param_types.size()) + "); };\n";
+                else if (ctx.method_names.count(prop.value->raw_name()) || prop.is_callback)
+                    update += "            " + field + " = [this]() { this->" + val + "(); };\n";
+                else if (prop.is_reference)
+                    update += "            if (coi_set_prop(" + field + ", &(" + val + "))) _inst._update_" + prop.name + "();\n";
+                else
+                    update += "            if (coi_set_prop(" + field + ", " + val + ")) _inst._update_" + prop.name + "();\n";
+            }
+            ctx.row->comps.push_back({index, qname, update, ctx.row_if, ctx.row_then});
+            ctx.ss << "        _row.c" << index << " = &" << alias << ";\n";
+        }
     }
     else
     {
@@ -601,6 +648,7 @@ static void generate_view_child(ASTNode *child, ViewCodegenContext& ctx)
             std::vector<std::string> parts = {code};
             ctx.ss << "        " << generate_formatter_block(parts, "webcc::dom::create_text_node_deferred(" + text_var + ", ") << "\n";
             
+            ctx.row_bind(text_var, "textnode", "", code);
             // Add binding for reactivity (only outside loops)
             if (!ctx.in_loop) {
                 Binding b;
@@ -628,6 +676,9 @@ void HTMLElement::generate_code(ViewCodegenContext& ctx)
             ctx.component_counters, ctx.method_names, ctx.parent_component_name, ctx.in_loop,
             ctx.loop_regions, ctx.loop_counter, ctx.if_regions, ctx.if_counter, ctx.loop_var_name, ctx.handles,
             &sk, -1, 0};
+        tctx.row = ctx.row;
+        tctx.row_if = ctx.row_if;
+        tctx.row_then = ctx.row_then;
         generate_code(tctx);
         std::string id = std::to_string(sk.id), n = std::to_string(sk.count);
         ctx.ss << "        static bool _tpl" << id << " = false;\n";
@@ -748,9 +799,10 @@ void HTMLElement::generate_code(ViewCodegenContext& ctx)
             std::string full = "webcc::" + es.struct_name();
             if (ctx.in_loop)
             {
-                std::string capture = build_lambda_capture(ctx.loop_var_name);
+                std::string capture = build_lambda_capture(ctx.loop_var_name); std::streampos _hm = ctx.ss.tellp();
                 ctx.ss << "        coi_events<" << full << ">.set(" << var << ", " << capture << "(const " << full
                        << "& _e) { (void)_e; " << body << " }, this);\n";
+                ctx.row_handler(var, ctx.ss.str().substr((size_t)_hm));
             }
             else
                 ctx.event_handlers.push_back({my_id, type, body, true});
@@ -769,12 +821,13 @@ void HTMLElement::generate_code(ViewCodegenContext& ctx)
             if (ctx.in_loop)
             {
                 // In loops, register handler inline with lambda capturing loop variable
-                std::string capture = build_lambda_capture(ctx.loop_var_name);
+                std::string capture = build_lambda_capture(ctx.loop_var_name); std::streampos _hm = ctx.ss.tellp();
                 std::string handler_code = attr.value->to_webcc();
                 if (is_call)
                     ctx.ss << "        g_dispatcher.set(" << var << ", " << capture << "() { " << handler_code << "; }, this);\n";
                 else
                     ctx.ss << "        g_dispatcher.set(" << var << ", " << capture << "() { " << handler_code << "(); }, this);\n";
+                ctx.row_handler(var, ctx.ss.str().substr((size_t)_hm));
             }
             else
             {
@@ -787,12 +840,13 @@ void HTMLElement::generate_code(ViewCodegenContext& ctx)
             bool is_call = dynamic_cast<FunctionCall *>(attr.value.get()) != nullptr;
             if (ctx.in_loop)
             {
-                std::string capture = build_lambda_capture(ctx.loop_var_name);
+                std::string capture = build_lambda_capture(ctx.loop_var_name); std::streampos _hm = ctx.ss.tellp();
                 std::string handler_code = attr.value->to_webcc();
                 if (is_call)
                     ctx.ss << "        g_input_dispatcher.set(" << var << ", " << capture << "(const coi::string& _value) { " << call_with_last_arg(handler_code, "_value") << "; }, this);\n";
                 else
                     ctx.ss << "        g_input_dispatcher.set(" << var << ", " << capture << "(const coi::string& _value) { " << handler_code << "(_value); }, this);\n";
+                ctx.row_handler(var, ctx.ss.str().substr((size_t)_hm));
             }
             else
             {
@@ -805,12 +859,13 @@ void HTMLElement::generate_code(ViewCodegenContext& ctx)
             bool is_call = dynamic_cast<FunctionCall *>(attr.value.get()) != nullptr;
             if (ctx.in_loop)
             {
-                std::string capture = build_lambda_capture(ctx.loop_var_name);
+                std::string capture = build_lambda_capture(ctx.loop_var_name); std::streampos _hm = ctx.ss.tellp();
                 std::string handler_code = attr.value->to_webcc();
                 if (is_call)
                     ctx.ss << "        g_change_dispatcher.set(" << var << ", " << capture << "(const coi::string& _value) { " << call_with_last_arg(handler_code, "_value") << "; }, this);\n";
                 else
                     ctx.ss << "        g_change_dispatcher.set(" << var << ", " << capture << "(const coi::string& _value) { " << handler_code << "(_value); }, this);\n";
+                ctx.row_handler(var, ctx.ss.str().substr((size_t)_hm));
             }
             else
             {
@@ -823,12 +878,13 @@ void HTMLElement::generate_code(ViewCodegenContext& ctx)
             bool is_call = dynamic_cast<FunctionCall *>(attr.value.get()) != nullptr;
             if (ctx.in_loop)
             {
-                std::string capture = build_lambda_capture(ctx.loop_var_name);
+                std::string capture = build_lambda_capture(ctx.loop_var_name); std::streampos _hm = ctx.ss.tellp();
                 std::string handler_code = attr.value->to_webcc();
                 if (is_call)
                     ctx.ss << "        g_keydown_dispatcher.set(" << var << ", " << capture << "(int _keycode) { " << call_with_last_arg(handler_code, "_keycode") << "; }, this);\n";
                 else
                     ctx.ss << "        g_keydown_dispatcher.set(" << var << ", " << capture << "(int _keycode) { " << handler_code << "(_keycode); }, this);\n";
+                ctx.row_handler(var, ctx.ss.str().substr((size_t)_hm));
             }
             else
             {
@@ -847,6 +903,15 @@ void HTMLElement::generate_code(ViewCodegenContext& ctx)
                 ctx.ss << "        webcc::dom::set_property(" << var << ", \"" << prop << "\", coi_bool_attr(" << val << "));\n";
             else
                 ctx.ss << "        webcc::dom::set_attribute(" << var << ", \"" << attr.name << "\", " << val << ");\n";
+            if (!attr.value->is_static())
+            {
+                if (tag == "select" && attr.name == "value")
+                    ctx.row_bind(var, "value", "value", val);
+                else if (const char *prop = bool_attr_property(attr.name))
+                    ctx.row_bind(var, "prop", prop, val);
+                else
+                    ctx.row_bind(var, attr.name == "value" ? "value" : "attr", attr.name, val);
+            }
 
             if (!attr.value->is_static() && !ctx.in_loop)
             {
@@ -943,6 +1008,9 @@ void HTMLElement::generate_code(ViewCodegenContext& ctx)
             ViewCodegenContext dctx{dyn, var, ctx.counter, ctx.event_handlers, ctx.bindings,
                 ctx.component_counters, ctx.method_names, ctx.parent_component_name, ctx.in_loop,
                 ctx.loop_regions, ctx.loop_counter, ctx.if_regions, ctx.if_counter, ctx.loop_var_name, ctx.handles};
+            dctx.row = ctx.row;
+            dctx.row_if = ctx.row_if;
+            dctx.row_then = ctx.row_then;
             generate_view_child(child, dctx);
             ctx.ss << (follows ? transform_to_insert_before(dyn.str(), var, "webcc::handle(" + tpl->clone_node(next_k) + ")") : dyn.str());
         }
@@ -1015,6 +1083,14 @@ void HTMLElement::generate_code(ViewCodegenContext& ctx)
         if (!code.empty())
         {
             ctx.ss << "        webcc::dom::set_inner_text(" << var << ", " << code << ");\n";
+        }
+
+        if (!all_static && ctx.row)
+        {
+            std::string args;
+            for (auto &child : children)
+                args += (args.empty() ? "" : ", ") + child->to_webcc();
+            ctx.row_bind(var, "text", "", children.size() == 1 ? children[0]->to_webcc() : "coi::string::concat(" + args + ")");
         }
 
         if (!all_static && !ctx.in_loop)
@@ -1101,6 +1177,31 @@ static void generate_prop_update_code(std::stringstream &ss, ComponentInstantiat
 // ViewIfStatement
 void ViewIfStatement::generate_code(ViewCodegenContext& ctx)
 {
+
+    // in a kept row: the condition is kept too, so an update knows the row has the same shape
+    if (ctx.in_loop && ctx.row)
+    {
+        int k = (int)ctx.row->ifs.size();
+        ctx.row->ifs.push_back({strip_outer_parens(condition->to_webcc()), ctx.row_if, ctx.row_then});
+        ctx.ss << "        _row.f[" << k << "] = (" << strip_outer_parens(condition->to_webcc()) << ");\n";
+        ctx.ss << "        if (_row.f[" << k << "]) {\n";
+        ViewCodegenContext then_ctx = ctx;
+        then_ctx.row_if = k;
+        then_ctx.row_then = true;
+        for (auto &child : then_children)
+            generate_view_child(child.get(), then_ctx);
+        if (!else_children.empty())
+        {
+            ctx.ss << "        } else {\n";
+            ViewCodegenContext else_ctx = ctx;
+            else_ctx.row_if = k;
+            else_ctx.row_then = false;
+            for (auto &child : else_children)
+                generate_view_child(child.get(), else_ctx);
+        }
+        ctx.ss << "        }\n";
+        return;
+    }
 
     // Simple static if for nested loops
     if (ctx.in_loop || !ctx.if_regions || !ctx.if_counter)
@@ -1372,6 +1473,14 @@ void ViewRawElement::generate_code(ViewCodegenContext& ctx)
     }
 
     // Create reactive binding for dynamic content
+    if (!all_static && ctx.row)
+    {
+        std::string args;
+        for (auto &child : children)
+            args += (args.empty() ? "" : ", ") + child->to_webcc();
+        ctx.row_bind(var, "html", "", children.size() == 1 ? children[0]->to_webcc() : "coi::string::concat(" + args + ")");
+    }
+
     if (!all_static && !ctx.in_loop)
     {
         Binding b;
@@ -1413,6 +1522,7 @@ void ViewForRangeStatement::generate_code(ViewCodegenContext& ctx)
 
     if (ctx.in_loop || !ctx.loop_regions || !ctx.loop_counter)
     {
+        if (ctx.row) ctx.row->rebuild = true;
         ctx.ss << "        for (int " << cpp_name(var_name) << " = " << start->to_webcc() << "; "
            << cpp_name(var_name) << " < " << end->to_webcc() << "; " << cpp_name(var_name) << "++) {\n";
         std::stringstream body_ss;
@@ -1483,6 +1593,12 @@ void ViewForRangeStatement::generate_code(ViewCodegenContext& ctx)
     ViewCodegenContext item_ctx{item_ss, loop_parent_var, temp_counter, ctx.event_handlers, ctx.bindings,
         temp_comp_counters, ctx.method_names, ctx.parent_component_name, true,
         nullptr, nullptr, nullptr, nullptr, var_name, &item_handles};
+    // rows of elements are kept between syncs and updated where their values changed
+    if (region.is_html_loop)
+    {
+        region.row = std::make_shared<RowPlan>();
+        item_ctx.row = region.row.get();
+    }
     for (auto &child : children)
     {
         generate_view_child(child.get(), item_ctx);
@@ -1532,6 +1648,7 @@ void ViewForEachStatement::generate_code(ViewCodegenContext& ctx)
 
     if (ctx.in_loop || !key_expr || !ctx.loop_regions || !ctx.loop_counter)
     {
+        if (ctx.row) ctx.row->rebuild = true;
         ctx.ss << "        for (auto& " << cpp_name(var_name) << " : " << iterable->to_webcc() << ") {\n";
         std::stringstream body_ss;
         HandleBlock body_handles;
@@ -1612,6 +1729,14 @@ void ViewForEachStatement::generate_code(ViewCodegenContext& ctx)
     ViewCodegenContext item_ctx{item_ss, loop_parent_var, temp_counter, ctx.event_handlers, ctx.bindings,
         temp_comp_counters, ctx.method_names, ctx.parent_component_name, true,
         nullptr, nullptr, nullptr, nullptr, var_name, &item_handles};
+    // rows of elements are kept between syncs, matched by key; a kept row's item may be another
+    // value, so its handlers (which hold the item) are set again on an update
+    if (region.is_html_loop)
+    {
+        region.row = std::make_shared<RowPlan>();
+        region.row->rebind = true;
+        item_ctx.row = region.row.get();
+    }
     for (auto &child : children)
     {
         generate_view_child(child.get(), item_ctx);

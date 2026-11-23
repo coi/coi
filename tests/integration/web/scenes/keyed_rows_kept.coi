@@ -1,0 +1,52 @@
+// a keyed loop keeps its rows: a change elsewhere writes nothing in them, a changed item updates
+// its row in place, rows move with their keys (the element moves, it isn't made again), a row's
+// handlers have its current item, an <if> that turns builds that row again, and push, pop,
+// remove and clear add and drop rows
+pod Note { int id; string title; bool pinned; }
+
+component KeyedRowsKept {
+    mut Note[] notes = [Note{id = 1, title = "a", pinned = false}, Note{id = 2, title = "b", pinned = false}, Note{id = 3, title = "c", pinned = false}];
+    mut int other = 0;
+    mut string opened = "";
+    mut int next = 4;
+
+    def bump() : void { other++; }
+    def rename() : void { notes[1].title = "B"; }
+    def reverse() : void {
+        mut Note[] r;
+        mut int i = notes.size() - 1;
+        while (i >= 0) { r.push(notes[i]); i--; }
+        notes = r;
+    }
+    def pin() : void { notes[0].pinned = !notes[0].pinned; }
+    def add() : void { notes.push(Note{id = next, title = `n${next}`, pinned = false}); next++; }
+    def drop() : void { notes.pop(); }
+    def dropFirst() : void { notes.remove(0); }
+    def wipe() : void { notes.clear(); }
+    def open(Note n) : void { opened = n.title; }
+
+    view {
+        <div>
+            <button class="bump" onclick={bump}>bump</button>
+            <button class="rename" onclick={rename}>rename</button>
+            <button class="reverse" onclick={reverse}>reverse</button>
+            <button class="pin" onclick={pin}>pin</button>
+            <button class="add" onclick={add}>add</button>
+            <button class="drop" onclick={drop}>drop</button>
+            <button class="dropfirst" onclick={dropFirst}>drop first</button>
+            <button class="wipe" onclick={wipe}>wipe</button>
+            <span class="other">{other}</span>
+            <span class="opened">{opened}</span>
+            <div class="list">
+                <for n in notes key={n.id}>
+                    <div class="row" data-id={`${n.id}`} onclick={open(n)}>
+                        <span class="title">{n.title}</span>
+                        <if n.pinned><i class="pinned">pinned</i></if>
+                    </div>
+                </for>
+            </div>
+        </div>
+    }
+}
+
+app { root = KeyedRowsKept; }
