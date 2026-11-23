@@ -48,6 +48,7 @@ component_array_sort|tests/integration/web/scenes/component_array_sort.coi|web
 range_rows_kept|tests/integration/web/scenes/range_rows_kept.coi|web
 keyed_rows_kept|tests/integration/web/scenes/keyed_rows_kept.coi|web
 nested_rows_kept|tests/integration/web/scenes/nested_rows_kept.coi|web
+ws_close_heard|tests/integration/web/scenes/ws_close_heard.coi|web
 local_var_dep|tests/integration/web/scenes/local_var_dep.coi|web
 state_from_param|tests/integration/web/scenes/state_from_param.coi|web
 prerender_routes|tests/integration/web/scenes/prerender_routes.coi|web

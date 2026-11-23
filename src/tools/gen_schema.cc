@@ -23,6 +23,8 @@
 //   name +listen(A) +cancel   - the listener cancels the browser's action when the handler says so
 //                               (webcc's prevent_default during the update), so a handler may return bool
 //   @cleanup("ns::func")      - run on owned members on destroy
+//   @cleanup_then("NAME")     - the event that still comes after that cleanup (a socket's CLOSE):
+//                               its callback stays when the cleanup is called by hand
 // Loaded from src/tools/schema_whitelist.def at runtime
 //
 // Format:

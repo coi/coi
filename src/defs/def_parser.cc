@@ -596,6 +596,10 @@ std::optional<TypeDef> DefParser::parse_type()
         {
             type_def.cleanup = value;
         }
+        else if (name == "cleanup_then")
+        {
+            type_def.cleanup_then = value;
+        }
         else if (name == "enum")
         {
             type_def.enum_cpp = value;
@@ -762,7 +766,7 @@ std::vector<DefFile> DefParser::parse_directory(const std::string &dir_path)
 // ============================================================
 
 static constexpr uint32_t DEF_CACHE_MAGIC = 0x44494f43; // "COID"
-static constexpr uint32_t DEF_CACHE_VERSION = 5;
+static constexpr uint32_t DEF_CACHE_VERSION = 6;
 
 DefSchema &DefSchema::instance()
 {
@@ -949,6 +953,8 @@ bool DefSchema::load(const std::string &def_dir)
                 }
                 if (!type_def.cleanup.empty() && it->second.cleanup.empty())
                     it->second.cleanup = type_def.cleanup;
+                if (!type_def.cleanup_then.empty() && it->second.cleanup_then.empty())
+                    it->second.cleanup_then = type_def.cleanup_then;
             }
             else
             {
@@ -1000,6 +1006,7 @@ bool DefSchema::load_cache(const std::string &cache_path)
         type_def.extends = read_string();
         type_def.alias_of = read_string();
         type_def.cleanup = read_string();
+        type_def.cleanup_then = read_string();
         type_def.enum_cpp = read_string();
         type_def.flags_cpp = read_string();
         uint32_t value_count = 0;
@@ -1081,6 +1088,7 @@ bool DefSchema::save_cache(const std::string &cache_path)
         write_string(type_def.extends);
         write_string(type_def.alias_of);
         write_string(type_def.cleanup);
+        write_string(type_def.cleanup_then);
         write_string(type_def.enum_cpp);
         write_string(type_def.flags_cpp);
         uint32_t value_count = type_def.enum_values.size();

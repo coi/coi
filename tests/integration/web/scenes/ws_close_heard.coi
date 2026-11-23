@@ -1,0 +1,33 @@
+// a socket closed by hand still says so: its onClose comes (code 1005 or 1006 here, the browser's),
+// so a component that closes to connect again somewhere else hears when it can. A timeout
+// cleared by hand still never fires
+component WsCloseHeard {
+    mut WebSocket ws;
+    mut Timeout timer;
+    mut string said = "";
+    mut int fired = 0;
+
+    def closed(int code) : void { said = said + `closed ${code > 0 ? "yes" : "no"} `; }
+    def messaged(string m) : void { said = said + "message "; }
+    def ring() : void { fired++; }
+
+    def reconnect() : void {
+        ws = WebSocket.connect("ws://127.0.0.1:1/", &onMessage = messaged, &onClose = closed);
+        ws.close();
+    }
+
+    mount {
+        timer = System.setTimeout(50, &ring);
+        timer.clearTimeout();
+    }
+
+    view {
+        <div>
+            <button class="go" onclick={reconnect}>go</button>
+            <p class="said">{said}</p>
+            <p class="fired">{fired}</p>
+        </div>
+    }
+}
+
+app { root = WsCloseHeard; }

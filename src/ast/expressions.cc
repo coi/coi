@@ -462,7 +462,9 @@ static std::string generate_event_registration(const MethodDef& event_method, co
 
 // a handle's @cleanup command called by hand (timer.clearTimeout()) ends it: no event comes for it
 // any more, so its callbacks go now, as when its last event arrives. Left in, every cancelled
-// timer would keep a slot in the table until its component goes
+// timer would keep a slot in the table until its component goes. The one event its type says
+// still comes after the cleanup (@cleanup_then: a socket closed by hand gets its CLOSE) keeps its
+// callback; it is the last, and takes the rest with it when it comes
 static std::string forget_if_ended(const std::string& call, const std::string& handle_type,
                                    const std::string& mapping, const std::string& handle_expr) {
     const TypeDef* td = DefSchema::instance().lookup_type(handle_type);
@@ -471,6 +473,7 @@ static std::string forget_if_ended(const std::string& call, const std::string& h
     for (const auto& m : td->methods) {
         if (m.mapping_type != MappingType::Event) continue;
         SchemaEventSpec spec = SchemaEventSpec::parse(m.mapping_value);
+        if (spec.name == td->cleanup_then) continue;
         out += ", coi_events<webcc::" + spec.struct_name() + ">.remove(" + handle_expr + ")";
     }
     return out + ")";

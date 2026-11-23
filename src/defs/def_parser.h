@@ -92,6 +92,7 @@ struct TypeDef
     std::string extends;     // Parent type (for handle inheritance)
     std::string alias_of;    // @alias("target") - this type is an alias for another
     std::string cleanup;     // @cleanup("ns::func") - run on owned members on destroy
+    std::string cleanup_then; // @cleanup_then("NAME") - the event that still comes after the cleanup (a socket's CLOSE)
     // @enum: platform enum, values match the C++ enum class
     std::string enum_cpp;
     std::vector<std::string> enum_values;

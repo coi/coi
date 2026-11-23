@@ -338,8 +338,9 @@ draw_text
 finish
 
 [websocket]
-# owned sockets close on destroy
+# owned sockets close on destroy; one closed by hand still says so (onClose)
 @cleanup("websocket::close")
+@cleanup_then("CLOSE")
 connect +events
 send
 close
