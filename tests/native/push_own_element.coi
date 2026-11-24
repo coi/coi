@@ -1,0 +1,22 @@
+// an array given one of its own elements while it has to grow keeps that element's value
+module PushOwn;
+
+pod Mark { string name; int at; }
+
+test "an element of the array pushed onto it" {
+    mut string[] words = ["one", "two", "three", "four"];
+    words.push(words[0]);
+    words.push(words[1]);
+    words.push(words[2]);
+    words.push(words[3]);
+    words.push(words[1]);
+    expect(words.size() == 9);
+    expect(words[4] == "one");
+    expect(words[8] == "two");
+}
+
+test "a pod with text in it" {
+    mut Mark[] marks = [Mark{name = "a", at = 1}, Mark{name = "b", at = 2}, Mark{name = "c", at = 3}, Mark{name = "d", at = 4}];
+    marks.push(marks[2]);
+    expect(marks[4].name == "c" && marks[4].at == 3);
+}
