@@ -135,6 +135,9 @@ std::unique_ptr<Statement> Parser::parse_statement_body()
     // Return
     if (current().type == TokenType::RETURN)
     {
+        // an arm runs on its own, so return there ends the arm, not the function around the match
+        if (match_arms > 0)
+            ErrorHandler::compiler_error("'return' inside a match arm ends only the arm, not the function: yield the value and return the match, or set a variable in the arm and return it after", current().line);
         advance();
         auto ret = std::make_unique<ReturnStatement>();
         if (current().type != TokenType::SEMICOLON)

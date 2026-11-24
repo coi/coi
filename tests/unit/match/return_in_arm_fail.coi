@@ -1,0 +1,19 @@
+// Test: return inside a match arm would end only the arm, so the function around it fell off its end
+pod Box { int n; }
+
+component MatchReturnInArm {
+    def first(string text) : int {
+        match (Json.parse(Box, text)) {
+            Success(Box b, BoxMeta m) => { return b.n; };
+            Error(string e) => { return -1; };
+        };
+    }
+
+    view {
+        <div>{first(`{"n":7}`)}</div>
+    }
+}
+
+app {
+    root = MatchReturnInArm;
+}
