@@ -1027,7 +1027,9 @@ component Notebook {
 | `db.get(key, &onValue, &onError)` | `onValue(Blob value, uint8 found)`; `found` is 0 for a missing key |
 | `db.remove(key, &onDone, &onError)` | done also when the key didn't exist |
 | `db.keys(prefix, &onKeys, &onError)` | `onKeys(string keys)`: sorted, one per line |
+| `db.clear(&onDone, &onError)` | every key gone, the database stays open |
 | `db.close()` | |
+| `IdbRequest.drop(name, &onDone, &onError)` | the database deleted; `onError("in use")` and nothing deleted while another tab, or a `Database` here not closed yet, has it open |
 
 Calls made before `onOpened` wait for the database, and calls on one database run in order.
 

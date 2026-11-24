@@ -1,0 +1,38 @@
+// a database dropped only once nothing else has it open
+component IdbDrop {
+    mut Database db;
+    mut string first = "-";
+    mut string second = "-";
+    mut string left = "-";
+
+    def opened(uint8 ok) : void {
+        db.put("k", [1, 2, 3], &onDone = stored);
+    }
+    // still open here: the drop is refused and the data stays
+    def stored() : void { IdbRequest.drop("coi-drop", &onDone = firstDone, &onError = firstRefused); }
+    def firstDone() : void { first = "dropped"; }
+    def firstRefused(string message) : void {
+        first = message;
+        db.close();
+        IdbRequest.drop("coi-drop", &onDone = secondDone, &onError = secondRefused);
+    }
+    def secondDone() : void {
+        second = "dropped";
+        db = Idb.open("coi-drop", &reopened);
+    }
+    def secondRefused(string message) : void { second = message; }
+    def reopened(uint8 ok) : void { db.keys("", &onKeys = gotKeys); }
+    def gotKeys(string keys) : void { left = keys.isEmpty() ? "empty" : keys; }
+
+    mount { db = Idb.open("coi-drop", &opened); }
+
+    view {
+        <div>
+            <p class="first">{first}</p>
+            <p class="second">{second}</p>
+            <p class="left">{left}</p>
+        </div>
+    }
+}
+
+app { root = IdbDrop; }

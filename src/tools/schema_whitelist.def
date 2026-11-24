@@ -291,6 +291,8 @@ remove +events(DONE, ERROR)
 clear +events(DONE, ERROR)
 keys +events(KEYS, ERROR)
 close
+# a database deleted, only while nothing else has it open (ERROR "in use" otherwise)
+drop +events(DONE, ERROR)
 
 [clipboard]
 # write_text only works in a click or key handler
