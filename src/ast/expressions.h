@@ -306,6 +306,7 @@ struct MatchExpr : Expression {
 
     MatchExpr() = default;
     std::string to_webcc() override;
+    std::string to_statement();
     void collect_dependencies(std::set<std::string>& deps) override;
     bool is_static() override;
     std::vector<ASTNode*> get_child_nodes() override {

@@ -1154,6 +1154,25 @@ static void check_component_args(ComponentConstruction *cc, const Component &com
     }
 }
 
+// a statement after which nothing runs: return, break, continue, or an if whose both sides are
+static bool jumps_away(Statement *s)
+{
+    if (auto *ret = dynamic_cast<ReturnStatement *>(s))
+        return !ret->is_yield;
+    if (dynamic_cast<BreakStatement *>(s) || dynamic_cast<ContinueStatement *>(s))
+        return true;
+    if (auto *block = dynamic_cast<BlockStatement *>(s))
+    {
+        for (auto &inner : block->statements)
+            if (jumps_away(inner.get()))
+                return true;
+        return false;
+    }
+    if (auto *if_stmt = dynamic_cast<IfStatement *>(s))
+        return if_stmt->else_branch && jumps_away(if_stmt->then_branch.get()) && jumps_away(if_stmt->else_branch.get());
+    return false;
+}
+
 std::string infer_expression_type(Expression *expr, const std::map<std::string, std::string> &scope)
 {
     if (auto *lit = dynamic_cast<IntLiteral *>(expr))
@@ -1462,21 +1481,19 @@ std::string infer_expression_type(Expression *expr, const std::map<std::string, 
         return result_type;
     }
 
-    // Block expression type inference: only a yield (parsed as ReturnStatement) gives a block a
-    // value. A last expression statement is just a statement, as in the generated code: a call
-    // that returns something there doesn't make the block a value
+    // Block expression type inference: only a yield gives a block a value, the first one, as the
+    // arm ends there. A last expression statement is just a statement, as in the generated code:
+    // a call that returns something there doesn't make the block a value. An arm that returns,
+    // breaks or continues before it yields has no value of its own (unknown, the other arms decide)
     if (auto block = dynamic_cast<BlockExpr *>(expr))
     {
-        for (auto it = block->statements.rbegin(); it != block->statements.rend(); ++it)
+        for (const auto &s : block->statements)
         {
-            if (auto* ret_stmt = dynamic_cast<ReturnStatement *>((*it).get()))
-            {
-                if (ret_stmt->value)
-                {
-                    return infer_expression_type(ret_stmt->value.get(), scope);
-                }
-                return "void";
-            }
+            auto *ret_stmt = dynamic_cast<ReturnStatement *>(s.get());
+            if (ret_stmt && ret_stmt->is_yield)
+                return ret_stmt->value ? infer_expression_type(ret_stmt->value.get(), scope) : "void";
+            if (jumps_away(s.get()))
+                return "unknown";
         }
         return "void";
     }
@@ -2449,8 +2466,47 @@ static void check_function_body(const FunctionDef &method, const Component *comp
     };
 
     std::function<void(const std::unique_ptr<Statement> &, std::map<std::string, std::string> &)> check_stmt;
+
+    // the statements of match arms in an expression, each arm with its bindings: a return there
+    // leaves this function. An inline function's body is its own
+    std::function<void(ASTNode *, const std::map<std::string, std::string> &)> check_arms;
+    check_arms = [&](ASTNode *node, const std::map<std::string, std::string> &scope)
+    {
+        if (!node || dynamic_cast<LambdaExpr *>(node))
+            return;
+        auto *match = dynamic_cast<MatchExpr *>(node);
+        if (!match)
+        {
+            for (auto *child : node->get_child_nodes())
+                check_arms(child, scope);
+            return;
+        }
+        check_arms(match->subject.get(), scope);
+        for (auto &arm : match->arms)
+        {
+            auto *block = dynamic_cast<BlockExpr *>(arm.body.get());
+            if (!block)
+            {
+                check_arms(arm.body.get(), scope);
+                continue;
+            }
+            auto arm_scope = scope;
+            for (const auto &binding : arm.pattern.variant_bindings)
+                arm_scope[binding.name] = binding.type;
+            for (const auto &field : arm.pattern.fields)
+                if (!field.value)
+                    arm_scope[field.name] = get_data_field_type(arm.pattern.type_name, field.name);
+            for (const auto &s : block->statements)
+                check_stmt(s, arm_scope);
+        }
+    };
+
     check_stmt = [&](const std::unique_ptr<Statement> &stmt, std::map<std::string, std::string> &current_scope)
     {
+        for (auto *child : stmt->get_child_nodes())
+            if (dynamic_cast<Expression *>(child))
+                check_arms(child, current_scope);
+
         if (auto block = dynamic_cast<BlockStatement *>(stmt.get()))
         {
             for (const auto &s : block->statements)
@@ -2952,6 +3008,12 @@ static void check_function_body(const FunctionDef &method, const Component *comp
             
             // Validate expression type
             infer_expression_type(expr_stmt->expression.get(), current_scope);
+        }
+        else if (auto ret_stmt = dynamic_cast<ReturnStatement *>(stmt.get()); ret_stmt && ret_stmt->is_yield)
+        {
+            // the arm's value, typed with the match
+            if (ret_stmt->value)
+                check_moved_use(ret_stmt->value.get(), ret_stmt->line);
         }
         else if (auto ret_stmt = dynamic_cast<ReturnStatement *>(stmt.get()))
         {

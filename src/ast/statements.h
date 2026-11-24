@@ -70,6 +70,7 @@ struct MemberAssignment : Statement {
 
 struct ReturnStatement : Statement {
     std::unique_ptr<Expression> value;
+    bool is_yield = false;  // a match arm's yield, the arm's value
 
     std::string to_webcc() override;
     void collect_dependencies(std::set<std::string>& deps) override;
@@ -114,11 +115,11 @@ struct WhileStatement : Statement {
 };
 
 struct BreakStatement : Statement {
-    std::string to_webcc() override { return "break;"; }
+    std::string to_webcc() override;
 };
 
 struct ContinueStatement : Statement {
-    std::string to_webcc() override { return "continue;"; }
+    std::string to_webcc() override;
 };
 
 struct ForRangeStatement : Statement {

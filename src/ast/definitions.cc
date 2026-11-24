@@ -70,9 +70,12 @@ std::string FunctionDef::to_webcc(const std::string& injected_code) {
             result += "    auto _coi_after = coi::on_exit([&]() {\n" + injected_code + "    });\n";
         }
     }
+    JumpTargets outer = g_jumps;
+    g_jumps = {true, 0};
     for(auto& stmt : body){
         result += "    " + tracked(stmt.get()) + "\n";
     }
+    g_jumps = outer;
     result += "}\n";
 
     for (auto& n : hidden) g_ref_props.insert(n);
@@ -157,12 +160,15 @@ std::string FunctionDef::free_definition() {
     // a test says where it is for a failed page action, and stops at one
     if (!test_name.empty())
         result += "    coi_test_where = " + cpp_string_literal(g_test_file) + ";\n";
+    JumpTargets outer = g_jumps;
+    g_jumps = {true, 0};
     for(auto& stmt : body){
         int line = test_name.empty() ? 0 : call_line(stmt.get());
         if (line) result += "    coi_test_line = " + std::to_string(line) + ";\n";
         result += "    " + stmt->to_webcc() + "\n";
         if (!test_name.empty()) result += "    if (coi_test_failed_now) return;\n";
     }
+    g_jumps = outer;
     result += "}\n";
     ComponentTypeContext::instance().end_method_scope();
     return result;

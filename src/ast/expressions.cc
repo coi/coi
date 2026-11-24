@@ -5,6 +5,7 @@
 #include "codegen_state.h"
 #include "formatter.h"
 #include "node.h" 
+#include "statements.h"
 #include "../defs/def_parser.h"
 #include "../codegen/json_codegen.h"
 #include "../cli/error.h"
@@ -1122,6 +1123,7 @@ std::string ArrayRepeatLiteral::to_webcc() {
     std::string fill = size.empty()
         ? "coi::vector<" + type + "> _v; _v.resize((size_t)(" + count->to_webcc() + ")); for (size_t _i = 0; _i < _v.size(); _i++) _v[_i] = _x;"
         : "coi::array<" + type + ", " + size + "> _v; _v.fill(_x);";
+    NoJumps own_function;
     return "[&]{ auto _x = " + value->to_webcc() + "; " + fill + " return _v; }()";
 }
 
@@ -1246,99 +1248,146 @@ std::vector<Expression*> ComponentConstruction::get_children() {
     return children;
 }
 
-// Match expression code generation
-// Generates a lambda (IIFE) with if-else chain
-std::string MatchExpr::to_webcc() {
-    std::string code = result_type.empty() ? "[&]() {\n" : "[&]() -> " + convert_type(result_type) + " {\n";
-    code += "        const auto& _match_subject = " + subject->to_webcc() + ";\n";
-    
-    bool first = true;
-    bool has_else = false;
-    
+// the test of an arm on _match_subject, and the bindings it makes
+static void arm_test(const MatchArm& arm, std::string& condition, std::string& bindings) {
+    if (arm.pattern.kind == MatchPattern::Kind::Literal) {
+        condition = "_match_subject == " + arm.pattern.literal_value->to_webcc();
+    }
+    else if (arm.pattern.kind == MatchPattern::Kind::Enum) {
+        std::string resolved_type = ComponentTypeContext::instance().resolve(arm.pattern.type_name);
+        condition = "_match_subject == " + resolved_type + "::" + arm.pattern.enum_value;
+    }
+    else if (arm.pattern.kind == MatchPattern::Kind::Pod) {
+        // fields with a value are compared, the others bound
+        std::vector<std::string> conditions;
+        for (const auto& field : arm.pattern.fields) {
+            if (field.value)
+                conditions.push_back("_match_subject." + cpp_name(field.name) + " == " + field.value->to_webcc());
+            else
+                bindings += "            const auto& " + cpp_name(field.name) + " = _match_subject." + cpp_name(field.name) + ";\n";
+        }
+        condition = conditions.empty() ? "true" : conditions[0];
+        for (size_t i = 1; i < conditions.size(); ++i)
+            condition += " && " + conditions[i];
+    }
+    else if (arm.pattern.kind == MatchPattern::Kind::Variant) {
+        condition = "_match_subject.is_" + arm.pattern.type_name + "()";
+        if (!arm.pattern.variant_bindings.empty()) {
+            bindings += "            const auto& __coi_variant = _match_subject.as_" + arm.pattern.type_name + "();\n";
+            for (size_t i = 0; i < arm.pattern.variant_bindings.size(); ++i)
+                bindings += "            const auto& " + cpp_name(arm.pattern.variant_bindings[i].name) +
+                            " = __coi_variant._" + std::to_string(i) + ";\n";
+        }
+    }
+}
+
+// a return, break or continue in it that leaves the match (a break in a loop of the arm stays
+// there). An inline function's body is its own
+static bool jumps_out(ASTNode* node, int loops) {
+    if (!node || dynamic_cast<LambdaExpr*>(node)) return false;
+    if (auto* ret = dynamic_cast<ReturnStatement*>(node); ret && !ret->is_yield) return true;
+    if (dynamic_cast<BreakStatement*>(node) || dynamic_cast<ContinueStatement*>(node)) return loops == 0;
+    if (dynamic_cast<WhileStatement*>(node) || dynamic_cast<ForRangeStatement*>(node) || dynamic_cast<ForEachStatement*>(node)) loops++;
+    for (auto* child : node->get_child_nodes())
+        if (jumps_out(child, loops)) return true;
+    return false;
+}
+
+// the arms in order, else last: "if (a) {...} else if (b) {...} else {...}", each arm's code
+// given by body()
+static std::string arm_chain(const std::vector<MatchArm>& arms, const std::function<std::string(const MatchArm&)>& body) {
+    std::string code;
+    const MatchArm* else_arm = nullptr;
     for (const auto& arm : arms) {
         if (arm.pattern.kind == MatchPattern::Kind::Else) {
-            has_else = true;
-            // else arm - will be handled at the end
+            if (!else_arm) else_arm = &arm;
             continue;
         }
-        
-        std::string condition;
-        std::string bindings;
-        
-        if (arm.pattern.kind == MatchPattern::Kind::Literal) {
-            // Literal pattern: compare directly with the value
-            condition = "_match_subject == " + arm.pattern.literal_value->to_webcc();
-        }
-        else if (arm.pattern.kind == MatchPattern::Kind::Enum) {
-            // Enum pattern: compare directly
-            std::string resolved_type = ComponentTypeContext::instance().resolve(arm.pattern.type_name);
-            condition = "_match_subject == " + resolved_type + "::" + arm.pattern.enum_value;
-        }
-        else if (arm.pattern.kind == MatchPattern::Kind::Pod) {
-            // Pod pattern: check each field
-            std::vector<std::string> conditions;
-            for (const auto& field : arm.pattern.fields) {
-                if (field.value) {
-                    // Value match: _match_subject.field == value
-                    conditions.push_back("_match_subject." + cpp_name(field.name) + " == " + field.value->to_webcc());
-                } else {
-                    // Binding pattern: capture the field into a local variable
-                    bindings += "            const auto& " + cpp_name(field.name) + " = _match_subject." + cpp_name(field.name) + ";\n";
-                }
-            }
-            
-            if (conditions.empty()) {
-                condition = "true";  // Just binding, always matches
-            } else {
-                condition = conditions[0];
-                for (size_t i = 1; i < conditions.size(); ++i) {
-                    condition += " && " + conditions[i];
-                }
-            }
-        }
-        else if (arm.pattern.kind == MatchPattern::Kind::Variant) {
-            condition = "_match_subject.is_" + arm.pattern.type_name + "()";
-            if (!arm.pattern.variant_bindings.empty()) {
-                bindings += "            const auto& __coi_variant = _match_subject.as_" + arm.pattern.type_name + "();\n";
-                for (size_t i = 0; i < arm.pattern.variant_bindings.size(); ++i) {
-                    bindings += "            const auto& " + cpp_name(arm.pattern.variant_bindings[i].name) +
-                                " = __coi_variant._" + std::to_string(i) + ";\n";
-                }
-            }
-        }
-        
-        if (first) {
-            code += "        if (" + condition + ") {\n";
-            first = false;
-        } else {
-            code += "        } else if (" + condition + ") {\n";
-        }
-        
-        code += bindings;
-        code += "            return " + arm.body->to_webcc() + ";\n";
+        std::string condition, bindings;
+        arm_test(arm, condition, bindings);
+        code += (code.empty() ? "        if (" : " else if (") + condition + ") {\n" + bindings + body(arm) + "        }";
     }
-    
-    // Generate else branch
-    for (const auto& arm : arms) {
-        if (arm.pattern.kind == MatchPattern::Kind::Else) {
-            if (first) {
-                // Only else arm, no conditions
-                code += "        return " + arm.body->to_webcc() + ";\n";
-            } else {
-                code += "        } else {\n";
-                code += "            return " + arm.body->to_webcc() + ";\n";
-                code += "        }\n";
-            }
-            has_else = true;
-            break;
+    if (else_arm)
+        code += (code.empty() ? "        {\n" : " else {\n") + body(*else_arm) + "        }";
+    return code + "\n";
+}
+
+// a match whose value isn't used: plain ifs, an arm's statements in them as they are, so a
+// return, break or continue there is the function's or the loop's
+std::string MatchExpr::to_statement() {
+    std::string code = "{\n        const auto& _match_subject = " + subject->to_webcc() + ";\n";
+    code += arm_chain(arms, [](const MatchArm& arm) {
+        auto* block = dynamic_cast<BlockExpr*>(arm.body.get());
+        if (!block) {
+            if (auto* inner = dynamic_cast<MatchExpr*>(arm.body.get()))
+                return "            " + inner->to_statement();
+            return "            " + arm.body->to_webcc() + ";\n";
         }
+        std::string stmts;
+        for (const auto& stmt : block->statements) {
+            auto* ret = dynamic_cast<ReturnStatement*>(stmt.get());
+            if (ret && ret->is_yield) {
+                // the arm ends at its yield
+                if (ret->value) stmts += "            (void)(" + ret->value->to_webcc() + ");\n";
+                break;
+            }
+            stmts += "            " + tracked(stmt.get()) + "\n";
+        }
+        return stmts;
+    });
+    return code + "    }\n";
+}
+
+// Match expression code generation: a lambda (IIFE) with an if-else chain. With a return, break
+// or continue in an arm, a GNU statement expression instead, which they leave as they would a
+// statement: ({ subject; test ? ({ arm; value; }) : ... })
+std::string MatchExpr::to_webcc() {
+    if (jumps_out(this, 0)) {
+        if (!g_jumps.function)
+            ErrorHandler::compiler_error("return, break or continue in a match arm needs the function around it, and this match runs "
+                                         "on its own (in a view, an inline function, a string's {...} or a field's first value)", line);
+        std::string type = result_type.empty() ? "" : convert_type(result_type);
+        // every arm gives the match's type, so the ?: has one; a brace list is built as it
+        auto value = [&](const std::string& v) {
+            if (type.empty()) return "(" + v + ")";
+            return v.starts_with("{") ? type + v : "static_cast<" + type + ">(" + v + ")";
+        };
+        // what an arm that jumps away gives: nothing, it never gets there
+        std::string none = type.empty() ? "__builtin_trap()" : "[]() -> " + type + " { __builtin_trap(); }()";
+        std::string code = "({\n        const auto& _match_subject = " + subject->to_webcc() + ";\n        ";
+        auto arm_value = [&](const MatchArm& arm, const std::string& bindings) {
+            auto* block = dynamic_cast<BlockExpr*>(arm.body.get());
+            if (!block && bindings.empty()) return value(arm.body->to_webcc());
+            std::string code = "({\n" + bindings;
+            if (!block) return code + "            " + value(arm.body->to_webcc()) + ";\n        })";
+            for (const auto& stmt : block->statements) {
+                auto* ret = dynamic_cast<ReturnStatement*>(stmt.get());
+                if (ret && ret->is_yield)
+                    return code + "            " + (ret->value ? value(ret->value->to_webcc()) : none) + ";\n        })";
+                code += "            " + tracked(stmt.get()) + "\n";
+            }
+            return code + "            " + none + ";\n        })";
+        };
+        const MatchArm* else_arm = nullptr;
+        for (const auto& arm : arms) {
+            if (arm.pattern.kind == MatchPattern::Kind::Else) {
+                if (!else_arm) else_arm = &arm;
+                continue;
+            }
+            std::string condition, bindings;
+            arm_test(arm, condition, bindings);
+            code += "(" + condition + ") ? " + arm_value(arm, bindings) + "\n        : ";
+        }
+        code += (else_arm ? arm_value(*else_arm, "") : none) + ";\n    })";
+        return code;
     }
-    
-    if (!has_else && !first) {
-        // Close the last if without else
-        code += "        }\n";
-    }
-    
+
+    NoJumps own_function;
+    std::string code = result_type.empty() ? "[&]() {\n" : "[&]() -> " + convert_type(result_type) + " {\n";
+    code += "        const auto& _match_subject = " + subject->to_webcc() + ";\n";
+    code += arm_chain(arms, [](const MatchArm& arm) {
+        return "            return " + arm.body->to_webcc() + ";\n";
+    });
     code += "    }()";
     return code;
 }
@@ -1376,6 +1425,7 @@ bool MatchExpr::is_static() {
 // a generic lambda: the element type is whatever the array holds, the loop is in the helper
 // (coi_index_where and friends in the generated prelude)
 std::string LambdaExpr::to_webcc() {
+    NoJumps own_function;
     return "[&](const auto& " + cpp_name(param) + ") { return (" + body->to_webcc() + "); }";
 }
 
@@ -1396,6 +1446,7 @@ void LambdaExpr::collect_member_dependencies(std::set<MemberDependency>& member_
 }
 
 std::string BlockExpr::to_webcc() {
+    NoJumps own_function;
     std::string code = "([&]() {\n";
     for (const auto& stmt : statements) {
         code += "            " + tracked(stmt.get()) + "\n";

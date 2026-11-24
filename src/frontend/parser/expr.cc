@@ -796,7 +796,6 @@ std::unique_ptr<Expression> Parser::parse_match()
         {
             advance(); // skip '{'
             auto block = std::make_unique<BlockExpr>();
-            match_arms++;
 
             while (current().type != TokenType::RBRACE && current().type != TokenType::END_OF_FILE)
             {
@@ -814,6 +813,7 @@ std::unique_ptr<Expression> Parser::parse_match()
                     }
                     expect(TokenType::SEMICOLON, "Expected ';' after yield expression");
                     ret->line = yield_line;
+                    ret->is_yield = true;
                     block->statements.push_back(std::move(ret));
                     continue;
                 }
@@ -821,7 +821,6 @@ std::unique_ptr<Expression> Parser::parse_match()
                 block->statements.push_back(parse_statement());
             }
 
-            match_arms--;
             expect(TokenType::RBRACE, "Expected '}' after match arm body");
 
             arm.body = std::move(block);

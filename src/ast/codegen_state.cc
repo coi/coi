@@ -4,6 +4,7 @@ std::set<std::string> g_ref_props;
 std::set<std::string> g_dirty_fields;
 std::set<std::string> g_inline_ref_writes;
 std::string g_test_file;
+JumpTargets g_jumps;
 std::map<std::string, UsedEvent> g_used_events;
 
 std::map<std::string, ComponentArrayLoopInfo> g_component_array_loops;

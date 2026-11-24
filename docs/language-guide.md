@@ -947,14 +947,15 @@ string label = match (status) {
 };
 ```
 
-An arm runs on its own, so `return` inside one would end only the arm, not the function around the `match`: it's a compile error. Yield the value and return the `match`, or set a variable in the arm and return after it:
+`return`, `break` and `continue` work in an arm too: `return` leaves the function around the `match`, `break` and `continue` act on the loop around it, whether the `match` is a statement or gives a value. An arm that leaves this way needs no `yield`:
 
 ```tsx
 def count(string text) : int {
-    return match (Json.parse(Box, text)) {
+    int n = match (Json.parse(Box, text)) {
         Success(Box b, BoxMeta m) => b.n;
-        Error(string e) => 0;
+        Error(string e) => { return -1; };
     };
+    return n * 2;
 }
 ```
 

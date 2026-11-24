@@ -3,6 +3,7 @@
 #include "codegen_state.h"
 #include "../defs/def_parser.h"
 #include "../codegen/codegen_utils.h"
+#include "../cli/error.h"
 
 std::string VarDeclaration::to_webcc()
 {
@@ -32,6 +33,7 @@ std::string VarDeclaration::to_webcc()
         }
         
         // Use count from repeat initializer (overrides fixed_size if both present)
+        NoJumps own_function;
         std::string count_str = repeat->count->to_webcc();
 
         // int[] xs = [0; n]: a vector of n copies, the count can be a runtime value
@@ -372,6 +374,20 @@ void MemberAssignment::collect_dependencies(std::set<std::string> &deps)
     value->collect_dependencies(deps);
 }
 
+std::string BreakStatement::to_webcc()
+{
+    if (g_jumps.function && !g_jumps.loops)
+        ErrorHandler::compiler_error("'break' outside a loop", line);
+    return "break;";
+}
+
+std::string ContinueStatement::to_webcc()
+{
+    if (g_jumps.function && !g_jumps.loops)
+        ErrorHandler::compiler_error("'continue' outside a loop", line);
+    return "continue;";
+}
+
 std::string ReturnStatement::to_webcc()
 {
     if (value)
@@ -405,6 +421,8 @@ static std::string emit_expect(FunctionCall *call)
 
 std::string ExpressionStatement::to_webcc()
 {
+    if (auto *match = dynamic_cast<MatchExpr *>(expression.get()))
+        return match->to_statement();
     // Check for array method calls on component arrays used in loops
     if (auto call = dynamic_cast<FunctionCall *>(expression.get()))
     {
@@ -646,9 +664,18 @@ void IfStatement::collect_dependencies(std::set<std::string> &deps)
         else_branch->collect_dependencies(deps);
 }
 
+// the body of a loop: a break or continue in a match arm in it goes to this loop
+static std::string loop_body(Statement *body)
+{
+    g_jumps.loops++;
+    std::string code = tracked(body);
+    g_jumps.loops--;
+    return code;
+}
+
 std::string WhileStatement::to_webcc()
 {
-    return "while(" + strip_outer_parens(condition->to_webcc()) + ") " + tracked(body.get());
+    return "while(" + strip_outer_parens(condition->to_webcc()) + ") " + loop_body(body.get());
 }
 
 void WhileStatement::collect_dependencies(std::set<std::string> &deps)
@@ -662,7 +689,7 @@ std::string ForRangeStatement::to_webcc()
     std::string code = "for(int " + cpp_name(var_name) + " = " + start->to_webcc() + "; ";
     code += "(" + cpp_name(var_name) + " < " + end->to_webcc() + "); ";
     code += cpp_name(var_name) + "++) ";
-    code += tracked(body.get());
+    code += loop_body(body.get());
     return code;
 }
 
@@ -680,7 +707,7 @@ std::string ForEachStatement::to_webcc()
     if (auto *lit = dynamic_cast<ArrayLiteral *>(iterable.get()); lit && !lit->element_type.empty())
         over = convert_type(lit->element_type + "[]") + over;
     std::string code = "for(auto& " + cpp_name(var_name) + " : " + over + ") ";
-    code += tracked(body.get());
+    code += loop_body(body.get());
     return code;
 }
 

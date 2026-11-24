@@ -1,5 +1,6 @@
 #include "formatter.h"
 #include "expressions.h"
+#include "codegen_state.h"
 
 bool is_string_expr(Expression* expr) {
     if (dynamic_cast<StringLiteral*>(expr)) return true;
@@ -41,6 +42,7 @@ std::string generate_formatter_appends(const std::vector<Expression*>& parts) {
 }
 
 std::string generate_formatter_expr(const std::vector<Expression*>& parts) {
+    NoJumps own_function;
     std::string code = "([&]() { webcc::hybrid_formatter<" + std::to_string(FORMATTER_BUFFER_SIZE) + "> _fmt; ";
     code += generate_formatter_appends(parts);
     code += "return coi::string(_fmt.c_str()); }())";
@@ -52,6 +54,7 @@ std::string generate_formatter_expr(const std::vector<Expression*>& parts) {
 std::string generate_formatter_call(const std::vector<Expression*>& parts,
                                     const std::string& callback_prefix,
                                     const std::string& callback_suffix) {
+    NoJumps own_function;
     std::string code = "([&]() { webcc::hybrid_formatter<" + std::to_string(FORMATTER_BUFFER_SIZE) + "> _fmt; ";
     code += generate_formatter_appends(parts);
     code += "return " + callback_prefix + "_fmt.c_str()" + callback_suffix + "; }())";

@@ -25,6 +25,22 @@ extern std::set<std::string> g_inline_ref_writes;
 // the file of the test being generated, as its failures should name it; "" outside a test
 extern std::string g_test_file;
 
+// where a return, break or continue in a match arm can go: the generated code is in a function
+// the user wrote, inside this many loops. Code generated into a lambda of its own (an inline
+// function, a string's {...}) has none, and NoJumps marks it
+struct JumpTargets
+{
+    bool function = false;
+    int loops = 0;
+};
+extern JumpTargets g_jumps;
+struct NoJumps
+{
+    JumpTargets saved = g_jumps;
+    NoJumps() { g_jumps = {}; }
+    ~NoJumps() { g_jumps = saved; }
+};
+
 // webcc events with a registered callback
 struct UsedEvent
 {

@@ -1,0 +1,229 @@
+// return, break and continue in a match arm leave the function or the loop around the match,
+// as a statement and as a value
+module MatchJumps;
+
+pod Box { int n; }
+pod Point { int x; int y; }
+enum Kind { Small, Big, Bad }
+
+def statement_return(int k) : int {
+    mut int seen = 0;
+    match (k) {
+        1 => { return 10; };
+        2 => { seen = 2; };
+        else => { return 30; };
+    };
+    return seen * 10;
+}
+
+def value_return(int k) : int {
+    int n = match (k) {
+        1 => { return 10; };
+        2 => 5;
+        else => {
+            if (k > 100) { return 99; }
+            yield k * 2;
+        };
+    };
+    return n + 1;
+}
+
+def bare_return(int k, mut string& trail) : void {
+    trail = "";
+    match (k) {
+        0 => { trail = "zero"; return; };
+        else => { trail = "other"; };
+    };
+    trail += " after";
+}
+
+def nested(int a, int b) : string {
+    mut string trail = "";
+    match (a) {
+        1 => {
+            match (b) {
+                1 => { return "one one"; };
+                else => { trail = "inner else"; };
+            };
+            return "one " + trail;
+        };
+        else => { };
+    };
+    return "none";
+}
+
+def nested_value(int a, int b) : int {
+    int n = match (a) {
+        1 => match (b) {
+            1 => { return 11; };
+            else => 12;
+        };
+        else => 0;
+    };
+    return n;
+}
+
+def first_big(int[] xs) : int {
+    for x in xs {
+        match (x > 10) {
+            true => { return x; };
+            else => { };
+        };
+    }
+    return -1;
+}
+
+def sum_until_zero(int[] xs) : int {
+    mut int sum = 0;
+    for x in xs {
+        match (x) {
+            0 => { break; };
+            5 => { continue; };
+            else => { sum += x; };
+        };
+    }
+    return sum;
+}
+
+def sum_values(int[] xs) : int {
+    mut int sum = 0;
+    mut int i = 0;
+    while (i < xs.size()) {
+        int x = xs[i];
+        i += 1;
+        int v = match (x) {
+            0 => { break; };
+            5 => { continue; };
+            else => x * 10;
+        };
+        sum += v;
+    }
+    return sum;
+}
+
+def loop_in_arm(int[] xs) : int {
+    mut int found = 0;
+    match (xs.size()) {
+        0 => { return -1; };
+        else => {
+            for x in xs {
+                if (x == 3) { break; }
+                found += 1;
+            }
+        };
+    };
+    return found;
+}
+
+def point_of(int k) : Point {
+    Point p = match (k) {
+        0 => { return Point{x = -1, y = -1}; };
+        else => Point{x = k, y = k * 2};
+    };
+    return p;
+}
+
+def label(Kind kind) : string {
+    string s = match (kind) {
+        Kind::Small => "small";
+        Kind::Big => { yield "big"; };
+        Kind::Bad => { return "bad!"; };
+    };
+    return s + ".";
+}
+
+def list_of(int k) : int[] {
+    int[] xs = match (k) {
+        0 => { return []; };
+        else => [k, k + 1];
+    };
+    return xs;
+}
+
+def boxed(string text) : int {
+    match (Json.parse(Box, text)) {
+        Success(Box b, BoxMeta m) => { return b.n; };
+        Error(string e) => { return -1; };
+    };
+    return -2;
+}
+
+def boxed_value(string text) : int {
+    int n = match (Json.parse(Box, text)) {
+        Success(Box b, BoxMeta m) => {
+            if (b.n == 0) { return 100; }
+            yield b.n;
+        };
+        Error(string e) => { return -1; };
+    };
+    return n * 2;
+}
+
+def returned_match(int k) : int {
+    return match (k) {
+        1 => { return 5; };
+        else => k;
+    };
+}
+
+test "a value returned from an arm in a statement match" {
+    expect(statement_return(1) == 10);
+    expect(statement_return(2) == 20);
+    expect(statement_return(3) == 30);
+}
+
+test "a value returned from an arm in a match that gives a value" {
+    expect(value_return(1) == 10);
+    expect(value_return(2) == 6);
+    expect(value_return(7) == 15);
+    expect(value_return(200) == 99);
+    expect(returned_match(1) == 5);
+    expect(returned_match(4) == 4);
+}
+
+test "a bare return skips what comes after the match" {
+    mut string trail = "";
+    bare_return(0, &trail);
+    expect(trail == "zero");
+    bare_return(1, &trail);
+    expect(trail == "other after");
+}
+
+test "return from a nested match" {
+    expect(nested(1, 1) == "one one");
+    expect(nested(1, 2) == "one inner else");
+    expect(nested(2, 1) == "none");
+    expect(nested_value(1, 1) == 11);
+    expect(nested_value(1, 2) == 12);
+    expect(nested_value(2, 2) == 0);
+}
+
+test "return from a match in a loop" {
+    expect(first_big([1, 4, 12, 30]) == 12);
+    expect(first_big([1, 2]) == -1);
+}
+
+test "break and continue in an arm act on the loop" {
+    expect(sum_until_zero([1, 5, 2, 0, 9]) == 3);
+    expect(sum_values([1, 5, 2, 0, 9]) == 30);
+    expect(loop_in_arm([1, 2, 3, 4]) == 2);
+    expect(loop_in_arm([]) == -1);
+}
+
+test "a pod, a string and an array as the value" {
+    expect(point_of(0).x == -1);
+    expect(point_of(3).y == 6);
+    expect(label(Kind::Small) == "small.");
+    expect(label(Kind::Big) == "big.");
+    expect(label(Kind::Bad) == "bad!");
+    expect(list_of(0).size() == 0);
+    expect(list_of(4) == [4, 5]);
+}
+
+test "Json.parse arms with bindings" {
+    expect(boxed(`{"n":7}`) == 7);
+    expect(boxed("nope") == -1);
+    expect(boxed_value(`{"n":7}`) == 14);
+    expect(boxed_value(`{"n":0}`) == 100);
+    expect(boxed_value("nope") == -1);
+}

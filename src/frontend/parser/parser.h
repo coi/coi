@@ -29,7 +29,6 @@ class Parser{
         size_t find_view_tag_close();
         bool allow_gt_comparison = true;  // When false, > is not treated as comparison op
         bool allow_brace_init = true;     // When false, Name{ is not treated as data literal
-        int match_arms = 0;               // inside a match arm's block: return would leave only the arm
         
         // Maps member variable names to their component types (for detecting <memberName/> in views)
         std::map<std::string, std::string> component_member_types;
