@@ -404,7 +404,7 @@ Numbers: constants, the usual functions, and random numbers. Everything takes an
 | `Math.sin(x)`, `Math.cos(x)`, `Math.tan(x)`, `Math.asin(x)`, `Math.acos(x)`, `Math.atan(x)`, `Math.atan2(y, x)` | Trigonometry, in radians |
 | `Math.floor(x)`, `Math.ceil(x)`, `Math.round(x)`, `Math.trunc(x)` | Rounding |
 | `Math.min(a, b)`, `Math.max(a, b)`, `Math.clamp(v, lo, hi)`, `Math.lerp(a, b, t)` | Utility |
-| `Math.random()` | Random float in [0.0, 1.0) |
+| `Math.random()` | Random float in [0.0, 1.0); other numbers on every load of the page (a `coi test` run repeats) |
 | `Math.random(int seed)` | Seeded random (for reproducibility) |
 
 ```coi

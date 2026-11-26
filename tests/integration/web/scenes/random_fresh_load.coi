@@ -1,0 +1,7 @@
+// Math.random() draws other numbers on every load of the page: its first three, shown
+component App {
+    mut string drawn = "";
+    mount { drawn = `${Math.random()} ${Math.random()} ${Math.random()}`; }
+    view { <p class="drawn">{drawn}</p> }
+}
+app { root = App; }
