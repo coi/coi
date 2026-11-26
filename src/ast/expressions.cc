@@ -1388,6 +1388,9 @@ std::string MatchExpr::to_webcc() {
     code += arm_chain(arms, [](const MatchArm& arm) {
         return "            return " + arm.body->to_webcc() + ";\n";
     });
+    // every case is an arm, so the end is never reached
+    if (!result_type.empty() && std::none_of(arms.begin(), arms.end(), [](const MatchArm& a) { return a.pattern.kind == MatchPattern::Kind::Else; }))
+        code += "        __builtin_trap();\n";
     code += "    }()";
     return code;
 }

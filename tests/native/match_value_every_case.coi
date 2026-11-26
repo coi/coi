@@ -1,0 +1,30 @@
+// a match that gives a value with an arm for every case and no else
+module MatchValueEveryCase;
+
+pod Box { int n; }
+enum Kind { Small, Big }
+
+def parsed(string text) : int {
+    return match (Json.parse(Box, text)) {
+        Success(Box b, BoxMeta m) => b.n;
+        Error(string e) => -1;
+    };
+}
+
+def size(Kind k) : int {
+    int n = match (k) {
+        Kind::Small => 1;
+        Kind::Big => 2;
+    };
+    return n;
+}
+
+test "a variant's arms give the value" {
+    expect(parsed(`{"n":7}`) == 7);
+    expect(parsed("nope") == -1);
+}
+
+test "an enum's arms give the value" {
+    expect(size(Kind::Small) == 1);
+    expect(size(Kind::Big) == 2);
+}
